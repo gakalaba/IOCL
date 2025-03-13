@@ -104,6 +104,7 @@ namespace strongstore
                                 const std::string &type, const std::string &data,
                                 void *meta_data)
     {
+        Debug("Inside strongstore server ReceiveMessage!");
         if (type == get_.GetTypeName())
         {
             get_.ParseFromString(data);
@@ -817,7 +818,7 @@ namespace strongstore
     {
         ASSERT(status == REPLY_OK);
 
-        // Debug("[%lu] COMMIT callback: %d", transaction_id, status);
+        Debug("[%lu] COMMIT callback: %d", transaction_id, status);
     }
 
     void Server::SendRWCommmitParticipantReplyOK(uint64_t transaction_id)
@@ -1555,7 +1556,7 @@ namespace strongstore
     void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                               string &response)
     {
-        // Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
+        Debug("Received LeaderUpcall in strongstore server: %lu %s", opnum, op.c_str());
 
         Request request;
 
@@ -1582,7 +1583,7 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        // Debug("Received Upcall: %lu %s", opnum, op.c_str());
+        Debug("Received Upcall: %lu %s", opnum, op.c_str());
         Request request;
         Reply reply;
 

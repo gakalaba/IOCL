@@ -45,6 +45,7 @@ namespace strongstore
           pendingCommits{},
           lastReqId{0}
     {
+        Debug("making replica client");
         client = new replication::vr::VRClient(config_, transport_, shard_idx_,
                                                client_id_);
     }

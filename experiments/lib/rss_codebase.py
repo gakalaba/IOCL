@@ -177,6 +177,7 @@ class RssCodebase:
                     client_command = 'setenv DEBUG all; %s' % client_command
 
         client_command = '(cd %s; %s) & ' % (exp_directory, client_command)
+        print("CLIENT COMMAND + ", repr(client_command))
         return client_command
 
     def get_replica_cmd(self, config, instance_idx, shard_idx, replica_idx, run, local_exp_directory,

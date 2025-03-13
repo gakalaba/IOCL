@@ -112,6 +112,8 @@ namespace replication
             }
         }
 
+
+	// Destructor
         VRReplica::~VRReplica()
         {
             delete viewChangeTimeout;
@@ -352,6 +354,7 @@ namespace replication
 
         void VRReplica::CloseBatch()
         {
+            Debug("Inside CloseBatch");
             ASSERT(AmLeader());
             ASSERT(lastBatchEnd < lastOp);
 
@@ -475,7 +478,8 @@ namespace replication
                 RDebug("Ignoring request because I'm not the leader");
                 return;
             }
-
+            
+            Debug("Handling Request--I AM the leader");
             // Save the client's address
             clientAddresses.erase(msg.req().clientid());
             clientAddresses.insert(
@@ -557,6 +561,7 @@ namespace replication
                 /* Add the request to my log */
                 log.Append(v, request, LOG_STATE_PREPARED);
 
+                /* Send prepare messages to replicas */
                 if (lastOp - lastBatchEnd + 1 > batchSize)
                 {
                     CloseBatch();

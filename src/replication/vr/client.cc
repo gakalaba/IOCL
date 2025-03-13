@@ -50,6 +50,7 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
+            Debug("VRClient created");
         }
 
         VRClient::~VRClient()
@@ -63,6 +64,7 @@ namespace replication
         void VRClient::Invoke(const string &request, continuation_t continuation,
                               error_continuation_t error_continuation)
         {
+            Debug("VRClient::Invoke invoked");
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
@@ -150,6 +152,7 @@ namespace replication
                                       const string &type, const string &data,
                                       void *meta_data)
         {
+            Debug("VRClient::ReceiveMessage invoked");
             proto::ReplyMessage reply;
             proto::UnloggedReplyMessage unloggedReply;
 

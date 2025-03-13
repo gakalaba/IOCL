@@ -457,6 +457,7 @@ int main(int argc, char **argv)
         std::cerr << "Unknown bench mode." << std::endl;
         return 1;
     }
+    Debug("The bench_mode is %s", bench_mode);
 
     // parse benchmark
     benchmode_t benchMode = BENCH_UNKNOWN;
@@ -474,6 +475,7 @@ int main(int argc, char **argv)
         std::cerr << "Unknown benchmark." << std::endl;
         return 1;
     }
+    Debug("The benchMode is %s", benchMode);
 
     // parse partitioner
     partitioner_t partType = DEFAULT;
@@ -517,8 +519,9 @@ int main(int argc, char **argv)
 
     // parse retwis settings
     std::vector<std::string> keys;
-    if (benchMode == BENCH_RETWIS)
+    switch (benchMode)
     {
+    case BENCH_RETWIS:
         if (FLAGS_keys_path.empty())
         {
             if (FLAGS_num_keys > 0)
@@ -566,6 +569,8 @@ int main(int argc, char **argv)
             }
             in.close();
         }
+    default:
+        NOT_REACHABLE();
     }
 
     switch (trans)
@@ -622,6 +627,7 @@ int main(int argc, char **argv)
         {
             Latency_t sum;
             _Latency_Init(&sum, "total");
+            Debug("The size of benchClients is %lu", benchClients.size());
             for (unsigned int i = 0; i < benchClients.size(); i++)
             {
                 Latency_Sum(&sum, &benchClients[i]->latency);
@@ -683,16 +689,8 @@ int main(int argc, char **argv)
         i++;
     }
 
-    // TODO: Remove this
-    // if (closestReplicas.size() > 0 &&
-    //     closestReplicas.size() != static_cast<size_t>(replica_config.n)) {
-    //     std::cerr << "If specifying closest replicas, must specify all "
-    //               << replica_config.n << "; only specified "
-    //               << closestReplicas.size() << std::endl;
-    //     return 1;
-    // }
-
     const std::size_t n_instances = replica_configs.size();
+    Debug("the size of replica_configs is %lu", n_instances);
     for (std::size_t i = 0; i < n_instances; ++i)
     {
         Client *client = nullptr;
@@ -701,8 +699,12 @@ int main(int argc, char **argv)
         case PROTO_STRONG:
         {
             auto &shard_config = replica_configs[i];
+            Debug("replica_configs[i] is %s", std::format("Value: {}\n", replica_configs[i]));
             auto &net_config = net_configs[i];
+            Debug("net_configs[i] is %s", std::format("Value: {}\n", net_configs[i]));
+
             auto &client_region = client_regions[i];
+            Debug("client_regions[i] is %s", std::format("Value: {}\n", client_regions[i]));
 
             client = new strongstore::Client(
                 consistency, net_config, client_region, shard_config,

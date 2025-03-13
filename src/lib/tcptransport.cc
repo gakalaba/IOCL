@@ -813,6 +813,7 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
                                             short what, void *arg)
 {
+    Debug("TCPIncomingEventCallback being called....");
     if (what & BEV_EVENT_ERROR)
     {
         Warning("Error on incoming TCP connection: %s",
@@ -831,6 +832,7 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
 void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,
                                             short what, void *arg)
 {
+    Debug("TCPOutgoingEventCallback being called....");
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
     // transport->mtx.lock();

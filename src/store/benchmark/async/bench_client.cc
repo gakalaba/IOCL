@@ -94,6 +94,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     n_sessions_started_ = 0;
     n = 0;
     curr_bdcb_ = bdcb;
+    // the next line binds WarmupDone to this, so it's like this->WarmupDone whenever that arg is called
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
