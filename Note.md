@@ -1,9 +1,9 @@
 # Spanner Replication codebase
 
 ## Transport/TCP/Event Loop
-Transport/TCP/Event Loop
+- Transport/TCP/Event Loop
 	- TCPTransport::TCPTransport constructor sets up libevent!!
-		- using <mark style="background: #ADCCFFA6;">event\_base\_new\_with\_config</mark>
+		- using <mark style="background: #ADCCFFA6;">event_base_new_with_config</mark>
 		- all the Timer \* stuff is also implemented in `lib/transport.cc` and `lib/tcptransport.cc`
 	- Register calls TCPAcceptCallback in `lib/tcptransport.cc`
 	- ConnectTCP **and** TCPAcceptCallback set TCPReadableCallback as the readcb in `lib/tcptransport.cc` as well as TCPOutgoingEventCallback **and** TCPIncomingEventCallback, respectively
@@ -99,10 +99,8 @@ Transport/TCP/Event Loop
 		- takes in Client \* (clients), the shard clients
 	- tport->Timer(0, \[bench, bdcb\]\(\){ bench->Start(bdcb); });
 		- Timer(uint64_t ms, timer_callback_t cb)
-			- which is also ```c++
-typedef std::function<void()> timer_callback_t;
-```
-			- this function just moves the callback ```(via std::move(cb))``` to an "info" struct where it's **added to the eventloop**
+			- which is also typedef std::function<void()> timer_callback_t;
+			- this function just moves the callback (via std::move(cb)) to an "info" struct where it's **added to the eventloop**
 		- in the retwis file, Start() is the starting point!!
 			- which inherits from bench_client!
 	- benchClients.push_back(bench);
