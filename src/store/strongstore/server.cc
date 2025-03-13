@@ -714,7 +714,7 @@ namespace strongstore
         }
         else if (s == ABORTED)
         { // Already aborted
-            // Debug("[%lu] Already aborted", transaction_id);
+          // Debug("[%lu] Already aborted", transaction_id);
         }
         else
         {
@@ -1041,7 +1041,7 @@ namespace strongstore
         }
         else if (s == ABORTED)
         { // Already aborted
-            // Debug("[%lu] Already aborted", transaction_id);
+          // Debug("[%lu] Already aborted", transaction_id);
         }
         else
         {

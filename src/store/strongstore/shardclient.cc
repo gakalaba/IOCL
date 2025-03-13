@@ -57,6 +57,7 @@ namespace strongstore
                                      const std::string &type,
                                      const std::string &data, void *meta_data)
     {
+        Debug("Got message wahoo");
         if (type == get_reply_.GetTypeName())
         {
             get_reply_.ParseFromString(data);
