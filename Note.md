@@ -110,7 +110,7 @@
 		- **starts event loop**
 		- starts transport layer, gets client connections up and running
 
-## Transaction Client/Client of Spanner/Client in Experiments
+## Spanner Client (transaction client from Experiments)
 - Client inside of `src/store/benchmark/async/bench_client.cc`
 	- lambdas
 		- `bench_client.h` defines a bench_done_callback type and execute_callback type, *both* std::function\<void()\> types (lambdas)
