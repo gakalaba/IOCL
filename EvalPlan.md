@@ -18,7 +18,7 @@ for Ellis/Multi-Paxos shown in ms above each bar
         - Should we keep the bar as a normalized figure or change it to absolute values?
             - this might not showcase constant time nature of Ellis-CT and 1BT
 
-![image](https://hackmd.io/_uploads/B1puopxhkl.png)
+![image](mockfig6.jpg)
 
 
 ## Latency in wide area
