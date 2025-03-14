@@ -457,7 +457,7 @@ int main(int argc, char **argv)
         std::cerr << "Unknown bench mode." << std::endl;
         return 1;
     }
-    Debug("The bench_mode is %s", bench_mode);
+    Debug("The bench_mode is %d", bench_mode);
 
     // parse benchmark
     benchmode_t benchMode = BENCH_UNKNOWN;
@@ -475,7 +475,7 @@ int main(int argc, char **argv)
         std::cerr << "Unknown benchmark." << std::endl;
         return 1;
     }
-    Debug("The benchMode is %s", benchMode);
+    Debug("The benchMode is %d", benchMode);
 
     // parse partitioner
     partitioner_t partType = DEFAULT;
@@ -519,6 +519,8 @@ int main(int argc, char **argv)
 
     // parse retwis settings
     std::vector<std::string> keys;
+    Debug("benchMode = %d", benchMode);
+    Debug("BENCH_RETWIS = %d", BENCH_RETWIS);
     switch (benchMode)
     {
     case BENCH_RETWIS:
@@ -569,6 +571,7 @@ int main(int argc, char **argv)
             }
             in.close();
         }
+        break;
     default:
         NOT_REACHABLE();
     }
@@ -699,12 +702,16 @@ int main(int argc, char **argv)
         case PROTO_STRONG:
         {
             auto &shard_config = replica_configs[i];
-            Debug("replica_configs[i] is %s", std::format("Value: {}\n", replica_configs[i]));
+            Debug("replica_configs[i] is ");
+            std::cerr << replica_configs[i].g << " " << replica_configs[i].n << " " << replica_configs[i].replicaHost(0,0) << std::endl;
+
             auto &net_config = net_configs[i];
-            Debug("net_configs[i] is %s", std::format("Value: {}\n", net_configs[i]));
+            Debug("net_configs[i] is ");
+            std::cerr << net_configs[i].GetRegion(0,0) << std::endl;
 
             auto &client_region = client_regions[i];
-            Debug("client_regions[i] is %s", std::format("Value: {}\n", client_regions[i]));
+            Debug("client_regions[i] is ");
+            std::cerr << client_regions[i] << std::endl;
 
             client = new strongstore::Client(
                 consistency, net_config, client_region, shard_config,
