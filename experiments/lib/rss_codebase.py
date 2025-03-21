@@ -395,6 +395,7 @@ class RssCodebase:
                 else:
                     replica_command = 'setenv DEBUG all; %s' % replica_command
         replica_command = 'cd %s; %s' % (exp_directory, replica_command)
+        print("&*&*&*&*&*&*&*&*&*&*&*&*&*&*&*&*&*REPLICA COMMAND = ", replica_command)
         return replica_command
 
     def prepare_local_exp_directory(self, config, config_file):
