@@ -30,12 +30,24 @@
 	-  HandleRequest in `replication/vr/replica.cc`
 		- if not leader --> ignore
 		- if leader --> LeaderUpcall
-			- ---> calls LeaderUpcall in `replication/common/replica.cc`
+			- ---> invokes LeaderUpcall in `replication/common/replica.cc`
 				- ---> calls app->LeaderUpcall
+				- `store/server.cc`, the app is instantiated as the strongstore server (new replication::vr::VRReplica takes in dynamically cast server object), hence why in `strongstore/server.cc` there's an implementation for LeaderUpcall. It doesn't really do much in this case, just handles an abort message that's replicated.
+				- ---> calls CloseBatch which actually issues the Prepare message to replicate. this means it only replicates when the batch timeout goes off/batchsize is reached
 	- Commit and reply to client in `replication/vr/replica.cc`
 		- Currently Commit to quorum is NOT piggybacked on the next PREPARE
 		- SendMessage(client, reply) from `lib/transportcommon.h`
 			- ---> which calls SendMessageInternal with replication.vr.proto.ReplyMessage
+	- HandleCommit (replicas) and HandlePrepareOK at quorum (leaders)
+		- ---> invoke CommitUpTo
+			- ---> invokes Execute which is defined in `replication/common/replica-inl.h`
+				- ---> invokes ReplicaUpcall in `replication/common/replica.cc`
+					- ---> invokes app->ReplicaUpcall
+					- just like LeaderUpcall, this calls the ReplicaUpcall function implemented in `strongstore/server.c`
+						- **It actually does do much. This is where all put() operations from the key value store are called, hence why the upstream call is Execute.** The kvstore app in this case isn't implemented at the replication layer, but rather at the transaction layer. and the replication layer just logs all the operations, but doesn't contain any execution logic itself.
+						- Importantly, no gets() are called from the ReplicaUpcall fn, cuz gets() aren't executed by the replication layer. they're immediately executed/handled when they arrive at the spanner server. and presumably the operation is then later logged.
+						- puts() and gets() are implemented in `src/store/common/backend`. there's a variety of `kvstore` and `versionstore` and `store` etc.
+						- the strongstore server implements a versioned kvstore
 ## VR Client library
 - VR Client library
 	- all inside of `replication/vr/client.cc`
@@ -49,17 +61,18 @@
 
 ## Spanner Txn Protocol
 - Server constructor in `src/store/strongstore/server.cc`
-	- ---> replica_client_ = ReplicaClient constructor
+	- ---> replica\_client\_ = ReplicaClient constructor
 		- ---> client = VRClient constructor
+		- the strongstore server implements a versioned kvstore
 - ReceiveMessage is the only publically exposed function in `store/strongstore/server.h`
 	- giant select statement
 	- t just cases on the message type in a giant select (Get, RWCommitCoordinator, RWCommitParticipant, PrepareOK, PrepareAbort, ROCommit, Abort, Wound, PingMessage) and calls the proper handler for that
 - HandleRWCommitParticipant in `store/strongstore/server.cc`
-	- ---> invokes replica_client_->Prepare in `store/strongstore/replicaclient.cc`
+	- ---> invokes replica\_client\_->Prepare in `store/strongstore/replicaclient.cc`
 		- ---> invokes client-->Invoke in `replication/vr/client.cc`
 	- *not seeing this function in the logs rn!*
 - HandlePrepareOK
-	- --->invokes replica_client_->CoordinatorCommit
+	- --->invokes replica\_client\_->CoordinatorCommit
 		- ---> invokes client->Invoke
 - QUESTION: where does the receiving of stuff happen?
 
@@ -69,15 +82,15 @@
 	- ---> invokes new Server constructor
 	- ---> invokes new VRReplica constructor
 - test runs at tport->Run(); from `lib/tcptransport.cc`
-	- ---> invokes <mark style="background: #ADCCFFA6;">event_base_dispatch</mark> which "starts the event loop"
+	- ---> invokes <mark style="background: #ADCCFFA6;">event\_base\_dispatch</mark> which "starts the event loop"
 		- It runs an event loop that waits for events to occur and then dispatches them to their corresponding callback functions. 
 		- The function blocks until there are no more registered events or until <mark style="background: #ADCCFFA6;">event_base_loopbreak</mark> or `event_base_loopexit()` is called.
 - Test stops by binding Cleanup function to SIGTERM (etc) signals 
 	- ---> invokes  tport->Stop
 		- ---> invokes <mark style="background: #ADCCFFA6;">event_base_loopbreak</mark>
 - Client starts at `store/benchmark/async/benchmark.cc`
-	- all the flags that get passed in from the command line as formatted in `experiments/lib/rss_codebase.py` can be found in this file as FLAGS_xxx. cuz gflags parses them and reads them in and stores them that way.
-	- bench_mode = OPEN or CLOSED
+	- all the flags that get passed in from the command line as formatted in `experiments/lib/rss_codebase.py` can be found in this file as FLAGS\_xxx. cuz gflags parses them and reads them in and stores them that way.
+	- bench\_mode = OPEN or CLOSED
 		- <mark style="background: #FFB86CA6;">const bench_args = {"open", "closed"}</mark>
 	- BenchmarkClientMode 
 		- <mark style="background: #FFB86CA6;">const bench_modes = {OPEN, CLOSED}</mark>
@@ -89,7 +102,7 @@
 		- the clients are strongstore::Clients found in `src/store/strongstore/client.cc`
 			- starts a client for each shard
 			- *these* clients are passed into the retwis::RetwisClient (bench)!!
-	- defines bench_done_callback bdcb = \[\&a, \&b, \&c\](){...code...}
+	- defines bench\_done\_callback bdcb = \[\&a, \&b, \&c\](){...code...}
 			- a, b, c are variables "captured by reference", so the lambda can modify these
 			- () means it takes in no parameters
 			- {} is the body
@@ -103,7 +116,7 @@
 			- this function just moves the callback (via std::move(cb)) to an "info" struct where it's **added to the eventloop**
 		- in the retwis file, Start() is the starting point!!
 			- which inherits from bench_client!
-	- benchClients.push_back(bench);
+	- benchClients.push\_back(bench);
 		- this file is run for each client process... so the vector list has as many processes
 		- need to pushback here for bdcb so it can sum up stats across all of them
 	- tport->Run();
@@ -137,7 +150,7 @@
 						- ---> invokes shardclient->RWCommitCoordinator to coordinator in `strongstore/shardclient.cc`
 						- ---> invokes shardclient->RWCommitParticipant ""
 - OnReply records the latency!!!
-	- print GetTransactionType which prints out ttype_ which is instantiated when the transaction is initialized as a RetwisTransaction type
+	- print GetTransactionType which prints out ttype\_ which is instantiated when the transaction is initialized as a RetwisTransaction type
 - `strongstore/client.cc`
 	- session management
 - only thing special about retwis client is it specifically defines GetNextTransaction!
