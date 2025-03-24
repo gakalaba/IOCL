@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "store/benchmark/async/bench_client_iocl.h"
+#include "store/benchmark/async/bench_client.h"
 #include "store/benchmark/async/common/key_selector.h"
 #include "store/benchmark/async/micro/app_request.h"
 #include "store/common/frontend/client.h"
@@ -46,11 +46,12 @@ namespace micro
         ZIPF
     };
 
-    class MicroClient : public BenchmarkClientIOCL
+    class MicroClient : public BenchmarkClient
     {
     public:
         MicroClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
                     Transport &transport, uint64_t id,
+                    BenchmarkClientMode mode,
                     double switch_probability,
                     double arrival_rate, double think_time, double stay_probability,
                     int mpl,
@@ -63,6 +64,7 @@ namespace micro
 
     protected:
         virtual AsyncAppRequest *GetNextAppRequest() override;
+        virtual AsyncTransaction *GetNextTransaction() override;
 
     private:
         KeySelector *keySelector;

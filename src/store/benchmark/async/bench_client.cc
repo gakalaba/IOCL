@@ -51,6 +51,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  int expDuration, int warmupSec, int cooldownSec,
                                  uint32_t abortBackoff, bool retryAborted,
                                  uint32_t maxBackoff, uint32_t maxAttempts,
+                                 uint64_t fanout,
                                  const std::string &latencyFilename)
     : transport_(transport),
       session_states_{},
@@ -74,7 +75,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       started{false},
       done{false},
       cooldownStarted{false},
-      mode_{mode}
+      mode_{mode},
+      fanout{fanout}
 {
     if (arrival_rate <= 0)
     {

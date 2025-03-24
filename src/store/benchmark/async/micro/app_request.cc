@@ -32,8 +32,15 @@
 namespace micro
 {
 
-    BasicAppRequest::BasicAppRequest(KeySelector *keySelector, std::mt19937 &rand)
-        : AsyncAppRequest(keySelector, 1 + rand() % 10, rand, "get_timeline") {}
+    BasicAppRequest::BasicAppRequest(KeySelector *keySelector, int numKeys, std::mt19937 &rand)
+        : AsyncAppRequest(),
+          keySelector(keySelector)
+    {
+        for (int i = 0; i < numKeys; ++i)
+        {
+            keyIdxs.push_back(keySelector->GetKey(rand));
+        }
+    }
 
     BasicAppRequest::~BasicAppRequest()
     {
@@ -44,7 +51,7 @@ namespace micro
         Debug("BASIC_APP_REQUEST %lu %lu", GetNumKeys(), op_index);
 
         // TODO: generate a random operation type according to zipfian!
-        return PUT("key", "value");
+        return Put("key", "value");
     }
 
 } // namespace micro

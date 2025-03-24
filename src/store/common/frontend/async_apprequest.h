@@ -33,9 +33,9 @@
 #include <string>
 
 #include "store/common/frontend/client.h"
-#include "store/common/frontend/operation_utils.h"
+#include "store/common/frontend/transaction_utils.h"
 
-struct StringPointerComp
+struct StringPointerCompAppReq
 {
     bool operator()(const std::string *a, const std::string *b) const
     {
@@ -43,8 +43,8 @@ struct StringPointerComp
     }
 };
 
-typedef std::map<const std::string *, const std::string *, StringPointerComp>
-    ReadValueMap;
+typedef std::map<const std::string *, const std::string *, StringPointerCompAppReq>
+    ReadValueMapAppReq;
 
 class AsyncAppRequest
 {
@@ -52,7 +52,6 @@ public:
     AsyncAppRequest() {}
     virtual ~AsyncAppRequest() {}
 
-    // Unique to async operation, NOT in operation_utils.h
     virtual Operation GetNextOperation(std::size_t op_index) = 0;
 };
 

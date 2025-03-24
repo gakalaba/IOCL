@@ -63,6 +63,7 @@ namespace retwis
 
     protected:
         virtual AsyncTransaction *GetNextTransaction() override;
+        virtual AsyncAppRequest *GetNextAppRequest() override;
 
     private:
         KeySelector *keySelector;

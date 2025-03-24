@@ -26,6 +26,7 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/micro/micro_client.h"
+#include "store/benchmark/async/retwis/add_user.h"
 
 #include <iostream>
 
@@ -36,18 +37,20 @@ namespace micro
 
     MicroClient::MicroClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
                              Transport &transport, uint64_t id,
+                             BenchmarkClientMode mode,
                              double switch_probability,
                              double arrival_rate, double think_time, double stay_probability,
                              int mpl,
                              int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
-                             bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, const std::string &latencyFilename,
-                             uint64_t fanout)
-        : BenchmarkClientIOCL(clients, timeout, transport, id,
-                              switch_probability,
-                              arrival_rate, think_time, stay_probability,
-                              mpl,
-                              expDuration, warmupSec, cooldownSec, abortBackoff,
-                              retryAborted, maxBackoff, maxAttempts, latencyFilename, fanout),
+                             bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, uint64_t fanout,
+                             const std::string &latencyFilename)
+        : BenchmarkClient(clients, timeout, transport, id,
+                          mode,
+                          switch_probability,
+                          arrival_rate, think_time, stay_probability,
+                          mpl,
+                          expDuration, warmupSec, cooldownSec, abortBackoff,
+                          retryAborted, maxBackoff, maxAttempts, fanout, latencyFilename),
           keySelector(keySelector)
     {
     }
@@ -58,7 +61,13 @@ namespace micro
 
     AsyncAppRequest *MicroClient::GetNextAppRequest()
     {
-        return new BasicAppRequest(keySelector, GetRand());
+        return new BasicAppRequest(keySelector, 5, GetRand());
+    }
+
+    AsyncTransaction *MicroClient::GetNextTransaction()
+    {
+        // FILLER, never used
+        return new retwis::AddUser(keySelector, GetRand());
     }
 
 } // namespace micro

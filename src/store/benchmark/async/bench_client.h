@@ -38,6 +38,7 @@
 #include "lib/message.h"
 #include "lib/transport.h"
 #include "store/common/frontend/async_transaction.h"
+#include "store/common/frontend/async_apprequest.h"
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
@@ -65,6 +66,7 @@ public:
                     int expDuration, int warmupSec, int cooldownSec,
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
+                    uint64_t fanout,
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
@@ -83,6 +85,7 @@ public:
 
 protected:
     virtual AsyncTransaction *GetNextTransaction() = 0;
+    virtual AsyncAppRequest *GetNextAppRequest() = 0;
 
     inline std::mt19937 &GetRand() { return rand_; }
 
@@ -207,6 +210,9 @@ private:
     bool cooldownStarted;
 
     BenchmarkClientMode mode_;
+
+    // IOCL stuff
+    uint64_t fanout;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

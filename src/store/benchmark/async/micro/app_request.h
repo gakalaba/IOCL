@@ -39,11 +39,18 @@ namespace micro
     class BasicAppRequest : public AsyncAppRequest
     {
     public:
-        BasicAppRequest(KeySelector *keySelector, std::mt19937 &rand);
+        BasicAppRequest(KeySelector *keySelector, int numKeys, std::mt19937 &rand);
         virtual ~BasicAppRequest();
 
     protected:
         Operation GetNextOperation(std::size_t op_index) override;
+
+        inline size_t GetNumKeys() const { return keyIdxs.size(); };
+
+        KeySelector *keySelector;
+
+    private:
+        std::vector<int> keyIdxs;
     };
 
 } // namespace micro

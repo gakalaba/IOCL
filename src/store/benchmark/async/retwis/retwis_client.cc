@@ -33,6 +33,7 @@
 #include "store/benchmark/async/retwis/follow.h"
 #include "store/benchmark/async/retwis/get_timeline.h"
 #include "store/benchmark/async/retwis/post_tweet.h"
+#include "store/benchmark/async/micro/app_request.h"
 
 namespace retwis
 {
@@ -51,7 +52,7 @@ namespace retwis
                           arrival_rate, think_time, stay_probability,
                           mpl,
                           expDuration, warmupSec, cooldownSec, abortBackoff,
-                          retryAborted, maxBackoff, maxAttempts, latencyFilename),
+                          retryAborted, maxBackoff, maxAttempts, 0, latencyFilename),
           keySelector(keySelector)
     {
     }
@@ -83,6 +84,11 @@ namespace retwis
             lastOp = "get_timeline";
             return new GetTimeline(keySelector, GetRand());
         }
+    }
+
+    AsyncAppRequest *RetwisClient::GetNextAppRequest()
+    {
+        return new micro::BasicAppRequest(keySelector, 0, GetRand());
     }
 
 } // namespace retwis
