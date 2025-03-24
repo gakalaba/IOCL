@@ -7,8 +7,8 @@ from utils.experiment_util import *
 from utils.remote_util import *
 
 
-class RssCodebase:
-
+class IOCLCodebase:
+#TODO:: add in the flag for replication protocol that both the clients and servers will use to spawn proper rep. client (VRClient or IOCLclient)
     def get_client_cmd(self, config, i, k, run, local_exp_directory,
                        remote_exp_directory):
 
