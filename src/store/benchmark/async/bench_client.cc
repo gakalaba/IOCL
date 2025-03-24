@@ -38,7 +38,7 @@
 #include "lib/message.h"
 #include "lib/timeval.h"
 #include "lib/transport.h"
-#include "store/strongstore/client.h"
+#include "store/strongstore/iocl_client.h"
 
 DEFINE_LATENCY(op);
 

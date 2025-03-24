@@ -45,10 +45,13 @@
 #include "store/benchmark/async/common/uniform_key_selector.h"
 #include "store/benchmark/async/common/zipf_key_selector.h"
 #include "store/benchmark/async/retwis/retwis_client.h"
+#include "store/benchmark/async/micro/micro_client.h"
 #include "store/common/partitioner.h"
 #include "store/common/stats.h"
 #include "store/common/truetime.h"
 #include "store/strongstore/client.h"
+#include "store/strongstore/iocl_client.h"
+
 #include "store/strongstore/networkconfig.h"
 
 enum protomode_t
@@ -61,6 +64,7 @@ enum benchmode_t
 {
     BENCH_UNKNOWN,
     BENCH_RETWIS,
+    BENCH_MICRO,
 };
 
 enum keysmode_t
@@ -161,8 +165,8 @@ DEFINE_validator(strong_consistency, &ValidateStrongConsistency);
 
 DEFINE_double(nb_time_alpha, 1.0, "multiple for non-block time estimates.");
 
-const std::string benchmark_args[] = {"retwis"};
-const benchmode_t benchmodes[]{BENCH_RETWIS};
+const std::string benchmark_args[] = {"retwis", "micro"};
+const benchmode_t benchmodes[]{BENCH_RETWIS, BENCH_MICRO};
 static bool ValidateBenchmark(const char *flagname, const std::string &value)
 {
     int n = sizeof(benchmark_args);
@@ -703,17 +707,17 @@ int main(int argc, char **argv)
         {
             auto &shard_config = replica_configs[i];
             Debug("replica_configs[i] is ");
-            std::cerr << replica_configs[i].g << " " << replica_configs[i].n << " " << replica_configs[i].replicaHost(0,0) << std::endl;
+            std::cerr << replica_configs[i].g << " " << replica_configs[i].n << " " << replica_configs[i].replicaHost(0, 0) << std::endl;
 
             auto &net_config = net_configs[i];
             Debug("net_configs[i] is ");
-            std::cerr << net_configs[i].GetRegion(0,0) << std::endl;
+            std::cerr << net_configs[i].GetRegion(0, 0) << std::endl;
 
             auto &client_region = client_regions[i];
             Debug("client_regions[i] is ");
             std::cerr << client_regions[i] << std::endl;
 
-            client = new strongstore::Client(
+            client = new strongstore::IOCLClient(
                 consistency, net_config, client_region, shard_config,
                 FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
                 tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha);
@@ -725,14 +729,7 @@ int main(int argc, char **argv)
 
         ASSERT(client != nullptr);
         clients.push_back(client);
-    }
-
-    switch (benchMode)
-    {
-    case BENCH_RETWIS:
-        break;
-    default:
-        NOT_REACHABLE();
+        Debug("The length of the strongstore clients list is %lu", clients.size());
     }
 
     uint32_t seed = FLAGS_client_id << 4;
@@ -751,6 +748,19 @@ int main(int argc, char **argv)
             FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
             FLAGS_max_attempts);
         break;
+    case BENCH_MICRO:
+        bench = new micro::MicroClient(
+            keySelector, clients, FLAGS_message_timeout, *tport, seed,
+            FLAGS_client_switch_probability,
+            FLAGS_client_arrival_rate, FLAGS_client_think_time, FLAGS_client_stay_probability,
+            FLAGS_mpl,
+            FLAGS_exp_duration, FLAGS_warmup_secs, FLAGS_cooldown_secs,
+            FLAGS_tput_interval,
+            FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
+            FLAGS_max_attempts,
+            static_cast<uint64_t>(8));
+        // TODO make this last parameter FLAGS_fanout
+        break;
     default:
         NOT_REACHABLE();
     }
@@ -761,12 +771,17 @@ int main(int argc, char **argv)
         tport->Timer(0, [bench, bdcb]()
                      { bench->Start(bdcb); });
         break;
+    case BENCH_MICRO:
+        tport->Timer(0, [bench, bdcb]()
+                     { bench->Start(bdcb); });
+        break;
     case BENCH_UNKNOWN:
     default:
         NOT_REACHABLE();
     }
 
     benchClients.push_back(bench);
+    Debug("The length of the benchmark (in this case retwis) benchClients is %lu", benchClients.size());
 
     if (threads.size() > 0)
     {

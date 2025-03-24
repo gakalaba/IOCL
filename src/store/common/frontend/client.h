@@ -25,15 +25,17 @@
 #include "store/common/stats.h"
 #include "store/common/timestamp.h"
 
-enum transaction_status_t {
+enum transaction_status_t
+{
     COMMITTED = 0,
     ABORTED_USER,
     ABORTED_SYSTEM,
     ABORTED_MAX_RETRIES
 };
 
-class Session : public rss::Session {
-   public:
+class Session : public rss::Session
+{
+public:
     Session() : rss::Session() {}
     Session(rss::Session &&session) : rss::Session(std::move(session)) {}
     Session(Session &&other) : rss::Session(std::move(other)) {}
@@ -56,8 +58,9 @@ typedef std::function<void()> commit_timeout_callback;
 typedef std::function<void()> abort_callback;
 typedef std::function<void()> abort_timeout_callback;
 
-class Client {
-   public:
+class Client
+{
+public:
     Client() { _Latency_Init(&clientLat, "client_lat"); }
     virtual ~Client() {}
 
@@ -65,7 +68,7 @@ class Client {
     virtual Session &ContinueSession(rss::Session &session) = 0;
     virtual rss::Session EndSession(Session &session) = 0;
 
-    virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
+    virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout);
 
     virtual void Retry(Session &session, begin_callback bcb,
                        begin_timeout_callback btcb, uint32_t timeout) = 0;
@@ -77,7 +80,7 @@ class Client {
     // Get the value corresponding to key.
     // Provide hint that transaction will later write the key.
     virtual void GetForUpdate(Session &session, const std::string &key, get_callback gcb,
-                              get_timeout_callback gtcb, uint32_t timeout) = 0;
+                              get_timeout_callback gtcb, uint32_t timeout);
 
     // Set the value for the given key.
     virtual void Put(Session &session, const std::string &key, const std::string &value,
@@ -85,25 +88,25 @@ class Client {
 
     // Commit all Get(s) and Put(s) since Begin().
     virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
-                        uint32_t timeout) = 0;
+                        uint32_t timeout);
 
     // Abort all Get(s) and Put(s) since Begin().
     virtual void Abort(Session &session, abort_callback acb, abort_timeout_callback atcb,
-                       uint32_t timeout) = 0;
+                       uint32_t timeout);
 
     virtual void ROCommit(Session &session, const std::unordered_set<std::string> &keys,
-                          commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout) = 0;
+                          commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout);
 
-    virtual void ForceAbort(const uint64_t transaction_id) = 0;
+    virtual void ForceAbort(const uint64_t transaction_id);
 
     inline Stats &GetStats() { return stats; }
 
-   protected:
+protected:
     void StartRecLatency();
     void EndRecLatency(const std::string &str);
     Stats stats;
 
-   private:
+private:
     Latency_t clientLat;
 };
 
