@@ -68,11 +68,11 @@ public:
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
-    virtual void Start(bench_done_callback bdcb);
+    void Start(bench_done_callback bdcb);
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
     void SendNext();
-    virtual void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
+    void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
     inline bool IsFullyDone() { return done; }
 
@@ -82,7 +82,7 @@ public:
     inline const Stats &GetStats() const { return stats; }
 
 protected:
-    virtual AsyncTransaction *GetNextTransaction();
+    virtual AsyncTransaction *GetNextTransaction() = 0;
 
     inline std::mt19937 &GetRand() { return rand_; }
 
@@ -100,7 +100,6 @@ protected:
     Transport &transport_;
 
 private:
-    friend class BenchmarkClientIOCL;
     class SessionState
     {
     public:

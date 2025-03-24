@@ -38,7 +38,7 @@
 #include "lib/message.h"
 #include "lib/timeval.h"
 #include "lib/transport.h"
-#include "store/strongstore/iocl_client.h"
+#include "store/strongstore/client.h"
 
 DEFINE_LATENCY(op);
 
@@ -94,14 +94,12 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     n_sessions_started_ = 0;
     n = 0;
     curr_bdcb_ = bdcb;
-    // the next line binds WarmupDone to this, so it's like this->WarmupDone whenever that arg is called
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
     transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNext, this));
 }
 
-// Send next app level request
 void BenchmarkClient::SendNext()
 {
     Debug("[%lu] SendNext", n_sessions_started_);
@@ -116,8 +114,6 @@ void BenchmarkClient::SendNext()
     Debug("session id: %lu", sid);
 
     auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
-    // RETWIS SPECIFIC ... this could also be where we do our thing
-    // GetNextTransaction returns the app level request which it selects based on workload
     auto transaction = GetNextTransaction();
     stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
@@ -162,7 +158,7 @@ void BenchmarkClient::SendNext()
 
         if (send_next)
         {
-            Debug("next app request arrival in %lu us; aka being put on event loop", next_arrival_us);
+            Debug("next arrival in %lu us", next_arrival_us);
             transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNext, this));
         }
     }
