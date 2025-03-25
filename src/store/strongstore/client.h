@@ -106,6 +106,7 @@ namespace strongstore
             GETTING,
             PUTTING,
             COMMITTING,
+            ENDING,
             NEEDS_ABORT,
             ABORTING
         };
@@ -136,6 +137,7 @@ namespace strongstore
         }
 
         void set_committing() { state_ = COMMITTING; }
+        void set_ending() { state_ = ENDING; }
         void set_needs_abort() { state_ = NEEDS_ABORT; }
         void set_aborting() { state_ = ABORTING; }
 
@@ -199,6 +201,9 @@ namespace strongstore
         // Begin a transaction
         virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
+        // For IOCL
+        virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout);
+
         // Begin a retried transaction.
         virtual void Retry(Session &session, begin_callback bcb,
                            begin_timeout_callback btcb, uint32_t timeout) override;
@@ -222,6 +227,10 @@ namespace strongstore
         // Commit all Get(s) and Put(s) since Begin().
         virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
                             uint32_t timeout) override;
+
+        // Finish and application level request since Begin().
+        // Commit all Get(s) and Put(s) since Begin().
+        virtual void EndAppRequest(Session &session, end_callback ecb);
 
         // Abort all Get(s) and Put(s) since Begin().
         virtual void Abort(Session &session, abort_callback acb, abort_timeout_callback atcb,

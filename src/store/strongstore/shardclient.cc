@@ -177,7 +177,7 @@ namespace strongstore
         Get(transaction_id, key, gcb, gtcb, timeout, true);
     }
 
-    void ShardClient::Get(uint64_t transaction_id, const std::string &key,
+    void ShardClient::Get(uint64_t request_id, const std::string &key,
                           get_callback gcb, get_timeout_callback gtcb,
                           uint32_t timeout, bool for_update)
     {
@@ -185,13 +185,13 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
+        PendingGet *pendingGet = new PendingGet(request_id, req_id);
         pendingGets[req_id] = pendingGet;
         pendingGet->key = key;
         pendingGet->gcb = gcb;
         pendingGet->gtcb = gtcb;
 
-        auto search = transactions_.find(transaction_id);
+        auto search = transactions_.find(request_id);
         ASSERT(search != transactions_.end());
         auto &t = search->second;
         auto &start_ts = t.start_time();
@@ -200,7 +200,7 @@ namespace strongstore
         get_.Clear();
         get_.mutable_rid()->set_client_id(client_id_);
         get_.mutable_rid()->set_client_req_id(req_id);
-        get_.set_transaction_id(transaction_id);
+        get_.set_transaction_id(request_id);
         start_ts.serialize(get_.mutable_timestamp());
         get_.set_key(key);
         get_.set_for_update(for_update);

@@ -755,7 +755,8 @@ int main(int argc, char **argv)
             FLAGS_tput_interval,
             FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
             FLAGS_max_attempts,
-            static_cast<uint64_t>(8));
+            static_cast<uint64_t>(8),
+            FLAGS_issue_concurrent);
         // TODO make this last parameter FLAGS_fanou
         break;
     default:
@@ -770,7 +771,7 @@ int main(int argc, char **argv)
         break;
     case BENCH_MICRO:
         tport->Timer(0, [bench, bdcb]()
-                     { bench->Start(bdcb); });
+                     { bench->StartIOCL(bdcb); });
         break;
     case BENCH_UNKNOWN:
     default:

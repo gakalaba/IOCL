@@ -66,14 +66,18 @@ public:
                     int expDuration, int warmupSec, int cooldownSec,
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
-                    uint64_t fanout,
+                    uint64_t fanout, bool issueConcurrent,
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
     void Start(bench_done_callback bdcb);
+    void StartIOCL(bench_done_callback bdcb);
+
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
     void SendNext();
+    void SendNextIOCL();
+
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
     inline bool IsFullyDone() { return done; }
@@ -82,6 +86,8 @@ public:
     std::vector<uint64_t> latencies;
 
     inline const Stats &GetStats() const { return stats; }
+
+    inline uint64_t GetFanout() { return fanout; };
 
 protected:
     virtual AsyncTransaction *GetNextTransaction() = 0;
@@ -107,10 +113,16 @@ private:
     {
     public:
         SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+
+        SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
+        AsyncAppRequest *apprequest() const { return appreq_; }
+        uint64_t fanout() { return fanout_; };
+
         execute_callback ecb() const { return ecb_; }
 
         Latency_Frame_t *lat() { return &lat_; }
@@ -142,6 +154,8 @@ private:
         Latency_Frame_t lat_;
         std::reference_wrapper<Session> session_;
         AsyncTransaction *transaction_;
+        AsyncAppRequest *appreq_;
+        uint64_t fanout_;
         execute_callback ecb_;
         uint64_t n_attempts_;
         std::size_t op_index_;
@@ -155,6 +169,8 @@ private:
 
     void ExecuteNextOperation(const uint64_t session_id);
 
+    void ExecuteNextOperationIOCL(const uint64_t session_id);
+
     void GetCallback(const uint64_t session_id,
                      int status, const std::string &key, const std::string &val, Timestamp ts);
     void GetTimeout(const uint64_t session_id,
@@ -166,6 +182,7 @@ private:
                     int status, const std::string &key, const std::string &val);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
+    void EndAppreqCallback(const uint64_t session_id, transaction_status_t status);
     void CommitTimeout();
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
@@ -213,6 +230,7 @@ private:
 
     // IOCL stuff
     uint64_t fanout;
+    bool issueConcurrent;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

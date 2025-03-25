@@ -58,6 +58,7 @@ namespace micro
                     int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
                     bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts,
                     uint64_t fanout,
+                    bool issueConcurrent,
                     const std::string &latencyFilename = "latency");
 
         virtual ~MicroClient();

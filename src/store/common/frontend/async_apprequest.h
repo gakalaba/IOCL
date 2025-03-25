@@ -53,6 +53,8 @@ public:
     virtual ~AsyncAppRequest() {}
 
     virtual Operation GetNextOperation(std::size_t op_index) = 0;
+
+    virtual const std::string &GetTransactionType() = 0;
 };
 
 #endif

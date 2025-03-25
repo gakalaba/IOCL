@@ -47,6 +47,8 @@ namespace micro
 
         inline size_t GetNumKeys() const { return keyIdxs.size(); };
 
+        const std::string &GetTransactionType() override { return "basic_appreq"; };
+
         KeySelector *keySelector;
 
     private:

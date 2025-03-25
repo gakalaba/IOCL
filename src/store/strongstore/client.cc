@@ -415,6 +415,32 @@ namespace strongstore
         bcb();
     }
 
+    void Client::BeginIOCL(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    {
+        // auto &session = static_cast<StrongSession &>(s);
+
+        // if (session.transaction_id() != static_cast<uint64_t>(-1))
+        // {
+        //     sessions_by_transaction_id_.erase(session.transaction_id());
+        // }
+
+        // auto tid = next_transaction_id_++;
+
+        Debug("[%lu] BeginIOCL", tid);
+
+        // Timestamp start_ts{tt_.Now().latest(), client_id_};
+
+        // session.start_transaction(tid, start_ts);
+        // sessions_by_transaction_id_.emplace(tid, session);
+
+        // for (uint64_t i = 0; i < nshards_; i++)
+        // {
+        //     sclients_[i]->Begin(tid, start_ts);
+        // }
+
+        bcb();
+    }
+
     /* Begins a transaction, retrying the transaction indicated by session.
      */
     void Client::Retry(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
@@ -451,13 +477,13 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto tid = session.transaction_id();
+        auto req_id = session.transaction_id();
 
-        Debug("GET [%lu : %s]", tid, key.c_str());
+        Debug("GET [%lu : %s]", req_id, key.c_str());
 
         if (session.needs_aborts())
         {
-            Debug("[%lu] Need to abort", tid);
+            Debug("[%lu] Need to abort", req_id);
             gcb(REPLY_FAIL, "", "", Timestamp());
             return;
         }
@@ -485,7 +511,7 @@ namespace strongstore
         };
 
         // Send the GET operation to appropriate shard.
-        sclients_[i]->Get(tid, key, gcb1, gtcb1, timeout);
+        sclients_[i]->Get(req_id, key, gcb1, gtcb1, timeout);
     }
 
     /* Returns the value corresponding to the supplied key. */
@@ -537,13 +563,13 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto tid = session.transaction_id();
+        auto req_id = session.transaction_id();
 
-        Debug("PUT [%lu : %s]", tid, key.c_str());
+        Debug("PUT [%lu : %s]", req_id, key.c_str());
 
         if (session.needs_aborts())
         {
-            Debug("[%lu] Need to abort", tid);
+            Debug("[%lu] Need to abort", req_id);
             pcb(REPLY_FAIL, "", "");
             return;
         }
@@ -570,7 +596,7 @@ namespace strongstore
             ptcb(s, k, v);
         };
 
-        sclients_[i]->Put(tid, key, value, pcb1, ptcb1, timeout);
+        sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
     }
 
     /* Attempts to commit the ongoing transaction. */
@@ -639,6 +665,20 @@ namespace strongstore
                 sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
             }
         }
+    }
+
+    /* Attempts to commit the ongoing transaction. */
+    void Client::EndAppRequest(Session &s, end_callback end_cb)
+    {
+        auto &session = static_cast<StrongSession &>(s);
+
+        auto req_id = session.transaction_id();
+
+        Debug("[%lu] EndAppRequest", req_id);
+
+        session.set_ending();
+
+        end_cb();
     }
 
     void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)

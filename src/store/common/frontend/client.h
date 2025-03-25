@@ -25,15 +25,17 @@
 #include "store/common/stats.h"
 #include "store/common/timestamp.h"
 
-enum transaction_status_t {
+enum transaction_status_t
+{
     COMMITTED = 0,
     ABORTED_USER,
     ABORTED_SYSTEM,
     ABORTED_MAX_RETRIES
 };
 
-class Session : public rss::Session {
-   public:
+class Session : public rss::Session
+{
+public:
     Session() : rss::Session() {}
     Session(rss::Session &&session) : rss::Session(std::move(session)) {}
     Session(Session &&other) : rss::Session(std::move(other)) {}
@@ -41,6 +43,8 @@ class Session : public rss::Session {
 
 typedef std::function<void()> begin_callback;
 typedef std::function<void()> begin_timeout_callback;
+
+typedef std::function<void()> end_callback;
 
 typedef std::function<void(int, const std::string &, const std::string &, Timestamp)> get_callback;
 typedef std::function<void(int, const std::string &)> get_timeout_callback;
@@ -56,8 +60,9 @@ typedef std::function<void()> commit_timeout_callback;
 typedef std::function<void()> abort_callback;
 typedef std::function<void()> abort_timeout_callback;
 
-class Client {
-   public:
+class Client
+{
+public:
     Client() { _Latency_Init(&clientLat, "client_lat"); }
     virtual ~Client() {}
 
@@ -98,12 +103,12 @@ class Client {
 
     inline Stats &GetStats() { return stats; }
 
-   protected:
+protected:
     void StartRecLatency();
     void EndRecLatency(const std::string &str);
     Stats stats;
 
-   private:
+private:
     Latency_t clientLat;
 };
 
