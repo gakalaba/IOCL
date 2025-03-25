@@ -100,7 +100,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
-    if IsIOCL ()
+    if (IsIOCL())
     {
         transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
     }
@@ -191,7 +191,7 @@ void BenchmarkClient::SendNextIOCL()
     auto appreq = GetNextAppRequest();
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
-    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, client.GetFanout()});
+    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
 
     auto &ss = session_states_.find(sid)->second;
     _Latency_StartRec(ss.lat());
@@ -314,7 +314,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
+        client.Put(session, op.key, op.value, pcb, ptcb, false, timeout_);
         break;
 
     case COMMIT:
@@ -354,18 +354,18 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     auto ptcb = std::bind(&BenchmarkClient::PutTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this, session_id);
 
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+
     if (op_index == ss.fanout())
     {
         // don't issue more
         client.EndAppRequest(session, end_cb);
-        return
+        return;
     }
 
     Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
-
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
 
     switch (op.type)
     {
@@ -374,7 +374,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
         break;
 
     case PUT:
-        client.PutIOCL(session, op.key, op.value, pcb, ptcb, timeout_);
+        client.Put(session, op.key, op.value, pcb, ptcb, true, timeout_);
         break;
 
     default:
@@ -413,7 +413,7 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if IsIOCL ()
+        if (IsIOCL())
         {
             ExecuteNextOperationIOCL(session_id);
         }
@@ -424,7 +424,7 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
     }
     else if (status == REPLY_FAIL)
     {
-        if IsIOCL ()
+        if (IsIOCL())
         {
             Panic("Got fail response from GET request issued to server");
         }
@@ -459,7 +459,7 @@ void BenchmarkClient::GetTimeout(const uint64_t session_id,
 }
 
 void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
-                                  const std::string &key, const std::string &val, Timestamp ts)
+                                  const std::string &key, const std::string &val)
 {
     Debug("[%lu] Put(%s,%s) callback in benchclient!", session_id, key.c_str(), val.c_str());
     auto search = session_states_.find(session_id);
@@ -469,7 +469,7 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if IsIOCL ()
+        if (IsIOCL())
         {
             ExecuteNextOperationIOCL(session_id);
         }
@@ -480,7 +480,7 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
     }
     else if (status == REPLY_FAIL)
     {
-        if IsIOCL ()
+        if (IsIOCL())
         {
             Panic("Got fail response from PUT request issued to server");
         }

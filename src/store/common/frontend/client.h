@@ -72,6 +72,8 @@ public:
 
     virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
 
+    virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) {};
+    virtual void EndAppRequest(Session &session, end_callback ecb) {};
     virtual void Retry(Session &session, begin_callback bcb,
                        begin_timeout_callback btcb, uint32_t timeout) = 0;
 
@@ -86,7 +88,7 @@ public:
 
     // Set the value for the given key.
     virtual void Put(Session &session, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout, bool isIOCL) = 0;
+                     put_callback pcb, put_timeout_callback ptcb, bool isIOCL, uint32_t timeout) = 0;
 
     // Commit all Get(s) and Put(s) since Begin().
     virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,

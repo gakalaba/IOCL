@@ -202,7 +202,7 @@ namespace strongstore
         virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
         // For IOCL
-        virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout);
+        virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
         // Begin a retried transaction.
         virtual void Retry(Session &session, begin_callback bcb,
@@ -222,7 +222,7 @@ namespace strongstore
         // Set the value for the given key.
         virtual void Put(Session &session, const std::string &key, const std::string &value,
                          put_callback pcb, put_timeout_callback ptcb,
-                         uint32_t timeout = PUT_TIMEOUT, bool isIOCL) override;
+                         bool isIOCL, uint32_t timeout = PUT_TIMEOUT) override;
 
         // Commit all Get(s) and Put(s) since Begin().
         virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
@@ -230,7 +230,7 @@ namespace strongstore
 
         // Finish and application level request since Begin().
         // Commit all Get(s) and Put(s) since Begin().
-        virtual void EndAppRequest(Session &session, end_callback ecb);
+        virtual void EndAppRequest(Session &session, end_callback ecb) override;
 
         // Abort all Get(s) and Put(s) since Begin().
         virtual void Abort(Session &session, abort_callback acb, abort_timeout_callback atcb,

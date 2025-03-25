@@ -276,7 +276,7 @@ namespace strongstore
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 
-        pcb(status, key, val, Timestamp(reply.timestamp()););
+        pcb(status, key, val);
     }
 
     void ShardClient::Put(uint64_t transaction_id, const std::string &key, const std::string &value,
@@ -300,14 +300,14 @@ namespace strongstore
         Debug("[shard %i] Sending PUT IOCL [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        PendingGet *pendingPut = new PendingPut(transaction_id, req_id);
+        PendingPut *pendingPut = new PendingPut(transaction_id, req_id);
         pendingPuts[req_id] = pendingPut;
         pendingPut->key = key;
         pendingPut->val = value;
         pendingPut->pcb = pcb;
         pendingPut->ptcb = ptcb;
 
-        auto search = transactions_.find(request_id);
+        auto search = transactions_.find(transaction_id);
         ASSERT(search != transactions_.end());
         auto &t = search->second;
         auto &start_ts = t.start_time();
@@ -316,11 +316,10 @@ namespace strongstore
         put_.Clear();
         put_.mutable_rid()->set_client_id(client_id_);
         put_.mutable_rid()->set_client_req_id(req_id);
-        put_.set_transaction_id(request_id);
+        put_.set_transaction_id(transaction_id);
         start_ts.serialize(put_.mutable_timestamp());
         put_.set_key(key);
         put_.set_value(value);
-        put_.set_for_update(for_update);
 
         transport_->SendMessageToReplica(this, shard_idx_, replica_, put_);
     }

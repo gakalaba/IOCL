@@ -431,7 +431,7 @@ namespace strongstore
         // Timestamp start_ts{tt_.Now().latest(), client_id_};
 
         // session.start_transaction(tid, start_ts);
-        sessions_by_transaction_id_.emplace(tid, session);
+        sessions_by_transaction_id_.emplace(req_id, session);
 
         // for (uint64_t i = 0; i < nshards_; i++)
         // {
@@ -559,7 +559,7 @@ namespace strongstore
 
     /* Sets the value corresponding to the supplied key. */
     void Client::Put(Session &s, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout, bool isIOCL)
+                     put_callback pcb, put_timeout_callback ptcb, bool isIOCL, uint32_t timeout)
     {
         auto &session = static_cast<StrongSession &>(s);
 

@@ -69,6 +69,8 @@ class IOCLCodebase:
             '--cooldown_secs', config['client_ramp_down'],
             '--protocol_mode', config['client_protocol_mode'],
             '--stats_file', stats_file,
+            '--client_fanout', config['client_fanout'],
+            '--client_issue_concurrent', config['client_issue_concurrent'],
             '--clock_error', truetime_error,
             '--strong_consistency', config['consistency']]])
 

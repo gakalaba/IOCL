@@ -57,7 +57,7 @@ namespace micro
         }
         else
         {
-            return Get(GetKey(op_index - 1), GetKey(op_index - 1));
+            return Get(GetKey(op_index - 1));
         }
     }
 
