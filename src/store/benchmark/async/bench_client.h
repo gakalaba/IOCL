@@ -71,7 +71,6 @@ public:
     virtual ~BenchmarkClient();
 
     void Start(bench_done_callback bdcb);
-    void StartIOCL(bench_done_callback bdcb);
 
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
@@ -166,6 +165,7 @@ private:
     void ExecuteAbort(const uint64_t session_id, transaction_status_t status);
 
     void SendNextInSession(const uint64_t session_id);
+    void SendNextInSessionIOCL(const uint64_t session_id);
 
     void ExecuteNextOperation(const uint64_t session_id);
 
@@ -186,6 +186,8 @@ private:
     void CommitTimeout();
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
+
+    inline bool IsIOCL() { return fanout > 0; };
 
     void Finish();
     void WarmupDone();

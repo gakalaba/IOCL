@@ -417,21 +417,21 @@ namespace strongstore
 
     void Client::BeginIOCL(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
     {
-        // auto &session = static_cast<StrongSession &>(s);
+        auto &session = static_cast<StrongSession &>(s);
 
-        // if (session.transaction_id() != static_cast<uint64_t>(-1))
-        // {
-        //     sessions_by_transaction_id_.erase(session.transaction_id());
-        // }
+        if (session.transaction_id() != static_cast<uint64_t>(-1))
+        {
+            sessions_by_transaction_id_.erase(session.transaction_id());
+        }
 
-        // auto tid = next_transaction_id_++;
+        auto req_id = next_transaction_id_++;
 
-        Debug("[%lu] BeginIOCL", tid);
+        Debug("[%lu] BeginIOCL", req_id);
 
         // Timestamp start_ts{tt_.Now().latest(), client_id_};
 
         // session.start_transaction(tid, start_ts);
-        // sessions_by_transaction_id_.emplace(tid, session);
+        sessions_by_transaction_id_.emplace(tid, session);
 
         // for (uint64_t i = 0; i < nshards_; i++)
         // {

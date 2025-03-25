@@ -212,6 +212,8 @@ namespace strongstore
                  uint32_t timeout, bool for_update);
 
         void HandleGetReply(const proto::GetReply &reply);
+        // for IOCL
+        void HandlePutReply(const proto::PutReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);

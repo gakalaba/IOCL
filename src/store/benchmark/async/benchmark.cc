@@ -771,7 +771,7 @@ int main(int argc, char **argv)
         break;
     case BENCH_MICRO:
         tport->Timer(0, [bench, bdcb]()
-                     { bench->StartIOCL(bdcb); });
+                     { bench->Start(bdcb); });
         break;
     case BENCH_UNKNOWN:
     default:

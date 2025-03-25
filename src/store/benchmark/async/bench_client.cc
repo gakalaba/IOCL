@@ -100,18 +100,14 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
-    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNext, this));
-}
-
-void BenchmarkClient::StartIOCL(bench_done_callback bdcb)
-{
-    n_sessions_started_ = 0;
-    n = 0;
-    curr_bdcb_ = bdcb;
-    transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
-    gettimeofday(&startTime, NULL);
-
-    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
+    if IsIOCL ()
+    {
+        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
+    }
+    else
+    {
+        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNext, this));
+    }
 }
 
 void BenchmarkClient::SendNext()
@@ -204,33 +200,6 @@ void BenchmarkClient::SendNextIOCL()
     auto btcb = []() {};
 
     client.BeginIOCL(session, bcb, btcb, timeout_);
-
-    // TODO
-    if (!cooldownStarted)
-    {
-        bool send_next = false;
-        uint64_t next_arrival_us = 0;
-        switch (mode_)
-        {
-        case BenchmarkClientMode::OPEN:
-            send_next = true;
-            next_arrival_us = static_cast<uint64_t>(next_arrival_dist_(rand_));
-            break;
-
-        case BenchmarkClientMode::CLOSED:
-            send_next = (n_sessions_started_ < mpl_);
-            next_arrival_us = 0;
-            break;
-        default:
-            Panic("Unexpected client mode!");
-        }
-
-        if (send_next)
-        {
-            Debug("next arrival in %lu us", next_arrival_us);
-            transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNext, this));
-        }
-    }
 }
 
 void BenchmarkClient::SendNextInSession(const uint64_t session_id)
@@ -284,6 +253,28 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
     default:
         NOT_REACHABLE();
     }
+}
+
+void BenchmarkClient::SendNextInSessionIOCL(const uint64_t session_id)
+{
+    auto search = session_states_.find(session_id);
+    ASSERT(search != session_states_.end());
+    auto &ss = search->second;
+
+    auto appreq = GetNextAppRequest();
+    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+
+    auto &session = ss.session();
+    auto sid = session.id();
+    Debug("session id: %lu", sid);
+
+    auto &client = *clients_[ss.current_client_index()];
+    _Latency_StartRec(ss.lat());
+
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    auto btcb = []() {};
+
+    client.BeginIOCL(session, bcb, btcb, timeout_);
 }
 
 void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
@@ -422,11 +413,25 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperation(session_id);
+        if IsIOCL ()
+        {
+            ExecuteNextOperationIOCL(session_id);
+        }
+        else
+        {
+            ExecuteNextOperation(session_id);
+        }
     }
     else if (status == REPLY_FAIL)
     {
-        ExecuteAbort(session_id, ABORTED_SYSTEM);
+        if IsIOCL ()
+        {
+            Panic("Got fail response from GET request issued to server");
+        }
+        else
+        {
+            ExecuteAbort(session_id, ABORTED_SYSTEM);
+        }
     }
     else
     {
@@ -464,11 +469,25 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperation(session_id);
+        if IsIOCL ()
+        {
+            ExecuteNextOperationIOCL(session_id);
+        }
+        else
+        {
+            ExecuteNextOperation(session_id);
+        }
     }
     else if (status == REPLY_FAIL)
     {
-        ExecuteAbort(session_id, ABORTED_SYSTEM);
+        if IsIOCL ()
+        {
+            Panic("Got fail response from PUT request issued to server");
+        }
+        else
+        {
+            ExecuteAbort(session_id, ABORTED_SYSTEM);
+        }
     }
     else
     {
@@ -538,7 +557,7 @@ void BenchmarkClient::EndAppreqCallback()
                     erase_session = false;
                     Debug("next arrival in session %lu us", next_arrival_us);
 
-                    transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNextInSession, this, session_id));
+                    transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNextIOCL, this, session_id));
                 }
             }
             else
