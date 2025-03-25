@@ -45,6 +45,11 @@ namespace micro
     protected:
         Operation GetNextOperation(std::size_t op_index) override;
 
+        inline const std::string &GetKey(int i) const
+        {
+            return keySelector->GetKey(keyIdxs[i]);
+        }
+
         inline size_t GetNumKeys() const { return keyIdxs.size(); };
 
         const std::string &GetTransactionType() override { return "basic_appreq"; };

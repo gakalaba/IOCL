@@ -49,9 +49,16 @@ namespace micro
     Operation BasicAppRequest::GetNextOperation(std::size_t op_index)
     {
         Debug("BASIC_APP_REQUEST %lu %lu", GetNumKeys(), op_index);
-
-        // TODO: generate a random operation type according to zipfian!
-        return Put("key", "value");
+        srand(time(0));
+        uint64_t percentage_writes = 75; // todo CHANGE THIS
+        if ((rand() % 100) < percentage_writes)
+        {
+            return Put(GetKey(op_index - 1), GetKey(op_index - 1));
+        }
+        else
+        {
+            return Get(GetKey(op_index - 1), GetKey(op_index - 1));
+        }
     }
 
 } // namespace micro
