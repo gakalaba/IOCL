@@ -119,6 +119,10 @@ namespace strongstore
                  put_callback pcb, put_timeout_callback ptcb,
                  uint32_t timeout);
 
+        void PutIOCL(uint64_t transaction_id, const std::string &key, const std::string &value,
+                     put_callback pcb, put_timeout_callback ptcb,
+                     uint32_t timeout);
+
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
                       const Timestamp &min_read_timestamp,
@@ -166,6 +170,16 @@ namespace strongstore
             get_callback gcb;
             get_timeout_callback gtcb;
         };
+
+        struct PendingPut : public PendingRequest
+        {
+            PendingPut(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
+            std::string key;
+            std::string val;
+            put_callback pcb;
+            put_timeout_callback ptcb;
+        };
+
         struct PendingRWCoordCommit : public PendingRequest
         {
             PendingRWCoordCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -213,7 +227,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::GetReply &reply);
         // for IOCL
-        void HandlePutReply(const proto::PutReply &reply);
+        void HandlePutIOCLReply(const proto::PutReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -227,6 +241,7 @@ namespace strongstore
         std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
+        std::unordered_map<uint64_t, PendingPut *> pendingPuts;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -235,6 +250,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
+        proto::Put put_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -244,6 +260,7 @@ namespace strongstore
         proto::Wound wound_;
 
         proto::GetReply get_reply_;
+        proto::PutReply put_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

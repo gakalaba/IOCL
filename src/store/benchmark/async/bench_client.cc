@@ -352,7 +352,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
     auto pcb = std::bind(&BenchmarkClient::PutCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     auto ptcb = std::bind(&BenchmarkClient::PutTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this);
+    auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this, session_id);
 
     if (op_index == ss.fanout())
     {
@@ -374,7 +374,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
         break;
 
     case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
+        client.PutIOCL(session, op.key, op.value, pcb, ptcb, timeout_);
         break;
 
     default:
@@ -459,9 +459,9 @@ void BenchmarkClient::GetTimeout(const uint64_t session_id,
 }
 
 void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
-                                  const std::string &key, const std::string &val)
+                                  const std::string &key, const std::string &val, Timestamp ts)
 {
-    Debug("[%lu] Put(%s,%s) callback.", session_id, key.c_str(), val.c_str());
+    Debug("[%lu] Put(%s,%s) callback in benchclient!", session_id, key.c_str(), val.c_str());
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
@@ -513,65 +513,29 @@ void BenchmarkClient::CommitCallback(const uint64_t session_id, transaction_stat
     ecb(status);
 }
 
-void BenchmarkClient::EndAppreqCallback()
+void BenchmarkClient::EndAppreqCallback(const uint64_t session_id)
 {
-    Debug("[%lu] EndAppreq Callback with result %d.", session_id, result);
+    Debug("[%lu] EndAppreq Callback with result success.", session_id);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
-    auto transaction = ss.transaction();
-    auto &ttype = transaction->GetTransactionType();
+    auto appreq = ss.apprequest();
+    auto &ttype = appreq->GetTransactionType();
     auto n_attempts = ss.n_attempts();
 
-    if (result == COMMITTED || result == ABORTED_USER ||
-        (maxAttempts != -1 && n_attempts >= static_cast<uint64_t>(maxAttempts)) ||
-        !retryAborted)
+    stats.Increment(ttype + "_completed", 1);
+
+    if (!cooldownStarted)
     {
-        bool erase_session = true;
-        if (result == COMMITTED)
-        {
-            stats.Increment(ttype + "_committed", 1);
-
-            if (!cooldownStarted)
-            {
-                bool send_next_in_session = false;
-                uint64_t next_arrival_us = 0;
-                switch (mode_)
-                {
-                case BenchmarkClientMode::OPEN:
-                    send_next_in_session = stay_dist_(rand_);
-                    next_arrival_us = static_cast<uint64_t>(think_time_dist_(rand_));
-                    break;
-
-                case BenchmarkClientMode::CLOSED:
-                    send_next_in_session = true;
-                    next_arrival_us = 0;
-                    break;
-                default:
-                    Panic("Unexpected client mode!");
-                }
-
-                if (send_next_in_session)
-                {
-                    erase_session = false;
-                    Debug("next arrival in session %lu us", next_arrival_us);
-
-                    transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNextIOCL, this, session_id));
-                }
-            }
-            else
-            {
-                Debug("end of session");
-            }
-        }
-
-        if (retryAborted)
-        {
-            stats.Add(ttype + "_attempts_list", n_attempts);
-        }
-
-        OnReply(session_id, result, erase_session);
+        Debug("next arrival in session %lu us", 0);
+        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
+        OnReply(session_id, 0, false);
+    }
+    else
+    {
+        Debug("end of session");
+        OnReply(session_id, 0, true);
     }
 }
 

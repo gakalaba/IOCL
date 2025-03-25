@@ -559,7 +559,7 @@ namespace strongstore
 
     /* Sets the value corresponding to the supplied key. */
     void Client::Put(Session &s, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout)
+                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout, bool isIOCL)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -596,7 +596,14 @@ namespace strongstore
             ptcb(s, k, v);
         };
 
-        sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
+        if (isIOCL)
+        {
+            sclients_[i]->PutIOCL(req_id, key, value, pcb1, ptcb1, timeout);
+        }
+        else
+        {
+            sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
+        }
     }
 
     /* Attempts to commit the ongoing transaction. */

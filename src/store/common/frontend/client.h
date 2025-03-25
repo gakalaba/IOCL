@@ -86,7 +86,7 @@ public:
 
     // Set the value for the given key.
     virtual void Put(Session &session, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout) = 0;
+                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout, bool isIOCL) = 0;
 
     // Commit all Get(s) and Put(s) since Begin().
     virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,

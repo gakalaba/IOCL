@@ -182,7 +182,7 @@ private:
                     int status, const std::string &key, const std::string &val);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
-    void EndAppreqCallback(const uint64_t session_id, transaction_status_t status);
+    void EndAppreqCallback(const uint64_t session_id);
     void CommitTimeout();
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
