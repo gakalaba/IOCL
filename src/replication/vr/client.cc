@@ -122,7 +122,7 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
 
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
+            Debug("SENDING REQUEST: %lu %lu", clientid, req);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToGroup(this, group, reqMsg))
             {

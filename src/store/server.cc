@@ -150,10 +150,11 @@ DEFINE_int64(strong_max_dep_depth, -1,
              "maximum length of dependency chain"
              " [-1 is no maximum] (for StrongStore MVTSO)");
 
-const std::string strong_consistency_args[] = {"ss", "rss"};
+const std::string strong_consistency_args[] = {"ss", "rss", "lin"};
 const strongstore::Consistency strong_consistency[]{
     strongstore::Consistency::SS,
     strongstore::Consistency::RSS,
+    strongstore::Consistency::LIN,
 };
 static bool ValidateStrongConsistency(const char *flagname,
                                       const std::string &value)
@@ -345,7 +346,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, tt, FLAGS_debug_stats);
+                                         tport, FLAGS_debug_stats);
         break;
     }
     default:

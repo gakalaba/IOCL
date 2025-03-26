@@ -41,8 +41,8 @@
 #include "lib/message.h"
 #include "store/common/backend/store.h"
 #include "store/common/backend/txnstore.h"
-#include "store/common/backend/versionstore.h"
 #include "store/common/transaction.h"
+//#include "store/common/backend/versionstore.h"
 
 namespace strongstore
 {

@@ -34,7 +34,8 @@ namespace strongstore
     enum Consistency
     {
         SS,
-        RSS
+        RSS,
+        LIN
     };
 
 } // namespace strongstore

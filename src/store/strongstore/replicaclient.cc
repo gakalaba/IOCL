@@ -52,6 +52,63 @@ namespace strongstore
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
+    void ReplicaClient::SendRequest(uint64_t request_id,
+                                    string op,
+                                    string key,
+                                    string value,
+                                    request_callback rcb, request_timeout_callback rtcb,
+                                    uint32_t timeout)
+    /*
+    let's just for now, leave out the callback.. not sure it's necessary
+    ,
+    prepare_callback pcb, prepare_timeout_callback ptcb,
+    uint32_t timeout)*/
+    {
+        Debug("[shard %i] SendRequest sending: %s", shard_idx_, op);
+
+        // create request
+        string request_str;
+        IOCLRequest request;
+        request.set_op(op);
+        request.set_reqid(request_id);
+        request.set_key(key);
+        request.set_value(value);
+
+        request.SerializeToString(&request_str);
+
+        uint64_t reqId = lastReqId++;
+        PendingRequest *pendingRequest = new PendingRequest(reqId);
+        pendingRequests[reqId] = pendingRequest;
+        pendingRequest->rcb = rcb;
+        pendingRequest->rtcb = rtcb;
+
+        client->Invoke(
+            request_str,
+            bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
+                 std::placeholders::_1, std::placeholders::_2));
+    }
+
+    /* Callback from a shard replica on prepare operation completion. */
+    bool ReplicaClient::SendRequestCallback(uint64_t reqId, const string &request_str,
+                                            const string &reply_str)
+    {
+        Reply reply;
+
+        reply.ParseFromString(reply_str);
+
+        Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
+              reply.status());
+        auto itr = this->pendingRequests.find(reqId);
+        ASSERT(itr != this->pendingRequests.end());
+        PendingRequest *pendingRequest = itr->second;
+        request_callback rcb = pendingRequest->rcb;
+        this->pendingRequests.erase(itr);
+        delete pendingRequest;
+        rcb(reply.status());
+
+        return true;
+    }
+
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
                                 const Timestamp &prepare_ts, int coordinator,

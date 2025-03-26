@@ -77,6 +77,34 @@ namespace strongstore
         }
     }
 
+    Server::Server(Consistency consistency, const transport::Configuration &shard_config,
+                   const transport::Configuration &replica_config,
+                   uint64_t server_id, int shard_idx, int replica_idx,
+                   Transport *transport, bool debug_stats)
+        : PingServer(transport),
+          tt_{NULL},                 // filler, will not use
+          transactions_{0, SS, tt_}, // filler, will not use
+          shard_config_{shard_config},
+          replica_config_{replica_config},
+          transport_{transport},
+          server_id_{server_id},
+          min_prepare_timestamp_{},
+          shard_idx_{shard_idx},
+          replica_idx_{replica_idx},
+          debug_stats_{debug_stats},
+          consistency_{consistency}
+    {
+        transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
+
+        replica_client_ =
+            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+
+        if (debug_stats_)
+        {
+            _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
+        }
+    }
+
     Server::~Server()
     {
         for (auto s : shard_clients_)
@@ -109,6 +137,11 @@ namespace strongstore
         {
             get_.ParseFromString(data);
             HandleGet(remote, get_);
+        }
+        else if (type == put_.GetTypeName())
+        {
+            put_.ParseFromString(data);
+            HandlePut(remote, put_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -158,6 +191,19 @@ namespace strongstore
 
     void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
     {
+        if (consistency_ = strongstore::Consistency::LIN)
+        {
+            uint64_t transaction_id = msg.transaction_id();
+            const Transaction transaction{msg.transaction()};
+
+            replica_client_->SendRequest(
+                transaction_id, transaction,
+                std::bind(&Server::PrepareCallback, this, transaction_id,
+                          std::placeholders::_1, std::placeholders::_2),
+                // this thing is the ptcb
+                [](int, Timestamp) {}, REQUEST_TIMEOUT);
+            return;
+        }
         uint64_t client_id = msg.rid().client_id();
         uint64_t client_req_id = msg.rid().client_req_id();
         uint64_t transaction_id = msg.transaction_id();
@@ -186,6 +232,7 @@ namespace strongstore
             ASSERT(r.wound_rws.size() == 0);
 
             std::pair<TimestampID, std::string> value;
+            // read the value from the store! this doesn't need to be replicated
             ASSERT(store_.get(key, value));
 
             get_reply_.Clear();
@@ -196,6 +243,7 @@ namespace strongstore
             get_reply_.set_val(value.second);
             value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
+            // respond back to the client (shard client)
             transport_->SendMessage(this, remote, get_reply_);
 
             transactions_.FinishGet(transaction_id, key);
@@ -233,6 +281,105 @@ namespace strongstore
         {
             NOT_REACHABLE();
         }
+    }
+
+    void Server::HandlePut(const TransportAddress &remote, proto::IOCLRequest &msg)
+    {
+        uint64_t transaction_id = msg.transaction_id();
+
+        // const Transaction transaction{msg.transaction()};
+
+        // replica_client_->SendRequest(
+        //     transaction_id, transaction,
+        // std::bind(&Server::PrepareCallback, this, transaction_id,
+        //           std::placeholders::_1, std::placeholders::_2),
+        // // this thing is the ptcb
+        // [](int, Timestamp) {}, PREPARE_TIMEOUT);
+
+        replica_client_->SendRequest(
+            transaction_id, msg.op(), msg.key(), msg.value(),
+            std::bind(&Server::PrepareCallback, this, transaction_id,
+                      std::placeholders::_1, std::placeholders::_2),
+            // this thing is the ptcb
+            [](int) {}, REQUEST_TIMEOUT);
+
+        // --------------------------------------------------
+        // HandleGet"
+        // uint64_t client_id = msg.rid().client_id();
+        // uint64_t client_req_id = msg.rid().client_req_id();
+        // uint64_t transaction_id = msg.transaction_id();
+
+        // const std::string &key = msg.key();
+        // const Timestamp timestamp{msg.timestamp()};
+
+        // bool for_update = msg.has_for_update() && msg.for_update();
+
+        // Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
+
+        // transactions_.StartGet(transaction_id, remote, key, for_update);
+
+        // LockAcquireResult r;
+        // if (for_update)
+        // {
+        //     r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
+        // }
+        // else
+        // {
+        //     r = locks_.AcquireReadLock(transaction_id, timestamp, key);
+        // }
+
+        // if (r.status == LockStatus::ACQUIRED)
+        // {
+        //     ASSERT(r.wound_rws.size() == 0);
+
+        //     std::pair<TimestampID, std::string> value;
+        //     ASSERT(store_.get(key, value));
+
+        //     get_reply_.Clear();
+        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
+        //     get_reply_.set_status(REPLY_OK);
+        //     get_reply_.set_key(msg.key());
+
+        //     get_reply_.set_val(value.second);
+        //     value.first.timestamp.serialize(get_reply_.mutable_timestamp());
+
+        //     transport_->SendMessage(this, remote, get_reply_);
+
+        //     transactions_.FinishGet(transaction_id, key);
+        // }
+        // else if (r.status == LockStatus::FAIL)
+        // {
+        //     ASSERT(r.wound_rws.size() == 0);
+
+        //     get_reply_.Clear();
+        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
+        //     get_reply_.set_status(REPLY_FAIL);
+        //     get_reply_.set_key(msg.key());
+
+        //     transport_->SendMessage(this, remote, get_reply_);
+
+        //     const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+
+        //     LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        //     transactions_.AbortGet(transaction_id, key);
+
+        //     NotifyPendingRWs(transaction_id, rr.notify_rws);
+        // }
+        // else if (r.status == LockStatus::WAITING)
+        // {
+        //     auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
+        //     reply->key = key;
+
+        //     pending_get_replies_[msg.transaction_id()] = reply;
+
+        //     transactions_.PauseGet(transaction_id, key);
+
+        //     WoundPendingRWs(transaction_id, r.wound_rws);
+        // }
+        // else
+        // {
+        //     NOT_REACHABLE();
+        // }
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -1501,6 +1648,7 @@ namespace strongstore
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
         for (auto &write : transaction.getWriteSet())
         {
+            // apply all the buffered writes to the store!
             store_.put(write.first, write.second, {commit_ts, transaction_id});
         }
 
@@ -1534,6 +1682,7 @@ namespace strongstore
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
         for (auto &write : transaction.getWriteSet())
         {
+            // apply all the buffered writes to the store!
             store_.put(write.first, write.second, {commit_ts, transaction_id});
         }
 
@@ -1718,7 +1867,14 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        store_.put(key, value, {timestamp, 0});
+        if (consistency_ = strongstore::Consistency::LIN)
+        {
+            iocl_store_.put(key, value);
+        }
+        else
+        {
+            store_.put(key, value, {timestamp, 0});
+        }
     }
 
 } // namespace strongstore

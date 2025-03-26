@@ -43,6 +43,7 @@
 #include "replication/vr/replica.h"
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
+#include "store/common/backend/kvstore.h"
 #include "store/common/truetime.h"
 #include "store/server.h"
 #include "store/strongstore/common.h"
@@ -109,6 +110,10 @@ namespace strongstore
                const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport, const TrueTime &tt,
+               bool debug_stats);
+        Server(Consistency consistency, const transport::Configuration &shard_config,
+               const transport::Configuration &replica_config, uint64_t server_id,
+               int groupIdx, int idx, Transport *transport,
                bool debug_stats);
         ~Server();
 
@@ -196,6 +201,8 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
+        void HandlePut(const TransportAddress &remote, proto::Put &msg);
+
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
@@ -265,6 +272,7 @@ namespace strongstore
         TransactionStore transactions_;
         LockTable locks_;
         VersionedKVStore<TimestampID, std::string> store_;
+        KVStore iocl_store_;
 
         const transport::Configuration &shard_config_;
         const transport::Configuration &replica_config_;
@@ -283,6 +291,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
 
         proto::Get get_;
+        proto::Put put_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

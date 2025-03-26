@@ -42,6 +42,9 @@
 #define ABORT_TIMEOUT 1000
 #define RETRY_TIMEOUT 500000
 
+#define REQUEST_TIMEOUT 1000
+#define REQUEST_RETRIES 5
+
 #include <set>
 #include <vector>
 
