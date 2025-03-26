@@ -224,6 +224,8 @@ class IOCLCodebase:
             '--shard_config_path', shard_config_path,
             '--group_idx', shard_idx,
             '--replica_idx', replica_idx,
+            '--client_fanout', config['client_fanout'],
+            '--client_issue_concurrent', config['client_issue_concurrent'],
             '--protocol', config['replication_protocol'],
             '--num_shards', config['num_shards'],
             '--stats_file', stats_file,

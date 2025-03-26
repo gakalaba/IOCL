@@ -42,7 +42,9 @@
 enum protocol_t
 {
     PROTO_UNKNOWN,
-    PROTO_STRONG
+    PROTO_STRONG,
+    PROTO_VR,
+    PROTO_IOCL_CT
 };
 
 enum transmode_t
@@ -66,10 +68,11 @@ DEFINE_uint64(num_shards, 1, "number of shards in the system");
 DEFINE_bool(debug_stats, false, "record stats related to debugging");
 
 const std::string protocol_args[] = {
-    "strong",
-};
+    "strong", "vr", "iocl_ct"};
 const protocol_t protos[]{
     PROTO_STRONG,
+    PROTO_VR,
+    PROTO_IOCL_CT,
 };
 static bool ValidateProtocol(const char *flagname, const std::string &value)
 {
@@ -336,6 +339,15 @@ int main(int argc, char **argv)
                                          tport, tt, FLAGS_debug_stats);
         break;
     }
+    case PROTO_IOCL_CT:
+    case PROTO_VR:
+    {
+        server = new strongstore::Server(consistency, shard_config,
+                                         replica_config, FLAGS_server_id,
+                                         FLAGS_group_idx, FLAGS_replica_idx,
+                                         tport, tt, FLAGS_debug_stats);
+        break;
+    }
     default:
     {
         NOT_REACHABLE();
@@ -454,6 +466,23 @@ int main(int argc, char **argv)
     {
     case PROTO_STRONG:
     {
+        replica = new replication::vr::VRReplica(
+            replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
+            dynamic_cast<replication::AppReplica *>(server),
+            FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_VR:
+    {
+        replica = new replication::vr::VRReplica(
+            replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
+            dynamic_cast<replication::AppReplica *>(server),
+            FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_IOCL_CT:
+    {
+        // TODO ANJA obv make this new iocl::IOCLReplica
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
