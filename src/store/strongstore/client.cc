@@ -559,7 +559,7 @@ namespace strongstore
 
     /* Sets the value corresponding to the supplied key. */
     void Client::Put(Session &s, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb, bool isIOCL, uint32_t timeout)
+                     put_callback pcb, put_timeout_callback ptcb, uint32_t timeout)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -596,16 +596,28 @@ namespace strongstore
             ptcb(s, k, v);
         };
 
-        if (isIOCL)
-        {
-            sclients_[i]->PutIOCL(req_id, key, value, pcb1, ptcb1, timeout);
-        }
-        else
-        {
-            sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
-        }
+        sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
     }
 
+    void Client::SendRequest(Session &s, const std::string op,
+                             const std::string &key, const std::string &value,
+                             req_callback rcb, req_timeout_callback rtcb,
+                             uint32_t timeout)
+    {
+        auto &session = static_cast<StrongSession &>(s);
+
+        auto req_id = session.transaction_id();
+
+        Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op, key.c_str(), value);
+
+        ASSERT(session.executing());
+
+        // Contact the appropriate shard to set the value.
+        // TODO ANJA this is wrong way wrong
+        int i = (*part_)(key, nshards_, -1, session.participants());
+
+        sclients_[i]->SendRequest(req_id, op, key, value, rcb, rtcb, timeout);
+    }
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
     {

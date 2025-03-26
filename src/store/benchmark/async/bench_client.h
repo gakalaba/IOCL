@@ -180,6 +180,10 @@ private:
                      int status, const std::string &key, const std::string &val);
     void PutTimeout(const uint64_t session_id,
                     int status, const std::string &key, const std::string &val);
+    void ReceiveRequestResponse(const uint64_t session_id,
+                                int status, const std::string &retval);
+    void SendRequestTimeout(const uint64_t session_id,
+                            int status, const std::string &retval);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
     void EndAppreqCallback(const uint64_t session_id);

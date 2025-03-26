@@ -29,26 +29,6 @@ message GetReply {
     optional TimestampMessage timestamp = 5;
 }
 
-message Put {
-    required RequestIDMessage rid = 1;
-    required uint64 transaction_id = 2;
-    required string key = 3;
-    required string value = 4;
-    optional TimestampMessage timestamp = 5;
-}
-
-message PutReply {
-    required RequestIDMessage rid = 1;
-    // 0 = OK
-    // -1 = failed
-    // -2 = retry
-    // -3 = abstain/no reply
-    required int32 status = 2;
-    required string key = 3;
-    optional string val = 4;
-    optional TimestampMessage timestamp = 5;
-}
-
 message RWCommitCoordinator {
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
@@ -188,9 +168,9 @@ message Reply {
      repeated uint64 notify_ros = 5;
 }
 
-message IOCLRequest {	
-    required string op = 1;
-    required uint64 reqid = 2;
+message IOCLRequest {
+    required RequestIDMessage rid = 1;	
+    required string op = 2;
     required string key = 3;
     required string value = 4;
 }
@@ -200,6 +180,24 @@ message IOCLReply {
     // -1 = failed
     // -2 = retry
     // -3 = abstain/no reply
-    required int32 status = 1;
-    required string value = 2;
+    required RequestIDMessage rid = 1;
+    required int32 status = 2;
+    required string return_value = 3;
+}
+
+message IOCLCoordinationRequest {
+    required RequestIDMessage rid = 1;	
+    required string op = 2;
+    required string key = 3;
+    required string value = 4;
+}
+
+message IOCLCoordinationReply {
+    // 0 = OK
+    // -1 = failed
+    // -2 = retry
+    // -3 = abstain/no reply
+    required RequestIDMessage rid = 1;
+    required int32 status = 2;
+    required string return_value = 3;
 }

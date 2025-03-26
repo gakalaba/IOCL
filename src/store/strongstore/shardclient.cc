@@ -63,10 +63,10 @@ namespace strongstore
             get_reply_.ParseFromString(data);
             HandleGetReply(get_reply_);
         }
-        else if (type == put_reply_.GetTypeName())
+        else if (type == req_reply_.GetTypeName())
         {
-            put_reply_.ParseFromString(data);
-            HandlePutIOCLReply(put_reply_);
+            req_reply_.ParseFromString(data);
+            HandleSendRequestReply(req_reply_);
         }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
@@ -251,34 +251,6 @@ namespace strongstore
         gcb(status, key, val, ts);
     }
 
-    void ShardClient::HandlePutIOCLReply(const proto::PutReply &reply)
-    {
-        uint64_t req_id = reply.rid().client_req_id();
-        int status = reply.status();
-
-        auto itr = pendingPuts.find(req_id);
-        if (itr == pendingPuts.end())
-        {
-            Debug("[%d][%lu] PutReply for stale request.", shard_idx_, req_id);
-            return; // stale request
-        }
-
-        PendingPut *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        put_callback pcb = req->pcb;
-        std::string key = req->key;
-        std::string val = req->val;
-        pendingPuts.erase(itr);
-        delete req;
-
-        Debug("[%lu] [shard %i] Received PUT reply: %s %s %d",
-              transaction_id, shard_idx_, key.c_str(), val.c_str(), status);
-
-        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-
-        pcb(status, key, val);
-    }
-
     void ShardClient::Put(uint64_t transaction_id, const std::string &key, const std::string &value,
                           put_callback pcb, put_timeout_callback ptcb,
                           uint32_t timeout)
@@ -292,36 +264,60 @@ namespace strongstore
         pcb(REPLY_OK, key, value);
     }
 
-    void ShardClient::PutIOCL(uint64_t transaction_id, const std::string &key, const std::string &value,
-                              put_callback pcb, put_timeout_callback ptcb,
-                              uint32_t timeout)
+    // IOCL issue a request
+    void ShardClient::SendRequest(uint64_t transaction_id, const std::string op,
+                                  const std::string &key, const std::string &value,
+                                  req_callback rcb, req_timeout_callback rtcb,
+                                  uint32_t timeout)
     {
-        // Send the GET operation to appropriate shard.
-        Debug("[shard %i] Sending PUT IOCL [%s]", shard_idx_, key.c_str());
+        // Send the operation to appropriate shard.
+        Debug("[shard %i] Sending REQUEST %s(%s, %s)", shard_idx_, op, key.c_str(), value);
 
         uint64_t req_id = last_req_id_++;
-        PendingPut *pendingPut = new PendingPut(transaction_id, req_id);
-        pendingPuts[req_id] = pendingPut;
-        pendingPut->key = key;
-        pendingPut->val = value;
-        pendingPut->pcb = pcb;
-        pendingPut->ptcb = ptcb;
-
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-        auto &t = search->second;
-        auto &start_ts = t.start_time();
+        PendingRequest *pendingReq = new PendingRequest(transaction_id, req_id);
+        pendingReqs[req_id] = pendingReq;
+        pendingReq->op = op;
+        pendingReq->key = key;
+        pendingReq->val = value;
+        pendingReq->rcb = rcb;
+        pendingReq->rtcb = rtcb;
 
         // TODO: Setup timeout
-        put_.Clear();
-        put_.mutable_rid()->set_client_id(client_id_);
-        put_.mutable_rid()->set_client_req_id(req_id);
-        put_.set_transaction_id(transaction_id);
-        start_ts.serialize(put_.mutable_timestamp());
-        put_.set_key(key);
-        put_.set_value(value);
+        req_.Clear();
+        req_.set_rid(transaction_id);
+        req_.set_key(key);
+        req_.set_value(value);
+        req_.set_op(op);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, put_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, req_);
+    }
+
+    // IOCL receive the response
+    void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
+    {
+        uint64_t req_id = reply.rid().client_req_id();
+        int status = reply.status();
+        string retval = reply.return_value();
+
+        auto itr = pendingReqs.find(req_id);
+        if (itr == pendingReqs.end())
+        {
+            Debug("[%d][%lu] SendRequestREply for stale request.", shard_idx_, req_id);
+            return; // stale request
+        }
+
+        PendingRequest *req = itr->second;
+        uint64_t transaction_id = req->transaction_id;
+        req_callback rcb = req->rcb;
+        pendingReqs.erase(itr);
+        delete req;
+
+        Debug("[%lu] [shard %i] Received SendRequest reply with status %s and return value %s",
+              transaction_id, shard_idx_, status, retval);
+
+        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
+
+        rcb(status, retval);
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

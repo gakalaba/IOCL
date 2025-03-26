@@ -314,7 +314,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, false, timeout_);
+        client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
         break;
 
     case COMMIT:
@@ -348,10 +348,8 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
-    auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto pcb = std::bind(&BenchmarkClient::PutCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    auto ptcb = std::bind(&BenchmarkClient::PutTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    auto rcb = std::bind(&BenchmarkClient::ReceiveRequestResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
+    auto rtcb = std::bind(&BenchmarkClient::SendRequestTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
     auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this, session_id);
 
     auto client_index = ss.current_client_index();
@@ -366,20 +364,22 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
 
     Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
+    std::string op_str;
 
     switch (op.type)
     {
     case GET:
-        client.Get(session, op.key, gcb, gtcb, timeout_);
+        op_str = "get";
         break;
 
     case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, true, timeout_);
+        op_str = "put";
         break;
 
     default:
-        NOT_REACHABLE();
+        Panic("unsupported opeartion type %lu", op.type);
     }
+    client.SendRequest(session, op_str, op.key, op.value, rcb, rtcb, timeout_);
 }
 
 void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status_t status)
@@ -413,25 +413,11 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if (IsIOCL())
-        {
-            ExecuteNextOperationIOCL(session_id);
-        }
-        else
-        {
-            ExecuteNextOperation(session_id);
-        }
+        ExecuteNextOperation(session_id);
     }
     else if (status == REPLY_FAIL)
     {
-        if (IsIOCL())
-        {
-            Panic("Got fail response from GET request issued to server");
-        }
-        else
-        {
-            ExecuteAbort(session_id, ABORTED_SYSTEM);
-        }
+        ExecuteAbort(session_id, ABORTED_SYSTEM);
     }
     else
     {
@@ -469,25 +455,11 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if (IsIOCL())
-        {
-            ExecuteNextOperationIOCL(session_id);
-        }
-        else
-        {
-            ExecuteNextOperation(session_id);
-        }
+        ExecuteNextOperation(session_id);
     }
     else if (status == REPLY_FAIL)
     {
-        if (IsIOCL())
-        {
-            Panic("Got fail response from PUT request issued to server");
-        }
-        else
-        {
-            ExecuteAbort(session_id, ABORTED_SYSTEM);
-        }
+        ExecuteAbort(session_id, ABORTED_SYSTEM);
     }
     else
     {
@@ -499,6 +471,31 @@ void BenchmarkClient::PutTimeout(const uint64_t session_id, int status,
                                  const std::string &key, const std::string &val)
 {
     Warning("[%lu] Put(%s,%s) timed out :(", session_id, key.c_str(), val.c_str());
+}
+
+void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
+                                             int status, const std::string &retval)
+{
+    Debug("session [%lu] running ReceiveRequestResponse callback in benchclient! status = %d and retval = %s", session_id, status, retval);
+    auto search = session_states_.find(session_id);
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+
+    if (status == REPLY_OK)
+    {
+        ExecuteNextOperationIOCL(session_id);
+    }
+    else
+    {
+        Panic("Received RequestResponse but the status wasn't OK! it was %d.", status);
+    }
+}
+
+void BenchmarkClient::SendRequestTimeout(const uint64_t session_id,
+                                         int status, const std::string &retval)
+{
+    Warning("[%lu] SendRequest timed out :(", session_id);
 }
 
 void BenchmarkClient::CommitCallback(const uint64_t session_id, transaction_status_t status)

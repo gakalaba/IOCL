@@ -77,6 +77,9 @@ namespace strongstore
     typedef std::function<void(int, const std::string &, const std::string &)> put_callback;
     typedef std::function<void(int, const std::string &, const std::string &)> put_timeout_callback;
 
+    typedef std::function<void(int, const std::string &)> req_callback;
+    typedef std::function<void(int, const std::string &)> req_timeout_callback;
+
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
 
@@ -122,9 +125,10 @@ namespace strongstore
                  put_callback pcb, put_timeout_callback ptcb,
                  uint32_t timeout);
 
-        void PutIOCL(uint64_t transaction_id, const std::string &key, const std::string &value,
-                     put_callback pcb, put_timeout_callback ptcb,
-                     uint32_t timeout);
+        void SendRequest(uint64_t request_id, const std::string op,
+                         const std::string &key, const std::string &value,
+                         req_callback rcb, req_timeout_callback rtcb,
+                         uint32_t timeout);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -165,6 +169,11 @@ namespace strongstore
             PendingRequest(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}
             uint64_t transaction_id;
             uint64_t req_id;
+            std::string op;
+            std::string key;
+            std::string val;
+            req_callback rcb;
+            req_timeout_callback rtcb;
         };
         struct PendingGet : public PendingRequest
         {
@@ -172,15 +181,6 @@ namespace strongstore
             std::string key;
             get_callback gcb;
             get_timeout_callback gtcb;
-        };
-
-        struct PendingPut : public PendingRequest
-        {
-            PendingPut(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            std::string key;
-            std::string val;
-            put_callback pcb;
-            put_timeout_callback ptcb;
         };
 
         struct PendingRWCoordCommit : public PendingRequest
@@ -230,7 +230,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::GetReply &reply);
         // for IOCL
-        void HandlePutIOCLReply(const proto::PutReply &reply);
+        void HandleSendRequestReply(const proto::IOCLReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -244,7 +244,7 @@ namespace strongstore
         std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
-        std::unordered_map<uint64_t, PendingPut *> pendingPuts;
+        std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -253,7 +253,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
-        proto::Put put_;
+        proto::IOCLRequest req_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -263,7 +263,7 @@ namespace strongstore
         proto::Wound wound_;
 
         proto::GetReply get_reply_;
-        proto::PutReply put_reply_;
+        proto::IOCLReply req_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;
