@@ -127,6 +127,9 @@ namespace strongstore
         void ReplicaUpcall(opnum_t opnum, const string &op,
                            string &response) override;
 
+        void ReplicaUpcall(const string op, const string &k,
+                           const string &v, string &response) override;
+
         void UnloggedUpcall(const string &op, string &response) override;
 
         // Override Server

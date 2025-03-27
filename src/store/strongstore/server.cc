@@ -1852,6 +1852,37 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    void Server::ReplicaUpcall(const string &op, const string &k, const string &v, string &response)
+    {
+        Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", op, k, v);
+        Request request;
+        IOCLReply reply;
+
+        request.ParseFromString(op);
+
+        string retval;
+        int status = REPLY_OK;
+        if (op == "get")
+        {
+            // TODO ANJA look up how to mutate variables
+            if (!iocl_store_.get(k, retval))
+            {
+                status = REPLY_FAIL;
+            };
+        }
+        else if (op == "put")
+        {
+            iocl_store_.put(k, v);
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        reply.set_status(status);
+        reply.set_return_value(retval);
+        reply.SerializeToString(&response);
+    }
+
     void Server::UnloggedUpcall(const string &op, string &response)
     {
         NOT_IMPLEMENTED();
