@@ -55,13 +55,14 @@ namespace replication
 
         VRReplica::VRReplica(transport::Configuration config, int groupIdx, int myIdx,
                              Transport *transport, unsigned int batchSize,
-                             AppReplica *app, bool debug_stats)
+                             AppReplica *app, bool isLin, bool debug_stats)
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
               prepareOKQuorum(config.QuorumSize() - 1),
               startViewChangeQuorum(config.QuorumSize() - 1),
               doViewChangeQuorum(config.QuorumSize() - 1),
+              is_lin_(isLin),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
@@ -112,8 +113,7 @@ namespace replication
             }
         }
 
-
-	// Destructor
+        // Destructor
         VRReplica::~VRReplica()
         {
             delete viewChangeTimeout;
@@ -159,7 +159,14 @@ namespace replication
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
                 ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
+                if (is_lin_)
+                {
+                    Execute();
+                }
+                else
+                {
+                    Execute(lastCommitted, entry->request, reply);
+                }
 
                 reply.set_view(entry->viewstamp.view);
                 reply.set_opnum(entry->viewstamp.opnum);
@@ -478,7 +485,7 @@ namespace replication
                 RDebug("Ignoring request because I'm not the leader");
                 return;
             }
-            
+
             Debug("Handling Request--I AM the leader");
             // Save the client's address
             clientAddresses.erase(msg.req().clientid());

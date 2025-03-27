@@ -469,7 +469,7 @@ int main(int argc, char **argv)
     {
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server) false,
             FLAGS_debug_stats);
         break;
     }
@@ -477,7 +477,7 @@ int main(int argc, char **argv)
     {
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server), true,
             FLAGS_debug_stats);
         break;
     }
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
         // TODO ANJA obv make this new iocl::IOCLReplica
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server), true,
             FLAGS_debug_stats);
         break;
     }

@@ -53,13 +53,14 @@ namespace replication
         public:
             VRReplica(transport::Configuration config, int groupIdx, int myIdx,
                       Transport *transport, unsigned int batchSize, AppReplica *app,
-                      bool debug_stats);
+                      bool isLin, bool debug_stats);
             ~VRReplica();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
 
         private:
+            bool is_lin_;
             view_t view;
             opnum_t lastCommitted;
             opnum_t lastOp;
