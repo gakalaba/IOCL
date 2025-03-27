@@ -1852,7 +1852,7 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
-    void Server::ReplicaUpcall(const string &op, const string &k, const string &v, string &response)
+    void Server::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &response)
     {
         Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", op, k, v);
         Request request;

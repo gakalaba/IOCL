@@ -58,11 +58,6 @@ namespace strongstore
                                     string value,
                                     request_callback rcb, request_timeout_callback rtcb,
                                     uint32_t timeout)
-    /*
-    let's just for now, leave out the callback.. not sure it's necessary
-    ,
-    prepare_callback pcb, prepare_timeout_callback ptcb,
-    uint32_t timeout)*/
     {
         Debug("[shard %i] SendRequest sending: %s", shard_idx_, op);
 
@@ -82,7 +77,7 @@ namespace strongstore
         pendingRequest->rcb = rcb;
         pendingRequest->rtcb = rtcb;
 
-        client->Invoke(
+        client->InvokeRequest(
             request_str,
             bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
                  std::placeholders::_1, std::placeholders::_2));

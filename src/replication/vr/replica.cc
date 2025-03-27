@@ -159,14 +159,7 @@ namespace replication
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
                 ReplyMessage reply;
-                if (is_lin_)
-                {
-                    Execute();
-                }
-                else
-                {
-                    Execute(lastCommitted, entry->request, reply);
-                }
+                Execute(lastCommitted, entry->request, reply);
 
                 reply.set_view(entry->viewstamp.view);
                 reply.set_opnum(entry->viewstamp.opnum);
@@ -402,6 +395,7 @@ namespace replication
         {
             RequestMessage request;
             UnloggedRequestMessage unloggedRequest;
+            // ExecutableRequestMessage execRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
             CommitMessage commit;
@@ -421,6 +415,11 @@ namespace replication
                 unloggedRequest.ParseFromString(data);
                 HandleUnloggedRequest(remote, unloggedRequest);
             }
+            // else if (type == execRequest.GetTypeName())
+            // {
+            //     execRequest.ParseFromString(data);
+            //     HandleExecRequest(remote, execRequest);
+            // }
             else if (type == prepare.GetTypeName())
             {
                 prepare.ParseFromString(data);
@@ -557,6 +556,13 @@ namespace replication
                 request.set_op(res);
                 request.set_clientid(msg.req().clientid());
                 request.set_clientreqid(msg.req().clientreqid());
+                if (msg.req().has_execop())
+                {
+                    Debug("inside Hanlde request, and the optional fields HAVE been set, and are being forwarded to the log entry");
+                    request.set_execop(msg.req().execop());
+                    request.set_execkey(msg.req().execkey());
+                    request.set_execval(msg.req().execval());
+                }
 
                 /* Assign it an opnum */
                 ++this->lastOp;

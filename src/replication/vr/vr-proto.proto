@@ -24,6 +24,17 @@ message UnloggedReplyMessage {
     required uint64 clientreqid = 2;
 }
 
+// message ExecutableRequestMessage {
+//     required replication.ExecutableRequest req = 1;
+// }
+
+// message ExecutableReplyMessage {
+//     required uint64 view = 1;
+//     required uint64 opnum = 2;
+//     required uint64 clientreqid = 3;
+//     required bytes reply = 4;
+// }
+
 message PrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;

@@ -6,6 +6,9 @@ message Request {
      required bytes op = 1;
      required uint64 clientid = 2;
      required uint64 clientreqid = 3;
+     optional string execop = 4;
+     optional string execkey = 5;
+     optional string execval = 6;
 }
 
 message UnloggedRequest {

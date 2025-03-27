@@ -38,36 +38,49 @@
 #include "lib/message.h"
 #include "replication/common/log.h"
 
-namespace replication {
+namespace replication
+{
 
-Replica::Replica(const transport::Configuration &configuration, int groupIdx,
-                 int myIdx, Transport *transport, AppReplica *app)
-    : configuration(configuration),
-      groupIdx(groupIdx),
-      myIdx(myIdx),
-      transport(transport),
-      app(app) {
-    transport->Register(this, configuration, groupIdx, myIdx);
-}
+    Replica::Replica(const transport::Configuration &configuration, int groupIdx,
+                     int myIdx, Transport *transport, AppReplica *app)
+        : configuration(configuration),
+          groupIdx(groupIdx),
+          myIdx(myIdx),
+          transport(transport),
+          app(app)
+    {
+        transport->Register(this, configuration, groupIdx, myIdx);
+    }
 
-Replica::~Replica() {}
+    Replica::~Replica() {}
 
-void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
-                           string &res) {
-    Debug("Making leader upcall for operation %s", op.c_str());
-    app->LeaderUpcall(opnum, op, replicate, res);
-    Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
-}
+    void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
+                               string &res)
+    {
+        Debug("Making leader upcall for operation %s", op.c_str());
+        app->LeaderUpcall(opnum, op, replicate, res);
+        Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
+    }
 
-void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res) {
-    Debug("Making upcall for opnum %d operation %s", opnum, op);
-    app->ReplicaUpcall(opnum, op, res);
+    void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res)
+    {
+        Debug("Making upcall for opnum %d operation %s", opnum, op);
+        app->ReplicaUpcall(opnum, op, res);
 
-    Debug("Upcall result: %s", res.c_str());
-}
+        Debug("Upcall result: %s", res.c_str());
+    }
 
-void Replica::UnloggedUpcall(const string &op, string &res) {
-    app->UnloggedUpcall(op, res);
-}
+    void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)
+    {
+        Debug("Making executable upcall for opnum %d operation %s and key %s and value %s", opnum, op, k, v);
+        app->ReplicaUpcall(opnum, op, k, v, res);
 
-}  // namespace replication
+        Debug("Upcall result: %s", res.c_str());
+    }
+
+    void Replica::UnloggedUpcall(const string &op, string &res)
+    {
+        app->UnloggedUpcall(op, res);
+    }
+
+} // namespace replication

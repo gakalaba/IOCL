@@ -80,6 +80,25 @@ namespace replication
             SendRequest(req);
         }
 
+        void VRClient::InvokeRequest(const string &request, continuation_t continuation,
+                                     error_continuation_t error_continuation)
+        {
+            Debug("VRClient::Invoke Request IOCL invoked!");
+            // TODO: Currently, invocations never timeout and error_continuation is
+            // never called. It may make sense to set a timeout on the invocation.
+            (void)error_continuation;
+
+            uint64_t reqId = ++lastReqId;
+            Timeout *timer =
+                new Timeout(transport, 500, [this, reqId]()
+                            { ResendRequest(reqId); });
+            PendingRequest *req =
+                new PendingRequest(request, reqId, continuation, timer);
+
+            pendingReqs[reqId] = req;
+            SendRequest(req);
+        }
+
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
                                       continuation_t continuation,
                                       error_continuation_t error_continuation,
@@ -113,6 +132,27 @@ namespace replication
         {
             Panic("Unimplemented.");
             return;
+        }
+
+        void VRClient::SendRequest(const PendingRequest *req)
+        {
+            proto::RequestMessage reqMsg;
+            reqMsg.mutable_req()->set_op(req->request);
+            reqMsg.mutable_req()->set_clientid(clientid);
+            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+
+            Debug("SENDING REQUEST: %lu %lu", clientid, req);
+            // XXX Try sending only to (what we think is) the leader first
+            if (transport->SendMessageToGroup(this, group, reqMsg))
+            {
+                req->timer->Reset();
+            }
+            else
+            {
+                Warning("Could not send request to replicas.");
+                pendingReqs.erase(req->clientReqId);
+                delete req;
+            }
         }
 
         void VRClient::SendRequest(const PendingRequest *req)
