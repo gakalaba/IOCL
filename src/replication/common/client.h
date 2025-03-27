@@ -74,8 +74,6 @@ namespace replication
 
         virtual void Invoke(const string &request, continuation_t continuation,
                             error_continuation_t error_continuation = nullptr) = 0;
-        virtual void InvokeRequest(const string &request, continuation_t continuation,
-                                   error_continuation_t error_continuation = nullptr) = 0;
         virtual void InvokeUnlogged(
             int replicaIdx, const string &request, continuation_t continuation,
             error_continuation_t error_continuation = nullptr,

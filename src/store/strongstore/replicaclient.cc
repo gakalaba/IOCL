@@ -77,7 +77,7 @@ namespace strongstore
         pendingRequest->rcb = rcb;
         pendingRequest->rtcb = rtcb;
 
-        client->InvokeRequest(
+        client->Invoke(
             request_str,
             bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
                  std::placeholders::_1, std::placeholders::_2));
