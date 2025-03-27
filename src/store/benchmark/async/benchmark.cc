@@ -138,10 +138,11 @@ DEFINE_string(protocol_mode, protocol_args[0],
               " use during this experiment");
 DEFINE_validator(protocol_mode, &ValidateProtocolMode);
 
-const std::string strong_consistency_args[] = {"ss", "rss"};
+const std::string strong_consistency_args[] = {"ss", "rss", "lin"};
 const strongstore::Consistency strong_consistency[]{
     strongstore::Consistency::SS,
     strongstore::Consistency::RSS,
+    strongstore::Consistency::LIN,
 };
 static bool ValidateStrongConsistency(const char *flagname,
                                       const std::string &value)
@@ -739,6 +740,7 @@ int main(int argc, char **argv)
     switch (benchMode)
     {
     case BENCH_RETWIS:
+        Debug("we'res tarting the retwis??");
         bench = new retwis::RetwisClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,
@@ -751,6 +753,7 @@ int main(int argc, char **argv)
             FLAGS_max_attempts);
         break;
     case BENCH_MICRO:
+        Debug("we're starting the microooooo");
         bench = new micro::MicroClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,
@@ -771,10 +774,12 @@ int main(int argc, char **argv)
     switch (benchMode)
     {
     case BENCH_RETWIS:
+        Debug("Retwis");
         tport->Timer(0, [bench, bdcb]()
                      { bench->Start(bdcb); });
         break;
     case BENCH_MICRO:
+        Debug("MICRO");
         tport->Timer(0, [bench, bdcb]()
                      { bench->Start(bdcb); });
         break;
