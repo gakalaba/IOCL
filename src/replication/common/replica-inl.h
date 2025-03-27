@@ -38,7 +38,7 @@ void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply)
     if (msg.has_execop())
     {
         Debug("when executing, noticed there's fields to execute this");
-        ReplicaUpcall(opnum, msg.execop(), msg.execkey(), msg.execval(), reply);
+        ReplicaUpcall(opnum, msg.execop(), msg.execkey(), msg.execval(), res);
     }
     else
     {
