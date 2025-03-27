@@ -201,7 +201,7 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
-        void HandlePut(const TransportAddress &remote, proto::Put &msg);
+        void HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg);
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -240,6 +240,8 @@ namespace strongstore
 
         void PrepareCallback(uint64_t transaction_id, int status,
                              Timestamp timestamp);
+        void SendRequestCallback(uint64_t transaction_id, int status,
+                                 string retval);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -291,7 +293,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
 
         proto::Get get_;
-        proto::Put put_;
+        proto::IOCLRequest req_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -300,6 +302,7 @@ namespace strongstore
         proto::Abort abort_;
 
         proto::GetReply get_reply_;
+        proto::IOCLReply req_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

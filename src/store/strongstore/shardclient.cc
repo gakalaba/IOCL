@@ -295,7 +295,7 @@ namespace strongstore
     // IOCL receive the response
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {
-        uint64_t req_id = reply.rid().client_req_id();
+        uint64_t req_id = reply.rid();
         int status = reply.status();
         string retval = reply.return_value();
 

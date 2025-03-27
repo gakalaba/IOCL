@@ -70,7 +70,7 @@ namespace strongstore
         string request_str;
         IOCLRequest request;
         request.set_op(op);
-        request.set_reqid(request_id);
+        request.set_rid(request_id);
         request.set_key(key);
         request.set_value(value);
 
@@ -88,7 +88,7 @@ namespace strongstore
                  std::placeholders::_1, std::placeholders::_2));
     }
 
-    /* Callback from a shard replica on prepare operation completion. */
+    /* Callback from a shard replica on sendrequest operation completion. */
     bool ReplicaClient::SendRequestCallback(uint64_t reqId, const string &request_str,
                                             const string &reply_str)
     {
@@ -104,7 +104,7 @@ namespace strongstore
         request_callback rcb = pendingRequest->rcb;
         this->pendingRequests.erase(itr);
         delete pendingRequest;
-        rcb(reply.status());
+        rcb(reply.status(), reply.value());
 
         return true;
     }

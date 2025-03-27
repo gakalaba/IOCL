@@ -169,7 +169,7 @@ message Reply {
 }
 
 message IOCLRequest {
-    required RequestIDMessage rid = 1;	
+    required uint64 rid = 1;	
     required string op = 2;
     required string key = 3;
     required string value = 4;
@@ -180,13 +180,13 @@ message IOCLReply {
     // -1 = failed
     // -2 = retry
     // -3 = abstain/no reply
-    required RequestIDMessage rid = 1;
+    required uint64 rid = 1;
     required int32 status = 2;
     required string return_value = 3;
 }
 
 message IOCLCoordinationRequest {
-    required RequestIDMessage rid = 1;	
+    required uint64 rid = 1;	
     required string op = 2;
     required string key = 3;
     required string value = 4;
@@ -197,7 +197,7 @@ message IOCLCoordinationReply {
     // -1 = failed
     // -2 = retry
     // -3 = abstain/no reply
-    required RequestIDMessage rid = 1;
+    required uint64 rid = 1;
     required int32 status = 2;
     required string return_value = 3;
 }

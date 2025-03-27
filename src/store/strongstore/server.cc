@@ -138,10 +138,10 @@ namespace strongstore
             get_.ParseFromString(data);
             HandleGet(remote, get_);
         }
-        else if (type == put_.GetTypeName())
+        else if (type == req_.GetTypeName())
         {
-            put_.ParseFromString(data);
-            HandlePut(remote, put_);
+            req_.ParseFromString(data);
+            HandleSendRequest(remote, req_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -191,19 +191,6 @@ namespace strongstore
 
     void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
     {
-        if (consistency_ = strongstore::Consistency::LIN)
-        {
-            uint64_t transaction_id = msg.transaction_id();
-            const Transaction transaction{msg.transaction()};
-
-            replica_client_->SendRequest(
-                transaction_id, transaction,
-                std::bind(&Server::PrepareCallback, this, transaction_id,
-                          std::placeholders::_1, std::placeholders::_2),
-                // this thing is the ptcb
-                [](int, Timestamp) {}, REQUEST_TIMEOUT);
-            return;
-        }
         uint64_t client_id = msg.rid().client_id();
         uint64_t client_req_id = msg.rid().client_req_id();
         uint64_t transaction_id = msg.transaction_id();
@@ -283,9 +270,9 @@ namespace strongstore
         }
     }
 
-    void Server::HandlePut(const TransportAddress &remote, proto::IOCLRequest &msg)
+    void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
-        uint64_t transaction_id = msg.transaction_id();
+        uint64_t transaction_id = msg.rid();
 
         // const Transaction transaction{msg.transaction()};
 
@@ -298,10 +285,10 @@ namespace strongstore
 
         replica_client_->SendRequest(
             transaction_id, msg.op(), msg.key(), msg.value(),
-            std::bind(&Server::PrepareCallback, this, transaction_id,
+            std::bind(&Server::SendRequestCallback, this, transaction_id,
                       std::placeholders::_1, std::placeholders::_2),
             // this thing is the ptcb
-            [](int) {}, REQUEST_TIMEOUT);
+            [](int, string) {}, REQUEST_TIMEOUT);
 
         // --------------------------------------------------
         // HandleGet"
@@ -1223,6 +1210,12 @@ namespace strongstore
         {
             NOT_REACHABLE();
         }
+    }
+
+    void Server::SendRequestCallback(uint64_t transaction_id, int status,
+                                     string retval)
+    {
+        Panic("HUHUH");
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
