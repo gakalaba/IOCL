@@ -34,12 +34,14 @@ namespace micro
 
     BasicAppRequest::BasicAppRequest(KeySelector *keySelector, int numKeys, std::mt19937 &rand)
         : AsyncAppRequest(),
-          keySelector(keySelector)
+          keySelector(keySelector),
+          ttype_{"basic_appreq"}
     {
         for (int i = 0; i < numKeys; ++i)
         {
             keyIdxs.push_back(keySelector->GetKey(rand));
         }
+        Debug("done!");
     }
 
     BasicAppRequest::~BasicAppRequest()
@@ -59,6 +61,11 @@ namespace micro
         {
             return Get(GetKey(op_index - 1));
         }
+    }
+
+    const std::string &BasicAppRequest::GetTransactionType()
+    {
+        return ttype_;
     }
 
 } // namespace micro

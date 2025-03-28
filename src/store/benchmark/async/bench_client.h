@@ -79,6 +79,13 @@ public:
 
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
+    // TODO ANJA:
+    // for IOCL transformed application use only
+    // SendRequest(opTypes state.Operation, keys int64, newValues state.Value, oldValues state.Value) (bool, state.Value)
+    // state.go will be in frontend/request_utils.cc+h
+    // #include request_utils.h
+    void SendRequest();
+
     inline bool IsFullyDone() { return done; }
 
     struct Latency_t latency;
@@ -115,7 +122,7 @@ private:
             : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
-            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }

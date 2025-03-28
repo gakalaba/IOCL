@@ -599,6 +599,7 @@ namespace strongstore
         sclients_[i]->Put(req_id, key, value, pcb1, ptcb1, timeout);
     }
 
+    // IOCL use only
     void Client::SendRequest(Session &s, const std::string op,
                              const std::string &key, const std::string &value,
                              req_callback rcb, req_timeout_callback rtcb,

@@ -356,6 +356,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
+    Debug("opindex == %d and ss.fanout() == %d", op_index, ss.fanout());
     if (op_index == ss.fanout())
     {
         // don't issue more

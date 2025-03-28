@@ -524,7 +524,7 @@ int main(int argc, char **argv)
 
     // parse retwis settings
     std::vector<std::string> keys;
-    if (benchMode == BENCH_RETWIS)
+    if (benchMode == BENCH_RETWIS || benchMode == BENCH_MICRO)
     {
         if (FLAGS_keys_path.empty())
         {
@@ -725,14 +725,6 @@ int main(int argc, char **argv)
 
         ASSERT(client != nullptr);
         clients.push_back(client);
-    }
-
-    switch (benchMode)
-    {
-    case BENCH_RETWIS:
-        break;
-    default:
-        NOT_REACHABLE();
     }
 
     uint32_t seed = FLAGS_client_id << 4;

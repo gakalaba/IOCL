@@ -1852,6 +1852,7 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &response)
     {
         Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", op, k, v);

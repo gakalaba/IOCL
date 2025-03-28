@@ -61,6 +61,7 @@ namespace micro
 
     AsyncAppRequest *MicroClient::GetNextAppRequest()
     {
+        // TODO ANJA make this fanout instead of 5 lol
         return new BasicAppRequest(keySelector, 5, GetRand());
     }
 

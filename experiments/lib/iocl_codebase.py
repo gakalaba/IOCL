@@ -123,7 +123,7 @@ class IOCLCodebase:
         if 'partitioner' in config:
             client_command += ' --partitioner %s' % config['partitioner']
 
-        if config['benchmark_name'] == 'retwis':
+        if config['benchmark_name'] == 'retwis' or config['benchmark_name'] == 'micro':
             client_command += ' --num_keys %d' % config['client_num_keys']
             if 'client_key_selector' in config:
                 client_command += ' --key_selector %s' % config['client_key_selector']
@@ -331,7 +331,7 @@ class IOCLCodebase:
         if 'server_debug_stats' in config and config['server_debug_stats']:
             replica_command += ' --debug_stats'
 
-        if config['benchmark_name'] == 'retwis':
+        if config['benchmark_name'] == 'retwis' or config['benchmark_name'] == 'micro':
             replica_command += ' --num_keys %d' % config['client_num_keys']
             if 'server_preload_keys' in config:
                 replica_command += ' --preload_keys=%s' % str(
