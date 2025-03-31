@@ -53,23 +53,16 @@ namespace strongstore
     ReplicaClient::~ReplicaClient() { delete client; }
 
     void ReplicaClient::SendRequest(uint64_t request_id,
-                                    string op,
-                                    string key,
-                                    string value,
+                                    IOCLRequest &msg,
                                     request_callback rcb, request_timeout_callback rtcb,
                                     uint32_t timeout)
     {
-        Debug("[shard %i] SendRequest sending: %s", shard_idx_, op.c_str());
+        Debug("[shard %i] SendRequest sending: %s", shard_idx_, msg);
 
         // create request
         string request_str;
-        IOCLRequest request;
-        request.set_op(op);
-        request.set_rid(request_id);
-        request.set_key(key);
-        request.set_value(value);
 
-        request.SerializeToString(&request_str);
+        msg.SerializeToString(&request_str);
 
         uint64_t reqId = lastReqId++;
         PendingRequest *pendingRequest = new PendingRequest(reqId);
@@ -87,7 +80,7 @@ namespace strongstore
     bool ReplicaClient::SendRequestCallback(uint64_t reqId, const string &request_str,
                                             const string &reply_str)
     {
-        Reply reply;
+        IOCLReply reply;
 
         reply.ParseFromString(reply_str);
 
@@ -99,7 +92,7 @@ namespace strongstore
         request_callback rcb = pendingRequest->rcb;
         this->pendingRequests.erase(itr);
         delete pendingRequest;
-        rcb(reply.status(), reply.value());
+        rcb(reply.status(), reply.return_value());
 
         return true;
     }

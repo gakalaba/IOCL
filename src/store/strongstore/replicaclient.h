@@ -66,7 +66,7 @@ namespace strongstore
         virtual ~ReplicaClient();
 
         void SendRequest(uint64_t request_id,
-                         string op, string key, string value,
+                         strongstore::proto::IOCLRequest &msg,
                          request_callback rcb, request_timeout_callback rtcb,
                          uint32_t timeout);
 

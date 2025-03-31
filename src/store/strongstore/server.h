@@ -127,9 +127,6 @@ namespace strongstore
         void ReplicaUpcall(opnum_t opnum, const string &op,
                            string &response) override;
 
-        void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
-                           const string &v, string &response) override;
-
         void UnloggedUpcall(const string &op, string &response) override;
 
         // Override Server
@@ -268,6 +265,7 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
+        void ReplicaUpcallIOCL(opnum_t opnum, strongstore::proto::IOCLRequest &req, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);

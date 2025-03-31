@@ -187,6 +187,7 @@ namespace replication
                 auto iter = clientAddresses.find(entry->request.clientid());
                 if (iter != clientAddresses.end())
                 {
+                    Debug("sending response to client?");
                     transport->SendMessage(this, *iter->second, reply);
                 }
             }
@@ -555,13 +556,6 @@ namespace replication
                 request.set_op(res);
                 request.set_clientid(msg.req().clientid());
                 request.set_clientreqid(msg.req().clientreqid());
-                if (msg.req().has_execop())
-                {
-                    Debug("inside Hanlde request, and the optional fields HAVE been set, and are being forwarded to the log entry");
-                    request.set_execop(msg.req().execop());
-                    request.set_execkey(msg.req().execkey());
-                    request.set_execval(msg.req().execval());
-                }
 
                 /* Assign it an opnum */
                 ++this->lastOp;

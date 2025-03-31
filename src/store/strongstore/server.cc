@@ -285,7 +285,7 @@ namespace strongstore
         // [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
         replica_client_->SendRequest(
-            transaction_id, msg.op(), msg.key(), msg.value(),
+            transaction_id, msg,
             std::bind(&Server::SendRequestCallback, this, transaction_id,
                       std::placeholders::_1, std::placeholders::_2),
             // this thing is the ptcb
@@ -1138,7 +1138,8 @@ namespace strongstore
     void Server::SendRequestCallback(uint64_t transaction_id, int status,
                                      string retval)
     {
-        Panic("HUHUH");
+        Debug("got this status %d and this retval %s", status, retval);
+        Panic("need to return this back to the shard client!");
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
@@ -1657,10 +1658,16 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        Debug("Received Spanner Upcall: %lu %s", opnum, op.c_str());
+        Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
+        IOCLRequest ioclrequest;
+        if (consistency_ == strongstore::Consistency::LIN)
+        {
+            ioclrequest.ParseFromString(op);
+            ReplicaUpcallIOCL(opnum, ioclrequest, response);
+            return;
+        }
         Request request;
         Reply reply;
-
         request.ParseFromString(op);
 
         int status = REPLY_OK;
@@ -1785,27 +1792,26 @@ namespace strongstore
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &response)
+    void Server::ReplicaUpcallIOCL(opnum_t opnum, IOCLRequest &req, string &response)
     {
-        Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", op, k, v);
-        IOCLRequest request;
+        Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
         IOCLReply reply;
-
-        request.ParseFromString(op);
 
         string retval;
         int status = REPLY_OK;
-        if (op == "get")
+        if (req.op() == "get")
         {
+            Debug("the request is get");
             // TODO ANJA look up how to mutate variables
-            if (!iocl_store_.get(k, retval))
+            if (!iocl_store_.get(req.key(), retval))
             {
                 status = REPLY_FAIL;
             };
         }
-        else if (op == "put")
+        else if (req.op() == "put")
         {
-            iocl_store_.put(k, v);
+            Debug("the request is put");
+            iocl_store_.put(req.key(), req.value());
         }
         else
         {
@@ -1813,6 +1819,7 @@ namespace strongstore
         }
         reply.set_status(status);
         reply.set_return_value(retval);
+        reply.set_rid(req.rid());
         reply.SerializeToString(&response);
     }
 

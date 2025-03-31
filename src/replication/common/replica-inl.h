@@ -35,16 +35,9 @@ template <class MSG>
 void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply)
 {
     string res;
-    if (msg.has_execop())
-    {
-        Debug("when executing, noticed there's fields to execute this");
-        ReplicaUpcall(opnum, msg.execop(), msg.execkey(), msg.execval(), res);
-    }
-    else
-    {
-        Debug("calling the wrong upcall");
-        ReplicaUpcall(opnum, msg.op(), res);
-    }
+
+    ReplicaUpcall(opnum, msg.op(), res);
+
     reply.set_reply(res);
 }
 
