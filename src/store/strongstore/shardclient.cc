@@ -271,7 +271,7 @@ namespace strongstore
                                   uint32_t timeout)
     {
         // Send the operation to appropriate shard.
-        Debug("[shard %i] Sending REQUEST %s(%s, %s)", shard_idx_, op, key.c_str(), value);
+        Debug("[shard %i] Sending REQUEST %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
         PendingRequest *pendingReq = new PendingRequest(transaction_id, req_id);

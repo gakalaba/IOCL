@@ -609,7 +609,7 @@ namespace strongstore
 
         auto req_id = session.transaction_id();
 
-        Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op, key.c_str(), value);
+        Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op.c_str(), key.c_str(), value.c_str());
 
         ASSERT(session.executing());
 

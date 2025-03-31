@@ -272,6 +272,7 @@ namespace strongstore
 
     void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
+        Debug("Calling HandleSendRequest! with msg %s: msg.op = %s, msg.key = %s, msg.value = %s", msg, msg.op(), msg.key(), msg.value());
         uint64_t transaction_id = msg.rid();
 
         // const Transaction transaction{msg.transaction()};
@@ -289,84 +290,6 @@ namespace strongstore
                       std::placeholders::_1, std::placeholders::_2),
             // this thing is the ptcb
             [](int, string) {}, REQUEST_TIMEOUT);
-
-        // --------------------------------------------------
-        // HandleGet"
-        // uint64_t client_id = msg.rid().client_id();
-        // uint64_t client_req_id = msg.rid().client_req_id();
-        // uint64_t transaction_id = msg.transaction_id();
-
-        // const std::string &key = msg.key();
-        // const Timestamp timestamp{msg.timestamp()};
-
-        // bool for_update = msg.has_for_update() && msg.for_update();
-
-        // Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
-
-        // transactions_.StartGet(transaction_id, remote, key, for_update);
-
-        // LockAcquireResult r;
-        // if (for_update)
-        // {
-        //     r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
-        // }
-        // else
-        // {
-        //     r = locks_.AcquireReadLock(transaction_id, timestamp, key);
-        // }
-
-        // if (r.status == LockStatus::ACQUIRED)
-        // {
-        //     ASSERT(r.wound_rws.size() == 0);
-
-        //     std::pair<TimestampID, std::string> value;
-        //     ASSERT(store_.get(key, value));
-
-        //     get_reply_.Clear();
-        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
-        //     get_reply_.set_status(REPLY_OK);
-        //     get_reply_.set_key(msg.key());
-
-        //     get_reply_.set_val(value.second);
-        //     value.first.timestamp.serialize(get_reply_.mutable_timestamp());
-
-        //     transport_->SendMessage(this, remote, get_reply_);
-
-        //     transactions_.FinishGet(transaction_id, key);
-        // }
-        // else if (r.status == LockStatus::FAIL)
-        // {
-        //     ASSERT(r.wound_rws.size() == 0);
-
-        //     get_reply_.Clear();
-        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
-        //     get_reply_.set_status(REPLY_FAIL);
-        //     get_reply_.set_key(msg.key());
-
-        //     transport_->SendMessage(this, remote, get_reply_);
-
-        //     const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-
-        //     LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        //     transactions_.AbortGet(transaction_id, key);
-
-        //     NotifyPendingRWs(transaction_id, rr.notify_rws);
-        // }
-        // else if (r.status == LockStatus::WAITING)
-        // {
-        //     auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
-        //     reply->key = key;
-
-        //     pending_get_replies_[msg.transaction_id()] = reply;
-
-        //     transactions_.PauseGet(transaction_id, key);
-
-        //     WoundPendingRWs(transaction_id, r.wound_rws);
-        // }
-        // else
-        // {
-        //     NOT_REACHABLE();
-        // }
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -1701,19 +1624,28 @@ namespace strongstore
         Debug("Received LeaderUpcall in strongstore server: %lu %s", opnum, op.c_str());
 
         Request request;
-
-        request.ParseFromString(op);
-
-        switch (request.op())
+        IOCLRequest ioclrequest;
+        if (consistency_ != strongstore::Consistency::LIN)
         {
-        case strongstore::proto::Request::PREPARE:
-        case strongstore::proto::Request::COMMIT:
-        case strongstore::proto::Request::ABORT:
+            request.ParseFromString(op);
+            switch (request.op())
+            {
+            case strongstore::proto::Request::PREPARE:
+            case strongstore::proto::Request::COMMIT:
+            case strongstore::proto::Request::ABORT:
+                replicate = true;
+                response = op;
+                break;
+            default:
+                Panic("Unrecognized operation.");
+            }
+        }
+        else
+        {
+            ioclrequest.ParseFromString(op);
             replicate = true;
             response = op;
-            break;
-        default:
-            Panic("Unrecognized operation.");
+            Debug("was able to parse IOCLRequest! it looks like %s", ioclrequest);
         }
     }
 
@@ -1725,7 +1657,7 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        Debug("Received Upcall: %lu %s", opnum, op.c_str());
+        Debug("Received Spanner Upcall: %lu %s", opnum, op.c_str());
         Request request;
         Reply reply;
 
@@ -1856,7 +1788,7 @@ namespace strongstore
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &response)
     {
         Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", op, k, v);
-        Request request;
+        IOCLRequest request;
         IOCLReply reply;
 
         request.ParseFromString(op);

@@ -55,10 +55,12 @@ namespace micro
         uint64_t percentage_writes = 75; // todo CHANGE THIS
         if ((rand() % 100) < percentage_writes)
         {
+            Debug("Sending Put");
             return Put(GetKey(op_index - 1), GetKey(op_index - 1));
         }
         else
         {
+            Debug("sending Get");
             return Get(GetKey(op_index - 1));
         }
     }

@@ -100,7 +100,6 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
-    Debug("here's IsIOCL yall %d", IsIOCL());
     if (IsIOCL())
     {
         transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
@@ -371,10 +370,12 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     switch (op.type)
     {
     case GET:
+        Debug("Sending get");
         op_str = "get";
         break;
 
     case PUT:
+        Debug("Sending put");
         op_str = "put";
         break;
 

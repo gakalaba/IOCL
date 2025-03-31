@@ -42,6 +42,7 @@ void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply)
     }
     else
     {
+        Debug("calling the wrong upcall");
         ReplicaUpcall(opnum, msg.op(), res);
     }
     reply.set_reply(res);
