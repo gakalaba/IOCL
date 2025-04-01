@@ -768,15 +768,18 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
 
     if (started)
     {
+        Debug("Started");
         // record latency
         if (!cooldownStarted)
         {
+            Debug("recording latency");
             _Latency_EndRec(&latency, lat);
             uint64_t ns = lat->accum;
             // TODO: use standard definitions across all clients for
             // success/commit and failure/abort
             if (result == 0)
             { // only record result if success
+                Debug("recording!");
                 struct timespec curr;
                 clock_gettime(CLOCK_MONOTONIC, &curr);
                 if (latencies.size() == 0UL)
@@ -793,6 +796,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
                 latencies.push_back(ns);
             }
         }
+        Debug("here");
 
         struct timeval diff;
         BenchState state = GetBenchState(diff);
@@ -815,6 +819,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
         client.EndSession(ss.session());
         session_states_.erase(search);
     }
+    Debug("returning");
 
     n++;
 }
