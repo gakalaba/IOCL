@@ -264,6 +264,9 @@ void BenchmarkClient::SendNextInSessionIOCL(const uint64_t session_id)
     auto appreq = GetNextAppRequest();
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
+    // reset op_index!
+    ss.start_apprequest(ss.session(), appreq, ss.current_client_index());
+
     auto &session = ss.session();
     auto sid = session.id();
     Debug("session id: %lu", sid);

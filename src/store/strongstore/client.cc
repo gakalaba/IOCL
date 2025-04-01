@@ -611,13 +611,27 @@ namespace strongstore
 
         Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op.c_str(), key.c_str(), value.c_str());
 
+        Debug("the execution value is %d", session.state_);
         ASSERT(session.executing());
 
         // Contact the appropriate shard to set the value.
         // TODO ANJA this is wrong way wrong
         int i = (*part_)(key, nshards_, -1, session.participants());
 
-        sclients_[i]->SendRequest(req_id, op, key, value, rcb, rtcb, timeout);
+        auto rcb1 = [rcb, session = std::ref(session)](int s, const std::string &v)
+        {
+            Debug("calling callback and SETIING TO EXECUTING!!!!!!!!!!");
+            session.get().set_executing();
+            rcb(s, v);
+        };
+
+        auto rtcb1 = [rtcb, session = std::ref(session)](int s, const std::string &v)
+        {
+            session.get().set_executing();
+            rtcb(s, v);
+        };
+
+        sclients_[i]->SendRequest(req_id, op, key, value, rcb1, rtcb1, timeout);
     }
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
@@ -696,7 +710,7 @@ namespace strongstore
 
         Debug("[%lu] EndAppRequest", req_id);
 
-        session.set_ending();
+        // session.set_ending();
 
         end_cb();
     }

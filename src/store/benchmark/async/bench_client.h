@@ -156,6 +156,15 @@ private:
             op_index_ = 1;
         }
 
+        void start_apprequest(Session &session, AsyncAppRequest *apprequest, std::size_t client_index)
+        {
+            session_ = session;
+            appreq_ = apprequest;
+            current_client_index_ = client_index;
+            n_attempts_ = 1;
+            op_index_ = 0;
+        }
+
     private:
         Latency_Frame_t lat_;
         std::reference_wrapper<Session> session_;
