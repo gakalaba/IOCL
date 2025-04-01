@@ -764,22 +764,20 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
 
     auto &ss = search->second;
     auto transaction = ss.transaction();
+    auto appreq = ss.apprequest();
     auto lat = ss.lat();
 
     if (started)
     {
-        Debug("Started");
         // record latency
         if (!cooldownStarted)
         {
-            Debug("recording latency");
             _Latency_EndRec(&latency, lat);
             uint64_t ns = lat->accum;
             // TODO: use standard definitions across all clients for
             // success/commit and failure/abort
             if (result == 0)
             { // only record result if success
-                Debug("recording!");
                 struct timespec curr;
                 clock_gettime(CLOCK_MONOTONIC, &curr);
                 if (latencies.size() == 0UL)
@@ -791,12 +789,20 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
                     // << startMeasureTime.tv_usec << std::endl;
                 }
                 uint64_t currNanos = curr.tv_sec * 1000000000ULL + curr.tv_nsec;
-                std::cout << transaction->GetTransactionType() << ',' << ns << ',' << currNanos << ','
-                          << client_id_ << std::endl;
+                if (transaction != NULL)
+                {
+                    std::cout << transaction->GetTransactionType() << ',' << ns << ',' << currNanos << ','
+                              << client_id_ << std::endl;
+                }
+                else
+                {
+                    std::cout << appreq->GetTransactionType() << ',' << ns << ',' << currNanos << ','
+                              << client_id_ << std::endl;
+                }
+
                 latencies.push_back(ns);
             }
         }
-        Debug("here");
 
         struct timeval diff;
         BenchState state = GetBenchState(diff);
@@ -812,6 +818,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
     }
 
     delete transaction;
+    delete appreq;
 
     if (erase_session)
     {
@@ -819,7 +826,6 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
         client.EndSession(ss.session());
         session_states_.erase(search);
     }
-    Debug("returning");
 
     n++;
 }

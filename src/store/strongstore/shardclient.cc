@@ -274,6 +274,7 @@ namespace strongstore
         Debug("[shard %i] Sending REQUEST %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
+        Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
         PendingRequest *pendingReq = new PendingRequest(transaction_id, req_id);
         pendingReqs[req_id] = pendingReq;
         pendingReq->op = op;
@@ -298,14 +299,15 @@ namespace strongstore
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {
         Debug("shard client got IOCLReply!");
-        uint64_t req_id = reply.transaction_id();
+        uint64_t req_id = reply.rid().client_req_id();
+        Debug("the transaction_id = %d", req_id);
         int status = reply.status();
         string retval = reply.return_value();
 
         auto itr = pendingReqs.find(req_id);
         if (itr == pendingReqs.end())
         {
-            Debug("[%d][%lu] SendRequestREply for stale request.", shard_idx_, req_id);
+            Debug("[%d][%lu] SendRequestREply for request not stored in PendingReqs.", shard_idx_, req_id);
             return; // stale request
         }
 
