@@ -181,6 +181,16 @@ namespace strongstore
             RequestID rid;
             std::string key;
         };
+        class PendingRequestReply
+        {
+        public:
+            PendingRequestReply(uint64_t client_id, uint64_t client_req_id,
+                                TransportAddress *remote)
+                : rid{client_id, client_req_id, remote} {}
+            RequestID rid;
+            std::string key;
+            std::string value;
+        };
 
         struct TimestampID
         {
@@ -292,6 +302,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
+        std::unordered_map<uint64_t, PendingRequestReply *> pending_req_replies_;
 
         proto::Get get_;
         proto::IOCLRequest req_;

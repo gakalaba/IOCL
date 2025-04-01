@@ -284,7 +284,9 @@ namespace strongstore
 
         // TODO: Setup timeout
         req_.Clear();
-        req_.set_rid(transaction_id);
+        req_.mutable_rid()->set_client_id(client_id_);
+        req_.mutable_rid()->set_client_req_id(req_id);
+        req_.set_transaction_id(transaction_id);
         req_.set_key(key);
         req_.set_value(value);
         req_.set_op(op);
@@ -295,7 +297,8 @@ namespace strongstore
     // IOCL receive the response
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {
-        uint64_t req_id = reply.rid();
+        Debug("shard client got IOCLReply!");
+        uint64_t req_id = reply.transaction_id();
         int status = reply.status();
         string retval = reply.return_value();
 

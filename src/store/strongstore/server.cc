@@ -273,16 +273,12 @@ namespace strongstore
     void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
         Debug("Calling HandleSendRequest! with msg %s: msg.op = %s, msg.key = %s, msg.value = %s", msg, msg.op(), msg.key(), msg.value());
-        uint64_t transaction_id = msg.rid();
+        uint64_t transaction_id = msg.transaction_id();
 
-        // const Transaction transaction{msg.transaction()};
-
-        // replica_client_->SendRequest(
-        //     transaction_id, transaction,
-        // std::bind(&Server::PrepareCallback, this, transaction_id,
-        //           std::placeholders::_1, std::placeholders::_2),
-        // // this thing is the ptcb
-        // [](int, Timestamp) {}, PREPARE_TIMEOUT);
+        auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
+        reply->key = msg.key();
+        reply->value = msg.value();
+        pending_req_replies_[transaction_id] = reply;
 
         replica_client_->SendRequest(
             transaction_id, msg,
@@ -1139,7 +1135,37 @@ namespace strongstore
                                      string retval)
     {
         Debug("got this status %d and this retval %s", status, retval);
-        Panic("need to return this back to the shard client!");
+
+        auto search = pending_req_replies_.find(transaction_id);
+        if (search == pending_req_replies_.end())
+        {
+            Panic("there should have been a pending request callback!");
+            return;
+        }
+
+        PendingRequestReply *reply = search->second;
+
+        uint64_t client_id = reply->rid.client_id();
+        uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->rid.addr();
+
+        const std::string &key = reply->key;
+        const std::string &val = reply->value;
+
+        Debug("[%lu] SendRequestCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
+
+        req_reply_.Clear();
+        req_reply_.mutable_rid()->set_client_id(client_id);
+        req_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        req_reply_.set_status(status);
+        req_reply_.set_return_value(retval);
+        req_reply_.set_transaction_id(transaction_id);
+
+        transport_->SendMessage(this, *remote, req_reply_);
+
+        delete remote;
+        delete reply;
+        pending_req_replies_.erase(search);
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
@@ -1819,7 +1845,9 @@ namespace strongstore
         }
         reply.set_status(status);
         reply.set_return_value(retval);
-        reply.set_rid(req.rid());
+        reply.set_transaction_id(req.transaction_id());
+        reply.mutable_rid()->set_client_id(req.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         reply.SerializeToString(&response);
     }
 
