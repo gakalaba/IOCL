@@ -69,8 +69,6 @@ class IOCLCodebase:
             '--cooldown_secs', config['client_ramp_down'],
             '--protocol_mode', config['client_protocol_mode'],
             '--stats_file', stats_file,
-            '--client_fanout', config['client_fanout'],
-            '--client_issue_concurrent', config['client_issue_concurrent'],
             '--clock_error', truetime_error,
             '--strong_consistency', config['consistency']]])
 
@@ -81,6 +79,10 @@ class IOCLCodebase:
         elif bench_mode == 'closed':
             client_command += ' --mpl=%d' % config['mpl']
 
+        if 'client_fanout' in config:
+            client_command += ' --client_fanout %d' % config['client_fanout']
+        if 'client_issue_concurrent' in config:
+            client_command += ' --client_issue_concurrent %s' % str(config['client_issue_concurrent']).lower()
         if 'client_switch_probability' in config:
             client_command += ' --client_switch_probability %f' %config['client_switch_probability']
 
