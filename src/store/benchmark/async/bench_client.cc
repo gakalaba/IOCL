@@ -373,12 +373,10 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     switch (op.type)
     {
     case GET:
-        Debug("Sending get");
         op_str = "get";
         break;
 
     case PUT:
-        Debug("Sending put");
         op_str = "put";
         break;
 

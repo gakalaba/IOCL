@@ -611,7 +611,6 @@ namespace strongstore
 
         Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op.c_str(), key.c_str(), value.c_str());
 
-        Debug("the execution value is %d", session.state_);
         ASSERT(session.executing());
 
         // Contact the appropriate shard to set the value.
@@ -620,7 +619,6 @@ namespace strongstore
 
         auto rcb1 = [rcb, session = std::ref(session)](int s, const std::string &v)
         {
-            Debug("calling callback and SETIING TO EXECUTING!!!!!!!!!!");
             session.get().set_executing();
             rcb(s, v);
         };
