@@ -278,6 +278,7 @@ namespace strongstore
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
         reply->key = msg.key();
         reply->value = msg.value();
+        Debug("&&&&&&&&&&&&&&&&&&&&&&&&about to store pending_req_replies[%d]", transaction_id);
         pending_req_replies_[transaction_id] = reply;
 
         replica_client_->SendRequest(
@@ -501,6 +502,7 @@ namespace strongstore
         ro_commit_reply_.set_transaction_id(transaction_id);
 
         std::pair<TimestampID, std::string> value;
+        Debug("keys = %s", keys);
         for (auto &k : keys)
         {
             ASSERT(store_.get(k, {commit_ts, transaction_id}, value));
@@ -1135,6 +1137,7 @@ namespace strongstore
                                      string retval)
     {
         Debug("got this status %d and this retval %s", status, retval);
+        Debug("&&&&&&&&&&&&&&&&&&&&&&&&about to search pending_req_replies[%d]", transaction_id);
 
         auto search = pending_req_replies_.find(transaction_id);
         if (search == pending_req_replies_.end())
