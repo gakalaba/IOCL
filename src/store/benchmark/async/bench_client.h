@@ -207,7 +207,7 @@ private:
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
 
-    inline bool IsIOCL() { return fanout > 0; };
+    inline bool IsIOCL() { return clients_[0]->IsIOCL(); };
 
     void Finish();
     void WarmupDone();

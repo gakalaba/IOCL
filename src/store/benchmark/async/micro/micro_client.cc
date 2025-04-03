@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "store/benchmark/async/micro/app_request.h"
+#include "store/benchmark/async/micro/big_transaction.h"
 
 namespace micro
 {
@@ -67,8 +68,7 @@ namespace micro
 
     AsyncTransaction *MicroClient::GetNextTransaction()
     {
-        // FILLER, never used
-        return new retwis::AddUser(keySelector, GetRand());
+        return new BasicBigTransaction(keySelector, GetFanout(), GetRand());
     }
 
 } // namespace micro

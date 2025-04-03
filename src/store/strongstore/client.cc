@@ -109,6 +109,11 @@ namespace strongstore
         Debug("sessions_by_transaction_id_.size(): %lu", sessions_by_transaction_id_.size());
     }
 
+    bool Client::IsIOCL()
+    {
+        return (consistency_ == LIN);
+    }
+
     void Client::CalculateCoordinatorChoices()
     {
         if (static_cast<std::size_t>(config_.g) > MAX_SHARDS)

@@ -112,6 +112,8 @@ public:
 
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
 
+    virtual bool IsIOCL() = 0;
+
     inline Stats &GetStats() { return stats; }
 
 protected:

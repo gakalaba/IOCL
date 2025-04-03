@@ -248,6 +248,7 @@ namespace strongstore
         void ROCommit(Session &session, const std::unordered_set<std::string> &keys,
                       commit_callback ccb, commit_timeout_callback ctcb,
                       uint32_t timeout) override;
+        bool IsIOCL() override;
 
     private:
         const static std::size_t MAX_SHARDS = 16;

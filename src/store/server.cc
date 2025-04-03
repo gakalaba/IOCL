@@ -334,6 +334,7 @@ int main(int argc, char **argv)
     {
     case PROTO_STRONG:
     {
+        Debug("Making transactional strongstore server");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
@@ -343,6 +344,7 @@ int main(int argc, char **argv)
     case PROTO_IOCL_CT:
     case PROTO_VR:
     {
+        Debug("Making application request strongstore server");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
@@ -467,7 +469,7 @@ int main(int argc, char **argv)
     {
     case PROTO_STRONG:
     {
-        Debug("wrong for now... starting strong store VR replica");
+        Debug("Making strongstore replica");
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
