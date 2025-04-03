@@ -1,0 +1,42 @@
+20250303-085843-6831 22222 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250303-085854-4619 22222 * WarmupDone      (bench_client.cc:675): Completed warmup period of 10 seconds with 1110 requests
+20250303-085915-4640 22222 * Finish          (bench_client.cc:873): Completed 6129 requests in 21.004289 seconds
+20250303-085915-4641 22222 * Finish          (bench_client.cc:874): 1 outstanding transactions.
+Session continued: 0
+last_service: spanner-4-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: spanner-4-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: spanner-4-1804289383, current_state: 2
+20250303-085923-4623 22222 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-03-08-58-34/out/client-0-0-4-stats-0.json.
+20250303-085925-4677 22222 * Cleanup         (bench_client.cc:697): Aborting 0 outstanding transactions.
+20250303-085925-4678 22222 * CooldownDone    (bench_client.cc:727): Finished cooldown period.
+20250303-085925-4736 22222 * CooldownDone    (bench_client.cc:734): Median latency is 3062322 ns (3062 us)
+20250303-085925-4738 22222 * CooldownDone    (bench_client.cc:743): Average latency is 3361469 ns (3361 us)
+20250303-085925-4739 22222 * CooldownDone    (bench_client.cc:747): 90th percentile latency is 4524769 ns (4524 us)
+20250303-085925-4739 22222 * CooldownDone    (bench_client.cc:751): 95th percentile latency is 4885363 ns (4885 us)
+20250303-085925-4740 22222 * CooldownDone    (bench_client.cc:755): 99th percentile latency is 5496236 ns (5496 us)
+20250303-085925-4740 22222 * LATENCY total: 1960 us 3361 us/2097 us 81 ms (6130 samples, 20 s total)
+20250303-085925-4741 22222 *    1048 us |          3 | 
+20250303-085925-4741 22222 *    2097 us |       5219 | ==================================================
+20250303-085925-4742 22222 *    4194 us |        899 | ========
+20250303-085925-4742 22222 *    8388 us |          3 | 
+20250303-085925-4742 22222 *      16 ms |          3 | 
+20250303-085925-4743 22222 *      33 ms |          2 | 
+20250303-085925-4743 22222 *      67 ms |          1 | 
+Inserted events:
+  0x56061b749390 [fd  7] Read Persist Internal
+  0x56061b75b350 [fd  9] Read Persist
+Active events:
+20250303-085925-4746 22222 * main            (benchmark.cc:802): Cleaning up after experiment.
+20250303-085925-4747 22222 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-03-08-58-34/out/client-0-0-4-stats-0.json.

@@ -1,0 +1,25 @@
+20250303-085545-0247 25342 * main            (server.cc:208):    Starting server.
+20250303-085558-9072 25342 * main            (server.cc:466):    Done loading server.
+20250303-085558-9085 25342 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-085558-9085 25342 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-085558-9086 25342 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-085558-9086 25342 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-085559-4076 25342 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 1
+20250303-085559-4080 25342 * HandleRequest   (replica.cc:525):   [0] Received duplicate request but no reply available; ignoring
+20250303-085559-4084 25342 * ResendPrepare   (replica.cc:348):   [0] Resending prepare
+20250303-085639-5839 25342 * Cleanup         (server.cc:525):    Gracefully exiting after signal 15.
+Inserted events:
+  0x55fd7aa44f20 [fd  9] Read Persist Internal
+  0x55fd7aa42420 [fd  10] Read Persist
+  0x55fd7aa44a20 [fd  11] Read Persist
+  0x55fdf69ff260 [fd  13] Read Persist
+  0x55fdf6a27740 [fd  14] Read Persist
+  0x55fdf6a27960 [fd  15] Read Persist
+  0x55fdf6a26b20 [fd  16] Read Persist
+  0x55fdf6a27b80 [fd  17] Read Persist
+  0x55fdf6a27da0 [fd  18] Read Persist
+  0x55fdf6a27fc0 [fd  19] Read Persist
+  0x55fdf6a28300 [fd  20] Read Persist
+  0x55fdf6a174a0 [fd  -1] Timeout=1743692200.307747
+Active events:
+20250303-085639-5842 25342 * Cleanup         (server.cc:529):    Exporting stats to /mnt/extra/experiments/2025-04-03-08-55-42/out/server-0-0-0-stats-0.json.

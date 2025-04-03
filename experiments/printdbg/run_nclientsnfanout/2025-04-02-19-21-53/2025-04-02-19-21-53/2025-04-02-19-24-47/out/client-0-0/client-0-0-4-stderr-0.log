@@ -1,0 +1,42 @@
+20250302-192456-1625 32010 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250302-192507-0073 32010 * WarmupDone      (bench_client.cc:675): Completed warmup period of 10 seconds with 3172 requests
+20250302-192528-0084 32010 * Finish          (bench_client.cc:873): Completed 11840 requests in 21.001898 seconds
+20250302-192528-0085 32010 * Finish          (bench_client.cc:874): 1 outstanding transactions.
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: , current_state: 0
+20250302-192536-0077 32010 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-02-19-24-47/out/client-0-0-4-stats-0.json.
+20250302-192538-0087 32010 * Cleanup         (bench_client.cc:697): Aborting 0 outstanding transactions.
+20250302-192538-0087 32010 * CooldownDone    (bench_client.cc:727): Finished cooldown period.
+20250302-192538-0205 32010 * CooldownDone    (bench_client.cc:734): Median latency is 1761892 ns (1761 us)
+20250302-192538-0210 32010 * CooldownDone    (bench_client.cc:743): Average latency is 1706621 ns (1706 us)
+20250302-192538-0211 32010 * CooldownDone    (bench_client.cc:747): 90th percentile latency is 2039113 ns (2039 us)
+20250302-192538-0211 32010 * CooldownDone    (bench_client.cc:751): 95th percentile latency is 2137311 ns (2137 us)
+20250302-192538-0212 32010 * CooldownDone    (bench_client.cc:755): 99th percentile latency is 2435099 ns (2435 us)
+20250302-192538-0212 32010 * LATENCY total: 618 us 1706 us/1048 us 41 ms (11841 samples, 20 s total)
+20250302-192538-0212 32010 *     524 us |        261 | =
+20250302-192538-0212 32010 *    1048 us |      10815 | ==================================================
+20250302-192538-0213 32010 *    2097 us |        762 | ===
+20250302-192538-0213 32010 *    4194 us |          0 |
+20250302-192538-0213 32010 *    8388 us |          0 |
+20250302-192538-0213 32010 *      16 ms |          1 | 
+20250302-192538-0213 32010 *      33 ms |          2 | 
+Inserted events:
+  0x5575e16d4390 [fd  7] Read Persist Internal
+  0x5575e16e5560 [fd  9] Read Persist
+Active events:
+20250302-192538-0216 32010 * main            (benchmark.cc:802): Cleaning up after experiment.
+20250302-192538-0216 32010 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-02-19-24-47/out/client-0-0-4-stats-0.json.
