@@ -250,7 +250,7 @@ namespace strongstore
 
         void PrepareCallback(uint64_t transaction_id, int status,
                              Timestamp timestamp);
-        void SendRequestCallback(uint64_t transaction_id, int status,
+        void SendRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, int status,
                                  string retval);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
@@ -302,7 +302,6 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
-        std::unordered_map<uint64_t, PendingRequestReply *> pending_req_replies_;
 
         proto::Get get_;
         proto::IOCLRequest req_;

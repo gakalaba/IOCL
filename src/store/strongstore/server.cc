@@ -278,12 +278,10 @@ namespace strongstore
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
         reply->key = msg.key();
         reply->value = msg.value();
-        Debug("&&&&&&&&&&&&&&&&&&&&&&&&about to store pending_req_replies[%d]", transaction_id);
-        pending_req_replies_[transaction_id] = reply;
 
         replica_client_->SendRequest(
             transaction_id, msg,
-            std::bind(&Server::SendRequestCallback, this, transaction_id,
+            std::bind(&Server::SendRequestCallback, this, reply, transaction_id,
                       std::placeholders::_1, std::placeholders::_2),
             // this thing is the ptcb
             [](int, string) {}, REQUEST_TIMEOUT);
@@ -1132,20 +1130,10 @@ namespace strongstore
         }
     }
 
-    void Server::SendRequestCallback(uint64_t transaction_id, int status,
+    void Server::SendRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, int status,
                                      string retval)
     {
         Debug("got this status %d and this retval %s", status, retval);
-        Debug("&&&&&&&&&&&&&&&&&&&&&&&&about to search pending_req_replies[%d]", transaction_id);
-
-        auto search = pending_req_replies_.find(transaction_id);
-        if (search == pending_req_replies_.end())
-        {
-            Panic("there should have been a pending request callback!");
-            return;
-        }
-
-        PendingRequestReply *reply = search->second;
 
         uint64_t client_id = reply->rid.client_id();
         uint64_t client_req_id = reply->rid.client_req_id();
@@ -1167,7 +1155,6 @@ namespace strongstore
 
         delete remote;
         delete reply;
-        pending_req_replies_.erase(search);
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
