@@ -384,6 +384,10 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
         Panic("unsupported opeartion type %lu", op.type);
     }
     client.SendRequest(session, op_str, op.key, op.value, rcb, rtcb, timeout_);
+    if (issueConcurrent)
+    {
+        ExecuteNextOperationIOCL(session_id);
+    }
 }
 
 void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status_t status)
@@ -488,7 +492,11 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperationIOCL(session_id);
+        // add this response to all the responses from this app request!
+        if (!issueConcurrent)
+        {
+            ExecuteNextOperationIOCL(session_id);
+        } // else other ops were already issued concurrently
     }
     else
     {
@@ -516,7 +524,9 @@ void BenchmarkClient::CommitCallback(const uint64_t session_id, transaction_stat
 
 void BenchmarkClient::EndAppreqCallback(const uint64_t session_id)
 {
-    Debug("[%lu] EndAppreq Callback with result success.", session_id);
+    Debug("[%lu] EndAppreq Callback", session_id);
+    // Check that we got a success response for each request in this application level request
+
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
@@ -527,6 +537,7 @@ void BenchmarkClient::EndAppreqCallback(const uint64_t session_id)
 
     stats.Increment(ttype + "_completed", 1);
 
+    // Send Next App Request
     if (!cooldownStarted)
     {
         Debug("next arrival in session %lu us", 0);
