@@ -353,7 +353,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
 
     auto rcb = std::bind(&BenchmarkClient::ReceiveRequestResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
     auto rtcb = std::bind(&BenchmarkClient::SendRequestTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this, session_id);
+    // auto end_cb = std::bind(&BenchmarkClient::EndAppreqCallback, this, session_id);
 
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
@@ -362,7 +362,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     if (op_index == ss.fanout())
     {
         // don't issue more
-        client.EndAppRequest(session, end_cb);
+        // client.EndAppRequest(session, end_cb);
         return;
     }
 
@@ -489,14 +489,40 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
+    ss.incr_responses();
 
     if (status == REPLY_OK)
     {
         // add this response to all the responses from this app request!
-        if (!issueConcurrent)
+        if (ss.responses() == ss.fanout())
         {
-            ExecuteNextOperationIOCL(session_id);
-        } // else other ops were already issued concurrently
+            auto appreq = ss.apprequest();
+            auto &ttype = appreq->GetTransactionType();
+            auto n_attempts = ss.n_attempts();
+
+            stats.Increment(ttype + "_completed", 1);
+
+            // Send Next App Request
+            if (!cooldownStarted)
+            {
+                Debug("next arrival in session %lu us", 0);
+                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
+                OnReply(session_id, 0, false);
+            }
+            else
+            {
+                Debug("end of session");
+                OnReply(session_id, 0, true);
+            }
+        }
+        else
+        {
+
+            if (!issueConcurrent)
+            {
+                ExecuteNextOperationIOCL(session_id);
+            } // else other ops were already issued concurrently
+        }
     }
     else
     {
