@@ -502,7 +502,6 @@ namespace strongstore
         ro_commit_reply_.set_transaction_id(transaction_id);
 
         std::pair<TimestampID, std::string> value;
-        Debug("keys = %s", keys);
         for (auto &k : keys)
         {
             ASSERT(store_.get(k, {commit_ts, transaction_id}, value));
@@ -1655,7 +1654,7 @@ namespace strongstore
 
         Request request;
         IOCLRequest ioclrequest;
-        if (consistency_ != strongstore::Consistency::LIN)
+        if (consistency_ != LIN)
         {
             request.ParseFromString(op);
             switch (request.op())
@@ -1689,7 +1688,7 @@ namespace strongstore
     {
         Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         IOCLRequest ioclrequest;
-        if (consistency_ == strongstore::Consistency::LIN)
+        if (consistency_ == LIN)
         {
             ioclrequest.ParseFromString(op);
             ReplicaUpcallIOCL(opnum, ioclrequest, response);
@@ -1862,7 +1861,7 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        if (consistency_ = strongstore::Consistency::LIN)
+        if (consistency_ == LIN)
         {
             iocl_store_.put(key, value);
         }
