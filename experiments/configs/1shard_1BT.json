@@ -35,11 +35,17 @@
   ],
   "client_total": [
     1,
-    2
+    2,
+    4,
+    8,
+    16
   ],
   "client_processes_per_client_node": [
     1,
-    2
+    2,
+    4,
+    8,
+    16
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -72,7 +78,7 @@
   "bench_mode": "closed",
   "mpl": 1,
   "client_key_selector": "zipf",
-  "client_fanout": 1,
+  "client_fanout": 4,
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.1,
   "rw_num_ops_txn": 1,
@@ -116,10 +122,10 @@
     5,
     6
   ],
-  "client_debug_output": true,
-  "server_debug_output": true,
+  "client_debug_output": false,
+  "server_debug_output": false,
   "client_debug_stats": false,
-  "server_debug_stats": true,
+  "server_debug_stats": false,
   "client_experiment_length": 40,
   "client_rand_sleep": 0,
   "client_ramp_down": 10,
