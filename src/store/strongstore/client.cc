@@ -536,7 +536,9 @@ namespace strongstore
             return;
         }
 
-        ASSERT(session.executing());
+        Debug("current state of session is %d", session.state());
+
+        ASSERT(session.executing() || session.getting());
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
@@ -579,7 +581,7 @@ namespace strongstore
             return;
         }
 
-        ASSERT(session.executing());
+        ASSERT(session.executing() || session.getting());
 
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
@@ -702,20 +704,6 @@ namespace strongstore
                 sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
             }
         }
-    }
-
-    /* Attempts to commit the ongoing transaction. */
-    void Client::EndAppRequest(Session &s, end_callback end_cb)
-    {
-        auto &session = static_cast<StrongSession &>(s);
-
-        auto req_id = session.transaction_id();
-
-        Debug("[%lu] EndAppRequest", req_id);
-
-        // session.set_ending();
-
-        end_cb();
     }
 
     void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)

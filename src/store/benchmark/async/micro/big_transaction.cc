@@ -35,13 +35,13 @@ namespace micro
     BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector, int numKeys, std::mt19937 &rand)
         : AsyncTransaction(),
           keySelector(keySelector),
-          ttype_{"basic_1BT"}
+          ttype_{"basic_1BT"},
+          fanout_{numKeys}
     {
         for (int i = 0; i < numKeys; ++i)
         {
             keyIdxs.push_back(keySelector->GetKey(rand));
         }
-        Debug("done!");
     }
 
     BasicBigTransaction::~BasicBigTransaction()
@@ -72,10 +72,12 @@ namespace micro
         }
         else if (op_index == GetNumKeys() + 1)
         {
+            Debug("Sending Commit");
             return Commit();
         }
         else
         {
+            Debug("Sending Wait????????");
             return Wait();
         }
     }
@@ -83,6 +85,11 @@ namespace micro
     const std::string &BasicBigTransaction::GetTransactionType()
     {
         return ttype_;
+    }
+
+    const int BasicBigTransaction::Fanout()
+    {
+        return fanout_;
     }
 
 } // namespace micro

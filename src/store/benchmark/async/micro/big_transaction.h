@@ -53,12 +53,14 @@ namespace micro
         inline size_t GetNumKeys() const { return keyIdxs.size(); };
 
         virtual const std::string &GetTransactionType() override;
+        virtual const int Fanout() override;
 
         KeySelector *keySelector;
 
     private:
         std::vector<int> keyIdxs;
         std::string ttype_;
+        int fanout_;
     };
 
 } // namespace micro

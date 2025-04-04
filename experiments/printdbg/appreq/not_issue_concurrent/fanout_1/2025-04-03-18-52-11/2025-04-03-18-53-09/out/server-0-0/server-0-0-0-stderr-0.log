@@ -1,0 +1,29 @@
+20250303-185312-1007 03923 * main            (server.cc:208):    Starting server.
+20250303-185324-3588 03923 * main            (server.cc:466):    Done loading server.
+20250303-185324-3601 03923 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-185324-3601 03923 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-185324-3602 03923 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-185324-3602 03923 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250303-185324-8592 03923 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 1
+20250303-185324-8596 03923 * HandleRequest   (replica.cc:503):   [0] Ignoring stale request
+20250303-185324-8599 03923 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 2
+20250303-185324-8601 03923 * ResendPrepare   (replica.cc:348):   [0] Resending prepare
+20250303-185324-8604 03923 * HandleRequest   (replica.cc:525):   [0] Received duplicate request but no reply available; ignoring
+20250303-185324-8615 03923 * HandleRequestStateTransfer (replica.cc:832):   [0] Sending state transfer from <0,0> to <0,0>
+20250303-185324-8617 03923 * HandleRequestStateTransfer (replica.cc:832):   [0] Sending state transfer from <0,0> to <0,0>
+20250303-185406-5048 03923 * Cleanup         (server.cc:525):    Gracefully exiting after signal 15.
+Inserted events:
+  0x55e8cf7eff20 [fd  9] Read Persist Internal
+  0x55e8cf7ed420 [fd  10] Read Persist
+  0x55e8cf7efa20 [fd  11] Read Persist
+  0x55e92554f0a0 [fd  14] Read Persist
+  0x55e9255766e0 [fd  15] Read Persist
+  0x55e925576900 [fd  16] Read Persist
+  0x55e92554d9a0 [fd  17] Read Persist
+  0x55e925576b20 [fd  18] Read Persist
+  0x55e925576d40 [fd  19] Read Persist
+  0x55e925577080 [fd  20] Read Persist
+  0x55e9255773c0 [fd  21] Read Persist
+  0x55e8cf7f1cc0 [fd  -1] Timeout=1743728047.282525
+Active events:
+20250303-185406-5052 03923 * Cleanup         (server.cc:529):    Exporting stats to /mnt/extra/experiments/2025-04-03-18-53-09/out/server-0-0-0-stats-0.json.

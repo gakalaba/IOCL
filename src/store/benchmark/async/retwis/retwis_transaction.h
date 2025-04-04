@@ -42,7 +42,7 @@ namespace retwis
     class RetwisTransaction : public AsyncTransaction
     {
     public:
-        RetwisTransaction(KeySelector *keySelector, int numKeys, std::mt19937 &rand, const std::string ttype);
+        RetwisTransaction(KeySelector *keySelector, int numKeys, std::mt19937 &rand, const std::string ttype, int fanout);
         virtual ~RetwisTransaction();
 
     protected:
@@ -54,12 +54,14 @@ namespace retwis
         inline size_t GetNumKeys() const { return keyIdxs.size(); }
 
         const std::string &GetTransactionType() override { return ttype_; };
+        const int Fanout() override {return fanout_;};
 
         KeySelector *keySelector;
 
     private:
         std::vector<int> keyIdxs;
         std::string ttype_;
+        int fanout_;
     };
 
 } // namespace retwis

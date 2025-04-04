@@ -742,10 +742,11 @@ int main(int argc, char **argv)
             FLAGS_exp_duration, FLAGS_warmup_secs, FLAGS_cooldown_secs,
             FLAGS_tput_interval,
             FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
+            FLAGS_client_issue_concurrent,
             FLAGS_max_attempts);
         break;
     case BENCH_MICRO:
-        Debug("we're starting the microooooo");
+        Debug("we're starting the microooooo, FLAGS_client_issue_concurrent=%d", FLAGS_client_issue_concurrent);
         bench = new micro::MicroClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,

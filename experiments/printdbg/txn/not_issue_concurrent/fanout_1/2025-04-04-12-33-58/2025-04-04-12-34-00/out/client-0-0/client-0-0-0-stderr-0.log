@@ -1,0 +1,41 @@
+20250304-123409-0664 25348 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250304-123420-0265 25348 * WarmupDone      (bench_client.cc:719): Completed warmup period of 10 seconds with 1717 requests
+20250304-123441-0264 25348 * Finish          (bench_client.cc:917): Completed 13442 requests in 20.999832 seconds
+20250304-123441-0265 25348 * Finish          (bench_client.cc:918): 1 outstanding transactions.
+Session continued: 0
+last_service: spanner-0-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: spanner-0-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: spanner-0-1804289383, current_state: 2
+20250304-123449-0268 25348 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-34-00/out/client-0-0-0-stats-0.json.
+20250304-123451-0337 25348 * Cleanup         (bench_client.cc:741): Aborting 0 outstanding transactions.
+20250304-123451-0338 25348 * CooldownDone    (bench_client.cc:771): Finished cooldown period.
+20250304-123451-0462 25348 * CooldownDone    (bench_client.cc:778): Median latency is 1395480 ns (1395 us)
+20250304-123451-0464 25348 * CooldownDone    (bench_client.cc:787): Average latency is 1503414 ns (1503 us)
+20250304-123451-0464 25348 * CooldownDone    (bench_client.cc:791): 90th percentile latency is 1940416 ns (1940 us)
+20250304-123451-0464 25348 * CooldownDone    (bench_client.cc:795): 95th percentile latency is 2002507 ns (2002 us)
+20250304-123451-0465 25348 * CooldownDone    (bench_client.cc:799): 99th percentile latency is 2146409 ns (2146 us)
+20250304-123451-0465 25348 * LATENCY total: 886 us 1503 us/1048 us 17 ms (13443 samples, 20 s total)
+20250304-123451-0465 25348 *     524 us |         69 | 
+20250304-123451-0465 25348 *    1048 us |      13166 | ==================================================
+20250304-123451-0465 25348 *    2097 us |        205 | 
+20250304-123451-0466 25348 *    4194 us |          1 | 
+20250304-123451-0466 25348 *    8388 us |          1 | 
+20250304-123451-0466 25348 *      16 ms |          1 | 
+Inserted events:
+  0x55ee9bad8390 [fd  7] Read Persist Internal
+  0x55ee9bae9c30 [fd  9] Read Persist
+Active events:
+20250304-123451-0468 25348 * main            (benchmark.cc:803): Cleaning up after experiment.
+20250304-123451-0468 25348 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-34-00/out/client-0-0-0-stats-0.json.
