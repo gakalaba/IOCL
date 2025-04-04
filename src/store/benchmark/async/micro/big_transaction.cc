@@ -35,7 +35,8 @@ namespace micro
     BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector, int numKeys, std::mt19937 &rand)
         : AsyncTransaction(),
           keySelector(keySelector),
-          ttype_{"basic_1BT"}
+          ttype_{"basic_1BT"},
+          fanout_{numKeys}
     {
         for (int i = 0; i < numKeys; ++i)
         {
@@ -56,9 +57,10 @@ namespace micro
         }
         else if (1 <= op_index && op_index <= GetNumKeys())
         {
-            srand(time(0));
-            uint64_t percentage_writes = 75; // todo CHANGE THIS
-            if ((rand() % 100) < percentage_writes)
+            // srand(time(0));
+            // uint64_t percentage_writes = 75; // todo CHANGE THIS
+            // if ((rand() % 100) < percentage_writes)
+            if (op_index % 2)
             {
                 Debug("Sending Put");
                 return Put(GetKey(op_index - 1), GetKey(op_index - 1));
@@ -71,10 +73,12 @@ namespace micro
         }
         else if (op_index == GetNumKeys() + 1)
         {
+            Debug("Sending Commit");
             return Commit();
         }
         else
         {
+            Debug("Sending Wait????????");
             return Wait();
         }
     }
@@ -82,6 +86,11 @@ namespace micro
     const std::string &BasicBigTransaction::GetTransactionType()
     {
         return ttype_;
+    }
+
+    const int BasicBigTransaction::Fanout()
+    {
+        return fanout_;
     }
 
 } // namespace micro

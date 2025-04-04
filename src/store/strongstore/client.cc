@@ -538,7 +538,7 @@ namespace strongstore
 
         Debug("current state of session is %d", session.state());
 
-        // ASSERT(session.executing());
+        ASSERT(session.executing() || session.getting());
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
@@ -581,7 +581,7 @@ namespace strongstore
             return;
         }
 
-        ASSERT(session.executing());
+        ASSERT(session.executing() || session.getting());
 
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());

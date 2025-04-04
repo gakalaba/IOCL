@@ -294,9 +294,9 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 
     Operation op = transaction->GetNextOperation(op_index);
     ss.incr_op_index();
+    Debug("Peeking next op");
     Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
     bool nextOpCommit = false;
-    bool isGet = false;
     if ((peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT))
     {
         // this means we have some in flight operations sent already...
@@ -318,14 +318,10 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     switch (op.type)
     {
     case GET:
-        ss.incr_sent_gets();
-        isGet = true;
         client.Get(session, op.key, gcb, gtcb, timeout_);
         break;
 
     case GET_FOR_UPDATE:
-        ss.incr_sent_gets();
-        isGet = true;
         client.GetForUpdate(session, op.key, gcb, gtcb, timeout_);
         break;
 
@@ -352,11 +348,16 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         NOT_REACHABLE();
     }
 
-    if (issueConcurrent && !nextOpCommit && isGet)
+    Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
+    if (issueConcurrent && !nextOpCommit && (op.type == GET || op.type == PUT || op.type == GET_FOR_UPDATE))
     {
         Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
         // TODO ANJA should these just be added to the event queue?? or actually issued next
         ExecuteNextOperation(session_id);
+    }
+    else
+    {
+        Debug("Not issueing next op from this fn");
     }
 }
 
@@ -440,11 +441,11 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     auto &ss = search->second;
     ss.incr_responses();
-    Debug("sent_gets = %d and responses = %d", ss.sent_gets(), ss.responses());
+    Debug("fanout = %d and responses = %d", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
-        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.sent_gets())))
+        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
         {
             ExecuteNextOperation(session_id);
         }
@@ -486,10 +487,15 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
+    ss.incr_responses();
+    Debug("fanout = %d and responses = %d", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperation(session_id);
+        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
+        {
+            ExecuteNextOperation(session_id);
+        }
     }
     else if (status == REPLY_FAIL)
     {
@@ -689,19 +695,20 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
 
             transport_.TimerMicro(backoff, [this, session_id]
                                   {
-                auto search = session_states_.find(session_id);
-                ASSERT(search != session_states_.end());
+                                      auto search = session_states_.find(session_id);
+                                      ASSERT(search != session_states_.end());
 
-                auto &ss = search->second;
-                ss.retry_transaction();
+                                      auto &ss = search->second;
+                                      ss.retry_transaction();
 
-                stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
+                                      stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
 
-                auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
-                auto btcb = []() {};
+                                      auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
+                                      auto btcb = []() {};
 
-                auto &client = *clients_[ss.current_client_index()];
-                client.Retry(ss.session(), bcb, btcb, timeout_); });
+                                      auto &client = *clients_[ss.current_client_index()];
+                                      client.Retry(ss.session(), bcb, btcb, timeout_);
+                                  });
         }
     }
 }
