@@ -45,14 +45,14 @@ namespace retwis
                                double arrival_rate, double think_time, double stay_probability,
                                int mpl,
                                int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
-                               bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, const std::string &latencyFilename)
+                               bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, bool issueConcurrent, const std::string &latencyFilename)
         : BenchmarkClient(clients, timeout, transport, id,
                           mode,
                           switch_probability,
                           arrival_rate, think_time, stay_probability,
                           mpl,
                           expDuration, warmupSec, cooldownSec, abortBackoff,
-                          retryAborted, maxBackoff, maxAttempts, 0, false, latencyFilename),
+                          retryAborted, maxBackoff, maxAttempts, 0, issueConcurrent, latencyFilename),
           keySelector(keySelector)
     {
     }
