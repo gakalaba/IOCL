@@ -82,7 +82,7 @@ class IOCLCodebase:
         if 'client_fanout' in config:
             client_command += ' --client_fanout %d' % config['client_fanout']
         if 'client_issue_concurrent' in config:
-            client_command += ' --client_issue_concurrent %s' % str(config['client_issue_concurrent']).lower()
+            client_command += ' --client_issue_concurrent=%s' % (str(config['client_issue_concurrent']).lower())
         if 'client_switch_probability' in config:
             client_command += ' --client_switch_probability %f' %config['client_switch_probability']
 
