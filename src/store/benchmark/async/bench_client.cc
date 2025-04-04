@@ -296,7 +296,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     ss.incr_op_index();
     Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
     bool nextOpCommit = false;
-    bool isCommit = false;
+    bool isGet = false;
     if ((peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT))
     {
         // this means we have some in flight operations sent already...
@@ -319,10 +319,13 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     {
     case GET:
         ss.incr_sent_gets();
+        isGet = true;
         client.Get(session, op.key, gcb, gtcb, timeout_);
         break;
 
     case GET_FOR_UPDATE:
+        ss.incr_sent_gets();
+        isGet = true;
         client.GetForUpdate(session, op.key, gcb, gtcb, timeout_);
         break;
 
@@ -331,7 +334,6 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case COMMIT:
-        isCommit = true;
         client.Commit(session, ccb, ctcb, timeout_);
         break;
 
@@ -340,7 +342,6 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case ROCOMMIT:
-        isCommit = true;
         client.ROCommit(session, op.keys, ccb, ctcb, timeout_);
         break;
 
@@ -351,7 +352,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         NOT_REACHABLE();
     }
 
-    if (issueConcurrent && !nextOpCommit && !isCommit)
+    if (issueConcurrent && !nextOpCommit && isGet)
     {
         Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
         // TODO ANJA should these just be added to the event queue?? or actually issued next
@@ -439,6 +440,7 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     auto &ss = search->second;
     ss.incr_responses();
+    Debug("sent_gets = %d and responses = %d", ss.sent_gets(), ss.responses());
 
     if (status == REPLY_OK)
     {
@@ -487,10 +489,7 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if (!issueConcurrent)
-        {
-            ExecuteNextOperation(session_id);
-        }
+        ExecuteNextOperation(session_id);
     }
     else if (status == REPLY_FAIL)
     {

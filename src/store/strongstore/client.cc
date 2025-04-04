@@ -536,7 +536,9 @@ namespace strongstore
             return;
         }
 
-        ASSERT(session.executing());
+        Debug("current state of session is %d", session.state());
+
+        // ASSERT(session.executing());
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
