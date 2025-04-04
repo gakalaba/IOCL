@@ -294,6 +294,14 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 
     Operation op = transaction->GetNextOperation(op_index);
     ss.incr_op_index();
+    Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
+    bool nextOpCommit = false;
+    bool isCommit = false;
+    if ((peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT))
+    {
+        // this means we have some in flight operations sent already...
+        nextOpCommit = true;
+    }
 
     auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
@@ -310,6 +318,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     switch (op.type)
     {
     case GET:
+        ss.incr_sent_gets();
         client.Get(session, op.key, gcb, gtcb, timeout_);
         break;
 
@@ -322,6 +331,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case COMMIT:
+        isCommit = true;
         client.Commit(session, ccb, ctcb, timeout_);
         break;
 
@@ -330,6 +340,7 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case ROCOMMIT:
+        isCommit = true;
         client.ROCommit(session, op.keys, ccb, ctcb, timeout_);
         break;
 
@@ -338,6 +349,13 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 
     default:
         NOT_REACHABLE();
+    }
+
+    if (issueConcurrent && !nextOpCommit && !isCommit)
+    {
+        Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
+        // TODO ANJA should these just be added to the event queue?? or actually issued next
+        ExecuteNextOperation(session_id);
     }
 }
 
@@ -387,6 +405,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     if (issueConcurrent)
     {
         Debug("we're about to issue the next operation within this app request without having gotten a response!!!");
+        // TODO ANJA should these just be added to the event queue?? or actually issued next
         ExecuteNextOperationIOCL(session_id);
     }
 }
@@ -419,10 +438,14 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
+    ss.incr_responses();
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperation(session_id);
+        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.sent_gets())))
+        {
+            ExecuteNextOperation(session_id);
+        }
     }
     else if (status == REPLY_FAIL)
     {
@@ -464,7 +487,10 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        ExecuteNextOperation(session_id);
+        if (!issueConcurrent)
+        {
+            ExecuteNextOperation(session_id);
+        }
     }
     else if (status == REPLY_FAIL)
     {
@@ -496,36 +522,36 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
     if (status == REPLY_OK)
     {
         // add this response to all the responses from this app request!
-        if (ss.responses() == ss.fanout())
+        if (issueConcurrent)
         {
-            Debug("we're done! gonna send a new app request soon");
-            auto appreq = ss.apprequest();
-            auto &ttype = appreq->GetTransactionType();
-            auto n_attempts = ss.n_attempts();
 
-            stats.Increment(ttype + "_completed", 1);
+            if (ss.responses() == ss.fanout())
+            {
+                Debug("we're done! gonna send a new app request soon");
+                auto appreq = ss.apprequest();
+                auto &ttype = appreq->GetTransactionType();
+                auto n_attempts = ss.n_attempts();
 
-            // Send Next App Request
-            if (!cooldownStarted)
-            {
-                Debug("next arrival in session %lu us", 0);
-                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
-                OnReply(session_id, 0, false);
-            }
-            else
-            {
-                Debug("end of session");
-                OnReply(session_id, 0, true);
+                stats.Increment(ttype + "_completed", 1);
+
+                // Send Next App Request
+                if (!cooldownStarted)
+                {
+                    Debug("next arrival in session %lu us", 0);
+                    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
+                    OnReply(session_id, 0, false);
+                }
+                else
+                {
+                    Debug("end of session");
+                    OnReply(session_id, 0, true);
+                }
             }
         }
         else
         {
-
-            if (!issueConcurrent)
-            {
-                Debug("we're gonna issue the next operation that's a part of this apprequest");
-                ExecuteNextOperationIOCL(session_id);
-            } // else other ops were already issued concurrently
+            Debug("we're gonna issue the next operation that's a part of this apprequest");
+            ExecuteNextOperationIOCL(session_id);
         }
     }
     else

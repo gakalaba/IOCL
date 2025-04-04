@@ -119,17 +119,19 @@ private:
     {
     public:
         SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, sent_gets_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
-            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, sent_gets_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
         AsyncAppRequest *apprequest() const { return appreq_; }
         uint64_t fanout() { return fanout_; };
         uint64_t responses() { return responses_; };
+        uint64_t sent_gets() { return sent_gets_; };
         void incr_responses() { responses_++; }
+        void incr_sent_gets() { sent_gets_++; }
 
         execute_callback ecb() const { return ecb_; }
 
@@ -151,6 +153,7 @@ private:
             n_attempts_ = 1;
             op_index_ = 1;
             responses_ = 0;
+            sent_gets_ = 0;
         }
 
         void retry_transaction()
@@ -158,6 +161,7 @@ private:
             n_attempts_++;
             op_index_ = 1;
             responses_ = 0;
+            sent_gets_ = 0;
         }
 
         void start_apprequest(Session &session, AsyncAppRequest *apprequest, std::size_t client_index)
@@ -177,6 +181,7 @@ private:
         AsyncAppRequest *appreq_;
         uint64_t fanout_;
         uint64_t responses_;
+        uint64_t sent_gets_;
         execute_callback ecb_;
         uint64_t n_attempts_;
         std::size_t op_index_;
