@@ -128,7 +128,7 @@ private:
         AsyncTransaction *transaction() const { return transaction_; }
         AsyncAppRequest *apprequest() const { return appreq_; }
         uint64_t fanout() { return fanout_; };
-        uint64_t responses(){return responses()};
+        uint64_t responses() { return responses_; };
         void incr_responses() { responses_++; }
 
         execute_callback ecb() const { return ecb_; }
