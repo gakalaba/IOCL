@@ -1,0 +1,41 @@
+20250304-125000-0233 32007 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250304-125012-0347 32007 * WarmupDone      (bench_client.cc:719): Completed warmup period of 10 seconds with 713 requests
+20250304-125033-0357 32007 * Finish          (bench_client.cc:917): Completed 4820 requests in 21.002843 seconds
+20250304-125033-0357 32007 * Finish          (bench_client.cc:918): 1 outstanding transactions.
+Session continued: 0
+last_service: spanner-15-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: spanner-15-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: spanner-15-1804289383, current_state: 2
+20250304-125041-0349 32007 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-49-51/out/client-0-0-15-stats-0.json.
+20250304-125043-0386 32007 * Cleanup         (bench_client.cc:741): Aborting 0 outstanding transactions.
+20250304-125043-0387 32007 * CooldownDone    (bench_client.cc:771): Finished cooldown period.
+20250304-125043-0433 32007 * CooldownDone    (bench_client.cc:778): Median latency is 4258284 ns (4258 us)
+20250304-125043-0435 32007 * CooldownDone    (bench_client.cc:787): Average latency is 4290103 ns (4290 us)
+20250304-125043-0436 32007 * CooldownDone    (bench_client.cc:791): 90th percentile latency is 5733075 ns (5733 us)
+20250304-125043-0436 32007 * CooldownDone    (bench_client.cc:795): 95th percentile latency is 6087429 ns (6087 us)
+20250304-125043-0437 32007 * CooldownDone    (bench_client.cc:799): 99th percentile latency is 6702691 ns (6702 us)
+20250304-125043-0437 32007 * LATENCY total: 1221 us 4290 us/4194 us 65 ms (4821 samples, 20 s total)
+20250304-125043-0438 32007 *    1048 us |        329 | ======
+20250304-125043-0438 32007 *    2097 us |       1947 | ======================================
+20250304-125043-0439 32007 *    4194 us |       2531 | ==================================================
+20250304-125043-0439 32007 *    8388 us |         10 | 
+20250304-125043-0439 32007 *      16 ms |          1 | 
+20250304-125043-0440 32007 *      33 ms |          3 | 
+Inserted events:
+  0x5624c18c2390 [fd  7] Read Persist Internal
+  0x5624c18d3c30 [fd  9] Read Persist
+Active events:
+20250304-125043-0444 32007 * main            (benchmark.cc:803): Cleaning up after experiment.
+20250304-125043-0444 32007 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-49-51/out/client-0-0-15-stats-0.json.
