@@ -234,10 +234,6 @@ namespace strongstore
         virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
                             uint32_t timeout) override;
 
-        // Finish and application level request since Begin().
-        // Commit all Get(s) and Put(s) since Begin().
-        virtual void EndAppRequest(Session &session, end_callback ecb) override;
-
         // Abort all Get(s) and Put(s) since Begin().
         virtual void Abort(Session &session, abort_callback acb, abort_timeout_callback atcb,
                            uint32_t timeout) override;

@@ -704,20 +704,6 @@ namespace strongstore
         }
     }
 
-    /* Attempts to commit the ongoing transaction. */
-    void Client::EndAppRequest(Session &s, end_callback end_cb)
-    {
-        auto &session = static_cast<StrongSession &>(s);
-
-        auto req_id = session.transaction_id();
-
-        Debug("[%lu] EndAppRequest", req_id);
-
-        // session.set_ending();
-
-        end_cb();
-    }
-
     void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)
     {
         auto tid = session.transaction_id();

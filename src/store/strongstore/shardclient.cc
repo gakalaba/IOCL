@@ -308,6 +308,7 @@ namespace strongstore
         if (itr == pendingReqs.end())
         {
             Debug("[%d][%lu] SendRequestREply for request not stored in PendingReqs.", shard_idx_, req_id);
+            Panic("huhuhuhuhuh");
             return; // stale request
         }
 
@@ -317,8 +318,8 @@ namespace strongstore
         pendingReqs.erase(itr);
         delete req;
 
-        Debug("[%lu] [shard %i] Received SendRequest reply with status %s and return value %s",
-              transaction_id, shard_idx_, status, retval);
+        Debug("[%lu] [shard %i] Received SendRequest reply with status %d and return value %s",
+              transaction_id, shard_idx_, status, retval.c_str());
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 

@@ -745,7 +745,7 @@ int main(int argc, char **argv)
             FLAGS_max_attempts);
         break;
     case BENCH_MICRO:
-        Debug("we're starting the microooooo");
+        Debug("we're starting the microooooo, FLAGS_client_issue_concurrent=%d", FLAGS_client_issue_concurrent);
         bench = new micro::MicroClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,

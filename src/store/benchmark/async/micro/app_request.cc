@@ -41,7 +41,6 @@ namespace micro
         {
             keyIdxs.push_back(keySelector->GetKey(rand));
         }
-        Debug("done!");
     }
 
     BasicAppRequest::~BasicAppRequest()
