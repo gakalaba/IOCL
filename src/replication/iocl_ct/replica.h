@@ -113,6 +113,11 @@ namespace replication
                                const proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
+            void HandleCoordination(const TransportAddress &remote,
+                                    const proto::CoordinationRequestMessage &msg);
+
+            void HandleCoordinationResp(const TransportAddress &remote,
+                                        const proto::CoordinationReplyMessage &msg);
 
             void HandlePrepare(const TransportAddress &remote,
                                const proto::PrepareMessage &msg);

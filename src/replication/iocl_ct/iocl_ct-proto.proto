@@ -15,6 +15,17 @@ message ReplyMessage {
     required bytes reply = 4;
 }
 
+message CoordinationRequestMessage {
+    required replication.Request req = 1;
+}
+
+message CoordinationReplyMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint64 clientreqid = 3;
+    required bytes reply = 4;
+}
+
 message UnloggedRequestMessage {
     required replication.UnloggedRequest req = 1;
 }

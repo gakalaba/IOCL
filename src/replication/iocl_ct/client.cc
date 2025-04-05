@@ -80,6 +80,11 @@ namespace replication
             SendRequest(req);
         }
 
+        void IOCL_CTClient::InvokeCoordination()
+        {
+            Debug("This client sent a coordination request");
+        }
+
         void IOCL_CTClient::InvokeUnlogged(int replicaIdx, const string &request,
                                            continuation_t continuation,
                                            error_continuation_t error_continuation,

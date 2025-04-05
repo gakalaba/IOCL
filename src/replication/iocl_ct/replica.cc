@@ -395,6 +395,8 @@ namespace replication
                                             void *meta_data)
         {
             RequestMessage request;
+            CoordinationRequestMessage coordReq;
+            CoordinationReplyMessage coordReply;
             UnloggedRequestMessage unloggedRequest;
             // ExecutableRequestMessage execRequest;
             PrepareMessage prepare;
@@ -416,11 +418,16 @@ namespace replication
                 unloggedRequest.ParseFromString(data);
                 HandleUnloggedRequest(remote, unloggedRequest);
             }
-            // else if (type == execRequest.GetTypeName())
-            // {
-            //     execRequest.ParseFromString(data);
-            //     HandleExecRequest(remote, execRequest);
-            // }
+            else if (type == coordReq.GetTypeName())
+            {
+                coordReq.ParseFromString(data);
+                HandleCoordination(remote, coordReq);
+            }
+            else if (type == coordReply.GetTypeName())
+            {
+                coordReply.ParseFromString(data);
+                HandleCoordinationResp(remote, coordReply);
+            }
             else if (type == prepare.GetTypeName())
             {
                 prepare.ParseFromString(data);
