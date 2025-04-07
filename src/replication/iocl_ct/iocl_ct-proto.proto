@@ -117,3 +117,7 @@ message StartViewMessage {
     required uint64 lastCommitted = 3;
     repeated LogEntry entries = 4;
 }
+
+message ArrivalAckMessage {
+    required uint64 arrivalTs = 1;
+}

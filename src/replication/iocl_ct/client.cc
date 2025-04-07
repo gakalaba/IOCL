@@ -83,6 +83,23 @@ namespace replication
         void IOCL_CTClient::InvokeCoordination()
         {
             Debug("This client sent a coordination request");
+            proto::CoordinationRequestMessage coordReqMsg;
+            coordReqMsg.mutable_req()->set_op(req->request);
+            coordReqMsg.mutable_req()->set_clientid(clientid);
+            coordReqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+
+            Debug("SENDING REQUEST: %lu %s", clientid, req);
+            // XXX Try sending only to (what we think is) the leader first
+            if (transport->SendMessageToPredecessor(this, group, coordReqMsg))
+            {
+                req->timer->Reset();
+            }
+            else
+            {
+                Warning("Could not send request to replicas.");
+                pendingReqs.erase(req->clientReqId);
+                delete req;
+            }
         }
 
         void IOCL_CTClient::InvokeUnlogged(int replicaIdx, const string &request,

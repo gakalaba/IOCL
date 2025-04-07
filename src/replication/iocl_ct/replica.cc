@@ -42,7 +42,7 @@
 #include "replication/iocl_ct/replica.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
 
-#define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
+#define RDebug(fmt, ...) Debug("[replica index = %d][group index = %d] " fmt, myIdx, groupIdx, ##__VA_ARGS__)
 #define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RWarning(fmt, ...) Warning("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RPanic(fmt, ...) Panic("[%d] " fmt, myIdx, ##__VA_ARGS__)
@@ -493,7 +493,7 @@ namespace replication
                 return;
             }
 
-            Debug("Handling Request--I AM the leader");
+            RDebug("Handling Request--I AM the leader");
             // Save the client's address
             clientAddresses.erase(msg.req().clientid());
             clientAddresses.insert(
@@ -560,10 +560,13 @@ namespace replication
             }
             else
             {
+                RDebug("replicating to other replicas!");
                 Request request;
                 request.set_op(res);
                 request.set_clientid(msg.req().clientid());
                 request.set_clientreqid(msg.req().clientreqid());
+                request.set_arrivalTimestamp(shardTimestamp);
+                shardTimestamp++;
 
                 /* Assign it an opnum */
                 ++this->lastOp;
@@ -572,8 +575,20 @@ namespace replication
 
                 RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
-                /* Add the request to my log */
-                log.Append(v, request, LOG_STATE_PREPARED);
+                /* Add the request to my unorderedLog.
+                 * But, before replicating, check if any successors
+                 * contacted me and asked for my arrival timestamp
+                 * */
+                auto successors = outstandingSuccessors.find(???);
+                if (successors != outstandingSuccessors.end())
+                {
+                    log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::move(successors->second));
+                    outstandingSuccessors.erase(???);
+                }
+                else
+                {
+                    log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::vector<Successor *>{});
+                }
 
                 /* Send prepare messages to replicas */
                 if (lastOp - lastBatchEnd + 1 > batchSize)
@@ -740,19 +755,35 @@ namespace replication
             {
                 /*
                  * We have a quorum of PrepareOK messages for this
-                 * opnumber. Execute it and all previous operations.
+                 * opnumber.
+                 *
+                 *
+                 * SendArrivalACK messages to the successors
+                 *
+                 * Execute it and all previous operations.
                  *
                  * (Note that we might have already executed it. That's fine,
                  * we just won't do anything.)
                  *
                  * This also notifies the client of the result.
                  */
-                CommitUpTo(msg.opnum());
 
-                if (msgs->size() >= (unsigned int)configuration.QuorumSize())
+                /* Send ArrivalACK messages to the other replicas */
+                ArrivalAckMessage a;
+                a.set_arrivalTs(arrival_ts);
+                if (!(transport->SendMessageToSuccessorList(this, a, entry.successors)))
                 {
-                    return;
+                    RWarning("Failed to send prepare message to all replicas");
                 }
+                // delete the successor list!!!!!!
+                delete entry.successors;
+
+                // CommitUpTo(msg.opnum());
+
+                // if (msgs->size() >= (unsigned int)configuration.QuorumSize())
+                // {
+                //     return;
+                // }
 
                 /*
                  * Send COMMIT message to the other replicas.
@@ -816,6 +847,52 @@ namespace replication
             }
 
             CommitUpTo(msg.opnum());
+        }
+
+        void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
+                                                const proto::CoordinationRequestMessage &msg)
+        {
+            Tag t = msg.get();
+            LogEntry *entry = FindUnsorted(t);
+            ArrivalAckMessage a;
+            a.set_arrivalTs(arrival_ts);
+            if (!entry)
+            {
+                entry = Find();
+                if (!entry)
+                {
+                    // If the request isn't there yet, add it to the outstandingSuccessors map
+                    outstandingSuccessors[t].push_back(new Successor(msg.asdfasdf));
+                }
+                else
+                {
+                    // Send the correct timestamp to this asking successor
+                    if (!(transport->SendMessageToSuccessor(this, a, msg.asdfksf)))
+                    {
+                        RWarning("Failed to send prepare message to successor");
+                    }
+                }
+            }
+            else
+            {
+                // If it's been prepared, send the correct timestamp to this asking successor
+                if (entry.state == LOG_STATE_PREPARED)
+                {
+                    if (!(transport->SendMessageToSuccessor(this, a, msg.asdfksf)))
+                    {
+                        RWarning("Failed to send prepare message to successor");
+                    }
+                }
+                else
+                {
+                    // Add this successor to the entry's successor list
+                    entry->successors.push_back(new Successor(msg.asdfasdf));
+                }
+            }
+        }
+        void IOCL_CTReplica::HandleCoordinationResp(const TransportAddress &remote,
+                                                    const proto::CoordinationReplyMessage &msg)
+        {
         }
 
         void IOCL_CTReplica::HandleRequestStateTransfer(

@@ -83,6 +83,8 @@ namespace replication
                 proto::ReplyMessage reply;
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
+            // IOCL specific
+            std::unordered_map<Tag, std::vector<Successor *>> outstandingSuccessors;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;

@@ -71,6 +71,13 @@ namespace replication
         uint64_t ShardId;
     };
 
+    struct Tag
+    {
+        uint64_t k;
+        uint64_t pid;
+        uint64_t seqno;
+    };
+
     struct LogEntry
     {
         viewstamp_t viewstamp;
@@ -117,7 +124,9 @@ namespace replication
     public:
         Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
+        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state, std::vector<Successor *> &&successors);
         LogEntry *Find(opnum_t opnum);
+        LogEntry *FindUnsorted(opnum_t opnum);
         // IOCL specifics
         LogEntry &InsertSorted(uint64_t sortTimestamp, const Request &req, LogEntryState state);
         bool SetStatus(opnum_t opnum, LogEntryState state);
@@ -139,6 +148,8 @@ namespace replication
 
     private:
         std::vector<LogEntry> entries;
+        // .find(), .end(), .insert(), .erase()
+        std::unordered_map<Tag, LogEntry> unorderedEntries;
         string initialHash;
         opnum_t start;
         bool useHash;
