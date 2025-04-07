@@ -41,75 +41,111 @@
 #include "lib/viewstamp.h"
 #include "replication/common/request.pb.h"
 
-namespace replication {
+namespace replication
+{
 
-enum LogEntryState {
-    LOG_STATE_COMMITTED,
-    LOG_STATE_PREPARED,
-    LOG_STATE_SPECULATIVE,  // specpaxos only
-    LOG_STATE_FASTPREPARED  // fastpaxos only
-};
+    enum LogEntryState
+    {
+        LOG_STATE_COMMITTED,
+        LOG_STATE_PREPARED,
+        LOG_STATE_SPECULATIVE,  // specpaxos only
+        LOG_STATE_FASTPREPARED, // fastpaxos only
+        /* IOCL specifics */
+        LOG_STATE_ARRIVED,
+        // LOG_STATE_PREPARED,
+        LOG_STATE_ASSIGNED,
+        LOG_STATE_READY // all acks have arrived
+        // LOG_STATE_COMMITTED
+    };
 
-struct LogEntry {
-    viewstamp_t viewstamp;
-    LogEntryState state;
-    Request request;
-    string hash;
-    // Speculative client table stuff
-    opnum_t prevClientReqOpnum;
-    ::google::protobuf::Message *replyMessage;
+    struct Predecessor
+    {
+        Request request;
+        uint64_t ShardId;
+        int64_t arrivalTimestamp;
+    };
 
-    LogEntry() { replyMessage = NULL; }
-    LogEntry(const LogEntry &x)
-        : viewstamp(x.viewstamp), state(x.state), request(x.request), hash(x.hash), prevClientReqOpnum(x.prevClientReqOpnum) {
-        if (x.replyMessage) {
-            replyMessage = x.replyMessage->New();
-            replyMessage->CopyFrom(*x.replyMessage);
-        } else {
-            replyMessage = NULL;
+    struct Successor
+    {
+        Request request;
+        uint64_t ShardId;
+    };
+
+    struct LogEntry
+    {
+        viewstamp_t viewstamp;
+        LogEntryState state;
+        Request request;
+        string hash;
+        // Speculative client table stuff
+        opnum_t prevClientReqOpnum;
+        ::google::protobuf::Message *replyMessage;
+        // IOCL specifics
+        uint64_t arrivalTimestamp;
+        uint64_t sortTimestamp;
+        std::vector<Predecessor *> predecessors;
+        std::vector<Successor *> successors;
+
+        LogEntry() { replyMessage = NULL; }
+        LogEntry(const LogEntry &x)
+            : viewstamp(x.viewstamp), state(x.state), request(x.request), hash(x.hash), prevClientReqOpnum(x.prevClientReqOpnum)
+        {
+            if (x.replyMessage)
+            {
+                replyMessage = x.replyMessage->New();
+                replyMessage->CopyFrom(*x.replyMessage);
+            }
+            else
+            {
+                replyMessage = NULL;
+            }
         }
-    }
-    LogEntry(viewstamp_t viewstamp, LogEntryState state,
-             const Request &request, const string &hash)
-        : viewstamp(viewstamp), state(state), request(request), hash(hash), replyMessage(NULL) {}
-    virtual ~LogEntry() {
-        if (replyMessage) {
-            delete replyMessage;
+        LogEntry(viewstamp_t viewstamp, LogEntryState state,
+                 const Request &request, const string &hash)
+            : viewstamp(viewstamp), state(state), request(request), hash(hash), replyMessage(NULL) {}
+        virtual ~LogEntry()
+        {
+            if (replyMessage)
+            {
+                delete replyMessage;
+            }
         }
-    }
-};
+    };
 
-class Log {
-   public:
-    Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
-    LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
-    LogEntry *Find(opnum_t opnum);
-    bool SetStatus(opnum_t opnum, LogEntryState state);
-    bool SetRequest(opnum_t op, const Request &req);
-    void RemoveAfter(opnum_t opnum);
-    LogEntry *Last();
-    viewstamp_t LastViewstamp() const;  // deprecated
-    opnum_t LastOpnum() const;
-    opnum_t FirstOpnum() const;
-    bool Empty() const;
-    template <class T>
-    void Dump(opnum_t from, T out);
-    template <class iter>
-    void Install(iter start, iter end);
-    const string &LastHash() const;
+    class Log
+    {
+    public:
+        Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
+        LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
+        LogEntry *Find(opnum_t opnum);
+        // IOCL specifics
+        LogEntry &InsertSorted(uint64_t sortTimestamp, const Request &req, LogEntryState state);
+        bool SetStatus(opnum_t opnum, LogEntryState state);
+        bool SetRequest(opnum_t op, const Request &req);
+        void RemoveAfter(opnum_t opnum);
+        LogEntry *Last();
+        viewstamp_t LastViewstamp() const; // deprecated
+        opnum_t LastOpnum() const;
+        opnum_t FirstOpnum() const;
+        bool Empty() const;
+        template <class T>
+        void Dump(opnum_t from, T out);
+        template <class iter>
+        void Install(iter start, iter end);
+        const string &LastHash() const;
 
-    static string ComputeHash(string lastHash, const LogEntry &entry);
-    static const string EMPTY_HASH;
+        static string ComputeHash(string lastHash, const LogEntry &entry);
+        static const string EMPTY_HASH;
 
-   private:
-    std::vector<LogEntry> entries;
-    string initialHash;
-    opnum_t start;
-    bool useHash;
-};
+    private:
+        std::vector<LogEntry> entries;
+        string initialHash;
+        opnum_t start;
+        bool useHash;
+    };
 
 #include "replication/common/log-impl.h"
 
-}  // namespace replication
+} // namespace replication
 
 #endif /* _COMMON_LOG_H_ */

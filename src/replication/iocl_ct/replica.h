@@ -71,6 +71,8 @@ namespace replication
             proto::PrepareMessage lastPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
+            // IOCL specifics
+            uint64_t shardTimestamp;
 
             Log log;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
@@ -136,6 +138,8 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
+            // IOCL specifics
+            uint64_t FoldL(const std::vector<Predecessor *> &predecessors);
         };
 
     } // namespace iocl_ct

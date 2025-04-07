@@ -707,8 +707,7 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                                       auto btcb = []() {};
 
                                       auto &client = *clients_[ss.current_client_index()];
-                                      client.Retry(ss.session(), bcb, btcb, timeout_);
-                                  });
+                                      client.Retry(ss.session(), bcb, btcb, timeout_); });
         }
     }
 }
