@@ -174,8 +174,11 @@ Value RedisStore::hmset(const std::string &key, const std::unordered_map<std::st
     }
 
     int newFieldCount = 0;
-    for (const auto &[field, val] : fields)
+    for (const auto &entry : fields)
     {
+        const std::string &field = entry.first;
+        const std::string &val = entry.second;
+
         bool isNew = (store[key].hash.find(field) == store[key].hash.end());
         store[key].hash[field] = val;
         if (isNew)
@@ -256,22 +259,31 @@ Value RedisStore::zrange(const std::string &key, int start, int stop)
 
     if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
     {
-        for (const auto &[k, v] : store)
+        for (const auto &entry : store)
         {
+            const std::string &k = entry.first;
+            const Value &v = entry.second;
+
             std::cout << "  Key: " << k << ", Type: " << static_cast<int>(v.type) << std::endl;
         }
         return Value::NewList({});
     }
 
-    for (const auto &[member, score] : store[key].hash)
+    for (const auto &entry : store[key].hash)
     {
+        const std::string &member = entry.first;
+        const std::string &score = entry.second;
+
         std::cout << "ZRANGE: Member: " << member << ", Score: " << score << std::endl;
     }
 
     // Convert hash to vector of pairs for sorting
     std::vector<std::pair<std::string, double>> members_scores;
-    for (const auto &[member, score_str] : store[key].hash)
+    for (const auto &entry : store[key].hash)
     {
+        const std::string &member = entry.first;
+        const std::string &score_str = entry.second;
+
         try
         {
             double score = std::stod(score_str);
@@ -323,8 +335,11 @@ Value RedisStore::zrevrange(const std::string &key, int start, int stop)
 
     // Convert hash to vector of pairs for sorting
     std::vector<std::pair<std::string, double>> members_scores;
-    for (const auto &[member, score_str] : store[key].hash)
+    for (const auto &entry : store[key].hash)
     {
+        const std::string &member = entry.first;
+        const std::string &score_str = entry.second;
+
         try
         {
             double score = std::stod(score_str);
