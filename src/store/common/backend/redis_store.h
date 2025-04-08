@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#include <optional>
+#include <boost/optional.hpp>
 #include <iostream>
 #include <algorithm>
 #include <sstream>
@@ -104,7 +104,7 @@ public:
     // Redis Ops
     // Writes
     void put(const std::string &key, const Value &val);
-    std::optional<Value> get(const std::string &key);
+    boost::optional<Value> get(const std::string &key);
     Value incr(const std::string &key);
     Value set(const std::string &key, const Value &val);
     Value sadd(const std::string &key, const std::string &member);

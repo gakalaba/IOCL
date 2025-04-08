@@ -18,7 +18,7 @@ Value RedisStore::execute(const Command &cmd)
     case Operation::GET:
     {
         auto val = get(cmd.key);
-        return val.has_value() ? val.value() : NIL;
+        return val.is_initialized() ? val.value() : NIL;
     }
     case Operation::INCR:
         return incr(cmd.key);
@@ -65,7 +65,7 @@ void RedisStore::put(const std::string &key, const Value &val)
     store[key] = val;
 }
 
-std::optional<Value> RedisStore::get(const std::string &key)
+boost::optional<Value> RedisStore::get(const std::string &key)
 {
     if (store.find(key) != store.end())
     {
@@ -73,7 +73,7 @@ std::optional<Value> RedisStore::get(const std::string &key)
     }
     // debug for get
     std::cout << "Key not found: " << key << "\n";
-    return std::nullopt;
+    return boost::none;
 }
 
 Value RedisStore::incr(const std::string &key)
