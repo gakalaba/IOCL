@@ -42,7 +42,6 @@
 
 DEFINE_LATENCY(op);
 
-using request_utils::AsynchOperationType;
 using request_utils::Value;
 
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
@@ -961,7 +960,7 @@ void BenchmarkClient::Finish()
 }
 
 // Transformed IOCL Apps!!
-std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t session_id, AsynchOperationType opType, int64_t key, Value newValue, Value oldValue)
+std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t session_id, request_utils::Operation opType, int64_t key, Value newValue, Value oldValue)
 {
     Debug("SendAsynchRequest");
     auto search = session_states_.find(session_id);
@@ -975,22 +974,18 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
-    std::string op_str;
-
     switch (opType)
     {
-    case AsynchOperationType::GET:
-        op_str = "get";
+    case request_utils::Operation::GET:
         break;
 
-    case AsynchOperationType::PUT:
-        op_str = "put";
+    case request_utils::Operation::PUT:
         break;
 
     default:
         Panic("NOT YET SUPPORTEDunsupported opeartion type %lu", opType);
     }
-    auto commandId = client.SendAsynchRequest(session, op_str, key, newValue, oldValue, rcb);
+    auto commandId = client.SendAsynchRequest(session, opType, key, newValue, oldValue, rcb);
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }
 

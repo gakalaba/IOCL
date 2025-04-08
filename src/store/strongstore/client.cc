@@ -639,9 +639,28 @@ namespace strongstore
         sclients_[i]->SendRequest(req_id, op, key, value, rcb1, rtcb1, timeout);
     }
 
-    uint64_t Client::SendAsynchRequest(Session &s, const std::string &op_str, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb)
+    uint64_t Client::SendAsynchRequest(Session &s, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb)
     {
-        return 0;
+        auto &session = static_cast<StrongSession &>(s);
+
+        auto req_id = session.transaction_id();
+
+        Debug("SendAsynchRequest request_id = [%lu]", req_id);
+
+        ASSERT(session.executing());
+
+        // Contact the appropriate shard to set the value.
+        // TODO ANJA this is wrong way wrong
+        int i = (*part_)(key, nshards_, -1, session.participants());
+
+        auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, uint64_t commandId)
+        {
+            session.get().set_executing();
+            return trcb(s, commandId);
+        };
+
+        sclients_[i]->SendAsynchRequest(req_id, optype, key, oldValue, newValue, rcb1);
+        return req_id;
     }
 
     /* Attempts to commit the ongoing transaction. */

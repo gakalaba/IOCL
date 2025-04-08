@@ -203,3 +203,14 @@ message IOCLCoordinationReply {
     required int32 status = 2;
     required string return_value = 3;
 }
+
+
+message TransformedIOCLRequest {
+    required RequestIDMessage rid = 1;
+    required request_utils::Operation op = 2;
+    required uint64_t key = 3;
+    required request_utils::Value oldValue = 4;
+    required request_utils::Value newValue = 5;
+}
+
+

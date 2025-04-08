@@ -86,7 +86,7 @@ public:
     // SendRequest(opTypes state.Operation, keys int64, newValues state.Value, oldValues state.Value) (bool, state.Value)
     // state.go will be in frontend/request_utils.cc+h
     // #include request_utils.h
-    std::tuple<bool, request_utils::Value> SendAsynchRequest(const uint64_t session_id, request_utils::AsynchOperationType opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue);
+    std::tuple<bool, request_utils::Value> SendAsynchRequest(const uint64_t session_id, request_utils::Operation opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue);
     std::tuple<request_utils::Value, uint64_t> AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId);
 
     inline bool IsFullyDone() { return done; }

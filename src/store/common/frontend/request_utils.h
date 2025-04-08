@@ -89,7 +89,7 @@ namespace request_utils
     static const Value NIL = Value::NewString("");
 
     // OPS
-    enum class AsynchOperationType
+    enum class Operation
     {
         PUT,
         GET,
@@ -111,7 +111,7 @@ namespace request_utils
     // A Command object carrying the operation, key, value and an optional extra field (oldValue).
     struct Command
     {
-        AsynchOperationType op;
+        Operation op;
         std::string key;
         Value value;
         Value oldValue; // used for both CAS ops and ops that require more than one field

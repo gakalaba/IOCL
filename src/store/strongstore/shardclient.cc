@@ -295,6 +295,34 @@ namespace strongstore
         transport_->SendMessageToReplica(this, shard_idx_, replica_, req_);
     }
 
+    void ShardClient::SendAsynchRequest(uint64_t transaction_id, request_utils::Operation optype,
+                                        uint64_t key, request_utils::Value oldValue,
+                                        request_utils::Value newValue, transformed_callback trcb)
+    {
+        // Send the operation to appropriate shard.
+        Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
+
+        uint64_t req_id = last_req_id_++;
+        Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
+        PendingAsynchRequest *pendingReq = new PendingAsynchRequest(transaction_id, req_id);
+        pendingAsynchReqs[req_id] = pendingReq;
+        pendingReq->op = optype;
+        pendingReq->key = key;
+        pendingReq->oldVal = oldValue;
+        pendingReq->newVal = newValue;
+        pendingReq->trcb = trcb;
+
+        treq_.Clear();
+        treq_.mutable_rid()->set_client_id(client_id_);
+        treq_.mutable_rid()->set_client_req_id(req_id);
+        treq_.set_op(optype);
+        treq_.set_key(key);
+        treq_.set_oldValue(oldValue);
+        treq_.set_newValue(newValue);
+
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
+    }
+
     // IOCL receive the response
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {

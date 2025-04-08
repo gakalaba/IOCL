@@ -81,7 +81,7 @@ namespace strongstore
     typedef std::function<void(int, const std::string &)> req_callback;
     typedef std::function<void(int, const std::string &)> req_timeout_callback;
 
-    typedef std::function<std::tuple<request_utils::Value, uint64_t>(int, uint64_t)> transformed_callback;
+    typedef std::function<std::tuple<request_utils::Value, uint64_t>(uint64_t, uint64_t)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -132,6 +132,9 @@ namespace strongstore
                          const std::string &key, const std::string &value,
                          req_callback rcb, req_timeout_callback rtcb,
                          uint32_t timeout);
+        void SendAsynchRequest(uint64_t req_id, request_utils::Operation optype,
+                               uint64_t key, request_utils::Value oldValue,
+                               request_utils::Value newValue, transformed_callback rcb);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -178,6 +181,19 @@ namespace strongstore
             req_callback rcb;
             req_timeout_callback rtcb;
         };
+
+        struct PendingAsynchRequest
+        {
+            PendingAsynchRequest(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}
+            uint64_t transaction_id;
+            uint64_t req_id;
+            request_utils::Operation op;
+            uint64_t key;
+            request_utils::Value oldVal;
+            request_utils::Value newVal;
+            transformed_callback trcb;
+        };
+
         struct PendingGet : public PendingRequest
         {
             PendingGet(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -248,6 +264,7 @@ namespace strongstore
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
         std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
+        std::unordered_map<uint64_t, PendingAsynchRequest *> pendingAsynchReqs;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -257,6 +274,7 @@ namespace strongstore
 
         proto::Get get_;
         proto::IOCLRequest req_;
+        proto::TransformedIOCLRequest treq_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
