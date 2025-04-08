@@ -42,6 +42,9 @@
 
 DEFINE_LATENCY(op);
 
+using request_utils::AsynchOperationType;
+using request_utils::Value;
+
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
                                  Transport &transport, uint64_t id,
                                  BenchmarkClientMode mode,
@@ -52,6 +55,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  uint32_t abortBackoff, bool retryAborted,
                                  uint32_t maxBackoff, uint32_t maxAttempts,
                                  uint64_t fanout, bool issueConcurrent,
+                                 bool transformed,
                                  const std::string &latencyFilename)
     : transport_(transport),
       session_states_{},
@@ -77,7 +81,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       cooldownStarted{false},
       mode_{mode},
       fanout{fanout},
-      issueConcurrent{issueConcurrent}
+      issueConcurrent{issueConcurrent},
+      isTransformed{transformed}
 {
     Debug("starting benchclient, issueConcurrent is %d", issueConcurrent);
     if (arrival_rate <= 0)
@@ -103,6 +108,34 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
     if (IsIOCL())
     {
+        if (IsTransformed())
+        {
+            Debug("[%lu] Starting Transformed App Client", n_sessions_started_);
+            n_sessions_started_++;
+
+            std::size_t client_index = n_sessions_started_ % clients_.size();
+            auto &client = *clients_[client_index];
+
+            auto &session = client.BeginSession();
+            auto sid = session.id();
+
+            Debug("session id: %lu", sid);
+
+            // auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+            // auto appreq = GetNextAppRequest();
+            // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+
+            // session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+
+            // auto &ss = session_states_.find(sid)->second;
+            // _Latency_StartRec(ss.lat());
+
+            // auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+            // auto btcb = []() {};
+
+            // client.BeginIOCL(session, bcb, btcb, timeout_);
+            return;
+        }
         transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
     }
     else
@@ -928,7 +961,40 @@ void BenchmarkClient::Finish()
 }
 
 // Transformed IOCL Apps!!
-std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(AsynchOperationType opType, int64_t key, Value newValue, Value oldValue)
+std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t session_id, AsynchOperationType opType, int64_t key, Value newValue, Value oldValue)
 {
-    Panic("HUHUH");
+    Debug("SendAsynchRequest");
+    auto search = session_states_.find(session_id);
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+    auto &session = ss.session();
+
+    auto rcb = std::bind(&BenchmarkClient::AwaitAsynchResponse, this, session_id, std::placeholders::_1);
+
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+
+    std::string op_str;
+
+    switch (opType)
+    {
+    case AsynchOperationType::GET:
+        op_str = "get";
+        break;
+
+    case AsynchOperationType::PUT:
+        op_str = "put";
+        break;
+
+    default:
+        Panic("NOT YET SUPPORTEDunsupported opeartion type %lu", opType);
+    }
+    auto commandId = client.SendAsynchRequest(session, op_str, key, newValue, oldValue, rcb);
+    return std::make_tuple(true, Value(std::to_string(commandId)));
+}
+
+std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
+{
+    return std::make_tuple(Value(std::to_string(commandId)), 0);
 }

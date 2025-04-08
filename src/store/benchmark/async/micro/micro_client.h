@@ -59,6 +59,7 @@ namespace micro
                     bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts,
                     uint64_t fanout,
                     bool issueConcurrent,
+                    bool isTransformed = false,
                     const std::string &latencyFilename = "latency");
 
         virtual ~MicroClient();

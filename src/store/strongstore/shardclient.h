@@ -57,6 +57,7 @@
 #include "store/common/transaction.h"
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
+#include "store/common/frontend/request_utils.h"
 
 namespace strongstore
 {
@@ -79,6 +80,8 @@ namespace strongstore
 
     typedef std::function<void(int, const std::string &)> req_callback;
     typedef std::function<void(int, const std::string &)> req_timeout_callback;
+
+    typedef std::function<std::tuple<request_utils::Value, uint64_t>(int, uint64_t)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;

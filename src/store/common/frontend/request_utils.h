@@ -37,81 +37,85 @@
 #include <algorithm>
 #include <sstream>
 
-enum class ValueType
+namespace request_utils
 {
-    STRING,
-    LIST,
-    SET,
-    HASH
-};
 
-class Value
-{
-public:
-    ValueType type;
-    std::string str;
-    std::vector<std::string> list;
-    std::unordered_set<std::string> set;
-    std::unordered_map<std::string, std::string> hash;
-
-    Value() : type(ValueType::STRING), str("") {}
-    Value(const std::string &s) : type(ValueType::STRING), str(s) {}
-    Value(const std::vector<std::string> &l) : type(ValueType::LIST), list(l) {}
-    Value(const std::unordered_set<std::string> &s) : type(ValueType::SET), set(s) {}
-    Value(const std::unordered_map<std::string, std::string> &h) : type(ValueType::HASH), hash(h) {}
-
-    static Value NewString(const std::string &s)
+    enum class ValueType
     {
-        return Value(s);
-    }
-    static Value NewList(const std::vector<std::string> &l)
-    {
-        return Value(l);
-    }
-    static Value NewSet(const std::unordered_set<std::string> &s)
-    {
-        return Value(s);
-    }
-    static Value NewHash(const std::unordered_map<std::string, std::string> &h)
-    {
-        return Value(h);
-    }
+        STRING,
+        LIST,
+        SET,
+        HASH
+    };
 
-    bool isNil() const
+    class Value
     {
-        return (type == ValueType::STRING && str.empty());
-    }
-};
+    public:
+        ValueType type;
+        std::string str;
+        std::vector<std::string> list;
+        std::unordered_set<std::string> set;
+        std::unordered_map<std::string, std::string> hash;
 
-static const Value NIL = Value::NewString("");
+        Value() : type(ValueType::STRING), str("") {}
+        Value(const std::string &s) : type(ValueType::STRING), str(s) {}
+        Value(const std::vector<std::string> &l) : type(ValueType::LIST), list(l) {}
+        Value(const std::unordered_set<std::string> &s) : type(ValueType::SET), set(s) {}
+        Value(const std::unordered_map<std::string, std::string> &h) : type(ValueType::HASH), hash(h) {}
 
-// OPS
-enum class AsynchOperationType
-{
-    PUT,
-    GET,
-    INCR,
-    SET,
-    SADD,
-    EXISTS,
-    HMGET,
-    HSET,
-    HMSET,
-    HGETALL,
-    ZADD,
-    ZINCRBY,
-    ZSCORE,
-    ZRANGE,
-    ZREVRANGE
-};
+        static Value NewString(const std::string &s)
+        {
+            return Value(s);
+        }
+        static Value NewList(const std::vector<std::string> &l)
+        {
+            return Value(l);
+        }
+        static Value NewSet(const std::unordered_set<std::string> &s)
+        {
+            return Value(s);
+        }
+        static Value NewHash(const std::unordered_map<std::string, std::string> &h)
+        {
+            return Value(h);
+        }
 
-// A Command object carrying the operation, key, value and an optional extra field (oldValue).
-struct Command
-{
-    AsynchOperationType op;
-    std::string key;
-    Value value;
-    Value oldValue; // used for both CAS ops and ops that require more than one field
-};
+        bool isNil() const
+        {
+            return (type == ValueType::STRING && str.empty());
+        }
+    };
+
+    static const Value NIL = Value::NewString("");
+
+    // OPS
+    enum class AsynchOperationType
+    {
+        PUT,
+        GET,
+        INCR,
+        SET,
+        SADD,
+        EXISTS,
+        HMGET,
+        HSET,
+        HMSET,
+        HGETALL,
+        ZADD,
+        ZINCRBY,
+        ZSCORE,
+        ZRANGE,
+        ZREVRANGE
+    };
+
+    // A Command object carrying the operation, key, value and an optional extra field (oldValue).
+    struct Command
+    {
+        AsynchOperationType op;
+        std::string key;
+        Value value;
+        Value oldValue; // used for both CAS ops and ops that require more than one field
+    };
+} // namespace request_utils
 
 #endif // REQUEST_UTILS_H

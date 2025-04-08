@@ -68,6 +68,7 @@ public:
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
                     uint64_t fanout, bool issueConcurrent,
+                    bool tranformed = false,
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
@@ -85,7 +86,8 @@ public:
     // SendRequest(opTypes state.Operation, keys int64, newValues state.Value, oldValues state.Value) (bool, state.Value)
     // state.go will be in frontend/request_utils.cc+h
     // #include request_utils.h
-    std::tuple<bool, Value> SendAsynchRequest(AsynchOperationType opType, int64_t key, Value newValue, Value oldValue);
+    std::tuple<bool, request_utils::Value> SendAsynchRequest(const uint64_t session_id, request_utils::AsynchOperationType opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue);
+    std::tuple<request_utils::Value, uint64_t> AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId);
 
     inline bool IsFullyDone() { return done; }
 
@@ -215,6 +217,7 @@ private:
     void AbortTimeout();
 
     inline bool IsIOCL() { return clients_[0]->IsIOCL(); };
+    inline bool IsTransformed() { return isTransformed; };
 
     void Finish();
     void WarmupDone();
@@ -260,6 +263,7 @@ private:
     // IOCL stuff
     uint64_t fanout;
     bool issueConcurrent;
+    bool isTransformed;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

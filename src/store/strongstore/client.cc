@@ -638,6 +638,12 @@ namespace strongstore
 
         sclients_[i]->SendRequest(req_id, op, key, value, rcb1, rtcb1, timeout);
     }
+
+    uint64_t Client::SendAsynchRequest(Session &s, const std::string &op_str, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb)
+    {
+        return 0;
+    }
+
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
     {
