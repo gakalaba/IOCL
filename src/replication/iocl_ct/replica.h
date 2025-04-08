@@ -73,6 +73,7 @@ namespace replication
             opnum_t lastBatchEnd;
             // IOCL specifics
             uint64_t shardTimestamp;
+            uint64_t lastExecutedTimestamp;
 
             Log log;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
@@ -85,6 +86,7 @@ namespace replication
             std::map<uint64_t, ClientTableEntry> clientTable;
             // IOCL specific
             std::unordered_map<Tag, std::vector<Successor *>> outstandingSuccessors;
+            std::unordered_map<Tag, std::tuple<int64_t, int64_t>> outstandingACKs;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
@@ -122,6 +124,9 @@ namespace replication
 
             void HandleCoordinationResp(const TransportAddress &remote,
                                         const proto::CoordinationReplyMessage &msg);
+
+            void HandleCoordinationResp2(const TransportAddress &remote,
+                                         const proto::CoordinationReplyMessage &msg);
 
             void HandlePrepare(const TransportAddress &remote,
                                const proto::PrepareMessage &msg);

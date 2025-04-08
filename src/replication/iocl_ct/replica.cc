@@ -160,6 +160,7 @@ namespace replication
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
                 ReplyMessage reply;
                 Execute(lastCommitted, entry->request, reply);
+                lastExecutedTimestamp++;
 
                 reply.set_view(entry->viewstamp.view);
                 reply.set_opnum(entry->viewstamp.opnum);
@@ -768,6 +769,7 @@ namespace replication
                  * This also notifies the client of the result.
                  */
 
+                log.SetPrepared(entry);
                 /* Send ArrivalACK messages to the other replicas */
                 ArrivalAckMessage a;
                 a.set_arrivalTs(arrival_ts);
@@ -775,8 +777,7 @@ namespace replication
                 {
                     RWarning("Failed to send prepare message to all replicas");
                 }
-                // delete the successor list!!!!!!
-                delete entry.successors;
+                // the successor list will be deleted after the second round
 
                 // CommitUpTo(msg.opnum());
 
@@ -853,7 +854,7 @@ namespace replication
                                                 const proto::CoordinationRequestMessage &msg)
         {
             Tag t = msg.get();
-            LogEntry *entry = FindUnsorted(t);
+            LogEntry *entry = log.FindUnsorted(t);
             ArrivalAckMessage a;
             a.set_arrivalTs(arrival_ts);
             if (!entry)
@@ -866,10 +867,15 @@ namespace replication
                 }
                 else
                 {
+                    // Entry is in the sorted log already
                     // Send the correct timestamp to this asking successor
-                    if (!(transport->SendMessageToSuccessor(this, a, msg.asdfksf)))
+                    // Fast path to second round
+                    // Send ACK to all successors
+                    SortedAckMessage a;
+                    a.set_sortedTs(entry.sortTimestamp);
+                    if (!(transport->SendMessageToSuccessorList(this, a, msg.sdfas)))
                     {
-                        RWarning("Failed to send prepare message to successor");
+                        RWarning("Failed to send prepare message to all replicas");
                     }
                 }
             }
@@ -893,6 +899,97 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationResp(const TransportAddress &remote,
                                                     const proto::CoordinationReplyMessage &msg)
         {
+            // The entry should be in the unsorted log
+            LogEntry &entry = log.FindUnsorted(msg.t);
+            if (!entry)
+            {
+                // It can only be the case that the entry hasn't arrived yet,
+                // since it cannot mov on to the sorted list otherwise.
+                // Add the entry to the outstandingACKs map
+                outstandingACKs[msg.t] = std::make_tuple(msg.arrivalTs, -1);
+                return;
+            }
+            if (entry.predecessors[msg.predIdx].arrivalTimestamp != -1)
+            {
+                Panic("Already got an arrival timestamp for this predecessor");
+            }
+            // Set the arrival timestamp
+            entry.predecessors[msg.predIdx].arrivalTimestamp = msg.arrivalTs;
+            entry.p++;
+
+            // If this is the nth predecessor ACK, compute a new timestamp
+            if (entry.p == entry.predecessors.size())
+            {
+                entry.sortTimestamp = std::max(FoldL(entry.predecessors), lastExecutedTimestamp);
+                // Insert into orderedLog, sorted by sortedTimestamp
+                log.InsertSorted(entry, LOG_STATE_ASSIGNED);
+                // Send ACK to all successors
+                SortedAckMessage a;
+                a.set_sortedTs(entry.sortTimestamp);
+                if (!(transport->SendMessageToSuccessorList(this, a, entry.successors)))
+                {
+                    RWarning("Failed to send prepare message to all replicas");
+                }
+
+                // delete the successor list!!!!!!
+                delete entry.successors;
+            }
+        }
+
+        void IOCL_CTReplica::HandleCoordinationResp2(const TransportAddress &remote,
+                                                     const proto::CoordinationReplyMessage &msg)
+        {
+            // This could be ariving for an entry that never came yet or for an entry that never got the first round ACK!
+            LogEntry &entry = log.FindUnsorted(msg.t);
+            if (!entry)
+            {
+                entry = Find();
+                if (!entry)
+                {
+                    // Entry never came yet! Add to outstanding ACK map
+                    auto ACKs = outstandingACKs.find(???);
+                    if (ACKS != outstandingACKs.end())
+                    {
+                        std::get<1>(ACKs) = msg.sortedTs;
+                    }
+                    else
+                    {
+                        outstandingACKs[msg.t] = std::make_tuple(std::get<0>(ACKs), msg.sortedTs);
+                    }
+                }
+                else
+                {
+                    // Entry is in the sorted log!
+                    Panic("Step 3.");
+                }
+            }
+            else
+            {
+                // Entry that never got the first round ACK
+                Panic("fast path!");
+            }
+        }
+
+        uint64_t IOCL_CTReplica::FoldL(const std::vector<Predecessor *> &predecessors)
+        {
+            if (predecessors.empty())
+            {
+                Panic("Called FoldL on empty predecessor list");
+                return 0;
+            }
+            auto v = predecessors.front()->arrivalTimestamp;
+            for (auto it = predecessors.begin() + 1; it != predecessors.end(); ++it)
+            {
+                if ((*it)->arrivalTimestamp > v)
+                {
+                    v = (*it)->arrivalTimestamp;
+                }
+                else
+                {
+                    v++;
+                }
+            }
+            return v;
         }
 
         void IOCL_CTReplica::HandleRequestStateTransfer(

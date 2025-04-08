@@ -92,6 +92,7 @@ namespace replication
         uint64_t sortTimestamp;
         std::vector<Predecessor *> predecessors;
         std::vector<Successor *> successors;
+        uint64_t p;
 
         LogEntry() { replyMessage = NULL; }
         LogEntry(const LogEntry &x)
@@ -124,11 +125,12 @@ namespace replication
     public:
         Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
-        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state, std::vector<Successor *> &&successors);
         LogEntry *Find(opnum_t opnum);
-        LogEntry *FindUnsorted(opnum_t opnum);
         // IOCL specifics
-        LogEntry &InsertSorted(uint64_t sortTimestamp, const Request &req, LogEntryState state);
+        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state, std::vector<Successor *> &&successors);
+        LogEntry &FindUnsorted(opnum_t opnum);
+        LogEntry &InsertSorted(LogEntry &entry, LogEntryState state);
+        void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);
         bool SetRequest(opnum_t op, const Request &req);
         void RemoveAfter(opnum_t opnum);

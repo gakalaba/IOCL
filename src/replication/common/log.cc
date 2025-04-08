@@ -129,6 +129,36 @@ namespace replication
         return entry;
     }
 
+    LogEntry &
+    Log::InsertSorted(LogEntry &entry, LogEntryState state)
+    {
+        if (entries.empty())
+        {
+            ASSERT(vs.opnum == start);
+        }
+        else
+        {
+            ASSERT(vs.opnum == LastOpnum() + 1);
+        }
+
+        LogEntry entry;
+        entry.viewstamp = vs;
+        entry.request = req;
+        entry.state = state;
+        if (useHash)
+        {
+            entry.hash = ComputeHash(LastHash(), entry);
+        }
+
+        entries.push_back(entry);
+        return *Find(vs.opnum);
+    }
+
+    void SetPrepared(LogEntry &entry)
+    {
+        entry.state = LOG_STATE_PREPARED;
+    }
+
     bool
     Log::SetStatus(opnum_t op, LogEntryState state)
     {
