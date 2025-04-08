@@ -707,8 +707,7 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                                       auto btcb = []() {};
 
                                       auto &client = *clients_[ss.current_client_index()];
-                                      client.Retry(ss.session(), bcb, btcb, timeout_);
-                                  });
+                                      client.Retry(ss.session(), bcb, btcb, timeout_); });
         }
     }
 }
@@ -926,4 +925,10 @@ void BenchmarkClient::Finish()
 
     uint64_t cooldown_us = cooldownSec * 1e6;
     transport_.TimerMicro(cooldown_us, std::bind(&BenchmarkClient::Cleanup, this));
+}
+
+// Transformed IOCL Apps!!
+std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(AsynchOperationType opType, int64_t key, Value newValue, Value oldValue)
+{
+    Panic("HUHUH");
 }

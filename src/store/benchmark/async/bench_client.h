@@ -39,6 +39,7 @@
 #include "lib/transport.h"
 #include "store/common/frontend/async_transaction.h"
 #include "store/common/frontend/async_apprequest.h"
+#include "store/common/frontend/request_utils.h"
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
@@ -84,7 +85,7 @@ public:
     // SendRequest(opTypes state.Operation, keys int64, newValues state.Value, oldValues state.Value) (bool, state.Value)
     // state.go will be in frontend/request_utils.cc+h
     // #include request_utils.h
-    void SendRequest();
+    std::tuple<bool, Value> SendAsynchRequest(AsynchOperationType opType, int64_t key, Value newValue, Value oldValue);
 
     inline bool IsFullyDone() { return done; }
 
