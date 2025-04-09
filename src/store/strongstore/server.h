@@ -44,6 +44,7 @@
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
 #include "store/common/backend/kvstore.h"
+#include "store/common/backend/redis_store.h"
 #include "store/common/truetime.h"
 #include "store/server.h"
 #include "store/strongstore/common.h"
@@ -114,7 +115,8 @@ namespace strongstore
         Server(Consistency consistency, const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport,
-               bool debug_stats);
+               bool debug_stats,
+               bool transformed = false);
         ~Server();
 
         // Override TransportReceiver
@@ -213,6 +215,8 @@ namespace strongstore
 
         void HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg);
 
+        void HandleAsynchSendRequest(const TransportAddress &remote, proto::TransformedIOCLRequest &msg);
+
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
@@ -286,6 +290,8 @@ namespace strongstore
         LockTable locks_;
         VersionedKVStore<TimestampID, std::string> store_;
         KVStore iocl_store_;
+        RedisStore transformed_store_;
+        bool transformed_;
 
         const transport::Configuration &shard_config_;
         const transport::Configuration &replica_config_;
@@ -305,6 +311,7 @@ namespace strongstore
 
         proto::Get get_;
         proto::IOCLRequest req_;
+        proto::TransformedIOCLRequest treq_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

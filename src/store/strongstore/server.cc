@@ -80,7 +80,7 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, bool debug_stats)
+                   Transport *transport, bool debug_stats, bool transformed)
         : PingServer(transport),
           tt_{NULL},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -92,7 +92,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency}
+          consistency_{consistency},
+          transformed_{transformed}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -142,6 +143,11 @@ namespace strongstore
         {
             req_.ParseFromString(data);
             HandleSendRequest(remote, req_);
+        }
+        else if (type == treq_.GetTypeName())
+        {
+            treq_.ParseFromString(data);
+            HandleSendAsynchRequest(remote, treq_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -273,6 +279,23 @@ namespace strongstore
     void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
         Debug("Calling HandleSendRequest! with msg %s: msg.op = %s, msg.key = %s, msg.value = %s", msg, msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
+        uint64_t transaction_id = msg.transaction_id();
+
+        auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
+        reply->key = msg.key();
+        reply->value = msg.value();
+
+        replica_client_->SendRequest(
+            transaction_id, msg,
+            std::bind(&Server::SendRequestCallback, this, reply, transaction_id,
+                      std::placeholders::_1, std::placeholders::_2),
+            // this thing is the ptcb
+            [](int, string) {}, REQUEST_TIMEOUT);
+    }
+
+    void Server::HandleAsynchSendRequest(const TransportAddress &remote, proto::TransformedIOCLRequest &msg)
+    {
+        Debug("Calling HandleSendAsynchRequest!");
         uint64_t transaction_id = msg.transaction_id();
 
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
@@ -1850,7 +1873,14 @@ namespace strongstore
     {
         if (consistency_ == LIN)
         {
-            iocl_store_.put(key, value);
+            if (!transformed_)
+            {
+                iocl_store_.put(key, value);
+            }
+            else
+            {
+                transformed_store_.put(key, value);
+            }
         }
         else
         {
