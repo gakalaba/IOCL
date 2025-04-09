@@ -68,6 +68,11 @@ namespace strongstore
             req_reply_.ParseFromString(data);
             HandleSendRequestReply(req_reply_);
         }
+        else if (type == treq_reply_.GetTypeName())
+        {
+            treq_reply_.ParseFromString(data);
+            HandleAsynchRequestReply(treq_reply_);
+        }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
             rw_commit_c_reply_.ParseFromString(data);
@@ -465,6 +470,75 @@ namespace strongstore
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 
         rcb(status, retval);
+    }
+
+    // IOCL receive the response
+    void ShardClient::HandleAsynchRequestReply(const proto::TransformedIOCLReply &reply)
+    {
+        Debug("shard client got TRANSFORMED IOCLReply!");
+        uint64_t req_id = reply.rid().client_req_id();
+        Debug("the transaction_id = %d", req_id);
+        int status = reply.status();
+
+        request_utils::Value retval;
+
+        // Setting the command oldValue
+        switch (reply.return_value().type())
+        {
+        case AsynchValue::STRING:
+            retval.type = request_utils::ValueType::STRING;
+            retval.str = reply.return_value().str();
+            break;
+        case AsynchValue::LIST:
+            retval.type = request_utils::ValueType::LIST;
+            for (int i = 0; i < reply.return_value().list_size(); ++i)
+            {
+                retval.list.push_back(reply.return_value().list(i));
+            }
+            break;
+        case AsynchValue::SET:
+            retval.type = request_utils::ValueType::SET;
+            for (int i = 0; i < reply.return_value().set_size(); ++i)
+            {
+                retval.set.insert(reply.return_value().set(i));
+            }
+            break;
+        case AsynchValue::HASH:
+            retval.type = request_utils::ValueType::HASH;
+            for (const auto &entry : reply.return_value().hash())
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                retval.hash[k] = v;
+            }
+            break;
+
+        default:
+            Panic("Not a valid Value type!");
+            break;
+        }
+
+        auto itr = pendingAsynchReqs.find(req_id);
+        if (itr == pendingAsynchReqs.end())
+        {
+            Debug("[%d][%lu] SendRequestASYNCHREply for request not stored in PendingReqs.", shard_idx_, req_id);
+            Panic("huhuhuhuhuh");
+            return; // stale request
+        }
+
+        PendingAsynchRequest *req = itr->second;
+        uint64_t transaction_id = req->transaction_id;
+        transformed_callback trcb = req->trcb;
+        pendingAsynchReqs.erase(itr);
+        delete req;
+
+        Debug("[%lu] [shard %i] Received SendRequest reply with status %d and return value",
+              transaction_id, shard_idx_, status);
+
+        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
+
+        trcb(status, retval, transaction_id);
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

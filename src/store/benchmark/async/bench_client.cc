@@ -81,7 +81,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       mode_{mode},
       fanout{fanout},
       issueConcurrent{issueConcurrent},
-      isTransformed{transformed}
+      isTransformed{transformed},
+      replies_map_{}
 {
     Debug("starting benchclient, issueConcurrent is %d", issueConcurrent);
     if (arrival_rate <= 0)
@@ -739,7 +740,8 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                                       auto btcb = []() {};
 
                                       auto &client = *clients_[ss.current_client_index()];
-                                      client.Retry(ss.session(), bcb, btcb, timeout_); });
+                                      client.Retry(ss.session(), bcb, btcb, timeout_);
+                                  });
         }
     }
 }
@@ -969,7 +971,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
     auto &ss = search->second;
     auto &session = ss.session();
 
-    auto rcb = std::bind(&BenchmarkClient::AwaitAsynchResponse, this, session_id, std::placeholders::_1);
+    auto rcb = std::bind(&BenchmarkClient::AsynchRequestCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
@@ -987,6 +989,12 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
     }
     auto commandId = client.SendAsynchRequest(session, opType, key, newValue, oldValue, rcb);
     return std::make_tuple(true, Value(std::to_string(commandId)));
+}
+
+void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
+{
+    replies_map_[commandId] = retval;
+    return;
 }
 
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)

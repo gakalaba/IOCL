@@ -81,7 +81,7 @@ namespace strongstore
     typedef std::function<void(int, const std::string &)> req_callback;
     typedef std::function<void(int, const std::string &)> req_timeout_callback;
 
-    typedef std::function<std::tuple<request_utils::Value, uint64_t>(uint64_t, uint64_t)> transformed_callback;
+    typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -250,6 +250,7 @@ namespace strongstore
         void HandleGetReply(const proto::GetReply &reply);
         // for IOCL
         void HandleSendRequestReply(const proto::IOCLReply &reply);
+        void HandleAsynchRequestReply(const proto::TransformedIOCLReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -285,6 +286,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::IOCLReply req_reply_;
+        proto::TransformedIOCLReply treq_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

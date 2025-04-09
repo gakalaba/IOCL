@@ -55,7 +55,7 @@ typedef std::function<void(int, const std::string &, const std::string &)>
 
 typedef std::function<void(int, const std::string &)> req_callback;
 typedef std::function<void(int, const std::string &)> req_timeout_callback;
-typedef std::function<std::tuple<request_utils::Value, uint64_t>(uint64_t, uint64_t)> transformed_callback;
+typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
 typedef std::function<void(transaction_status_t)> commit_callback;
 typedef std::function<void()> commit_timeout_callback;

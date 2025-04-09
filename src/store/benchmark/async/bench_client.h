@@ -209,6 +209,9 @@ private:
                                 int status, const std::string &retval);
     void SendRequestTimeout(const uint64_t session_id,
                             int status, const std::string &retval);
+    void AsynchRequestCallback(const uint64_t session_id,
+                               int status, const request_utils::Value retval,
+                               int commandId);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
     void EndAppreqCallback(const uint64_t session_id);
@@ -264,6 +267,7 @@ private:
     uint64_t fanout;
     bool issueConcurrent;
     bool isTransformed;
+    std::unordered_map<uint64_t, request_utils::Value> replies_map_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

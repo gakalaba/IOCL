@@ -653,10 +653,10 @@ namespace strongstore
         // TODO ANJA this is wrong way wrong
         int i = (*part_)(key, nshards_);
 
-        auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, uint64_t commandId)
+        auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, request_utils::Value retval, int req_id)
         {
             session.get().set_executing();
-            return trcb(s, commandId);
+            return trcb(s, retval, req_id);
         };
 
         sclients_[i]->SendAsynchRequest(req_id, optype, key, oldValue, newValue, rcb1);
