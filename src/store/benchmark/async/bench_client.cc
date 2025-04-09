@@ -999,5 +999,20 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
 
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
 {
-    return std::make_tuple(Value(std::to_string(commandId)), 0);
+    Debug("Called AwaitAsynchResponse!");
+    //TODO need to increment the request id!!
+    if (replies_map_.find(commandId) != replies_map_.end())
+    {
+        Debug("Got a response!");
+        auto search = session_states_.find(session_id);
+        ASSERT(search != session_states_.end());
+
+        auto &ss = search->second;
+        //TODO ANJA somehwere in here we need to increment the transaction id!!
+
+        // right now we don't delete the value... for the purposes of double await? TODO ANJA see with austin
+        return std::make_tuple(replies_map_[commandId], 0);
+    }
+    // Wait until the response is in this map....
+    transport_.Timer(1, std::bind(&BenchmarkClient::AwaitAsynchResponse, this, session_id, commandId));
 }
