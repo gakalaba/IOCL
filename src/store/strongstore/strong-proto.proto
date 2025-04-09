@@ -207,10 +207,10 @@ message IOCLCoordinationReply {
 
 message TransformedIOCLRequest {
     required RequestIDMessage rid = 1;
-    required request_utils::Operation op = 2;
-    required uint64_t key = 3;
-    required request_utils::Value oldValue = 4;
-    required request_utils::Value newValue = 5;
+    required AsynchOperation op = 2;
+    required uint64 key = 3;
+    required AsynchValue oldValue = 4;
+    required AsynchValue newValue = 5;
 }
 
 
