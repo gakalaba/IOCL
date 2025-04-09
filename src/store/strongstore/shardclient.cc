@@ -244,7 +244,6 @@ namespace strongstore
         }
 
         Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        // TODO ANJA: want to delete this... cuz we're not doing trasnactions!
         transactions_[transaction_id].addReadSet(key, ts);
         read_sets_[transaction_id][key] = val;
 
@@ -315,10 +314,124 @@ namespace strongstore
         treq_.Clear();
         treq_.mutable_rid()->set_client_id(client_id_);
         treq_.mutable_rid()->set_client_req_id(req_id);
-        treq_.set_op(optype);
         treq_.set_key(key);
-        treq_.set_oldValue(oldValue);
-        treq_.set_newValue(newValue);
+        switch (optype)
+        {
+        case request_utils::Operation::PUT:
+            treq_.mutable_op()->set_op(AsynchOperation::PUT);
+            break;
+        case request_utils::Operation::GET:
+            treq_.mutable_op()->set_op(AsynchOperation::GET);
+            break;
+        case request_utils::Operation::INCR:
+            treq_.mutable_op()->set_op(AsynchOperation::INCR);
+            break;
+        case request_utils::Operation::SADD:
+            treq_.mutable_op()->set_op(AsynchOperation::SADD);
+            break;
+        case request_utils::Operation::EXISTS:
+            treq_.mutable_op()->set_op(AsynchOperation::EXISTS);
+            break;
+        case request_utils::Operation::HMGET:
+            treq_.mutable_op()->set_op(AsynchOperation::HMGET);
+            break;
+        case request_utils::Operation::HSET:
+            treq_.mutable_op()->set_op(AsynchOperation::HSET);
+            break;
+        case request_utils::Operation::HMSET:
+            treq_.mutable_op()->set_op(AsynchOperation::HMSET);
+            break;
+        case request_utils::Operation::HGETALL:
+            treq_.mutable_op()->set_op(AsynchOperation::HGETALL);
+            break;
+        case request_utils::Operation::ZADD:
+            treq_.mutable_op()->set_op(AsynchOperation::ZADD);
+            break;
+        case request_utils::Operation::ZINCRBY:
+            treq_.mutable_op()->set_op(AsynchOperation::ZINCRBY);
+            break;
+        case request_utils::Operation::ZSCORE:
+            treq_.mutable_op()->set_op(AsynchOperation::ZSCORE);
+            break;
+        case request_utils::Operation::ZRANGE:
+            treq_.mutable_op()->set_op(AsynchOperation::ZRANGE);
+            break;
+        case request_utils::Operation::ZREVRANGE:
+            treq_.mutable_op()->set_op(AsynchOperation::ZREVRANGE);
+            break;
+        default:
+            Panic("Not implemented ops yet");
+        }
+
+        // Setting the old value
+        switch (oldValue.type)
+        {
+        case request_utils::ValueType::STRING:
+            treq_.mutable_oldvalue()->set_type(AsynchValue::STRING);
+            treq_.mutable_oldvalue()->set_str(oldValue.str);
+            break;
+        case request_utils::ValueType::LIST:
+            treq_.mutable_oldvalue()->set_type(AsynchValue::LIST);
+            for (string s : oldValue.list)
+            {
+                treq_.mutable_oldvalue()->add_list(s);
+            }
+            break;
+        case request_utils::ValueType::SET:
+            treq_.mutable_oldvalue()->set_type(AsynchValue::SET);
+            for (string s : oldValue.set)
+            {
+                treq_.mutable_oldvalue()->add_set(s);
+            }
+            break;
+        case request_utils::ValueType::HASH:
+            treq_.mutable_oldvalue()->set_type(AsynchValue::HASH);
+            for (const auto &entry : oldValue.hash)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                (*treq_.mutable_oldvalue()->mutable_hash())[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
+
+        // Setting the new value
+        switch (newValue.type)
+        {
+        case request_utils::ValueType::STRING:
+            treq_.mutable_newvalue()->set_type(AsynchValue::STRING);
+            treq_.mutable_newvalue()->set_str(newValue.str);
+            break;
+        case request_utils::ValueType::LIST:
+            treq_.mutable_newvalue()->set_type(AsynchValue::LIST);
+            for (string s : newValue.list)
+            {
+                treq_.mutable_newvalue()->add_list(s);
+            }
+            break;
+        case request_utils::ValueType::SET:
+            treq_.mutable_newvalue()->set_type(AsynchValue::SET);
+            for (string s : newValue.set)
+            {
+                treq_.mutable_newvalue()->add_set(s);
+            }
+            break;
+        case request_utils::ValueType::HASH:
+            treq_.mutable_newvalue()->set_type(AsynchValue::HASH);
+            for (const auto &entry : newValue.hash)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                (*treq_.mutable_newvalue()->mutable_hash())[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
 
         transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
     }

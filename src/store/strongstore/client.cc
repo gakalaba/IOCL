@@ -651,7 +651,7 @@ namespace strongstore
 
         // Contact the appropriate shard to set the value.
         // TODO ANJA this is wrong way wrong
-        int i = (*part_)(key, nshards_, -1, session.participants());
+        int i = (*part_)(key, nshards_);
 
         auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, uint64_t commandId)
         {

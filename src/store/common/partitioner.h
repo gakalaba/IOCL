@@ -50,6 +50,7 @@ public:
                                 int group, const std::vector<int> &txnGroups) = 0;
     uint64_t operator()(const std::string &key, uint64_t numShards,
                         int group, const std::set<int> &txnGroups);
+    uint64_t operator()(uint64_t key, uint64_t numShards);
 };
 
 class DefaultPartitioner : public Partitioner

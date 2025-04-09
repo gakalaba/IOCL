@@ -39,6 +39,12 @@ uint64_t Partitioner::operator()(const std::string &key, uint64_t num_shards,
     return this->operator()(key, num_shards, group, txn_groups_vec);
 }
 
+uint64_t Partitioner::operator()(uint64_t key, uint64_t numShards)
+{
+    std::size_t hash = std::hash<uint64_t>{}(key);
+    return (hash % numShards);
+}
+
 uint64_t DefaultPartitioner::operator()(const std::string &key, uint64_t nshards,
                                         int group, const std::vector<int> &txnGroups)
 {
