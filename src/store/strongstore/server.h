@@ -280,6 +280,7 @@ namespace strongstore
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
         void ReplicaUpcallIOCL(opnum_t opnum, strongstore::proto::IOCLRequest &req, string &response);
+        void ReplicaUpcallTransformed(opnum_t opnum, strongstore::proto::TransformedIOCLRequest &req, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);

@@ -69,6 +69,10 @@ namespace strongstore
                          strongstore::proto::IOCLRequest &msg,
                          request_callback rcb, request_timeout_callback rtcb,
                          uint32_t timeout);
+        void SendAsynchRequest(uint64_t request_id,
+                               TransformedIOCLRequest &msg,
+                               request_callback rcb, request_timeout_callback rtcb,
+                               uint32_t timeout);
 
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,

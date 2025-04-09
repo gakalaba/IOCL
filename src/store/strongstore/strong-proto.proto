@@ -213,4 +213,8 @@ message TransformedIOCLRequest {
     required AsynchValue newValue = 5;
 }
 
-
+message TransformedIOCLReply {
+    required RequestIDMessage rid = 1;
+    required AsynchValue val = 2;
+    required uint64 retval = 3;
+}

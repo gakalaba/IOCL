@@ -36,6 +36,9 @@
 #include <memory>
 #include <unordered_set>
 
+using redis::Operation;
+using redis::ValueType;
+
 namespace strongstore
 {
 
@@ -296,7 +299,7 @@ namespace strongstore
     void Server::HandleAsynchSendRequest(const TransportAddress &remote, proto::TransformedIOCLRequest &msg)
     {
         Debug("Calling HandleSendAsynchRequest!");
-        uint64_t transaction_id = msg.transaction_id();
+        uint64_t transaction_id = msg.rid().client_req_id();
 
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
         reply->key = msg.key();
@@ -789,7 +792,7 @@ namespace strongstore
         }
         else if (s == ABORTED)
         { // Already aborted
-          // Debug("[%lu] Already aborted", transaction_id);
+            // Debug("[%lu] Already aborted", transaction_id);
         }
         else
         {
@@ -1116,7 +1119,7 @@ namespace strongstore
         }
         else if (s == ABORTED)
         { // Already aborted
-          // Debug("[%lu] Already aborted", transaction_id);
+            // Debug("[%lu] Already aborted", transaction_id);
         }
         else
         {
@@ -1698,10 +1701,19 @@ namespace strongstore
     {
         Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         IOCLRequest ioclrequest;
+        TransformedIOCLRequest transioclrequest;
         if (consistency_ == LIN)
         {
-            ioclrequest.ParseFromString(op);
-            ReplicaUpcallIOCL(opnum, ioclrequest, response);
+            if (!transformed_)
+            {
+                ioclrequest.ParseFromString(op);
+                ReplicaUpcallIOCL(opnum, ioclrequest, response);
+            }
+            else
+            {
+                transioclrequest.ParseFromString(op);
+                ReplicaUpcallTransformed(opnum, transioclrequest, response);
+            }
             return;
         }
         Request request;
@@ -1855,6 +1867,148 @@ namespace strongstore
         {
             Panic("Unrecognized operation.");
         }
+        reply.set_status(status);
+        reply.set_return_value(retval);
+        reply.set_transaction_id(req.transaction_id());
+        reply.mutable_rid()->set_client_id(req.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        reply.SerializeToString(&response);
+    }
+
+    void Server::ReplicaUpcallTransformed(opnum_t opnum, TransformedIOCLRequest &req, string &response)
+    {
+        Debug("Inside new ReplicaUpcall for ASYNCHRequests");
+        TransformedIOCLReply reply;
+
+        redis::Command c;
+
+        // Setting the command key
+        c.key = std::to_string(req.key());
+
+        // Setting the command op
+        switch (req.mutable_op()->op())
+        {
+        case AsynchOperation::PUT:
+            c.op = Operation::PUT;
+            break;
+        case AsynchOperation::GET:
+            c.op = Operation::GET;
+            break;
+        case AsynchOperation::INCR:
+            c.op = Operation::INCR;
+            break;
+        case AsynchOperation::SADD:
+            c.op = Operation::SADD;
+            break;
+        case AsynchOperation::EXISTS:
+            c.op = Operation::EXISTS;
+            break;
+        case AsynchOperation::HMGET:
+            c.op = Operation::HMGET;
+            break;
+        case AsynchOperation::HSET:
+            c.op = Operation::HSET;
+            break;
+        case AsynchOperation::HMSET:
+            c.op = Operation::HMSET;
+            break;
+        case AsynchOperation::HGETALL:
+            c.op = Operation::HGETALL;
+            break;
+        case AsynchOperation::ZADD:
+            c.op = Operation::ZADD;
+            break;
+        case AsynchOperation::ZINCRBY:
+            c.op = Operation::ZINCRBY;
+            break;
+        case AsynchOperation::ZSCORE:
+            c.op = Operation::ZSCORE;
+            break;
+        case AsynchOperation::ZRANGE:
+            c.op = Operation::ZRANGE;
+            break;
+        case AsynchOperation::ZREVRANGE:
+            c.op = Operation::ZREVRANGE;
+            break;
+        default:
+            Panic("Not implemented ops yet");
+        }
+
+        // Setting the command oldValue
+        switch (req.mutable_oldvalue()->type())
+        {
+        case AsynchValue::STRING:
+            c.oldValue.type = ValueType::STRING;
+            c.oldValue.str = req.mutable_oldvalue()->str();
+            break;
+        case AsynchValue::LIST:
+            c.oldValue.type = ValueType::LIST;
+            for (int i = 0; i < req.mutable_oldvalue()->list_size(); ++i)
+            {
+                c.oldValue.list.push_back(req.mutable_oldvalue()->list(i));
+            }
+            break;
+        case AsynchValue::SET:
+            c.oldValue.type = ValueType::SET;
+            for (int i = 0; i < req.mutable_oldvalue()->set_size(); ++i)
+            {
+                c.oldValue.set.insert(req.mutable_oldvalue()->set(i));
+            }
+            break;
+        case AsynchValue::HASH:
+            c.oldValue.type = ValueType::HASH;
+            const auto &value_map = req.mutable_oldvalue()->hash();
+            for (const auto &entry : value_map)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                c.oldValue.hash[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
+
+        // Setting the command value
+        switch (req.mutable_newvalue()->type())
+        {
+        case AsynchValue::STRING:
+            c.value.type = ValueType::STRING;
+            c.value.str = req.mutable_newvalue()->str();
+            break;
+        case AsynchValue::LIST:
+            c.value.type = ValueType::LIST;
+            for (int i = 0; i < req.mutable_newvalue()->list_size(); ++i)
+            {
+                c.value.list.push_back(req.mutable_newvalue()->list(i));
+            }
+            break;
+        case AsynchValue::SET:
+            c.value.type = ValueType::SET;
+            for (int i = 0; i < req.mutable_newvalue()->set_size(); ++i)
+            {
+                c.value.set.insert(req.mutable_newvalue()->set(i));
+            }
+            break;
+        case AsynchValue::HASH:
+            c.value.type = ValueType::HASH;
+            const auto &value_map = req.mutable_newvalue()->hash();
+            for (const auto &entry : value_map)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                c.value.hash[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
+
+        // Execute the command
+        int status = REPLY_OK;
+        redis::Value retval = transformed_store_.execute(c);
         reply.set_status(status);
         reply.set_return_value(retval);
         reply.set_transaction_id(req.transaction_id());

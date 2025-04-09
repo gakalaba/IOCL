@@ -97,6 +97,30 @@ namespace strongstore
         return true;
     }
 
+    void ReplicaClient::SendAsynchRequest(uint64_t request_id,
+                                          TransformedIOCLRequest &msg,
+                                          request_callback rcb, request_timeout_callback rtcb,
+                                          uint32_t timeout)
+    {
+        Debug("[shard %i] SendAsynchRequest sending: %s", shard_idx_, msg);
+
+        // create request
+        string asynch_request_str;
+
+        msg.SerializeToString(&asynch_request_str);
+
+        uint64_t reqId = lastReqId++;
+        PendingRequest *pendingRequest = new PendingRequest(reqId);
+        pendingRequests[reqId] = pendingRequest;
+        pendingRequest->rcb = rcb;
+        pendingRequest->rtcb = rtcb;
+
+        client->Invoke(
+            asynch_request_str,
+            bind(&ReplicaClient::AsynchRequestCallback, this, pendingRequest->reqId,
+                 std::placeholders::_1, std::placeholders::_2));
+    }
+
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
                                 const Timestamp &prepare_ts, int coordinator,
