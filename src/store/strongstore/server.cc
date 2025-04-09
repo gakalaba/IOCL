@@ -150,7 +150,7 @@ namespace strongstore
         else if (type == treq_.GetTypeName())
         {
             treq_.ParseFromString(data);
-            HandleSendAsynchRequest(remote, treq_);
+            HandleAsynchSendRequest(remote, treq_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -302,15 +302,13 @@ namespace strongstore
         uint64_t transaction_id = msg.rid().client_req_id();
 
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
-        reply->key = msg.key();
-        reply->value = msg.value();
 
-        replica_client_->SendRequest(
+        typedef std::function<void(string)> transformed_callback;
+
+        replica_client_->SendAsynchRequest(
             transaction_id, msg,
-            std::bind(&Server::SendRequestCallback, this, reply, transaction_id,
-                      std::placeholders::_1, std::placeholders::_2),
-            // this thing is the ptcb
-            [](int, string) {}, REQUEST_TIMEOUT);
+            std::bind(&Server::AsynchRequestCallback, this, reply, transaction_id,
+                      std::placeholders::_1));
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -1183,6 +1181,32 @@ namespace strongstore
         delete reply;
     }
 
+    void Server::AsynchRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, string reply_str)
+    {
+        TransformedIOCLReply tr_reply;
+
+        tr_reply.ParseFromString(reply_str);
+        Debug("Transformed IOCL REPLY");
+
+        uint64_t client_id = reply->rid.client_id();
+        uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->rid.addr();
+
+        Debug("[%lu] AsynchRequestCallback", transaction_id);
+
+        // treq_reply_.Clear();
+        // treq_reply_.mutable_rid()->set_client_id(client_id);
+        // treq_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        // treq_reply_.set_status(status);
+        // treq_reply_.set_return_value(retval);
+        // treq_reply_.set_transaction_id(transaction_id);
+
+        transport_->SendMessage(this, *remote, tr_reply);
+
+        delete remote;
+        delete reply;
+    }
+
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {
         // Debug("[%lu] Received PREPARE_OK callback: %d %d", transaction_id, shard_idx_, status);
@@ -1878,8 +1902,6 @@ namespace strongstore
     void Server::ReplicaUpcallTransformed(opnum_t opnum, TransformedIOCLRequest &req, string &response)
     {
         Debug("Inside new ReplicaUpcall for ASYNCHRequests");
-        TransformedIOCLReply reply;
-
         redis::Command c;
 
         // Setting the command key
@@ -1957,8 +1979,7 @@ namespace strongstore
             break;
         case AsynchValue::HASH:
             c.oldValue.type = ValueType::HASH;
-            const auto &value_map = req.mutable_oldvalue()->hash();
-            for (const auto &entry : value_map)
+            for (const auto &entry : req.mutable_oldvalue()->hash())
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
@@ -1966,8 +1987,10 @@ namespace strongstore
                 c.oldValue.hash[k] = v;
             }
             break;
+
         default:
             Panic("Not a valid Value type!");
+            break;
         }
 
         // Setting the command value
@@ -1993,8 +2016,7 @@ namespace strongstore
             break;
         case AsynchValue::HASH:
             c.value.type = ValueType::HASH;
-            const auto &value_map = req.mutable_newvalue()->hash();
-            for (const auto &entry : value_map)
+            for (const auto &entry : req.mutable_newvalue()->hash())
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
@@ -2009,11 +2031,45 @@ namespace strongstore
         // Execute the command
         int status = REPLY_OK;
         redis::Value retval = transformed_store_.execute(c);
+
+        TransformedIOCLReply reply;
         reply.set_status(status);
-        reply.set_return_value(retval);
-        reply.set_transaction_id(req.transaction_id());
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        // Setting the return value!
+        switch (retval.type)
+        {
+        case ValueType::STRING:
+            reply.mutable_return_value()->set_type(AsynchValue::STRING);
+            reply.mutable_return_value()->set_str(retval.str);
+            break;
+        case ValueType::LIST:
+            reply.mutable_return_value()->set_type(AsynchValue::LIST);
+            for (string s : retval.list)
+            {
+                reply.mutable_return_value()->add_list(s);
+            }
+            break;
+        case ValueType::SET:
+            reply.mutable_return_value()->set_type(AsynchValue::SET);
+            for (string s : retval.set)
+            {
+                reply.mutable_return_value()->add_set(s);
+            }
+            break;
+        case ValueType::HASH:
+            reply.mutable_return_value()->set_type(AsynchValue::HASH);
+            for (const auto &entry : retval.hash)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                (*reply.mutable_return_value()->mutable_hash())[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
         reply.SerializeToString(&response);
     }
 

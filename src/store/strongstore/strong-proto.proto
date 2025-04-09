@@ -215,6 +215,6 @@ message TransformedIOCLRequest {
 
 message TransformedIOCLReply {
     required RequestIDMessage rid = 1;
-    required AsynchValue val = 2;
-    required uint64 retval = 3;
+    required AsynchValue return_value = 2;
+    required uint64 status = 3;
 }

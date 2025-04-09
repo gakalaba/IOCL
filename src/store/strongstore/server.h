@@ -256,6 +256,7 @@ namespace strongstore
                              Timestamp timestamp);
         void SendRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, int status,
                                  string retval);
+        void AsynchRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, string reply_str);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -291,7 +292,7 @@ namespace strongstore
         LockTable locks_;
         VersionedKVStore<TimestampID, std::string> store_;
         KVStore iocl_store_;
-        RedisStore transformed_store_;
+        redis::RedisStore transformed_store_;
         bool transformed_;
 
         const transport::Configuration &shard_config_;
@@ -322,6 +323,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::IOCLReply req_reply_;
+        proto::TransformedIOCLReply treq_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

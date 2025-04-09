@@ -99,8 +99,7 @@ namespace strongstore
 
     void ReplicaClient::SendAsynchRequest(uint64_t request_id,
                                           TransformedIOCLRequest &msg,
-                                          request_callback rcb, request_timeout_callback rtcb,
-                                          uint32_t timeout)
+                                          transformed_callback trcb)
     {
         Debug("[shard %i] SendAsynchRequest sending: %s", shard_idx_, msg);
 
@@ -112,13 +111,28 @@ namespace strongstore
         uint64_t reqId = lastReqId++;
         PendingRequest *pendingRequest = new PendingRequest(reqId);
         pendingRequests[reqId] = pendingRequest;
-        pendingRequest->rcb = rcb;
-        pendingRequest->rtcb = rtcb;
+        pendingRequest->trcb = trcb;
 
         client->Invoke(
             asynch_request_str,
             bind(&ReplicaClient::AsynchRequestCallback, this, pendingRequest->reqId,
                  std::placeholders::_1, std::placeholders::_2));
+    }
+
+    /* Callback from a shard replica on sendrequest operation completion. */
+    bool ReplicaClient::AsynchRequestCallback(uint64_t reqId, const string &request_str,
+                                              const string &reply_str)
+    {
+        Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_);
+        auto itr = this->pendingRequests.find(reqId);
+        ASSERT(itr != this->pendingRequests.end());
+        PendingRequest *pendingRequest = itr->second;
+        transformed_callback trcb = pendingRequest->trcb;
+        this->pendingRequests.erase(itr);
+        delete pendingRequest;
+        trcb(reply_str);
+
+        return true;
     }
 
     void ReplicaClient::Prepare(uint64_t transaction_id,
