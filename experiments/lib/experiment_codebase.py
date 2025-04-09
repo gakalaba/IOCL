@@ -1,7 +1,10 @@
 from .iocl_codebase import IOCLCodebase
+from .transformed_codebase import TransformedCodebase
+
 
 __BUILDERS__ = {
     "iocl": IOCLCodebase()
+    "transformed": TransformedCodebase()
 }
 
 
