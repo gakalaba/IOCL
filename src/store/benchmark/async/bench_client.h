@@ -73,6 +73,7 @@ public:
     virtual ~BenchmarkClient();
 
     void Start(bench_done_callback bdcb);
+    uint64_t CustomInit();
 
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 

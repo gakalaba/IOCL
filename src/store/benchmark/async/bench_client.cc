@@ -98,6 +98,36 @@ BenchmarkClient::~BenchmarkClient()
     Debug("session_states_.size(): %lu", session_states_.size());
 }
 
+uint64_t BenchmarkClient::CustomInit()
+{
+
+    Debug("[%lu] Starting Transformed App Client", n_sessions_started_);
+    n_sessions_started_++;
+
+    std::size_t client_index = n_sessions_started_ % clients_.size();
+    auto &client = *clients_[client_index];
+
+    auto &session = client.BeginSession();
+    auto sid = session.id();
+
+    Debug("session id: %lu", sid);
+
+    // auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    // auto appreq = GetNextAppRequest();
+    // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+
+    // session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+
+    // auto &ss = session_states_.find(sid)->second;
+    // _Latency_StartRec(ss.lat());
+
+    // auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    // auto btcb = []() {};
+
+    // client.BeginIOCL(session, bcb, btcb, timeout_);
+    return sid;
+}
+
 void BenchmarkClient::Start(bench_done_callback bdcb)
 {
     n_sessions_started_ = 0;
@@ -108,34 +138,6 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
     if (IsIOCL())
     {
-        if (IsTransformed())
-        {
-            Debug("[%lu] Starting Transformed App Client", n_sessions_started_);
-            n_sessions_started_++;
-
-            std::size_t client_index = n_sessions_started_ % clients_.size();
-            auto &client = *clients_[client_index];
-
-            auto &session = client.BeginSession();
-            auto sid = session.id();
-
-            Debug("session id: %lu", sid);
-
-            // auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
-            // auto appreq = GetNextAppRequest();
-            // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
-
-            // session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
-
-            // auto &ss = session_states_.find(sid)->second;
-            // _Latency_StartRec(ss.lat());
-
-            // auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
-            // auto btcb = []() {};
-
-            // client.BeginIOCL(session, bcb, btcb, timeout_);
-            return;
-        }
         transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
     }
     else
