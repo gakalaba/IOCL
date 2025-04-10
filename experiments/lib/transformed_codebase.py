@@ -22,8 +22,8 @@ class TransformedCodebase:
 
         if 'run_locally' in config and config['run_locally']:
             client_host = 'localhost'
-            path_to_client_bin = os.path.join(config['src_directory'],
-                                              config['bin_directory_name'], config['client_bin_name'])
+            # path_to_client_bin = os.path.join(config['src_directory'],
+            #                                   config['bin_directory_name'], config['client_bin_name'])
             exp_directory = local_exp_directory
             replica_config_paths = map(lambda c: os.path.join(
                 local_exp_directory, c), replica_configs)
@@ -36,9 +36,9 @@ class TransformedCodebase:
                                       '%s-%d-stats-%d.json' % (client, k, run))
         else:
             client_host = client
-            path_to_client_bin = os.path.join(
-                config['base_remote_bin_directory_nfs'],
-                config['bin_directory_name'], config['client_bin_name'])
+            # path_to_client_bin = os.path.join(
+            #     config['base_remote_bin_directory_nfs'],
+            #     config['bin_directory_name'], config['client_bin_name'])
             exp_directory = remote_exp_directory
             replica_config_paths = map(lambda c: os.path.join(
                 remote_exp_directory, c), replica_configs)
@@ -52,93 +52,114 @@ class TransformedCodebase:
 
         client_id = i * config["client_processes_per_client_node"] + k
 
-        bench_mode = config['bench_mode']
+        # bench_mode = config['bench_mode']
 
-        truetime_error = config["truetime_error"] if "truetime_error" in config else 0
-        client_command = ' '.join([str(x) for x in [
-            path_to_client_bin,
-            '--client_id', client_id,
-            '--client_host', client_host,
-            '--replica_config_paths', ','.join(shard_config_paths),
-            '--net_config_path', network_config_path,
-            '--num_shards', config['num_shards'],
-            '--benchmark', config['benchmark_name'],
-            '--bench_mode', bench_mode,
-            '--exp_duration', config['client_experiment_length'],
-            '--warmup_secs', config['client_ramp_up'],
-            '--cooldown_secs', config['client_ramp_down'],
-            '--protocol_mode', config['client_protocol_mode'],
-            '--stats_file', stats_file,
-            '--clock_error', truetime_error,
-            '--strong_consistency', config['consistency']]])
+        # truetime_error = config["truetime_error"] if "truetime_error" in config else 0
+        client_command = ''.join([str(x) for x in [
+            'source ', config['python_venv'],
+            '; python ',
+            config['python_app_name'],
+            ' --clientid=', client_id,
+            ' --explen=', config['client_experiment_length'],
+            ' --warmup_secs=', config['client_ramp_up'],
+            ' --cooldown_secs=', config['client_ramp_down'],
+            ' --client_host=', client_host,
+            ' --replica_config_paths=', ','.join(shard_config_paths),
+            ' --net_config_path=', network_config_path,
+            ' --num_shards=', config['num_shards'],
+        ]])
 
-        if bench_mode == 'open':
-            client_command += ' --client_arrival_rate %f' % config['client_arrival_rate']
-            client_command += ' --client_think_time %f' % config['client_think_time']
-            client_command += ' --client_stay_probability %f' % config['client_stay_probability']
-        elif bench_mode == 'closed':
-            client_command += ' --mpl=%d' % config['mpl']
 
-        if 'client_fanout' in config:
-            client_command += ' --client_fanout %d' % config['client_fanout']
-        if 'client_issue_concurrent' in config:
-            client_command += ' --client_issue_concurrent=%s' % (str(config['client_issue_concurrent']).lower())
-        if 'client_switch_probability' in config:
-            client_command += ' --client_switch_probability %f' %config['client_switch_probability']
+        # client_command = ' '.join([str(x) for x in [
+        #     path_to_client_bin,
+        #     '--client_id', client_id,
+        #     '--client_host', client_host,
+        #     '--replica_config_paths', ','.join(shard_config_paths),
+        #     '--net_config_path', network_config_path,
+        #     '--num_shards', config['num_shards'],
+        #     '--benchmark', config['benchmark_name'],
+        #     '--bench_mode', bench_mode,
+        #     '--exp_duration', config['client_experiment_length'],
+        #     '--warmup_secs', config['client_ramp_up'],
+        #     '--cooldown_secs', config['client_ramp_down'],
+        #     '--protocol_mode', config['client_protocol_mode'],
+        #     '--stats_file', stats_file,
+        #     '--clock_error', truetime_error,
+        #     '--strong_consistency', config['consistency']]])
+
+        # if bench_mode == 'open':
+        #     client_command += ' --client_arrival_rate %f' % config['client_arrival_rate']
+        #     client_command += ' --client_think_time %f' % config['client_think_time']
+        #     client_command += ' --client_stay_probability %f' % config['client_stay_probability']
+        # elif bench_mode == 'closed':
+        #     client_command += ' --mpl=%d' % config['mpl']
+
+        # if 'client_fanout' in config:
+        #     client_command += ' --client_fanout %d' % config['client_fanout']
+        # if 'client_issue_concurrent' in config:
+        #     client_command += ' --client_issue_concurrent=%s' % (str(config['client_issue_concurrent']).lower())
+        # if 'client_switch_probability' in config:
+        #     client_command += ' --client_switch_probability %f' %config['client_switch_probability']
 
         if config['server_emulate_wan']:
             client_command += ' --ping_replicas=true'
 
-        if config['replication_protocol'] == 'tapir':
-            if 'sync_commit' in config['replication_protocol_settings']:
-                client_command += ' --tapir_sync_commit=%s' % (
-                    str(config['replication_protocol_settings']['sync_commit']).lower())
+        # if config['replication_protocol'] == 'tapir':
+        #     if 'sync_commit' in config['replication_protocol_settings']:
+        #         client_command += ' --tapir_sync_commit=%s' % (
+        #             str(config['replication_protocol_settings']['sync_commit']).lower())
 
-        if config['replication_protocol'] == 'strong':
-            if 'unreplicated' in config['replication_protocol_settings']:
-                client_command += ' --strong_unreplicated=%s' % str(
-                    config['replication_protocol_settings']['unreplicated']).lower()
+        # if config['replication_protocol'] == 'strong':
+        #     if 'unreplicated' in config['replication_protocol_settings']:
+        #         client_command += ' --strong_unreplicated=%s' % str(
+        #             config['replication_protocol_settings']['unreplicated']).lower()
 
         if 'message_transport_type' in config['replication_protocol_settings']:
-            client_command += ' --trans_protocol %s' % config['replication_protocol_settings']['message_transport_type']
+            client_command += ' --trans_protocol=%s' % config['replication_protocol_settings']['message_transport_type']
 
         if 'client_debug_stats' in config and config['client_debug_stats']:
             client_command += ' --debug_stats'
 
-        if 'nb_time_alpha' in config:
-            client_command += ' --nb_time_alpha %f' % config['nb_time_alpha']
+        # if 'nb_time_alpha' in config:
+        #     client_command += ' --nb_time_alpha %f' % config['nb_time_alpha']
 
-        if 'client_message_timeout' in config:
-            client_command += ' --message_timeout %d' % config['client_message_timeout']
-        if 'client_abort_backoff' in config:
-            client_command += ' --abort_backoff %d' % config['client_abort_backoff']
-        if 'client_retry_aborted' in config:
-            client_command += ' --retry_aborted=%s' % (
-                str(config['client_retry_aborted']).lower())
-        if 'client_max_attempts' in config:
-            client_command += ' --max_attempts %d' % config['client_max_attempts']
-        if 'client_max_backoff' in config:
-            client_command += ' --max_backoff %d' % config['client_max_backoff']
-        if 'client_rand_sleep' in config:
-            client_command += ' --delay %d' % config['client_rand_sleep']
+        # if 'client_message_timeout' in config:
+        #     client_command += ' --message_timeout %d' % config['client_message_timeout']
+        # if 'client_abort_backoff' in config:
+        #     client_command += ' --abort_backoff %d' % config['client_abort_backoff']
+        # if 'client_retry_aborted' in config:
+        #     client_command += ' --retry_aborted=%s' % (
+        #         str(config['client_retry_aborted']).lower())
+        # if 'client_max_attempts' in config:
+        #     client_command += ' --max_attempts %d' % config['client_max_attempts']
+        # if 'client_max_backoff' in config:
+        #     client_command += ' --max_backoff %d' % config['client_max_backoff']
+        # if 'client_rand_sleep' in config:
+        #     client_command += ' --delay %d' % config['client_rand_sleep']
 
         if 'partitioner' in config:
-            client_command += ' --partitioner %s' % config['partitioner']
+            client_command += ' --partitioner=%s' % config['partitioner']
+        
+        client_command += ' --num_keys=%d' % config['client_num_keys']
+        if 'client_key_selector' in config:
+            client_command += ' --key_selector=%s' % config['client_key_selector']
+        if config['client_key_selector'] == 'zipf':
+            client_command += ' --zipf_coefficient=%f' % config['client_zipf_coefficient']
 
-        if config['benchmark_name'] == 'retwis' or config['benchmark_name'] == 'micro':
-            client_command += ' --num_keys %d' % config['client_num_keys']
-            if 'client_key_selector' in config:
-                client_command += ' --key_selector %s' % config['client_key_selector']
-            if config['client_key_selector'] == 'zipf':
-                client_command += ' --zipf_coefficient %f' % config['client_zipf_coefficient']
+        # if config['benchmark_name'] == 'retwis' or config['benchmark_name'] == 'micro':
+        #     client_command += ' --num_keys %d' % config['client_num_keys']
+        #     if 'client_key_selector' in config:
+        #         client_command += ' --key_selector %s' % config['client_key_selector']
+        #     if config['client_key_selector'] == 'zipf':
+        #         client_command += ' --zipf_coefficient %f' % config['client_zipf_coefficient']
 
-        if 'client_wrap_command' in config and len(config['client_wrap_command']) > 0:
-            client_command = config['client_wrap_command'] % client_command
+        # if 'client_wrap_command' in config and len(config['client_wrap_command']) > 0:
+        #     client_command = config['client_wrap_command'] % client_command
 
-        if 'pin_client_processes' in config and isinstance(config['pin_client_processes'], list) and len(config['pin_client_processes']) > 0:
-            core = config['pin_client_processes'][client_id %
-                                                  len(config['pin_client_processes'])]
-            client_command = 'taskset 0x%x %s' % (1 << core, client_command)
+        # if 'pin_client_processes' in config and isinstance(config['pin_client_processes'], list) and len(config['pin_client_processes']) > 0:
+        #     core = config['pin_client_processes'][client_id %
+        #                                           len(config['pin_client_processes'])]
+        #     client_command = 'taskset 0x%x %s' % (1 << core, client_command)
 
         if 'run_locally' in config and config['run_locally']:
             stdout_file = os.path.join(exp_directory,
@@ -180,7 +201,9 @@ class TransformedCodebase:
                 else:
                     client_command = 'setenv DEBUG all; %s' % client_command
 
-        client_command = '(cd %s; %s) & ' % (exp_directory, client_command)
+        # client_command = '(cd %s; %s) & ' % (exp_directory, client_command)
+
+        client_command = '(cd %s; %s) & ' % (config['base_python_directory'], client_command)
         print("CLIENT COMMAND + ", repr(client_command))
         return client_command
 

@@ -3,7 +3,7 @@ from .transformed_codebase import TransformedCodebase
 
 
 __BUILDERS__ = {
-    "iocl": IOCLCodebase()
+    "iocl": IOCLCodebase(),
     "transformed": TransformedCodebase()
 }
 
