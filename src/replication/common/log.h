@@ -69,7 +69,7 @@ namespace replication
     struct Successor
     {
         PerShardTag identifier;
-        uint64_t ShardId;
+        const TransportAddress &remote;
     };
 
     struct PerShardTag
@@ -92,7 +92,8 @@ namespace replication
         uint64_t sortTimestamp;
         std::vector<Predecessor *> predecessors;
         std::vector<Successor *> successors;
-        uint64_t p;
+        uint64_t acks;
+        uint64_t acks2;
 
         LogEntry() { replyMessage = NULL; }
         LogEntry(const LogEntry &x)
@@ -129,6 +130,7 @@ namespace replication
         // IOCL specifics
         LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req,
                                  LogEntryState state,
+                                 uint64_t arrivalTs,
                                  std::vector<Successor *> &&successors,
                                  std::vector<Predecessor *> &&predecessors);
         LogEntry &FindUnsorted(opnum_t opnum);

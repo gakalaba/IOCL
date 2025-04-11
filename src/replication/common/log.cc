@@ -77,6 +77,7 @@ namespace replication
 
     LogEntry &
     Log::AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state,
+                        uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
                         std::vector<Predecessor *> &&predecessors)
     {
@@ -93,6 +94,7 @@ namespace replication
         entry.viewstamp = vs;
         entry.request = req;
         entry.state = state;
+        entry.arrivalTimestamp = arrivalTs;
         if (!successors.empty())
         {
             entry.successors = std::move(successors);
@@ -108,7 +110,11 @@ namespace replication
             entry.hash = ComputeHash(LastHash(), entry);
         }
 
-        unorderedEntries[???] = entry;
+        PerShardTag t;
+        t.pid = req.t()->pid();
+        t.seqno = req.t()->seqno();
+
+        unorderedEntries[t] = entry;
 
         return *Find(vs.opnum);
     }

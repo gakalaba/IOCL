@@ -16,25 +16,23 @@ message ReplyMessage {
 }
 
 message SuccessorRequestMessage {
-    required uint64 pid = 1;
-    required uint64 seqno = 2;
-}
-
-message SuccessorRequestMessage2 {
-    required uint64 pid = 1;
-    required uint64 seqno = 2;
+    required PerShardTag p = 1;
+    required PerShardTag s = 2;
+    required uint64 predIdx = 3;
 }
 
 message PredecessorReplyMessage {
-    required uint64 pid = 1;
-    required uint64 seqno = 2;
-    required uint64 arrivalTs = 3;
+    required PerShardTag p = 1;
+    required uint64 arrivalTs = 2;
+    required PerShardTag s = 3;
+    required uint64 predIdx = 4;
 }
 
 message PredecessorReplyMessage2 {
-    required uint64 pid = 1;
-    required uint64 seqno = 2;
-    required uint64 sortedTs = 3;
+    required PerShardTag p = 1;
+    required uint64 sortedTs = 2;
+    required PerShardTag s = 3;
+    required uint64 predIdx = 4;
 }
 
 message UnloggedRequestMessage {
@@ -51,9 +49,26 @@ message PrepareMessage {
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
     repeated Request request = 4;
+    repeated uint64 arrivalts = 5;
+
 }
 
 message PrepareOKMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint32 replicaIdx = 3;
+}
+
+message PrepareMessage2 {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint64 batchstart = 3;
+    repeated Request request = 4;
+    repeated uint64 sortedts = 5;
+
+}
+
+message PrepareOKMessage2 {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint32 replicaIdx = 3;

@@ -94,7 +94,7 @@ namespace replication
                             { ResendPrepare(); });
             this->closeBatchTimeout =
                 new Timeout(transport, 300, [this]()
-                            { CloseBatch(); });
+                            { CloseBatch(0); });
 
             if (AmLeader())
             {
@@ -354,7 +354,7 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::CloseBatch()
+        void IOCL_CTReplica::CloseBatch(uint64_t arrivalts)
         {
             Debug("Inside CloseBatch");
             ASSERT(AmLeader());
@@ -372,12 +372,57 @@ namespace replication
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
+                // TODO understand if this already includes the arrivalTS????
+                // cuz if not then we also have to replicate the predlist etc.
                 Request *r = p.add_request();
                 const LogEntry *entry = log.Find(i);
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
+                // add an arrival timestamp for each request we replicate in the first round
+                p.add_arrivalts(entry->arrivalTimestamp);
+            }
+            lastPrepare = p;
+
+            if (!(transport->SendMessageToAll(this, p)))
+            {
+                RWarning("Failed to send prepare message to all replicas");
+            }
+            lastBatchEnd = lastOp;
+
+            resendPrepareTimeout->Reset();
+            closeBatchTimeout->Stop();
+        }
+
+        void IOCL_CTReplica::CloseBatch2(uint64_t sortedts)
+        {
+            Debug("Inside CloseBatch");
+            ASSERT(AmLeader());
+            ASSERT(lastBatchEnd < lastOp);
+
+            opnum_t batchStart = lastBatchEnd + 1;
+
+            RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
+                   batchStart, lastOp);
+            /* Send prepare messages */
+            PrepareMessage2 p;
+            p.set_view(view);
+            p.set_opnum(lastOp);
+            p.set_batchstart(batchStart);
+
+            for (opnum_t i = batchStart; i <= lastOp; i++)
+            {
+                // TODO understand if this already includes the arrivalTS????
+                // cuz if not then we also have to replicate the predlist etc.
+                Request *r = p.add_request();
+                const LogEntry *entry = log.Find(i);
+                ASSERT(entry != NULL);
+                ASSERT(entry->viewstamp.view == view);
+                ASSERT(entry->viewstamp.opnum == i);
+                *r = entry->request;
+                // add an arrival timestamp for each request we replicate in the first round
+                p.add_sortedts(entry->sortTimestamp);
             }
             lastPrepare = p;
 
@@ -396,12 +441,18 @@ namespace replication
                                             void *meta_data)
         {
             RequestMessage request;
-            CoordinationRequestMessage coordReq;
-            CoordinationReplyMessage coordReply;
+            /* Acks for timestamps ****************/
+            SuccessorRequestMessage succReq;     ///
+            PredecessorReplyMessage predReply;   ///
+            PredecessorReplyMessage2 predReply2; ///
+            /**************************************/
             UnloggedRequestMessage unloggedRequest;
-            // ExecutableRequestMessage execRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
+            /* Second round of replication */
+            PrepareMessage2 prepare2;     ///
+            PrepareOKMessage2 prepareOK2; ///
+            /*******************************/
             CommitMessage commit;
             RequestStateTransferMessage requestStateTransfer;
             StateTransferMessage stateTransfer;
@@ -419,15 +470,20 @@ namespace replication
                 unloggedRequest.ParseFromString(data);
                 HandleUnloggedRequest(remote, unloggedRequest);
             }
-            else if (type == coordReq.GetTypeName())
+            else if (type == succReq.GetTypeName())
             {
-                coordReq.ParseFromString(data);
-                HandleCoordination(remote, coordReq);
+                succReq.ParseFromString(data);
+                HandleCoordination(remote, succReq);
             }
-            else if (type == coordReply.GetTypeName())
+            else if (type == predReply.GetTypeName())
             {
-                coordReply.ParseFromString(data);
-                HandleCoordinationResp(remote, coordReply);
+                predReply.ParseFromString(data);
+                HandleCoordinationResp(remote, predReply);
+            }
+            else if (type == predReply2.GetTypeName())
+            {
+                predReply2.ParseFromString(data);
+                HandleCoordinationResp2(remote, predReply2);
             }
             else if (type == prepare.GetTypeName())
             {
@@ -438,6 +494,16 @@ namespace replication
             {
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
+            }
+            else if (type == prepare2.GetTypeName())
+            {
+                prepare2.ParseFromString(data);
+                HandlePrepare2(remote, prepare2);
+            }
+            else if (type == prepareOK.GetTypeName())
+            {
+                prepareOK2.ParseFromString(data);
+                HandlePrepareOK2(remote, prepareOK2);
             }
             else if (type == commit.GetTypeName())
             {
@@ -566,7 +632,9 @@ namespace replication
                 request.set_op(res);
                 request.set_clientid(msg.req().clientid());
                 request.set_clientreqid(msg.req().clientreqid());
-                request.set_arrivalTimestamp(shardTimestamp);
+
+                /* Assign it an arrival timestamp */
+                auto arrivalTimestamp = shardTimestamp;
                 shardTimestamp++;
 
                 /* Assign it an opnum */
@@ -592,12 +660,12 @@ namespace replication
                     predecessors = outstandingPredecessors.find(???)->second;
                     outstandingPredecessors.erase(???);
                 }
-                log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::move(successors), std::move(predecessors));
+                log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors));
 
                 /* Send prepare messages to replicas */
                 if (lastOp - lastBatchEnd + 1 > batchSize)
                 {
-                    CloseBatch();
+                    CloseBatch(arrivalTimestamp);
                 }
                 else
                 {
@@ -705,6 +773,8 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
+
+                // TODO ANJA this is supposed to be ApendUnsorted
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
                 UpdateClientTable(req);
             }
@@ -773,8 +843,8 @@ namespace replication
                  */
 
                 log.SetPrepared(entry);
-                /* Send ArrivalACK messages to the other replicas */
-                ArrivalAckMessage a;
+                /* Send PredecessorReply messages to the other replicas */
+                PredecessorReplyMessage a;
                 a.set_arrivalTs(arrival_ts);
                 if (!(transport->SendMessageToSuccessorList(this, a, entry.successors)))
                 {
@@ -854,96 +924,124 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
-                                                const proto::CoordinationRequestMessage &msg)
+                                                const proto::SuccessorRequestMessage &msg)
         {
-            Tag t = msg.get();
-            LogEntry *entry = log.FindUnsorted(t);
-            ArrivalAckMessage a;
-            a.set_arrivalTs(arrival_ts);
+            LogEntry *entry = log.FindUnsorted(msg.p());
+            PredecessorReplyMessage a;
+            a.set_p(msg.p());
+            a.set_s(msg.s());
+            a.set_predIdx(msg.predIdx());
+            Successor *s = new Successor{msg.s(), remote};
+
             if (!entry)
             {
-                entry = Find();
+                entry = Find(msg.p());
                 if (!entry)
                 {
                     // If the request isn't there yet, add it to the outstandingSuccessors map
-                    outstandingSuccessors[t].push_back(new Successor(msg.asdfasdf));
+                    // Add this successor for the next round of timestamp replies
+                    outstandingSuccessors[msg.p()].push_back(s);
                 }
                 else
                 {
                     // Entry is in the sorted log already
-                    // Send the correct timestamp to this asking successor
+                    // Have already sent sortedTs to successors, there is no successor list anymore
+                    // This is probably a late successor
                     // Fast path to second round
-                    // Send ACK to all successors
-                    SortedAckMessage a;
-                    a.set_sortedTs(entry.sortTimestamp);
-                    if (!(transport->SendMessageToSuccessorList(this, a, msg.sdfas)))
+                    // Send sortedTs to this successor
+                    PredecessorReplyMessage2 aa;
+                    aa.set_p(msg.p());
+                    aa.set_s(msg.s());
+                    a.set_predIdx(msg.predIdx());
+                    aa.set_sortedTs(entry->sortTimestamp);
+                    if (!(transport->SendMessageToSuccessor(this, shard?, aa)))
                     {
-                        RWarning("Failed to send prepare message to all replicas");
+                        RWarning("Failed to send PredecessorReplyMessage2 from HandleCoordination");
                     }
                 }
             }
             else
             {
+                a.set_arrivalTs(entry->arrivalTimestamp);
+                // Add this successor for the next round of timestamp replies
+                entry->successors.push_back(s);
                 // If it's been prepared, send the correct timestamp to this asking successor
                 if (entry.state == LOG_STATE_PREPARED)
                 {
-                    if (!(transport->SendMessageToSuccessor(this, a, msg.asdfksf)))
+                    // Only send the ack once it's replicated the arrival timestamp!
+                    if (!(transport->SendMessageToSuccessor(this, shard?, a)))
                     {
-                        RWarning("Failed to send prepare message to successor");
+                        RWarning("Failed to send PredecessorReplyMessage from HandleCoordination");
                     }
                 }
-                else
-                {
-                    // Add this successor to the entry's successor list
-                    entry->successors.push_back(new Successor(msg.asdfasdf));
-                }
+                // else we'll send it from HandlePrepareOK
             }
         }
         void IOCL_CTReplica::HandleCoordinationResp(const TransportAddress &remote,
-                                                    const proto::CoordinationReplyMessage &msg)
+                                                    const proto::PredecessorReplyMessage &msg)
         {
             // The entry should be in the unsorted log
-            LogEntry &entry = log.FindUnsorted(msg.t);
+            LogEntry *entry = log.FindUnsorted(msg.s());
             if (!entry)
             {
-                // It can only be the case that the entry hasn't arrived yet,
-                // since it cannot mov on to the sorted list otherwise. TODO orrrr what happens if it gets a round 2 ack first?
-                // Add the entry to the outstandingPredecessors map
-                // Entry never came yet! Add to outstanding ACK map
-                auto p = outstandingPredecessors.find(???);
-                if (p != outstandingPredecessors.end())
+                entry = Find(msg.s());
+                if (!entry)
                 {
-                    // This is the second ACK from the predecessor for this entry
-                    p.arrivalTimestamp = msg.arrivalTs;
+                    // Entry never came yet! Add to outstanding ACK map
+                    auto preds_map = outstandingPredecessors.find(msg.s());
+                    if (preds_map != outstandingPredecessors.end())
+                    {
+                        // The outstandingPredecessors map has an entry for this successor
+                        // so *some* predecessor to this yet unarrived successor has already replied
+                        thisp = pres_map[msg.predIdx()];
+                        if (thisp != preds_map.end())
+                        {
+                            // This is the second ACK from the same predecessor for this successor
+                            preds_map[msg.predIdx()].arrivalTimestamp = msg.arrivalTs();
+                        }
+                        else
+                        {
+                            // This is the first time this predecessor ACKd
+                            Predecessor *newp = new Predecessor{msg.p(), remote, msg.arrivalTs(), 0};
+                            preds_map[msg.predIdx()] = newp;
+                        }
+                    }
+                    else
+                    {
+                        // The outstandingPredecessors map doesn't have an entry for this successor at all
+                        std::unordered_map m;
+                        Predecessor *newp = new Predecessor{msg.p(), remote, msg.arrivalTs(), 0};
+                        m[msg.predIdx()] = newp;
+                        outstandingPredecessors[msg.s()] = m;
+                    }
                 }
-                else
-                {
-                    // This is the first ACK from the predecessor for this entry
-                    Predecessor *newp = new Predecessor{msg, msg.shardID, msg.arrivalTs, -1};
-                    outstandingPredecessors[msg.t] = newp;
-                }
-
-                outstandingPredecessors[msg.t] = std::make_tuple(msg.arrivalTs, -1);
+                // else
+                // This request is in the sorted log... so it doesn't reall need this response
                 return;
             }
-            if (entry.predecessors[msg.predIdx].arrivalTimestamp != -1)
+            // entry is in the unsorted log!
+            if (entry.predecessors[msg.predIdx()].arrivalTimestamp != -1)
             {
                 Panic("Already got an arrival timestamp for this predecessor");
             }
             // Set the arrival timestamp
-            entry.predecessors[msg.predIdx].arrivalTimestamp = msg.arrivalTs;
-            entry.p++;
+            entry.predecessors[msg.predIdx()].arrivalTimestamp = msg.arrivalTs();
+            entry.acks++;
 
             // If this is the nth predecessor ACK, compute a new timestamp
-            if (entry.p == entry.predecessors.size())
+            if (entry.acks == entry.predecessors.size())
             {
+                // Step 2.
                 entry.sortTimestamp = std::max(FoldL(entry.predecessors), lastExecutedTimestamp);
                 // Insert into orderedLog, sorted by sortedTimestamp
                 log.InsertSorted(entry, LOG_STATE_ASSIGNED);
                 // Send ACK to all successors
-                SortedAckMessage a;
-                a.set_sortedTs(entry.sortTimestamp);
-                if (!(transport->SendMessageToSuccessorList(this, a, entry.successors)))
+                PredecessorReplyMessage2 aa;
+                aa.set_p(msg.p());
+                aa.set_s(msg.s());
+                aa.set_predIdx(msg.predIdx());
+                aa.set_sortedTs(entry.sortTimestamp);
+                if (!(transport->SendMessageToSuccessorList(this, entry.successors, aa)))
                 {
                     RWarning("Failed to send prepare message to all replicas");
                 }
@@ -954,40 +1052,57 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleCoordinationResp2(const TransportAddress &remote,
-                                                     const proto::CoordinationReplyMessage &msg)
+                                                     const proto::PredecessorReplyMessage2 &msg)
         {
             // This could be ariving for an entry that never came yet or for an entry that never got the first round ACK!
-            LogEntry &entry = log.FindUnsorted(msg.t);
+            LogEntry &entry = log.FindUnsorted(msg.s());
             if (!entry)
             {
-                entry = Find();
+                entry = Find(msg.s());
                 if (!entry)
                 {
                     // Entry never came yet! Add to outstanding ACK map
-                    auto p = outstandingPredecessors.find(???);
-                    if (p != outstandingPredecessors.end())
+                    auto preds_map = outstandingPredecessors.find(msg.s());
+                    if (preds_map != outstandingPredecessors.end())
                     {
-                        // This is the second ACK from the predecessor for this entry
-                        p.sortedTimestamp = msg.sortedTs;
+                        // The outstandingPredecessors map has an entry for this successor
+                        // so *some* predecessor to this yet unarrived successor has already replied
+                        thisp = pres_map[msg.predIdx()];
+                        if (thisp != preds_map.end())
+                        {
+                            // This is the second ACK from the same predecessor for this successor
+                            preds_map[msg.predIdx()].sortedTimestamp = msg.sortedTs();
+                        }
+                        else
+                        {
+                            // This is the first time this predecessor ACKd
+                            Predecessor *newp = new Predecessor{msg.p(), remote, 0, msg.sortedTs()};
+                            preds_map[msg.predIdx()] = newp;
+                        }
                     }
                     else
                     {
-                        // This is the first ACK from the predecessor for this entry
-                        Predecessor *newp = new Predecessor{msg, msg.shardID, -1, msg.sortedTs};
-                        outstandingPredecessors[msg.t] = newp;
+                        // The outstandingPredecessors map doesn't have an entry for this successor at all
+                        std::unordered_map m;
+                        Predecessor *newp = new Predecessor{msg.p(), remote, 0, msg.sortedTs()};
+                        m[msg.predIdx()] = newp;
+                        outstandingPredecessors[msg.s()] = m;
                     }
                 }
                 else
                 {
                     // Entry is in the sorted log! Has had first ACK
                     if (entry.p == entry.predecessors.size())
+                    {
+                        // Step 3.
+                    }
                 }
             }
             else
             {
                 // Entry is in the unsorted map... probably has been replicated...
                 // Entry that never got the first round ACK
-                Panic("fast path!");
+                Panic("fast path! ~or~ possibly out of order!");
                 Panic("Yeah i'm not sure what we do with this... cuz now we have both pieces of info hmmmm");
             }
         }

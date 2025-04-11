@@ -86,7 +86,7 @@ namespace replication
             std::map<uint64_t, ClientTableEntry> clientTable;
             // IOCL specific
             std::unordered_map<Tag, std::vector<Successor *>> outstandingSuccessors;
-            std::unordered_map<Tag, std::vector<Predecessor *>> outstandingPredecessors;
+            std::unordered_map<Tag, std::unordered_map<uint64_t, Predecessor *>> outstandingPredecessors;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
@@ -113,7 +113,7 @@ namespace replication
             void SendNullCommit();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
-            void CloseBatch();
+            void CloseBatch(uint64_t arrivalts);
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);
