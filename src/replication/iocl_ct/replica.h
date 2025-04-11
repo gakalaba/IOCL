@@ -77,6 +77,7 @@ namespace replication
 
             Log log;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
+            std::map<uint64_t, std::unique_ptr<TransportAddress>> shardAddresses;
             struct ClientTableEntry
             {
                 uint64_t lastReqId;
