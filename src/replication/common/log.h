@@ -60,20 +60,20 @@ namespace replication
 
     struct Predecessor
     {
-        Request request;
+        PerShardTag identifier;
         uint64_t ShardId;
         int64_t arrivalTimestamp;
+        int64_t sortedTimestamp;
     };
 
     struct Successor
     {
-        Request request;
+        PerShardTag identifier;
         uint64_t ShardId;
     };
 
-    struct Tag
+    struct PerShardTag
     {
-        uint64_t k;
         uint64_t pid;
         uint64_t seqno;
     };
@@ -127,7 +127,10 @@ namespace replication
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
         LogEntry *Find(opnum_t opnum);
         // IOCL specifics
-        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state, std::vector<Successor *> &&successors);
+        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req,
+                                 LogEntryState state,
+                                 std::vector<Successor *> &&successors,
+                                 std::vector<Predecessor *> &&predecessors);
         LogEntry &FindUnsorted(opnum_t opnum);
         LogEntry &InsertSorted(LogEntry &entry, LogEntryState state);
         void SetPrepared(LogEntry &entry);
@@ -151,7 +154,7 @@ namespace replication
     private:
         std::vector<LogEntry> entries;
         // .find(), .end(), .insert(), .erase()
-        std::unordered_map<Tag, LogEntry> unorderedEntries;
+        std::unordered_map<PerShardTag, LogEntry> unorderedEntries;
         string initialHash;
         opnum_t start;
         bool useHash;

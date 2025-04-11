@@ -86,7 +86,7 @@ namespace replication
             std::map<uint64_t, ClientTableEntry> clientTable;
             // IOCL specific
             std::unordered_map<Tag, std::vector<Successor *>> outstandingSuccessors;
-            std::unordered_map<Tag, std::tuple<int64_t, int64_t>> outstandingACKs;
+            std::unordered_map<Tag, std::vector<Predecessor *>> outstandingPredecessors;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;

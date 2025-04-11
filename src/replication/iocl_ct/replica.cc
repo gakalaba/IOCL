@@ -580,16 +580,19 @@ namespace replication
                  * But, before replicating, check if any successors
                  * contacted me and asked for my arrival timestamp
                  * */
-                auto successors = outstandingSuccessors.find(???);
-                if (successors != outstandingSuccessors.end())
+                auto successors = std::vector<Successor *>{};
+                if (outstandingSuccessors.find(???) != outstandingSuccessors.end())
                 {
-                    log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::move(successors->second));
-                    outstandingSuccessors.erase(???);
-                }
-                else
+                    successors = outstandingSuccessors.find(???)->second;
+                    outstandingSuccessors.erase(??);
+                };
+                auto predecessors = std::vector<Predecessor *>{};
+                if (outstandingPredecessors.find(???) != outstandingPredecessors.end())
                 {
-                    log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::vector<Successor *>{});
+                    predecessors = outstandingPredecessors.find(???)->second;
+                    outstandingPredecessors.erase(???);
                 }
+                log.AppendUnsorted(v, request, LOG_STATE_ARRIVED, std::move(successors), std::move(predecessors));
 
                 /* Send prepare messages to replicas */
                 if (lastOp - lastBatchEnd + 1 > batchSize)
@@ -904,9 +907,23 @@ namespace replication
             if (!entry)
             {
                 // It can only be the case that the entry hasn't arrived yet,
-                // since it cannot mov on to the sorted list otherwise.
-                // Add the entry to the outstandingACKs map
-                outstandingACKs[msg.t] = std::make_tuple(msg.arrivalTs, -1);
+                // since it cannot mov on to the sorted list otherwise. TODO orrrr what happens if it gets a round 2 ack first?
+                // Add the entry to the outstandingPredecessors map
+                // Entry never came yet! Add to outstanding ACK map
+                auto p = outstandingPredecessors.find(???);
+                if (p != outstandingPredecessors.end())
+                {
+                    // This is the second ACK from the predecessor for this entry
+                    p.arrivalTimestamp = msg.arrivalTs;
+                }
+                else
+                {
+                    // This is the first ACK from the predecessor for this entry
+                    Predecessor *newp = new Predecessor{msg, msg.shardID, msg.arrivalTs, -1};
+                    outstandingPredecessors[msg.t] = newp;
+                }
+
+                outstandingPredecessors[msg.t] = std::make_tuple(msg.arrivalTs, -1);
                 return;
             }
             if (entry.predecessors[msg.predIdx].arrivalTimestamp != -1)
@@ -947,26 +964,31 @@ namespace replication
                 if (!entry)
                 {
                     // Entry never came yet! Add to outstanding ACK map
-                    auto ACKs = outstandingACKs.find(???);
-                    if (ACKS != outstandingACKs.end())
+                    auto p = outstandingPredecessors.find(???);
+                    if (p != outstandingPredecessors.end())
                     {
-                        std::get<1>(ACKs) = msg.sortedTs;
+                        // This is the second ACK from the predecessor for this entry
+                        p.sortedTimestamp = msg.sortedTs;
                     }
                     else
                     {
-                        outstandingACKs[msg.t] = std::make_tuple(std::get<0>(ACKs), msg.sortedTs);
+                        // This is the first ACK from the predecessor for this entry
+                        Predecessor *newp = new Predecessor{msg, msg.shardID, -1, msg.sortedTs};
+                        outstandingPredecessors[msg.t] = newp;
                     }
                 }
                 else
                 {
-                    // Entry is in the sorted log!
-                    Panic("Step 3.");
+                    // Entry is in the sorted log! Has had first ACK
+                    if (entry.p == entry.predecessors.size())
                 }
             }
             else
             {
+                // Entry is in the unsorted map... probably has been replicated...
                 // Entry that never got the first round ACK
                 Panic("fast path!");
+                Panic("Yeah i'm not sure what we do with this... cuz now we have both pieces of info hmmmm");
             }
         }
 
