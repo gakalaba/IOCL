@@ -2,8 +2,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include "store/benchmark/async/bench_client.h"
-#include "store/benchmark/micro/micro_client.h" 
-#include "redis_store.h" 
+#include "store/benchmark/async/micro/micro_client.h"
+#include "store/common/backend/redis_store.h"
 
 namespace py = pybind11;
 
@@ -27,16 +27,14 @@ Value python_to_value(const py::object& obj) {
     return NIL;
 }
 
-// Create benchmark client
-void InitializeBenchmarkClient() {
-    // Initialize the required parameters. These are placeholders,
-    // so replace these with your actual initialization code.
+// Simplified initialization function
+std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
+    // Placeholder implementation - replace with actual initialization
     KeySelector keySelector = new UniformKeySelector(keys);
     std::vector<std::shared_ptr<Client>> clients = /* your client initialization */;
     Transport* tport = /* your transport initialization */;
     
-    // The values below (e.g., FLAGS_message_timeout, seed, etc.) are assumed to be defined in your project.
-    benchmarkClient = std::make_unique<micro::MicroClient>(
+    return std::make_unique<micro::MicroClient>(
         keySelector,
         clients,
         FLAGS_message_timeout,
@@ -61,27 +59,8 @@ void InitializeBenchmarkClient() {
     );
 }
 
-// // SendRequest
-// std::pair<bool, Value> SendRequest(Operation op, int64_t keys, const Value& newVal, const Value& oldVal) {
-//     // Create a Command object to pass to RedisStore::execute
-//     Command cmd;
-//     cmd.op = op;
-//     cmd.key = std::to_string(keys);
-//     cmd.value = newVal;
-//     cmd.oldValue = oldVal;
-    
-//     try {
-//         // Execute the command using the global RedisStore instance
-//         Value result = globalRedisStore.execute(cmd);
-//         return {true, result};
-//     } catch (const std::exception& e) {
-//         std::cerr << "Error in SendRequest: " << e.what() << std::endl;
-//         return {false, NIL};
-//     }
-// }
-
 // AsyncSendRequest - Asynchronous version of SendRequest
-std::pair<bool, int> AsyncSendRequest(Operation op, int64_t key, const Value& newVal, const Value& oldVal) {
+std::pair<bool, int> AsyncSendRequest(uint64_t session_id, Operation op, int64_t key, const Value& newVal, const Value& oldVal) {
     try {
         auto result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
         bool success = std::get<0>(result);
@@ -99,10 +78,11 @@ std::pair<bool, int> AsyncSendRequest(Operation op, int64_t key, const Value& ne
     }
 }
 
+
 // AsyncGetResponse - Retrieve the result of an asynchronous request
 std::pair<bool, Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
     try {
-        std::tuple<Value, uint64_t> result_tuple = client.AwaitAsynchResponse(session_id, commandId);
+        std::tuple<Value, uint64_t> result_tuple = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
         Value result = std::get<0>(result_tuple);
 
         return {true, result};
@@ -111,6 +91,7 @@ std::pair<bool, Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId)
         return {false, NIL};
     }
 }
+
 
 // Helper function to convert Value to Python objects
 py::object value_to_python(const Value& val) {
@@ -133,14 +114,14 @@ py::object value_to_python(const Value& val) {
 uint64_t CustomInitSession() {
     if (!benchmarkClient) {
         // If the client wasn't already created, initialize it.
-        InitializeBenchmarkClient();
+        benchmarkClient = CreateBenchmarkClient();
     }
     return benchmarkClient->CustomInit();
 }
 
+PYBIND11_MODULE(redisstorepython, m) {
+    m.doc() = "Redis Store Python Bindings";
 
-// Create the Python module
-PYBIND11_MODULE(redisstore, m) {
     // Define the Operation enum
     py::enum_<Operation>(m, "Operation")
         .value("PUT", Operation::PUT)
@@ -197,31 +178,37 @@ PYBIND11_MODULE(redisstore, m) {
         .def("execute", &RedisStore::execute)
         .def("__del__", [](RedisStore& self) { self.~RedisStore(); });
 
-    // Wrapper for SendRequest to handle Python types
-    m.def("send_request", [](Operation op, int64_t keys, py::object new_values, py::object old_values) {
-        // Debug print input parameters
-        Value newVal = python_to_value(new_values);
-        Value oldVal = python_to_value(old_values);
-        
-        bool success;
-        Value result;
-        std::tie(success, result) = SendRequest(op, keys, newVal, oldVal);
-        
-        return py::make_tuple(success, value_to_python(result));
-    }, py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
+    // Expose Value conversion function
+    m.def("python_to_value", &python_to_value, "Convert Python object to Value");
 
+    // Expose BenchmarkClient creation
+    m.def("create_benchmark_client", &CreateBenchmarkClient, "Create a BenchmarkClient instance");
+
+    // Wrapper for SendRequest to handle Python types
+    // m.def("send_request", [](Operation op, int64_t keys, py::object new_values, py::object old_values) {
+    //     // Debug print input parameters
+    //     Value newVal = python_to_value(new_values);
+    //     Value oldVal = python_to_value(old_values);
+        
+    //     bool success;
+    //     Value result;
+    //     std::tie(success, result) = SendRequest(op, keys, newVal, oldVal);
+        
+    //     return py::make_tuple(success, value_to_python(result));
+    // }, py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
+    
     // Wrapper for AsyncSendRequest to handle Python types
-    m.def("async_send_request", [](Operation op, int64_t keys, py::object new_values, py::object old_values) {
+    m.def("async_send_request", [](uint64_t session_id, Operation op, int64_t keys, py::object new_values, py::object old_values) {
         // Debug print input parameters
         Value newVal = python_to_value(new_values);
         Value oldVal = python_to_value(old_values);
         
         bool success;
         int requestId;
-        std::tie(success, requestId) = AsyncSendRequest(op, keys, newVal, oldVal);
+        std::tie(success, requestId) = AsyncSendRequest(session_id, op, keys, newVal, oldVal);
         
         return py::make_tuple(success, requestId);
-    }, py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
+    }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncGetResponse to handle Python types
     m.def("async_get_response", [](uint64_t session_id, uint64_t commandId) {

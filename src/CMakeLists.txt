@@ -43,3 +43,6 @@ add_subdirectory(replication)
 
 # add store executables
 add_subdirectory(store)
+
+# add Python bindings
+add_subdirectory(iocl_python)

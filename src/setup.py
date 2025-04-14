@@ -6,15 +6,14 @@ ext_modules = [
     Pybind11Extension(
         "redisstore",
         [
-            "binding.cc",  
-            "/users/akalaba/IOCL/src/store/common/backend/redis_store.cc",
-            "src/store/benchmark/async/bench_client.cc",
+            "iocl_python/binding.cc",
+            "store/common/backend/redis_store.cc",
+            "store/benchmark/async/bench_client.cc",
         ],
         include_dirs=[
-            "./",  
-            "src",  
-            "/users/akalaba/IOCL/src", 
-            "/users/akalaba/IOCL/src/lib",  # Add this
+            ".",
+            "store",
+            "lib",
         ],
         extra_compile_args=["-std=c++17"],
     ),
@@ -26,6 +25,9 @@ setup(
     author="Your Name",
     author_email="your.email@example.com",
     description="Python bindings for Redis Store C++ library",
-    packages=[],  # or list your Python packages if you have any
+    packages=[],
     python_requires=">=3.6",
+    ext_modules=ext_modules,
+    cmdclass={"build_ext": build_ext},
+    cmake_install_dir=".",
 )
