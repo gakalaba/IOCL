@@ -42,7 +42,7 @@
 class TransportAddress
 {
 public:
-    virtual ~TransportAddress() { }
+    virtual ~TransportAddress() {}
     virtual TransportAddress *clone() const = 0;
 };
 
@@ -52,7 +52,7 @@ protected:
     typedef ::google::protobuf::Message Message;
 
 public:
-    TransportReceiver() : myAddress(nullptr) { }
+    TransportReceiver() : myAddress(nullptr) {}
     virtual ~TransportReceiver();
     virtual void SetAddress(const TransportAddress *addr);
     virtual const TransportAddress *GetAddress();
@@ -60,18 +60,19 @@ public:
     virtual void ReceiveMessage(const TransportAddress &remote,
                                 const string &type,
                                 const string &data,
-                                void * meta_data) = 0;
+                                void *meta_data) = 0;
 
 protected:
     const TransportAddress *myAddress;
 };
 
-typedef std::function<void (void)> timer_callback_t;
+typedef std::function<void(void)> timer_callback_t;
 
 class Transport
 {
 protected:
     typedef ::google::protobuf::Message Message;
+
 public:
     virtual ~Transport() {}
     /* -1 in replicaIdx and groupIdx indicates client */
@@ -106,6 +107,7 @@ public:
     virtual bool SendMessageToGroup(TransportReceiver *src,
                                     int groupIdx,
                                     const Message &m) = 0;
+    virtual string GiveMeTheIPAddr(const TransportAddress &dst) = 0;
     /* Send message to failure coordinator
      */
     virtual bool SendMessageToFC(TransportReceiver *src,
@@ -122,7 +124,7 @@ public:
     /* Dispatch function f to the thread pool
      * handle the result in cb
      */
-    virtual void DispatchTP(std::function<void*()> f, std::function<void(void*)> cb) = 0;
+    virtual void DispatchTP(std::function<void *()> f, std::function<void(void *)> cb) = 0;
 };
 
 class Timeout
@@ -145,4 +147,4 @@ private:
     int timerId;
 };
 
-#endif  // _LIB_TRANSPORT_H_
+#endif // _LIB_TRANSPORT_H_

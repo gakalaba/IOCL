@@ -243,37 +243,39 @@ void TCPTransport::ConnectTCP(
     int fd;
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        PPanic("Failed to create socket for outgoing TCP connection");
+        Debug("Failed to create socket for outgoing TCP connection");
+        Panic("ahh");
     }
 
     // Put it in non-blocking mode
     if (fcntl(fd, F_SETFL, O_NONBLOCK, 1))
     {
-        PWarning("Failed to set O_NONBLOCK on outgoing TCP socket");
+        Debug("Failed to set O_NONBLOCK on outgoing TCP socket");
     }
 
     // Set TCP_NODELAY
     int n = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&n, sizeof(n)) < 0)
     {
-        PWarning("Failedt to set TCP_NODELAY on TCP listening socket");
+        Debug("Failedt to set TCP_NODELAY on TCP listening socket");
     }
 
     n = SOCKET_BUF_SIZE;
     if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&n, sizeof(n)) < 0)
     {
-        PWarning("Failed to set SO_RCVBUF on socket");
+        Debug("Failed to set SO_RCVBUF on socket");
     }
 
     if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char *)&n, sizeof(n)) < 0)
     {
-        PWarning("Failed to set SO_SNDBUF on socket");
+        Debug("Failed to set SO_SNDBUF on socket");
     }
 
     TCPTransportTCPListener *info = new TCPTransportTCPListener();
     info->transport = this;
     info->acceptFd = 0;
     info->receiver = dstSrc.second;
+    Debug("info->receiver = %d", dstSrc.second);
     info->replicaIdx = -1;
     info->acceptEvent = NULL;
 
@@ -302,7 +304,7 @@ void TCPTransport::ConnectTCP(
         tcpAddresses.erase(bev);
         // mtx.unlock();
 
-        Warning("Failed to connect to server via TCP");
+        Debug("Failed to connect to server via TCP");
         return;
     }
 
@@ -321,18 +323,21 @@ void TCPTransport::ConnectTCP(
     TCPTransportAddress *addr = new TCPTransportAddress(sin);
     if (dstSrc.second->GetAddress() == nullptr)
     {
+        Debug("Setting this second address...");
         dstSrc.second->SetAddress(addr);
     }
 
-    Debug("Opened TCP connection to %s:%d from %s:%d",
+    Debug("Opened TCP connection to %s:%d from %s:%d and saved in dstSrc is %s",
           inet_ntoa(dstSrc.first.addr.sin_addr), htons(dstSrc.first.addr.sin_port),
-          inet_ntoa(sin.sin_addr), htons(sin.sin_port));
+          inet_ntoa(sin.sin_addr), htons(sin.sin_port),
+          dstSrc.second->GetAddress());
 }
 
 void TCPTransport::Register(TransportReceiver *receiver,
                             const transport::Configuration &config,
                             int groupIdx, int replicaIdx)
 {
+    Debug("I'm tryna be Register'd with groupIdx = %d and replicaIdx = %d", groupIdx, replicaIdx);
     ASSERT(replicaIdx < config.n);
     struct sockaddr_in sin;
 
@@ -342,6 +347,7 @@ void TCPTransport::Register(TransportReceiver *receiver,
     // Clients don't need to accept TCP connections
     if (replicaIdx == -1)
     {
+        Debug("not creating socket to listen on!");
         return;
     }
 
@@ -427,6 +433,11 @@ void TCPTransport::Register(TransportReceiver *receiver,
     Debug("Accepting connections on TCP port %hu", ntohs(sin.sin_port));
 }
 
+string TCPTransport::GiveMeTheIPAddrInternal(const TCPTransportAddress &dst)
+{
+    return inet_ntoa(dst.addr.sin_addr);
+}
+
 bool TCPTransport::SendMessageInternal(TransportReceiver *src,
                                        const TCPTransportAddress &dst,
                                        const Message &m)
@@ -437,8 +448,10 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     auto dstSrc = std::make_pair(dst, src);
     auto kv = tcpOutgoing.find(dstSrc);
     // See if we have a connection open
+    Debug("The tcpOutgoing map has size %d", tcpOutgoing.size());
     if (kv == tcpOutgoing.end())
     {
+        Debug("we don't already have an outgoing connection ready, so we gotta make it! with info = %", src);
         ConnectTCP(dstSrc);
         kv = tcpOutgoing.find(dstSrc);
     }
@@ -487,10 +500,12 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
 
     if (bufferevent_write(ev, buf, totalLen) < 0)
     {
+        Debug("oops we definitely couldn't write the message on this connection");
         Warning("Failed to write to TCP buffer");
         fprintf(stderr, "tcp write failed\n");
         return false;
     }
+    Debug("ok!!! completed wriitng the message on this new socket");
 
     /*Latency_Start(&sockWriteLat);
     if (write(ev->ev_write.ev_fd, buf, totalLen) < 0) {
@@ -680,6 +695,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
 {
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
+    Debug("Saw some event on the port!");
 
     if (what & EV_READ)
     {
@@ -692,6 +708,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         if ((newfd = accept(fd, (struct sockaddr *)&sin,
                             &sinLength)) < 0)
         {
+            Debug("Failed to accept incoming TCP connection");
             PWarning("Failed to accept incoming TCP connection");
             return;
         }
@@ -699,6 +716,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         // Put it in non-blocking mode
         if (fcntl(newfd, F_SETFL, O_NONBLOCK, 1))
         {
+            Debug("Failed to set nonblocking");
             PWarning("Failed to set O_NONBLOCK");
         }
 
@@ -707,6 +725,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         if (setsockopt(newfd, IPPROTO_TCP,
                        TCP_NODELAY, (char *)&n, sizeof(n)) < 0)
         {
+            Debug("Failed to set nodelay");
             PWarning("Failed to set TCP_NODELAY on TCP listening socket");
         }
 

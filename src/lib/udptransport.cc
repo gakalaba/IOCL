@@ -553,6 +553,11 @@ SerializeMessage(const string &data, const string &type,
     return totalLen;
 }
 
+string UDPTransport::GiveMeTheIPAddrInternal(const UDPTransportAddress &dst)
+{
+    return inet_ntoa(dst.addr.sin_addr);
+}
+
 bool UDPTransport::_SendMessageInternal(TransportReceiver *src,
                                         const UDPTransportAddress &dst,
                                         const Message &m,

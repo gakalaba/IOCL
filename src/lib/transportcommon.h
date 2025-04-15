@@ -98,6 +98,12 @@ public:
         return SendMessageInternal(src, kv->second, m);
     }
 
+    string GiveMeTheIPAddr(const TransportAddress &dst)
+    {
+        const ADDR &dstAddr = dynamic_cast<const ADDR &>(dst);
+        return GiveMeTheIPAddrInternal(dstAddr);
+    }
+
     virtual bool SendMessageToFC(TransportReceiver *src, const Message &m) override
     {
         const transport::Configuration *cfg = configurations[src];
@@ -130,6 +136,7 @@ public:
         {
             LookupAddresses();
         }
+        Debug("Calling sendMessageTOAll and the groupIdx is %d", groupIdx);
 
         return SendMessageToGroup(src, groupIdx, m);
     }
@@ -204,7 +211,7 @@ public:
             {
                 if (srcGroup != -1 && *srcAddr == kv.second)
                 {
-                    Debug("skipping");
+                    Debug("skipping sending to self");
                     continue;
                 }
                 Debug("sending");
@@ -221,6 +228,7 @@ protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ADDR &dst,
                                      const Message &m) = 0;
+    virtual string GiveMeTheIPAddrInternal(const ADDR &dst) = 0;
     virtual ADDR LookupAddress(const transport::Configuration &cfg,
                                int groupIdx,
                                int replicaIdx) = 0;
@@ -251,6 +259,7 @@ protected:
                           int groupIdx,
                           int replicaIdx)
     {
+        Debug("inside RegisterConfiguration!");
         ASSERT(receiver != NULL);
 
         // Have we seen this configuration before? If so, get a

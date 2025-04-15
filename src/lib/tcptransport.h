@@ -140,6 +140,7 @@ private:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const TCPTransportAddress &dst,
                                      const Message &m) override;
+    virtual string GiveMeTheIPAddrInternal(const TCPTransportAddress &dst) override;
     virtual const TCPTransportAddress *
     LookupMulticastAddress(const transport::Configuration *config) override
     {

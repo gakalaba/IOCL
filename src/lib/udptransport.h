@@ -137,6 +137,7 @@ private:
     bool SendMessageInternal(TransportReceiver *src,
                              const UDPTransportAddress &dst,
                              const Message &m) override;
+    string GiveMeTheIPAddrInternal(const UDPTransportAddress &dst) override;
 
     UDPTransportAddress
     LookupAddress(const transport::ReplicaAddress &addr);
