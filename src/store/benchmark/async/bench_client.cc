@@ -526,37 +526,36 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
 
     if (status == REPLY_OK)
     {
-        // add this response to all the responses from this app request!
-        if (issueConcurrent)
+        if (ss.responses() == ss.fanout())
         {
+            Debug("we're done! gonna send a new app request soon");
+            auto appreq = ss.apprequest();
+            auto &ttype = appreq->GetTransactionType();
+            auto n_attempts = ss.n_attempts();
 
-            if (ss.responses() == ss.fanout())
+            stats.Increment(ttype + "_completed", 1);
+
+            // Send Next App Request
+            if (!cooldownStarted)
             {
-                Debug("we're done! gonna send a new app request soon");
-                auto appreq = ss.apprequest();
-                auto &ttype = appreq->GetTransactionType();
-                auto n_attempts = ss.n_attempts();
-
-                stats.Increment(ttype + "_completed", 1);
-
-                // Send Next App Request
-                if (!cooldownStarted)
-                {
-                    Debug("next arrival in session %lu us", 0);
-                    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
-                    OnReply(session_id, 0, false);
-                }
-                else
-                {
-                    Debug("end of session");
-                    OnReply(session_id, 0, true);
-                }
+                Debug("next arrival in session %lu us", 0);
+                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
+                OnReply(session_id, 0, false);
+            }
+            else
+            {
+                Debug("end of session");
+                OnReply(session_id, 0, true);
             }
         }
         else
         {
-            Debug("we're gonna issue the next operation that's a part of this apprequest");
-            ExecuteNextOperationIOCL(session_id);
+            if (!issueConcurrent)
+            {
+
+                Debug("we're gonna issue the next operation that's a part of this apprequest");
+                ExecuteNextOperationIOCL(session_id);
+            }
         }
     }
     else
@@ -707,8 +706,7 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                                       auto btcb = []() {};
 
                                       auto &client = *clients_[ss.current_client_index()];
-                                      client.Retry(ss.session(), bcb, btcb, timeout_);
-                                  });
+                                      client.Retry(ss.session(), bcb, btcb, timeout_); });
         }
     }
 }
