@@ -1,4 +1,4 @@
-import redisstore as rs
+import redisstorepython as rs
 import hashlib
 import struct
 
@@ -11,51 +11,25 @@ def string_to_int64_hash(s):
     return int64_hash
 
 
-def SyncRequest(op_type, key, value=None, old_value=None):
+def InitCustom():
+    """
+    Initialize a session using the underlying C++ CustomInit method.
+
+    :return: Session ID
+    """
+    return rs.custom_init_session()
+
+
+def SyncAppRequest(session_id, op_type, key, value=None, old_value=None):
     """
     Perform an operation on a key with optional value and old_value.
 
+    :param session_id: Session ID from CustomInit()
     :param op_type: Operation type (e.g., 'PUT', 'GET', 'INCR', 'SET', etc.)
-    :param key: Key for the operation (string or integer)
+    :param key: Key for the operation
     :param value: Value for the operation (optional)
     :param old_value: Old value for comparison operations (optional)
-    :return: Tuple of (success, result)
-    """
-    ### this is just going to call AsyncAppRequest followed by AsyncAppResponse
-    request_id = AsyncAppSendRequest(op_type, key, value=None, old_value=None)
-    result = AsyncAppGetResponse(request_id)
-    return result
-    # # Convert string operation type to enum
-    # if isinstance(op_type, str):
-    #     try:
-    #         op = getattr(rs.Operation, op_type.upper())
-    #     except AttributeError:
-    #         raise ValueError(f"Unknown operation: {op_type}")
-    # else:
-    #     op = op_type
-
-    # # Convert key to int64 if it's a string that can be converted to an integer
-    # if isinstance(key, str) and key.isdigit():
-    #     key = int(key)
-    # elif isinstance(key, str):
-    #     key = string_to_int64_hash(key)
-
-    # # Call the underlying C++ function
-    # success, result = rs.send_request(op, key, str(value), str(old_value))
-
-    # if not success:
-    #     raise Exception("Failed to perform operation")
-
-
-def AsyncSendRequest(op_type, key, value=None, old_value=None):
-    """
-    Perform an asynchronous operation on a key with optional value and old_value.
-
-    :param op_type: Operation type (e.g., 'PUT', 'GET', 'INCR', 'SET', etc.)
-    :param key: Key for the operation (string or integer)
-    :param value: Value for the operation (optional)
-    :param old_value: Old value for comparison operations (optional)
-    :return: Tuple of (success, request_id)
+    :return: Result of the operation
     """
     # Convert string operation type to enum
     if isinstance(op_type, str):
@@ -72,26 +46,64 @@ def AsyncSendRequest(op_type, key, value=None, old_value=None):
     elif isinstance(key, str):
         key = string_to_int64_hash(key)
 
-    # Call the underlying C++ async function
-    success, request_id = rs.async_send_request(op, key, str(value), str(old_value))
+    # Convert value and old_value to string
+    value = str(value) if value is not None else None
+    old_value = str(old_value) if old_value is not None else None
 
-    if not success:
-        raise Exception("Failed to submit async operation")
+    # Send async request
+    success, request_id = rs.async_send_request(session_id, op, key, value, old_value)
+    
+    # Get async response
+    success, result = rs.async_get_response(session_id, request_id)
 
+    return result
+
+
+def AsyncSendRequest(session_id, op_type, key, value=None, old_value=None):
+    """
+    Send an asynchronous request.
+
+    :param session_id: Session ID from CustomInit()
+    :param op_type: Operation type (e.g., 'PUT', 'GET')
+    :param key: Key for the operation
+    :param value: Value for the operation (optional)
+    :param old_value: Old value for comparison operations (optional)
+    :return: Request ID
+    """
+    # Convert string operation type to enum
+    if isinstance(op_type, str):
+        try:
+            op = getattr(rs.Operation, op_type.upper())
+        except AttributeError:
+            raise ValueError(f"Unknown operation: {op_type}")
+    else:
+        op = op_type
+
+    # Convert key to int64 if it's a string that can be converted to an integer
+    if isinstance(key, str) and key.isdigit():
+        key = int(key)
+    elif isinstance(key, str):
+        key = string_to_int64_hash(key)
+
+    # Convert value and old_value to string
+    value = str(value) if value is not None else None
+    old_value = str(old_value) if old_value is not None else None
+
+    # Send async request
+    success, request_id = rs.async_send_request(session_id, op, key, value, old_value)
+    
     return request_id
 
 
-def AsyncGetResponse(request_id):
+def AsyncGetResponse(session_id, request_id):
     """
     Retrieve the result of an asynchronous operation.
 
-    :param request_id: Request ID returned by AsyncAppSendRequest
+    :param session_id: Session ID from CustomInit()
+    :param request_id: Request ID returned by AsyncSendRequest
     :return: Result of the async operation
     """
-    # Call the underlying C++ async get response function
-    success, result = rs.async_get_response(request_id)
-
-    if not success:
-        raise Exception("Failed to retrieve async operation result")
+    # Get async response
+    success, result = rs.async_get_response(session_id, request_id)
 
     return result

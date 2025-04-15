@@ -1,33 +1,17 @@
-from setuptools import setup, Extension
-from pybind11.setup_helpers import Pybind11Extension, build_ext
-from skbuild import setup
-
-ext_modules = [
-    Pybind11Extension(
-        "redisstore",
-        [
-            "iocl_python/binding.cc",
-            "store/common/backend/redis_store.cc",
-            "store/benchmark/async/bench_client.cc",
-        ],
-        include_dirs=[
-            ".",
-            "store",
-            "lib",
-        ],
-        extra_compile_args=["-std=c++17"],
-    ),
-]
+from setuptools import setup, find_packages
 
 setup(
-    name="redistore",
-    version="0.1",
-    author="Your Name",
-    author_email="your.email@example.com",
-    description="Python bindings for Redis Store C++ library",
-    packages=[],
-    python_requires=">=3.6",
-    ext_modules=ext_modules,
-    cmdclass={"build_ext": build_ext},
-    cmake_install_dir=".",
+    name='iocl',
+    version='0.1.0',
+    description='iocl library',
+    packages=find_packages('iocl_python'),
+    package_dir={'': 'iocl_python'},
+    install_requires=[
+        'numpy',  # Add any dependencies your library needs
+    ],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+    ],
+    keywords='distributed-systems research database',
+    python_requires='>=3.6',
 )

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(IOCL_Python LANGUAGES CXX)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Find Python development headers
 find_package(Python COMPONENTS Interpreter Development REQUIRED)

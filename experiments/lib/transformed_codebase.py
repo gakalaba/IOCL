@@ -202,7 +202,8 @@ class TransformedCodebase:
                     client_command = 'setenv DEBUG all; %s' % client_command
 
         # client_command = '(cd %s; %s) & ' % (exp_directory, client_command)
-
+        python_cmd = f"python {os.path.join(config['src_directory'], 'app_sync.py')}"
+        client_command = python_cmd
         client_command = '(cd %s; %s) & ' % (config['base_python_directory'], client_command)
         print("CLIENT COMMAND + ", repr(client_command))
         return client_command
