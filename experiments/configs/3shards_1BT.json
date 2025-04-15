@@ -21,9 +21,9 @@
   "num_instances": 1,
   "shard_config": "shard.config",
   "replica_config": "replica.config",
+  "network_config": "network.json",
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
-  "network_config": "network.json",
   "fault_tolerance": 1,
   "num_shards": 3,
   "shards": [
@@ -70,9 +70,9 @@
   "client_key_selector": "zipf",
   "client_fanout": 1,
   "client_issue_concurrent": false,
-  "client_zipf_coefficient": 0.7,
+  "client_zipf_coefficient": 0.1,
   "rw_num_ops_txn": 1,
-  "server_load_time": 5,
+  "server_load_time": 20,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -388,4 +388,3 @@
   "client_cpuprofile": false,
   "server_gc_debug_trace": false
 }
-

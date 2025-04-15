@@ -11,9 +11,9 @@
   "replication_protocol": "vr",
   "client_protocol_mode": "span-lock",
   "server_names": [
+    "us-east-1-0",
     "us-east-1-1",
-    "us-east-1-2",
-    "us-east-1-0"
+    "us-east-1-2"
   ],
   "consistency": [
     "lin"
@@ -60,18 +60,6 @@
       "us-east-1-1",
       "us-east-1-2",
       "client-1-0"
-    ],
-    "eu-west-1": [
-      "eu-west-1-0",
-      "eu-west-1-1",
-      "eu-west-1-2",
-      "client-1-0"
-    ],
-    "us-west-1": [
-      "us-west-1-0",
-      "us-west-1-1",
-      "us-west-1-2",
-      "client-2-0"
     ]
   },
   "server_port": 7087,
@@ -80,10 +68,10 @@
   "benchmark_name": "micro",
   "bench_mode": "closed",
   "mpl": 1,
-  "client_key_selector": "uniform",
+  "client_key_selector": "zipf",
   "client_fanout": 1,
   "client_issue_concurrent": false,
-  "client_zipf_coefficient": 0.0,
+  "client_zipf_coefficient": 0.1,
   "rw_num_ops_txn": 1,
   "server_load_time": 20,
   "server_preload_keys": true,
