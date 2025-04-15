@@ -16,10 +16,7 @@
     "us-east-1-2",
     "eu-west-1-0",
     "eu-west-1-1",
-    "eu-west-1-2",
-    "us-west-1-0",
-    "us-west-1-1",
-    "us-west-1-2"
+    "eu-west-1-2"
   ],
   "consistency": [
     "ss"
@@ -27,6 +24,8 @@
   "num_instances": 1,
   "shard_config": "shard.config",
   "replica_config": "replica.config",
+  "replica_config_format_str": "replica-%d.config",
+  "shard_config_format_str": "shard-%d.config",
   "network_config": "network.json",
   "fault_tolerance": 1,
   "num_shards": 10,
@@ -34,90 +33,76 @@
     [
       "us-east-1-0",
       "eu-west-1-0",
-      "us-west-1-0"
+      "eu-west-1-0"
     ],
     [
       "us-east-1-0",
       "eu-west-1-0",
-      "us-west-1-0"
+      "eu-west-1-0"
     ],
     [
       "us-east-1-0",
       "eu-west-1-0",
-      "us-west-1-0"
+      "eu-west-1-0"
     ],
     [
       "us-east-1-0",
       "eu-west-1-0",
-      "us-west-1-0"
+      "eu-west-1-0"
     ],
     [
       "us-east-1-0",
       "eu-west-1-0",
-      "us-west-1-0"
+      "eu-west-1-0"
     ],
     [
       "us-east-1-1",
       "eu-west-1-1",
-      "us-west-1-1"
+      "eu-west-1-1"
     ],
     [
       "us-east-1-1",
       "eu-west-1-1",
-      "us-west-1-1"
+      "eu-west-1-1"
     ],
     [
       "us-east-1-1",
       "eu-west-1-1",
-      "us-west-1-1"
+      "eu-west-1-1"
     ],
     [
       "us-east-1-1",
       "eu-west-1-1",
-      "us-west-1-1"
+      "eu-west-1-1"
     ],
     [
       "us-east-1-1",
       "eu-west-1-1",
-      "us-west-1-1"
+      "eu-west-1-1"
     ]
   ],
   "client_total": [
-    84
+    1
   ],
   "client_processes_per_client_node": [
-    14
+    1
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0",
-    "client-1-0",
-    "client-2-0",
-    "client-3-0",
-    "client-4-0",
-    "client-5-0"
+    "client-1-0"
   ],
   "server_regions": {
     "us-east-1": [
       "us-east-1-0",
       "us-east-1-1",
       "us-east-1-2",
-      "client-0-0",
-      "client-3-0"
+      "client-1-0"
     ],
     "eu-west-1": [
       "eu-west-1-0",
       "eu-west-1-1",
       "eu-west-1-2",
-      "client-1-0",
-      "client-4-0"
-    ],
-    "us-west-1": [
-      "us-west-1-0",
-      "us-west-1-1",
-      "us-west-1-2",
-      "client-2-0",
-      "client-5-0"
+      "client-1-0"
     ]
   },
   "server_port": 7087,
@@ -125,9 +110,11 @@
   "client_num_keys": 10000000,
   "benchmark_name": "retwis",
   "client_key_selector": "uniform",
+  "bench_mode": "closed",
+  "mpl": 1,
   "client_zipf_coefficient": 0.0,
   "rw_num_ops_txn": 1,
-  "server_load_time": 20,
+  "server_load_time": 5,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -136,14 +123,14 @@
   "client_message_timeout": 60000,
   "run_locally": false,
   "replication_protocol_settings": {
-    "message_transport_type": "udp"
+    "message_transport_type": "tcp"
   },
   "stats_merge_lists": [
     "txn_groups",
     "commit_branch"
   ],
   "experiment_name": "newproj",
-  "codebase_name": "rss",
+  "codebase_name": "iocl",
   "pin_client_processes": [
     0,
     1,
@@ -168,13 +155,13 @@
     6
   ],
   "client_debug_output": true,
-  "server_debug_output": "server.cc",
+  "server_debug_output": true,
   "client_debug_stats": false,
-  "server_debug_stats": true,
-  "client_experiment_length": 120,
+  "server_debug_stats": false,
+  "client_experiment_length": 40,
   "client_rand_sleep": 0,
-  "client_ramp_down": 30,
-  "client_ramp_up": 30,
+  "client_ramp_down": 10,
+  "client_ramp_up": 10,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
@@ -390,11 +377,11 @@
   "plot_tput_lat_y_label": "Latency (ms)",
   "input_latency_scale": 1000000000,
   "output_latency_scale": 1000,
-  "src_commit_hash": "main",
+  "src_commit_hash": "debug",
   "stats_file_name": "stats.json",
-  "base_local_exp_directory": "/users/akalaba/spanner-rss/experiments/results",
+  "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
   "base_mounted_fs_path": "/mnt/extra",
-  "base_remote_bin_directory_nfs": "/users/akalaba/spanner-rss",
+  "base_remote_bin_directory_nfs": "/users/akalaba/IOCL",
   "base_remote_exp_directory": "/mnt/extra/experiments",
   "bin_directory_name": "bin",
   "client_bin_name": "benchmark",
@@ -406,7 +393,7 @@
   "num_experiment_runs": 1,
   "out_directory_name": "out",
   "server_bin_name": "server",
-  "src_directory": "/users/akalaba/spanner-rss/src",
+  "src_directory": "/users/akalaba/IOCL/src",
   "make_collect_bins": [
     "store/benchmark/async/benchmark",
     "store/server"

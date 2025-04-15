@@ -13,7 +13,7 @@
   "server_names": [
     "us-east-1-1",
     "us-east-1-2",
-    "eu-west-1-0"
+    "us-east-1-0"
   ],
   "consistency": [
     "ss"
@@ -28,24 +28,16 @@
   "num_shards": 1,
   "shards": [
     [
+      "us-east-1-0",
       "us-east-1-1",
-      "us-east-1-2",
-      "eu-west-1-0"
+      "us-east-1-2"
     ]
   ],
   "client_total": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_processes_per_client_node": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -78,7 +70,7 @@
   "bench_mode": "closed",
   "mpl": 1,
   "client_key_selector": "zipf",
-  "client_fanout": 4,
+  "client_fanout": 1,
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.1,
   "rw_num_ops_txn": 1,
@@ -122,8 +114,8 @@
     5,
     6
   ],
-  "client_debug_output": false,
-  "server_debug_output": false,
+  "client_debug_output": true,
+  "server_debug_output": true,
   "client_debug_stats": false,
   "server_debug_stats": false,
   "client_experiment_length": 40,
@@ -345,7 +337,7 @@
   "plot_tput_lat_y_label": "Latency (ms)",
   "input_latency_scale": 1000000000,
   "output_latency_scale": 1000,
-  "src_commit_hash": "addingIOCL",
+  "src_commit_hash": "debug",
   "stats_file_name": "stats.json",
   "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
   "base_mounted_fs_path": "/mnt/extra",
