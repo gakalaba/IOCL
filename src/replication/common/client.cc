@@ -70,6 +70,7 @@ namespace replication
             Debug("VRClient ID: %lu", this->clientid);
         }
 
+        Debug("Client calling Register with -1 -1");
         transport->Register(this, config, -1, -1);
     }
 

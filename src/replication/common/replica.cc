@@ -49,6 +49,7 @@ namespace replication
           transport(transport),
           app(app)
     {
+        Debug("Replica calling register with shard_idx = %d, replica_idx = %d", groupIdx, myIdx);
         transport->Register(this, configuration, groupIdx, myIdx);
     }
 

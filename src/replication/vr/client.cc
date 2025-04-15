@@ -50,7 +50,7 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
-            Debug("VRClient created");
+            Debug("VRClient created with ID = %d", clientid);
         }
 
         VRClient::~VRClient()
@@ -122,9 +122,9 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
 
-            Debug("SENDING REQUEST: %lu %s", clientid, req);
+            Debug(" Client %lu SENDING REQUEST", clientid);
             // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToGroup(this, group, reqMsg))
+            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             {
                 req->timer->Reset();
             }

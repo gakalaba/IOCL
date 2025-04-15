@@ -350,6 +350,7 @@ namespace replication
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
+            resendPrepareTimeout->Reset();
         }
 
         void VRReplica::CloseBatch()
@@ -481,7 +482,7 @@ namespace replication
 
             if (!AmLeader())
             {
-                RDebug("Ignoring request because I'm not the leader");
+                RDebug("Ignoring request because I'm not the leader, came from %s", transport->GiveMeTheIPAddr(remote).c_str());
                 return;
             }
 
@@ -506,9 +507,10 @@ namespace replication
                 if (msg.req().clientreqid() == entry.lastReqId)
                 {
                     // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
+                    // have one.
+                    // We might not have a reply to resend if we're
                     // waiting for the other replicas; in that case, just
-                    // discard the request.
+                    // discard the request. OOORRRR we gotta continuet trying to replicate it!
                     if (entry.replied)
                     {
                         RNotice("Received duplicate request; resending reply");
