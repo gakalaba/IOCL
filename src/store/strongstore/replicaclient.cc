@@ -57,7 +57,7 @@ namespace strongstore
                                     request_callback rcb, request_timeout_callback rtcb,
                                     uint32_t timeout)
     {
-        Debug("[shard %i] SendRequest sending: %s", shard_idx_, msg);
+        Debug("[shard %i] SendRequest sending msg", shard_idx_);
 
         // create request
         string request_str;

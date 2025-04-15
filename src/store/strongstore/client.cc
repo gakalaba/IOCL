@@ -692,9 +692,11 @@ namespace strongstore
             Debug("[%lu] PREPARE callback status %d", transaction_id, status);
         };
         auto pctcb = [](int) {};
+        Debug("How many participants???? %d participants", participants.size());
 
         for (auto p : participants)
         {
+            Debug("p = %d", p);
             if (p == coordinator_shard)
             {
                 sclients_[p]->RWCommitCoordinator(tid, participants, nonblock_timestamp, cccb, cctcb, timeout);

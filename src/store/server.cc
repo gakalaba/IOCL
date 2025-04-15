@@ -488,7 +488,6 @@ int main(int argc, char **argv)
     case PROTO_IOCL_CT:
     {
         // TODO ANJA obv make this new iocl::IOCLReplica
-        Debug("huhuhuh");
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),

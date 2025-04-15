@@ -45,6 +45,7 @@ namespace strongstore
           shard_idx_{shard},
           wcb_{wcb}
     {
+        Debug("shard_client calling register with shard_idx = %d, replica_idx = %d", -1, -1);
         transport_->Register(this, config_, -1, -1);
 
         // TODO: Remove hardcoding
@@ -292,6 +293,7 @@ namespace strongstore
         req_.set_value(value);
         req_.set_op(op);
 
+        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         transport_->SendMessageToReplica(this, shard_idx_, replica_, req_);
     }
 

@@ -61,6 +61,7 @@ namespace strongstore
           consistency_{consistency},
           debug_stats_{debug_stats}
     {
+        Debug("server calling register with shard_idx = %d, replica_idx = %d", shard_idx_, replica_idx_);
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
         for (int i = 0; i < shard_config_.g; i++)
@@ -272,7 +273,7 @@ namespace strongstore
 
     void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
-        Debug("Calling HandleSendRequest! with msg %s: msg.op = %s, msg.key = %s, msg.value = %s", msg, msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
+        Debug("Calling HandleSendRequest! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
