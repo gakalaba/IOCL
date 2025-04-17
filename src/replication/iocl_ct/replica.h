@@ -68,9 +68,9 @@ namespace replication
             opnum_t lastRequestStateTransferOpnum;
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
                 pendingPrepares;
-            proto::PrepareMessage lastPrepare;
+            proto::PrepareMessage lastPrepare2;
             unsigned int batchSize;
-            opnum_t lastBatchEnd;
+            opnum_t lastBatchEnd2;
             // IOCL specifics
             uint64_t shardTimestamp;
             uint64_t lastExecutedTimestamp;

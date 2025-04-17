@@ -50,11 +50,9 @@ message UnloggedReplyMessage {
 }
 
 message PrepareMessage {
-    required uint64 view = 1;
-    required uint64 opnum = 2;
-    required uint64 batchstart = 3;
-    repeated Request request = 4;
-    repeated uint64 arrivalts = 5;
+    required uint64 batchstart = 1;
+    repeated Request request = 2;
+    repeated uint64 arrivalts = 3;
 
 }
 
