@@ -85,9 +85,9 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
             // IOCL specific
-            std::unordered_map<PerShardTag, std::vector<Successor *>> outstandingSuccessors;
+            std::unordered_map<uint64_t, std::vector<Successor *>> outstandingSuccessors;
             // Because predecessors, unlike successors, have an invocation order associated with them, the inner map maps predIdx to predecessor
-            std::unordered_map<PerShardTag, std::unordered_map<uint64_t, Predecessor *>> outstandingPredecessors;
+            std::unordered_map<uint64_t, std::unordered_map<uint64_t, Predecessor *>> outstandingPredecessors;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
@@ -121,13 +121,13 @@ namespace replication
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
             void HandleCoordination(const TransportAddress &remote,
-                                    const proto::CoordinationRequestMessage &msg);
+                                    const proto::SuccessorRequestMessage &msg);
 
             void HandleCoordinationResp(const TransportAddress &remote,
-                                        const proto::CoordinationReplyMessage &msg);
+                                        const proto::PredecessorReplyMessage &msg);
 
             void HandleCoordinationResp2(const TransportAddress &remote,
-                                         const proto::CoordinationReplyMessage &msg);
+                                         const proto::PredecessorReplyMessage2 &msg);
 
             void HandlePrepare(const TransportAddress &remote,
                                const proto::PrepareMessage &msg);

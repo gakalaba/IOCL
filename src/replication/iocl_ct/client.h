@@ -64,7 +64,7 @@ namespace replication
             virtual void ReceiveMessage(const TransportAddress &remote,
                                         const string &type, const string &data,
                                         void *meta_data);
-            virtual void InvokeCoordination();
+            virtual void InvokeCoordination(PerShardTag p, PerShardTag s, uint64_t predIdx, uint64_t sendTo);
 
         protected:
             int view;

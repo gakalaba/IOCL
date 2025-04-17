@@ -80,25 +80,22 @@ namespace replication
             SendRequest(req);
         }
 
-        void IOCL_CTClient::InvokeCoordination()
+        void IOCL_CTClient::InvokeCoordination(PerShardTag p, PerShardTag s, uint64_t predIdx, uint64_t sendTo)
         {
             Debug("This client sent a coordination request");
-            proto::CoordinationRequestMessage coordReqMsg;
-            coordReqMsg.mutable_req()->set_op(req->request);
-            coordReqMsg.mutable_req()->set_clientid(clientid);
-            coordReqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            proto::SuccessorRequestMessage coordReqMsg;
+            coordReqMsg.mutable_p()->set_pid(p.pid());
+            coordReqMsg.mutable_p()->set_seqno(p.seqno());
+            coordReqMsg.mutable_s()->set_pid(s.pid());
+            coordReqMsg.mutable_s()->set_seqno(s.seqno());
+            coordReqMsg.set_predidx(predIdx);
+            coordReqMsg.set_shardidx(group);
 
-            Debug("SENDING REQUEST: %lu %s", clientid, req);
+            Debug("SENDING Coordination REquest to shard: %lu", sendTo);
             // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToPredecessor(this, group, coordReqMsg))
-            {
-                req->timer->Reset();
-            }
-            else
+            if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
             {
                 Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
             }
         }
 
