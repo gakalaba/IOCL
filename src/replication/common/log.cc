@@ -50,6 +50,23 @@ namespace replication
         }
     }
 
+    uint64_t TagToInt(PerShardTag tag)
+    {
+        return (tag.pid() << 32) | (tag.seqno() & 0xFFFFFFFF);
+    }
+
+    uint64_t IntToPid(uint64_t tag)
+    {
+        uint64_t pid = (tag >> 32) & 0xFFFFFFFF;
+        return pid;
+    }
+
+    uint64_t IntToSeqno(uint64_t tag)
+    {
+        uint64_t seqno = (tag & 0xFFFFFFFF);
+        return seqno;
+    }
+
     LogEntry &
     Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     {
@@ -75,23 +92,14 @@ namespace replication
         return *Find(vs.opnum);
     }
 
-    LogEntry &
-    Log::AppendUnsorted(viewstamp_t vs, const Request &req, LogEntryState state,
+    void
+    Log::AppendUnsorted(const Request &req, PerShardTag t, LogEntryState state,
                         uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
-                        std::vector<Predecessor *> &&predecessors)
+                        std::vector<Predecessor *> &&predecessors,
+                        uint64_t acks, uint64_t acks2)
     {
-        if (entries.empty())
-        {
-            ASSERT(vs.opnum == start);
-        }
-        else
-        {
-            ASSERT(vs.opnum == LastOpnum() + 1);
-        }
-
         LogEntry entry;
-        entry.viewstamp = vs;
         entry.request = req;
         entry.state = state;
         entry.arrivalTimestamp = arrivalTs;
@@ -110,13 +118,11 @@ namespace replication
             entry.hash = ComputeHash(LastHash(), entry);
         }
 
-        PerShardTag t;
-        t.pid = req.t()->pid();
-        t.seqno = req.t()->seqno();
+        entry.acks = acks;
+        entry.acks2 = acks2;
 
-        unorderedEntries[t] = entry;
-
-        return *Find(vs.opnum);
+        uint64_t shardTag = TagToInt(t);
+        unorderedEntries[shardTag] = entry;
     }
 
     // This really ought to be const
@@ -144,7 +150,7 @@ namespace replication
     }
 
     LogEntry &
-    Log::InsertSorted(LogEntry &entry, LogEntryState state)
+    Log::InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag)
     {
         if (entries.empty())
         {
@@ -155,16 +161,12 @@ namespace replication
             ASSERT(vs.opnum == LastOpnum() + 1);
         }
 
-        LogEntry entry;
         entry.viewstamp = vs;
-        entry.request = req;
         entry.state = state;
-        if (useHash)
-        {
-            entry.hash = ComputeHash(LastHash(), entry);
-        }
 
         entries.push_back(entry);
+
+        unorderedEntries.erase(shardTag);
         return *Find(vs.opnum);
     }
 

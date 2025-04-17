@@ -60,7 +60,7 @@ namespace replication
 
     struct Predecessor
     {
-        PerShardTag identifier;
+        uint64_t perShardTag;
         uint64_t shardId;
         int64_t arrivalTimestamp;
         int64_t sortedTimestamp;
@@ -68,14 +68,8 @@ namespace replication
 
     struct Successor
     {
-        PerShardTag identifier;
+        uint64_t perShardTag;
         uint64_t shardId;
-    };
-
-    struct PerShardTag
-    {
-        uint64_t pid;
-        uint64_t seqno;
     };
 
     struct LogEntry
@@ -128,13 +122,14 @@ namespace replication
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
         LogEntry *Find(opnum_t opnum);
         // IOCL specifics
-        LogEntry &AppendUnsorted(viewstamp_t vs, const Request &req,
-                                 LogEntryState state,
-                                 uint64_t arrivalTs,
-                                 std::vector<Successor *> &&successors,
-                                 std::vector<Predecessor *> &&predecessors);
+        void AppendUnsorted(const Request &req, PerShardTag t,
+                            LogEntryState state,
+                            uint64_t arrivalTs,
+                            std::vector<Successor *> &&successors,
+                            std::vector<Predecessor *> &&predecessors,
+                            uint64_t acks, uint64_t acks2);
         LogEntry &FindUnsorted(opnum_t opnum);
-        LogEntry &InsertSorted(LogEntry &entry, LogEntryState state);
+        LogEntry &InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag);
         void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);
         bool SetRequest(opnum_t op, const Request &req);
@@ -160,7 +155,7 @@ namespace replication
         bool useHash;
         // IOCL specifics
         // .find(), .end(), .insert(), .erase()
-        std::unordered_map<PerShardTag, LogEntry> unorderedEntries;
+        std::unordered_map<uint64_t, LogEntry> unorderedEntries;
     };
 
 #include "replication/common/log-impl.h"
