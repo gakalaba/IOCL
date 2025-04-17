@@ -6,6 +6,8 @@ package replication.iocl_ct.proto;
 
 message RequestMessage {
     required replication.Request req = 1;
+    required PerShardTag t = 2;
+    repeated PerShardTag predlist = 3;
 }
 
 message ReplyMessage {
@@ -19,6 +21,7 @@ message SuccessorRequestMessage {
     required PerShardTag p = 1;
     required PerShardTag s = 2;
     required uint64 predIdx = 3;
+    required uint64 shardIdx = 4;
 }
 
 message PredecessorReplyMessage {
@@ -26,6 +29,7 @@ message PredecessorReplyMessage {
     required uint64 arrivalTs = 2;
     required PerShardTag s = 3;
     required uint64 predIdx = 4;
+    required uint64 shardIdx = 5;
 }
 
 message PredecessorReplyMessage2 {
@@ -33,6 +37,7 @@ message PredecessorReplyMessage2 {
     required uint64 sortedTs = 2;
     required PerShardTag s = 3;
     required uint64 predIdx = 4;
+    required uint64 shardIdx = 5;
 }
 
 message UnloggedRequestMessage {

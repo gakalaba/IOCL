@@ -61,7 +61,7 @@ namespace replication
     struct Predecessor
     {
         PerShardTag identifier;
-        uint64_t ShardId;
+        uint64_t shardId;
         int64_t arrivalTimestamp;
         int64_t sortedTimestamp;
     };
@@ -69,7 +69,7 @@ namespace replication
     struct Successor
     {
         PerShardTag identifier;
-        const TransportAddress &remote;
+        uint64_t shardId;
     };
 
     struct PerShardTag
@@ -155,11 +155,12 @@ namespace replication
 
     private:
         std::vector<LogEntry> entries;
-        // .find(), .end(), .insert(), .erase()
-        std::unordered_map<PerShardTag, LogEntry> unorderedEntries;
         string initialHash;
         opnum_t start;
         bool useHash;
+        // IOCL specifics
+        // .find(), .end(), .insert(), .erase()
+        std::unordered_map<PerShardTag, LogEntry> unorderedEntries;
     };
 
 #include "replication/common/log-impl.h"

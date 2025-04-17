@@ -77,7 +77,6 @@ namespace replication
 
             Log log;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
-            std::map<uint64_t, std::unique_ptr<TransportAddress>> shardAddresses;
             struct ClientTableEntry
             {
                 uint64_t lastReqId;
@@ -86,8 +85,9 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
             // IOCL specific
-            std::unordered_map<Tag, std::vector<Successor *>> outstandingSuccessors;
-            std::unordered_map<Tag, std::unordered_map<uint64_t, Predecessor *>> outstandingPredecessors;
+            std::unordered_map<PerShardTag, std::vector<Successor *>> outstandingSuccessors;
+            // Because predecessors, unlike successors, have an invocation order associated with them, the inner map maps predIdx to predecessor
+            std::unordered_map<PerShardTag, std::unordered_map<uint64_t, Predecessor *>> outstandingPredecessors;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;

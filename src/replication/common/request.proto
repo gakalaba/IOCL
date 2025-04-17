@@ -11,8 +11,6 @@ message Request {
      required bytes op = 1;
      required uint64 clientid = 2;
      required uint64 clientreqid = 3;
-     optional PerShardTag t = 4;
-     repeated PerShardTag predlist = 5;
 }
 
 message UnloggedRequest {
