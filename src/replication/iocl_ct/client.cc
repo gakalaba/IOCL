@@ -80,14 +80,12 @@ namespace replication
             SendRequest(req);
         }
 
-        void IOCL_CTClient::InvokeCoordination(PerShardTag p, PerShardTag s, uint64_t predIdx, uint64_t sendTo)
+        void IOCL_CTClient::InvokeCoordination(uint64_t p, uint64_t s, uint64_t predIdx, uint64_t sendTo)
         {
             Debug("This client sent a coordination request");
             proto::SuccessorRequestMessage coordReqMsg;
-            coordReqMsg.mutable_p()->set_pid(p.pid());
-            coordReqMsg.mutable_p()->set_seqno(p.seqno());
-            coordReqMsg.mutable_s()->set_pid(s.pid());
-            coordReqMsg.mutable_s()->set_seqno(s.seqno());
+            coordReqMsg.set_p(p);
+            coordReqMsg.set_s(s);
             coordReqMsg.set_predidx(predIdx);
             coordReqMsg.set_shardidx(group);
 

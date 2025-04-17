@@ -50,23 +50,6 @@ namespace replication
         }
     }
 
-    uint64_t TagToInt(PerShardTag tag)
-    {
-        return (tag.pid() << 32) | (tag.seqno() & 0xFFFFFFFF);
-    }
-
-    uint64_t IntToPid(uint64_t tag)
-    {
-        uint64_t pid = (tag >> 32) & 0xFFFFFFFF;
-        return pid;
-    }
-
-    uint64_t IntToSeqno(uint64_t tag)
-    {
-        uint64_t seqno = (tag & 0xFFFFFFFF);
-        return seqno;
-    }
-
     LogEntry &
     Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     {
@@ -93,7 +76,7 @@ namespace replication
     }
 
     void
-    Log::AppendUnsorted(const Request &req, PerShardTag t, LogEntryState state,
+    Log::AppendUnsorted(const Request &req, uint64_t shardTag, LogEntryState state,
                         uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
                         std::vector<Predecessor *> &&predecessors,
@@ -121,13 +104,40 @@ namespace replication
         entry.acks = acks;
         entry.acks2 = acks2;
 
-        uint64_t shardTag = TagToInt(t);
         unorderedEntries[shardTag] = entry;
+    }
+
+    LogEntry *Log::FindUnsorted(uint64_t shardTag)
+    {
+        return &(unorderedEntries[shardTag]);
     }
 
     // This really ought to be const
     LogEntry *
     Log::Find(opnum_t opnum)
+    {
+        if (entries.empty())
+        {
+            return NULL;
+        }
+
+        if (opnum < start)
+        {
+            return NULL;
+        }
+
+        if (opnum - start > entries.size() - 1)
+        {
+            return NULL;
+        }
+
+        LogEntry *entry = &entries[opnum - start];
+        ASSERT(entry->viewstamp.opnum == opnum);
+        return entry;
+    }
+
+    LogEntry *
+    Log::Find(??)
     {
         if (entries.empty())
         {
@@ -164,10 +174,29 @@ namespace replication
         entry.viewstamp = vs;
         entry.state = state;
 
+        // TODO Anja we actually want to sort based on the sortedtimestamp!!!!
         entries.push_back(entry);
 
         unorderedEntries.erase(shardTag);
         return *Find(vs.opnum);
+    }
+
+    void
+    Log::ResortSorted(LogEntry &entry, LogEntryState state)
+    {
+        if (entries.empty())
+        {
+            ASSERT(entry.viewstamp.opnum == start);
+        }
+        else
+        {
+            ASSERT(entry.viewstamp.opnum == LastOpnum() + 1);
+        }
+
+        entry.state = state;
+
+        // TODO Anja we actually want to sort based on the sortedtimestamp!!!!
+        // entries.push_back(entry);
     }
 
     void SetPrepared(LogEntry &entry)

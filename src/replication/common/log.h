@@ -122,14 +122,16 @@ namespace replication
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
         LogEntry *Find(opnum_t opnum);
         // IOCL specifics
-        void AppendUnsorted(const Request &req, PerShardTag t,
+        void AppendUnsorted(const Request &req, uint64_t shardTag,
                             LogEntryState state,
                             uint64_t arrivalTs,
                             std::vector<Successor *> &&successors,
                             std::vector<Predecessor *> &&predecessors,
                             uint64_t acks, uint64_t acks2);
-        LogEntry &FindUnsorted(opnum_t opnum);
         LogEntry &InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag);
+        void ResortSorted(LogEntry &entry, LogEntryState state);
+        LogEntry *FindUnsorted(uint64_t shardTag);
+
         void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);
         bool SetRequest(opnum_t op, const Request &req);

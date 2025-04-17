@@ -66,9 +66,8 @@ namespace replication
             opnum_t lastOp;
             view_t lastRequestStateTransferView;
             opnum_t lastRequestStateTransferOpnum;
-            std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
-                pendingPrepares;
-            proto::PrepareMessage lastPrepare2;
+            std::list<std::pair<TransportAddress *, proto::PrepareMessage>> pendingPrepares;
+            proto::PrepareMessage2 lastPrepare2;
             unsigned int batchSize;
             opnum_t lastBatchEnd2;
             // IOCL specifics
@@ -97,7 +96,7 @@ namespace replication
             Timeout *nullCommitTimeout;
             Timeout *stateTransferTimeout;
             Timeout *resendPrepareTimeout;
-            Timeout *closeBatchTimeout;
+            Timeout *closeBatch2Timeout;
 
             Latency_t rec_to_upcall_lat_;
             Latency_t upcall_to_exec_lat_;
@@ -114,12 +113,14 @@ namespace replication
             void SendNullCommit();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
-            void CloseBatch(uint64_t arrivalts);
+            void CloseBatch2(uint64_t arrivalts);
+            void CloseBatch(uint64_t sortedts);
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
+            // IOCL specifics
             void HandleCoordination(const TransportAddress &remote,
                                     const proto::SuccessorRequestMessage &msg);
 
@@ -133,6 +134,13 @@ namespace replication
                                const proto::PrepareMessage &msg);
             void HandlePrepareOK(const TransportAddress &remote,
                                  const proto::PrepareOKMessage &msg);
+            void HandlePrepare2(const TransportAddress &remote,
+                                const proto::PrepareMessage2 &msg);
+            void HandlePrepareOK2(const TransportAddress &remote,
+                                  const proto::PrepareOKMessage2 &msg);
+            void assignSortedTs(LogEntry &entry, uint64_t shardTag);
+            void addOutstandingPredecessor(::google::protobuf::Message &msg, bool arrival);
+            //
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleRequestStateTransfer(
@@ -146,8 +154,6 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
-            // IOCL specifics
-            uint64_t FoldL(const std::vector<Predecessor *> &predecessors);
         };
 
     } // namespace iocl_ct

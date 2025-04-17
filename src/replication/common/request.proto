@@ -2,11 +2,6 @@ syntax = "proto2";
 
 package replication;
 
-message PerShardTag {
-     required uint64 pid = 1;
-     required uint64 seqno = 2;
-}
-
 message Request {
      required bytes op = 1;
      required uint64 clientid = 2;
