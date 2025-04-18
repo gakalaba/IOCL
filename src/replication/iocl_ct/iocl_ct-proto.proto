@@ -50,16 +50,14 @@ message UnloggedReplyMessage {
 }
 
 message PrepareMessage {
-    required uint64 batchstart = 1;
-    required uint64 shardTag = 2;
-    repeated Request request = 3;
-    repeated uint64 arrivalts = 4;
-
+    repeated Request requests = 1;
+    repeated uint64 shardTags = 2;
+    repeated uint64 arrivalts = 3;
 }
 
 message PrepareOKMessage {
     required uint32 replicaIdx = 1;
-    required uint64 shardTag = 2;
+    repeated uint64 shardTags = 2;
 }
 
 message PrepareMessage2 {

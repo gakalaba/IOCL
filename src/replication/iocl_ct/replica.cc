@@ -72,6 +72,8 @@ namespace replication
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd2 = 0;
+            lastBatchEnd = 0;
+            lastUnsorted = 0;
             lastExecutedTimestamp = 0;
 
             if (batchSize > 1)
@@ -95,7 +97,7 @@ namespace replication
                             { ResendPrepare(); });
             this->closeBatch2Timeout =
                 new Timeout(transport, 300, [this]()
-                            { CloseBatch2(0); });
+                            { CloseBatch2(); });
 
             if (AmLeader())
             {
@@ -355,43 +357,36 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::CloseBatch(uint64_t sortedts)
+        void IOCL_CTReplica::CloseBatch()
         {
             Debug("Inside CloseBatch");
             ASSERT(AmLeader());
-            ASSERT(lastBatchEnd < lastOp);
 
-            opnum_t batchStart = lastBatchEnd + 1;
-
-            RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
-                   batchStart, lastOp);
+            RDebug("Sending batched prepare");
             /* Send prepare messages */
             PrepareMessage p;
-            p.set_batchstart(batchStart);
 
-            for (opnum_t i = batchStart; i <= lastOp; i++)
+            for (const auto &entry_ptr : thebatch)
             {
-                // TODO understand if this already includes the arrivalTS????
-                // cuz if not then we also have to replicate the predlist etc.
-                Request *r = p.add_request();
-                const LogEntry *entry = log.FindUnsorted(i);
-                ASSERT(entry != NULL);
-                *r = entry->request;
+                Request *r = p.add_requests();
+                *r = entry_ptr->request;
                 // add an arrival timestamp for each request we replicate in the first round
-                p.add_arrivalts(entry->arrivalTimestamp);
+                p.add_arrivalts(entry_ptr->arrivalTimestamp);
+                p.add_shardtags(entry_ptr->myShardTag);
+                // TODO ANJA for right now, we're skipping the unordered map on the replicas AND the predecessor list... those are just on the leader???
             }
 
             if (!(transport->SendMessageToAll(this, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
-            lastBatchEnd = lastOp;
 
-            // resendPrepareTimeout->Reset();
-            // closeBatchTimeout->Stop();
+            thebatch.clear();
+
+            resendPrepareTimeout->Reset();
         }
 
-        void IOCL_CTReplica::CloseBatch2(uint64_t arrivalts)
+        void IOCL_CTReplica::CloseBatch2()
         {
             Debug("Inside CloseBatch2");
             ASSERT(AmLeader());
@@ -678,35 +673,26 @@ namespace replication
 
                     RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
-                    /* Add the request to my log */
-                    auto entry = log.Append(v, request, LOG_STATE_PREPARED);
+                    /* Add the request to my log(s) */
+                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
-                    log.ResortSorted(entry, LOG_STATE_READY);
+                    log.AppendSorted(v, LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
+                    log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
 
-                    if (lastOp - lastBatchEnd2 + 1 > batchSize)
-                    {
-
-                        CloseBatch2(arrivalTimestamp);
-                    }
-                    else
-                    {
-                        RDebug("Keeping in batch");
-                        if (!closeBatch2Timeout->Active())
-                        {
-                            closeBatch2Timeout->Start();
-                        }
-                    }
+                    // TODO Anja add batching!
+                    CloseBatch2();
                 }
                 else
                 // Ready to add to unsorted log!
                 {
                     RDebug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    log.AppendUnsorted(request, msg.t(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    auto b = &log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    thebatch.insert(b);
 
-                    if (lastOp - lastBatchEnd + 1 > batchsize)
+                    if (thebatch.size() > batchSize)
                     {
-                        CloseBatch(arrivalTimestamp);
+                        CloseBatch();
                     }
                 }
 
@@ -739,26 +725,11 @@ namespace replication
         void IOCL_CTReplica::HandlePrepare(const TransportAddress &remote,
                                            const PrepareMessage &msg)
         {
-            RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
-                   msg.view(), msg.batchstart(), msg.opnum());
+            RDebug("Received PREPARE");
 
             if (this->status != STATUS_NORMAL)
             {
                 RDebug("Ignoring PREPARE due to abnormal status");
-                return;
-            }
-
-            if (msg.view() < this->view)
-            {
-                RDebug("Ignoring PREPARE due to stale view");
-                return;
-            }
-
-            if (msg.view() > this->view)
-            {
-                RequestStateTransfer();
-                pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
                 return;
             }
 
@@ -767,58 +738,21 @@ namespace replication
                 RPanic("Unexpected PREPARE: I'm the leader of this view");
             }
 
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
-
             viewChangeTimeout->Reset();
-
-            if (msg.opnum() <= this->lastOp)
-            {
-                RDebug("Ignoring PREPARE; already prepared that operation");
-                // Resend the prepareOK message
-                PrepareOKMessage reply;
-                reply.set_view(msg.view());
-                reply.set_opnum(msg.opnum());
-                reply.set_replicaidx(myIdx);
-                if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
-                {
-                    RWarning("Failed to send PrepareOK message to leader");
-                }
-                return;
-            }
-
-            if (msg.batchstart() > this->lastOp + 1)
-            {
-                RequestStateTransfer();
-                pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
-                return;
-            }
-
-            /* Add operations to the log */
-            opnum_t op = msg.batchstart() - 1;
-            for (auto &req : msg.request())
-            {
-                op++;
-                if (op <= lastOp)
-                {
-                    continue;
-                }
-                this->lastOp++;
-
-                // TODO ANJA this is supposed to be ApendUnsorted
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
-                UpdateClientTable(req);
-            }
-            ASSERT(op == msg.opnum());
-
             /* Build reply and send it to the leader */
             PrepareOKMessage reply;
-            reply.set_view(msg.view());
-            reply.set_opnum(msg.opnum());
             reply.set_replicaidx(myIdx);
+
+            /* Add operations to the log */
+            int i;
+            for (auto &req : msg.requests())
+            {
+                log.AppendUnsorted(req, msg.shardtags(i), LOG_STATE_PREPARED, msg.arrivalts(i), std::vector<Successor *>{}, std::vector<Predecessor *>{}, 0, 0);
+                UpdateClientTable(req);
+                reply.add_shardtags(msg.shardtags(i));
+                i++;
+            }
+            ASSERT(i == msg.requests().size());
 
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))
@@ -921,24 +855,12 @@ namespace replication
         void IOCL_CTReplica::HandlePrepareOK(const TransportAddress &remote,
                                              const PrepareOKMessage &msg)
         {
-            RDebug("Received PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
-                   msg.view(), msg.opnum(), msg.replicaidx());
+            RDebug("Received PREPAREOK <%d> from replica %d",
+                   msg.opnum(), msg.replicaidx());
 
             if (this->status != STATUS_NORMAL)
             {
                 RDebug("Ignoring PREPAREOK due to abnormal status");
-                return;
-            }
-
-            if (msg.view() < this->view)
-            {
-                RDebug("Ignoring PREPAREOK due to stale view");
-                return;
-            }
-
-            if (msg.view() > this->view)
-            {
-                RequestStateTransfer();
                 return;
             }
 
@@ -948,7 +870,6 @@ namespace replication
                 return;
             }
 
-            viewstamp_t vs = {msg.view(), msg.opnum()};
             if (auto msgs =
                     (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
             {
@@ -980,29 +901,6 @@ namespace replication
                     {
                         RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
                     }
-                }
-                // the successor list will be deleted after the second round
-
-                // CommitUpTo(msg.opnum());
-
-                // if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                // {
-                //     return;
-                // }
-
-                /*
-                 * Send COMMIT message to the other replicas.
-                 *
-                 * This can be done asynchronously, so it really ought to be
-                 * piggybacked on the next PREPARE or something.
-                 */
-                CommitMessage cm;
-                cm.set_view(this->view);
-                cm.set_opnum(this->lastCommitted);
-
-                if (!(transport->SendMessageToAll(this, cm)))
-                {
-                    RWarning("Failed to send COMMIT message to all replicas");
                 }
 
                 nullCommitTimeout->Reset();

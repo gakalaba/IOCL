@@ -112,6 +112,7 @@ namespace replication
         entry.request = req;
         entry.state = state;
         entry.arrivalTimestamp = arrivalTs;
+        entry.myShardTag = shardTag;
         if (!successors.empty())
         {
             entry.successors = std::move(successors);

@@ -70,6 +70,7 @@ namespace replication
             proto::PrepareMessage2 lastPrepare2;
             unsigned int batchSize;
             opnum_t lastBatchEnd2;
+            std::unordered_set<LogEntry *> thebatch;
             // IOCL specifics
             uint64_t shardTimestamp;
             uint64_t lastExecutedTimestamp;
@@ -113,8 +114,8 @@ namespace replication
             void SendNullCommit();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
-            void CloseBatch2(uint64_t arrivalts);
-            void CloseBatch(uint64_t sortedts);
+            void CloseBatch2();
+            void CloseBatch();
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);

@@ -84,6 +84,7 @@ namespace replication
         // IOCL specifics
         uint64_t arrivalTimestamp;
         uint64_t sortTimestamp;
+        uint64_t myShardTag;
         std::vector<Predecessor *> predecessors;
         std::vector<Successor *> successors;
         uint64_t acks;
