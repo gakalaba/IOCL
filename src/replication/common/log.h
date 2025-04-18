@@ -70,6 +70,7 @@ namespace replication
     {
         uint64_t perShardTag;
         uint64_t shardId;
+        uint64_t predIdx;
     };
 
     struct LogEntry
@@ -134,6 +135,7 @@ namespace replication
         LogEntry &AppendSorted(viewstamp_t vs, LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
+        bool InSorted(uint64_t shardTag);
         LogEntry &ResortSorted(viewstamp_t vs, LogEntryState state,
                                uint64_t shardTag, uint64_t finalSortedTs);
 

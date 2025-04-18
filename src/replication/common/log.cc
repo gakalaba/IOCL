@@ -141,7 +141,14 @@ namespace replication
 
     LogEntry *Log::FindUnsorted(uint64_t shardTag)
     {
-        return &(unorderedEntries[shardTag]);
+        if (unorderedEntries.find(shardTag) != unorderedEntries.end())
+        {
+            return &(unorderedEntries[shardTag]);
+        }
+        else
+        {
+            return NULL;
+        }
     }
 
     /************** Sorted Log ***************/
@@ -171,12 +178,27 @@ namespace replication
         auto it = findByFirst(sortedLog, shardTag);
         if (it != sortedLog.end())
         {
-            return FindUnsorted(shardTag);
+            auto retval = FindUnsorted(shardTag);
+            ASSERT(retval != NULL);
+            return retval;
         }
         else
         {
             Debug("didn't find it in the sorted log!");
             return NULL;
+        }
+    }
+
+    bool Log::InSorted(uint64_t shardTag)
+    {
+        auto it = findByFirst(sortedLog, shardTag);
+        if (it != sortedLog.end())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
 

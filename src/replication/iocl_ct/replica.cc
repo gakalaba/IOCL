@@ -761,6 +761,64 @@ namespace replication
             }
         }
 
+        void IOCL_CTReplica::HandlePrepareOK(const TransportAddress &remote,
+                                             const PrepareOKMessage &msg)
+        {
+            RDebug("Received PREPAREOK from replica %d",
+                   msg.replicaidx());
+
+            if (this->status != STATUS_NORMAL)
+            {
+                RDebug("Ignoring PREPAREOK due to abnormal status");
+                return;
+            }
+
+            if (!AmLeader())
+            {
+                RWarning("Ignoring PREPAREOK because I'm not the leader");
+                return;
+            }
+
+            PredecessorReplyMessage a;
+            if (auto msgs =
+                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+            {
+                /*
+                 * We have a quorum of PrepareOK messages for this
+                 * batch.
+                 *
+                 *
+                 * Loop through the batch
+                 *
+                 * Mark the entries as replicated
+                 *
+                 * any of the ones that are replicated AND coordinated:
+                 * call appropriate helpers
+                 */
+                // TODO Anja think about fast path here....
+                for (auto &shardTag : msg.shardtags())
+                {
+                    auto entry = log.FindUnsorted(shardTag);
+                    log.SetPrepared(*entry);
+
+                    /* Send PredecessorReply messages to the other replicas */
+                    a.set_arrivalts(entry->arrivalTimestamp);
+                    a.set_p(shardTag);
+                    for (auto it = entry->successors.begin(); it != entry->successors.end(); it++)
+                    {
+                        a.set_s((*it)->perShardTag);
+                        // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
+                        if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
+                        {
+                            RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
+                        }
+                    }
+                }
+
+                nullCommitTimeout->Reset();
+            }
+        }
+
         void IOCL_CTReplica::HandlePrepare2(const TransportAddress &remote,
                                             const PrepareMessage2 &msg)
         {
@@ -849,61 +907,6 @@ namespace replication
                     this, configuration.GetLeaderIndex(view), reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
-            }
-        }
-
-        void IOCL_CTReplica::HandlePrepareOK(const TransportAddress &remote,
-                                             const PrepareOKMessage &msg)
-        {
-            RDebug("Received PREPAREOK <%d> from replica %d",
-                   msg.opnum(), msg.replicaidx());
-
-            if (this->status != STATUS_NORMAL)
-            {
-                RDebug("Ignoring PREPAREOK due to abnormal status");
-                return;
-            }
-
-            if (!AmLeader())
-            {
-                RWarning("Ignoring PREPAREOK because I'm not the leader");
-                return;
-            }
-
-            if (auto msgs =
-                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
-            {
-                /*
-                 * We have a quorum of PrepareOK messages for this
-                 * opnumber.
-                 *
-                 *
-                 * SendArrivalACK messages to the successors
-                 *
-                 * Execute it and all previous operations.
-                 *
-                 * (Note that we might have already executed it. That's fine,
-                 * we just won't do anything.)
-                 *
-                 * This also notifies the client of the result.
-                 */
-                auto entry = log.FindUnsorted(msg.shardtag());
-
-                log.SetPrepared(*entry);
-                /* Send PredecessorReply messages to the other replicas */
-                PredecessorReplyMessage a;
-                a.set_arrivalts(arrival_ts);
-                for (auto it = entry->successors.begin(); it != entry->successors.end(); it++)
-                {
-                    a.set_s((*it)->perShardTag);
-                    // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
-                    if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
-                    {
-                        RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
-                    }
-                }
-
-                nullCommitTimeout->Reset();
             }
         }
 
@@ -1028,42 +1031,41 @@ namespace replication
         {
             ASSERT(AmLeader());
             LogEntry *entry = log.FindUnsorted(msg.p());
+            bool inSorted = log.InSorted(msg.p());
             PredecessorReplyMessage a;
             a.set_p(msg.p());
             a.set_s(msg.s());
             a.set_predidx(msg.predidx());
-            Successor *s = new Successor{msg.s(), msg.shardidx()};
+            Successor *s = new Successor{msg.s(), msg.shardidx(), msg.predidx()};
 
-            if (!entry)
+            if (inSorted)
             {
-                entry = Find(msg.p());
-                if (!entry)
+                // Entry is in the sorted log already
+                // Have already sent sortedTs to successors, there is no successor list anymore
+                // This is probably a late successor
+                // Fast path to second round
+                // Send sortedTs to this successor
+                ASSERT(entry->state == LOG_STATE_ASSIGNED || entry->state == LOG_STATE_READY || entry->state == LOG_STATE_COMMITTED);
+                PredecessorReplyMessage2 aa;
+                aa.set_p(msg.p());
+                aa.set_s(msg.s());
+                aa.set_predidx(msg.predidx());
+                aa.set_sortedts(entry->sortTimestamp);
+                aa.set_shardidx(groupIdx);
+                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, aa)))
                 {
-                    // If the request isn't there yet, add it to the outstandingSuccessors map
-                    // Add this successor for the next round of timestamp replies
-                    outstandingSuccessors[msg.p()].push_back(s);
-                }
-                else
-                {
-                    // Entry is in the sorted log already
-                    // Have already sent sortedTs to successors, there is no successor list anymore
-                    // This is probably a late successor
-                    // Fast path to second round
-                    // Send sortedTs to this successor
-                    PredecessorReplyMessage2 aa;
-                    aa.set_p(msg.p());
-                    aa.set_s(msg.s());
-                    aa.set_predidx(msg.predidx());
-                    aa.set_sortedts(entry->sortTimestamp);
-                    aa.set_shardidx(groupIdx);
-                    if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, aa)))
-                    {
-                        RWarning("Failed to send PredecessorReplyMessage2 from HandleCoordination");
-                    }
+                    RWarning("Failed to send PredecessorReplyMessage2 from HandleCoordination");
                 }
             }
-            else
+            else if (!inSorted && !entry)
             {
+                // If the request isn't there yet, add it to the outstandingSuccessors map
+                // Add this successor for the next round of timestamp replies
+                outstandingSuccessors[msg.p()].push_back(s);
+            }
+            else if (!inSorted && entry)
+            {
+                ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
                 a.set_arrivalts(entry->arrivalTimestamp);
                 a.set_shardidx(groupIdx);
                 // Add this successor for the next round of timestamp replies
@@ -1086,31 +1088,36 @@ namespace replication
             ASSERT(AmLeader());
             // The entry should be in the unsorted log
             LogEntry *entry = log.FindUnsorted(msg.s());
-            if (!entry)
+            bool inSorted = log.InSorted(msg.s());
+            if (inSorted)
             {
-                entry = Find(??);
-                if (!entry)
-                {
-                    IOCL_CTReplica::addOutstandingPredecessor(msg);
-                }
-                // else
+                ASSERT(entry->state == LOG_STATE_ASSIGNED || entry->state == LOG_STATE_READY || entry->state == LOG_STATE_COMMITTED);
                 // This request is in the sorted log... so it doesn't really need this response
                 return;
             }
-            // entry is in the unsorted log!
-            if (entry->predecessors[msg.predidx()]->arrivalTimestamp != -1 && entry->predecessors[msg.predidx()]->sortedTimestamp == -1)
+            else if (!inSorted && !entry)
             {
-                Panic("Duplicate arrival timestamp for this predecessor");
+                IOCL_CTReplica::addOutstandingPredecessor(msg);
             }
-            // Set the arrival timestamp
-            entry->predecessors[msg.predidx()]->arrivalTimestamp = msg.arrivalts();
-            entry->acks++;
-
-            // If this is the nth predecessor ACK, compute a new timestamp
-            if (entry->acks == entry->predecessors.size())
+            else if (!inSorted && entry)
             {
-                // Step 2.
-                IOCL_CTReplica::assignSortedTs(*entry, msg.s());
+                ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
+
+                // entry is in the unsorted log!
+                if (entry->predecessors[msg.predidx()]->arrivalTimestamp != -1 && entry->predecessors[msg.predidx()]->sortedTimestamp == -1)
+                {
+                    Panic("Duplicate arrival timestamp for this predecessor");
+                }
+                // Set the arrival timestamp
+                entry->predecessors[msg.predidx()]->arrivalTimestamp = msg.arrivalts();
+                entry->acks++;
+
+                // If this is the nth predecessor ACK, compute a new timestamp
+                if (entry->acks == entry->predecessors.size())
+                {
+                    // Step 2.
+                    IOCL_CTReplica::assignSortedTs(*entry, msg.s());
+                }
             }
         }
 
@@ -1120,29 +1127,30 @@ namespace replication
             ASSERT(AmLeader());
             // This could be ariving for an entry that never came yet or for an entry that never got the first round ACK!
             LogEntry *entry = log.FindUnsorted(msg.s());
-            if (!entry)
+            bool inSorted = log.InSorted(msg.p());
+            if (inSorted)
             {
-                entry = Find(??);
-                if (!entry)
+                ASSERT(entry->state == LOG_STATE_ASSIGNED || entry->state == LOG_STATE_READY || entry->state == LOG_STATE_COMMITTED);
+
+                // Entry is in the sorted log!
+                entry->acks2++;
+                entry->predecessors[msg.predidx()]->sortedTimestamp = msg.sortedts();
+                if (entry->acks2 == entry->predecessors.size())
                 {
-                    IOCL_CTReplica::addOutstandingPredecessor2(msg);
-                }
-                else
-                {
-                    // Entry is in the sorted log!
-                    entry->acks2++;
-                    entry->predecessors[msg.predidx()]->sortedTimestamp = msg.sortedts();
-                    if (entry->acks2 == entry->predecessors.size())
-                    {
-                        // Step 3.
-                        entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastExecutedTimestamp);
-                        log.ResortSorted(*entry, LOG_STATE_READY);
-                        CloseBatch2();
-                    }
+                    // Step 3.
+                    entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastExecutedTimestamp);
+                    log.ResortSorted(entry->viewstamp, LOG_STATE_READY, msg.s(), entry->sortTimestamp);
+                    CloseBatch2();
                 }
             }
-            else
+            else if (!inSorted && !entry)
             {
+                IOCL_CTReplica::addOutstandingPredecessor2(msg);
+            }
+            else if (!inSorted && entry)
+            {
+                ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
+
                 // Entry is in the unsorted map... probably has been replicated...
                 // Set the arrival timestamp
                 entry->predecessors[msg.predidx()]->sortedTimestamp = msg.sortedts();
@@ -1166,7 +1174,7 @@ namespace replication
                 {
                     // Step 3.
                     entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastExecutedTimestamp);
-                    log.ResortSorted(*entry, LOG_STATE_READY);
+                    log.ResortSorted(entry->viewstamp, LOG_STATE_READY, msg.s(), entry->sortTimestamp);
                     CloseBatch2();
                 }
             }
@@ -1181,15 +1189,15 @@ namespace replication
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
-            log.InsertSortedFromUnsorted(v, entry, LOG_STATE_ASSIGNED, shardTag);
+            log.AppendSorted(v, LOG_STATE_ASSIGNED, shardTag, entry.sortTimestamp);
             // Send ACK to all successors
             PredecessorReplyMessage2 aa;
             aa.set_p(shardTag);
-            aa.set_predidx(??); // TODO ANJA is this right???
             aa.set_sortedts(entry.sortTimestamp);
             for (auto it = entry.successors.begin(); it != entry.successors.end(); it++)
             {
                 aa.set_s((*it)->perShardTag);
+                aa.set_predidx((*it)->predIdx); // TODO ANJA is this right???
                 // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
                 if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, aa)))
                 {
@@ -1228,8 +1236,6 @@ namespace replication
                 {
                     // This is the second ACK from the same predecessor for this successor
                     Panic("why are we getting duplicate acks from the same pred to the same coord for arrival of Ack%d", 1);
-                    // preds_map[msg.predIdx()].sortedTimestamp = sortedTs;
-                    // preds_map[msg.predIdx()].arrivalTimestamp = arrivalTs;
                 }
                 else
                 {
@@ -1262,8 +1268,6 @@ namespace replication
                 {
                     // This is the second ACK from the same predecessor for this successor
                     Panic("why are we getting duplicate acks from the same pred to the same coord for arrival of Ack%d", 2);
-                    // preds_map[msg.predIdx()].sortedTimestamp = sortedTs;
-                    // preds_map[msg.predIdx()].arrivalTimestamp = arrivalTs;
                 }
                 else
                 {
