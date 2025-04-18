@@ -136,28 +136,28 @@ namespace replication
         return entry;
     }
 
-    LogEntry *
-    Log::Find(??)
-    {
-        if (entries.empty())
-        {
-            return NULL;
-        }
+    // LogEntry *
+    // Log::Find(uint64_t opnum)
+    // {
+    //     if (entries.empty())
+    //     {
+    //         return NULL;
+    //     }
 
-        if (opnum < start)
-        {
-            return NULL;
-        }
+    //     if (opnum < start)
+    //     {
+    //         return NULL;
+    //     }
 
-        if (opnum - start > entries.size() - 1)
-        {
-            return NULL;
-        }
+    //     if (opnum - start > entries.size() - 1)
+    //     {
+    //         return NULL;
+    //     }
 
-        LogEntry *entry = &entries[opnum - start];
-        ASSERT(entry->viewstamp.opnum == opnum);
-        return entry;
-    }
+    //     LogEntry *entry = &entries[opnum - start];
+    //     ASSERT(entry->viewstamp.opnum == opnum);
+    //     return entry;
+    // }
 
     LogEntry &
     Log::InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag)

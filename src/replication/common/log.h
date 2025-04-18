@@ -121,6 +121,7 @@ namespace replication
         Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
         LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
         LogEntry *Find(opnum_t opnum);
+        // LogEntry *Find(uint64_t opnum);
         // IOCL specifics
         void AppendUnsorted(const Request &req, uint64_t shardTag,
                             LogEntryState state,

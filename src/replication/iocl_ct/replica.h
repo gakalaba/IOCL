@@ -139,7 +139,10 @@ namespace replication
             void HandlePrepareOK2(const TransportAddress &remote,
                                   const proto::PrepareOKMessage2 &msg);
             void assignSortedTs(LogEntry &entry, uint64_t shardTag);
-            void addOutstandingPredecessor(::google::protobuf::Message &msg, bool arrival);
+            // void addOutstandingPredecessor(const google::protobuf::Message &msg, bool arrival);
+            void addOutstandingPredecessor(const proto::PredecessorReplyMessage &msg);
+            void addOutstandingPredecessor2(const proto::PredecessorReplyMessage2 &msg);
+            // void sendMessageToSuccessorList(std::vector<replication::Successor *> &successors, google::protobuf::Message &msg);
             //
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);

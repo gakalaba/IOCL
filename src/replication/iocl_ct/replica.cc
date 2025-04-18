@@ -215,7 +215,7 @@ namespace replication
                 ASSERT(entry->state == LOG_STATE_PREPARED);
                 UpdateClientTable(entry->request);
 
-                PrepareOKMessage reply;
+                PrepareOKMessage2 reply;
                 reply.set_view(view);
                 reply.set_opnum(i);
                 reply.set_replicaidx(myIdx);
@@ -827,6 +827,97 @@ namespace replication
             }
         }
 
+        void IOCL_CTReplica::HandlePrepare2(const TransportAddress &remote,
+                                            const PrepareMessage2 &msg)
+        {
+            RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
+                   msg.view(), msg.batchstart(), msg.opnum());
+
+            if (this->status != STATUS_NORMAL)
+            {
+                RDebug("Ignoring PREPARE due to abnormal status");
+                return;
+            }
+
+            if (msg.view() < this->view)
+            {
+                RDebug("Ignoring PREPARE due to stale view");
+                return;
+            }
+
+            if (msg.view() > this->view)
+            {
+                RequestStateTransfer();
+                pendingPrepares.push_back(
+                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+                return;
+            }
+
+            if (AmLeader())
+            {
+                RPanic("Unexpected PREPARE: I'm the leader of this view");
+            }
+
+            ASSERT(msg.batchstart() <= msg.opnum());
+            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
+                   (unsigned int)msg.request_size());
+
+            viewChangeTimeout->Reset();
+
+            if (msg.opnum() <= this->lastOp)
+            {
+                RDebug("Ignoring PREPARE; already prepared that operation");
+                // Resend the prepareOK message
+                PrepareOKMessage reply;
+                reply.set_view(msg.view());
+                reply.set_opnum(msg.opnum());
+                reply.set_replicaidx(myIdx);
+                if (!(transport->SendMessageToReplica(
+                        this, configuration.GetLeaderIndex(view), reply)))
+                {
+                    RWarning("Failed to send PrepareOK message to leader");
+                }
+                return;
+            }
+
+            if (msg.batchstart() > this->lastOp + 1)
+            {
+                RequestStateTransfer();
+                pendingPrepares.push_back(
+                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+                return;
+            }
+
+            /* Add operations to the log */
+            opnum_t op = msg.batchstart() - 1;
+            for (auto &req : msg.request())
+            {
+                op++;
+                if (op <= lastOp)
+                {
+                    continue;
+                }
+                this->lastOp++;
+
+                // TODO ANJA this is supposed to be ApendUnsorted
+                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                UpdateClientTable(req);
+            }
+            ASSERT(op == msg.opnum());
+
+            /* Build reply and send it to the leader */
+            PrepareOKMessage reply;
+            reply.set_view(msg.view());
+            reply.set_opnum(msg.opnum());
+            reply.set_replicaidx(myIdx);
+
+            if (!(transport->SendMessageToReplica(
+                    this, configuration.GetLeaderIndex(view), reply)))
+            {
+                RWarning("Failed to send PrepareOK message to leader");
+            }
+        }
+
         void IOCL_CTReplica::HandlePrepareOK(const TransportAddress &remote,
                                              const PrepareOKMessage &msg)
         {
@@ -881,9 +972,14 @@ namespace replication
                 /* Send PredecessorReply messages to the other replicas */
                 PredecessorReplyMessage a;
                 a.set_arrivalts(arrival_ts);
-                if (!(transport->SendMessageToSuccessorList(this, a, entry->successors)))
+                for (auto it = entry->successors.begin(); it != entry->successors.end(); it++)
                 {
-                    RWarning("Failed to send prepare message to all replicas");
+                    a.set_s((*it)->perShardTag);
+                    // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
+                    if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
+                    {
+                        RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
+                    }
                 }
                 // the successor list will be deleted after the second round
 
@@ -1097,7 +1193,7 @@ namespace replication
                 entry = Find(??);
                 if (!entry)
                 {
-                    IOCL_CTReplica::addOutstandingPredecessor(msg, true);
+                    IOCL_CTReplica::addOutstandingPredecessor(msg);
                 }
                 // else
                 // This request is in the sorted log... so it doesn't really need this response
@@ -1131,7 +1227,7 @@ namespace replication
                 entry = Find(??);
                 if (!entry)
                 {
-                    IOCL_CTReplica::addOutstandingPredecessor(msg, false);
+                    IOCL_CTReplica::addOutstandingPredecessor2(msg);
                 }
                 else
                 {
@@ -1190,8 +1286,8 @@ namespace replication
             log.InsertSortedFromUnsorted(v, entry, LOG_STATE_ASSIGNED, shardTag);
             // Send ACK to all successors
             PredecessorReplyMessage2 aa;
-            aa.set_p(msg.p());
-            aa.set_predidx(msg.predidx()); // TODO ANJA is this right???
+            aa.set_p(shardTag);
+            aa.set_predidx(??); // TODO ANJA is this right???
             aa.set_sortedts(entry.sortTimestamp);
             for (auto it = entry.successors.begin(); it != entry.successors.end(); it++)
             {
@@ -1207,35 +1303,82 @@ namespace replication
             // delete entry.successors;
         }
 
-        void IOCL_CTReplica::addOutstandingPredecessor(::google::protobuf::Message &msg, bool arrival)
+        // void IOCL_CTReplica::sendMessageToSuccessorList(std::vector<replication::Successor *> &successors, google::protobuf::Message &msg)
+        // {
+        //     for (auto it = successors.begin(); it != successors.end(); it++)
+        //     {
+        //         msg.set_s((*it)->perShardTag);
+        //         // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
+        //         if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
+        //         {
+        //             RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
+        //         }
+        //     }
+        // }
+
+        void IOCL_CTReplica::addOutstandingPredecessor(const proto::PredecessorReplyMessage &msg)
         {
-            auto arrivalTs = arrival ? msg.arrivalts() : -1;
-            auto sortedTs = arrival ? msg.sortedts() : -1;
+            auto arrivalTs = msg.arrivalts();
+            auto sortedTs = -1;
             auto preds_map = outstandingPredecessors.find(msg.s());
             if (preds_map != outstandingPredecessors.end())
             {
                 // The outstandingPredecessors map has an entry for this successor
                 // so *some* predecessor to this yet unarrived successor has already replied
-                auto thisp = preds_map[msg.predidx()];
-                if (thisp != preds_map.end())
+                auto thisp = preds_map->second.find(msg.predidx());
+                if (thisp != (preds_map->second).end())
                 {
                     // This is the second ACK from the same predecessor for this successor
-                    Panic("why are we getting duplicate acks from the same pred to the same coord for arrival of Ack%d", int(arrival) + 1);
+                    Panic("why are we getting duplicate acks from the same pred to the same coord for arrival of Ack%d", 1);
                     // preds_map[msg.predIdx()].sortedTimestamp = sortedTs;
                     // preds_map[msg.predIdx()].arrivalTimestamp = arrivalTs;
                 }
                 else
                 {
                     // This is the first time this predecessor ACKd
-                    Predecessor *newp = new Predecessor{msg.p(), msg.shardIdx(), arrivalTs, sortedTs};
-                    preds_map[msg.predIdx()] = newp;
+                    Predecessor *newp = new Predecessor{msg.p(), msg.shardidx(), arrivalTs, sortedTs};
+                    preds_map->second[msg.predidx()] = newp;
                 }
             }
             else
             {
                 // The outstandingPredecessors map doesn't have an entry for this successor at all
                 std::unordered_map<uint64_t, replication::Predecessor *> m;
-                Predecessor *newp = new Predecessor{msg.p(), msg.shardIdx(), arrivalTs, sortedTs};
+                Predecessor *newp = new Predecessor{msg.p(), msg.shardidx(), arrivalTs, sortedTs};
+                m[msg.predidx()] = newp;
+                outstandingPredecessors[msg.s()] = m;
+            }
+        }
+
+        void IOCL_CTReplica::addOutstandingPredecessor2(const proto::PredecessorReplyMessage2 &msg)
+        {
+            auto arrivalTs = -1;
+            auto sortedTs = msg.sortedts();
+            auto preds_map = outstandingPredecessors.find(msg.s());
+            if (preds_map != outstandingPredecessors.end())
+            {
+                // The outstandingPredecessors map has an entry for this successor
+                // so *some* predecessor to this yet unarrived successor has already replied
+                auto thisp = preds_map->second.find(msg.predidx());
+                if (thisp != preds_map->second.end())
+                {
+                    // This is the second ACK from the same predecessor for this successor
+                    Panic("why are we getting duplicate acks from the same pred to the same coord for arrival of Ack%d", 2);
+                    // preds_map[msg.predIdx()].sortedTimestamp = sortedTs;
+                    // preds_map[msg.predIdx()].arrivalTimestamp = arrivalTs;
+                }
+                else
+                {
+                    // This is the first time this predecessor ACKd
+                    Predecessor *newp = new Predecessor{msg.p(), msg.shardidx(), arrivalTs, sortedTs};
+                    preds_map->second[msg.predidx()] = newp;
+                }
+            }
+            else
+            {
+                // The outstandingPredecessors map doesn't have an entry for this successor at all
+                std::unordered_map<uint64_t, replication::Predecessor *> m;
+                Predecessor *newp = new Predecessor{msg.p(), msg.shardidx(), arrivalTs, sortedTs};
                 m[msg.predidx()] = newp;
                 outstandingPredecessors[msg.s()] = m;
             }
