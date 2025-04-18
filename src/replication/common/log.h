@@ -123,15 +123,18 @@ namespace replication
         LogEntry *Find(opnum_t opnum);
         // LogEntry *Find(uint64_t opnum);
         // IOCL specifics
-        void AppendUnsorted(const Request &req, uint64_t shardTag,
-                            LogEntryState state,
-                            uint64_t arrivalTs,
-                            std::vector<Successor *> &&successors,
-                            std::vector<Predecessor *> &&predecessors,
-                            uint64_t acks, uint64_t acks2);
-        LogEntry &InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag);
-        void ResortSorted(LogEntry &entry, LogEntryState state);
+        LogEntry &AppendUnsorted(const Request &req, uint64_t shardTag,
+                                 LogEntryState state,
+                                 uint64_t arrivalTs,
+                                 std::vector<Successor *> &&successors,
+                                 std::vector<Predecessor *> &&predecessors,
+                                 uint64_t acks, uint64_t acks2);
         LogEntry *FindUnsorted(uint64_t shardTag);
+        LogEntry &AppendSorted(viewstamp_t vs, LogEntryState state,
+                               uint64_t shardTag, uint64_t sortedTs);
+        LogEntry *FindSorted(uint64_t shardTag);
+        LogEntry &ResortSorted(viewstamp_t vs, LogEntryState state,
+                               uint64_t shardTag, uint64_t finalSortedTs);
 
         void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);
@@ -158,6 +161,53 @@ namespace replication
         bool useHash;
         // IOCL specifics
         // .find(), .end(), .insert(), .erase()
+        struct CompareBySecond
+        {
+            bool operator()(const std::tuple<uint64_t, uint64_t> &a, const std::tuple<uint64_t, uint64_t> &b) const
+            {
+                Debug("hi! we're comparing by the sortedTimestamps wahoo");
+                return std::get<1>(a) < std::get<1>(b);
+            }
+        };
+
+        bool deleteByFirst(std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> &s, uint64_t firstElement)
+        {
+            // Create a tuple with the first element you want to search for and a placeholder for the second
+            std::tuple<uint64_t, uint64_t> keyToFind = {firstElement, 0}; // The second element doesn't matter
+
+            // Use lower_bound to find the first element greater than or equal to the key
+            auto it = s.lower_bound(keyToFind);
+
+            // Check if the iterator points to a valid element and if the first element matches
+            if (it != s.end() && std::get<0>(*it) == firstElement)
+            {
+                s.erase(it); // Erase the element from the set
+                return true; // Successfully erased
+            }
+
+            return false; // Element not found
+        };
+
+        std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond>::iterator findByFirst(
+            std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> &s, uint64_t firstElement)
+        {
+
+            // Create a tuple with the first element you want to search for and a placeholder for the second
+            std::tuple<uint64_t, uint64_t> keyToFind = {firstElement, 0}; // The second element doesn't matter
+
+            // Use lower_bound to find the first element greater than or equal to the key
+            auto it = s.lower_bound(keyToFind);
+
+            // Check if the iterator points to a valid element and if the first element matches
+            if (it != s.end() && std::get<0>(*it) == firstElement)
+            {
+                return it; // Found the element
+            }
+
+            return s.end(); // Not found
+        };
+
+        std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> sortedLog; // tuple<tag, sortedTs>
         std::unordered_map<uint64_t, LogEntry> unorderedEntries;
     };
 

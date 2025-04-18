@@ -50,6 +50,7 @@ namespace replication
         }
     }
 
+    /**************** Old Log ****************/
     LogEntry &
     Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     {
@@ -75,7 +76,32 @@ namespace replication
         return *Find(vs.opnum);
     }
 
-    void
+    // This really ought to be const
+    LogEntry *
+    Log::Find(opnum_t opnum)
+    {
+        if (entries.empty())
+        {
+            return NULL;
+        }
+
+        if (opnum < start)
+        {
+            return NULL;
+        }
+
+        if (opnum - start > entries.size() - 1)
+        {
+            return NULL;
+        }
+
+        LogEntry *entry = &entries[opnum - start];
+        ASSERT(entry->viewstamp.opnum == opnum);
+        return entry;
+    }
+
+    /************** Unordered Log ****************/
+    LogEntry &
     Log::AppendUnsorted(const Request &req, uint64_t shardTag, LogEntryState state,
                         uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
@@ -105,6 +131,11 @@ namespace replication
         entry.acks2 = acks2;
 
         unorderedEntries[shardTag] = entry;
+        return *FindUnsorted(shardTag);
+
+        // unorderedEntries.push_back(entry);
+
+        // TagToUnorderedIdx[shardTag] = unorderedEntries.size() - 1;
     }
 
     LogEntry *Log::FindUnsorted(uint64_t shardTag)
@@ -112,57 +143,11 @@ namespace replication
         return &(unorderedEntries[shardTag]);
     }
 
-    // This really ought to be const
-    LogEntry *
-    Log::Find(opnum_t opnum)
-    {
-        if (entries.empty())
-        {
-            return NULL;
-        }
-
-        if (opnum < start)
-        {
-            return NULL;
-        }
-
-        if (opnum - start > entries.size() - 1)
-        {
-            return NULL;
-        }
-
-        LogEntry *entry = &entries[opnum - start];
-        ASSERT(entry->viewstamp.opnum == opnum);
-        return entry;
-    }
-
-    // LogEntry *
-    // Log::Find(uint64_t opnum)
-    // {
-    //     if (entries.empty())
-    //     {
-    //         return NULL;
-    //     }
-
-    //     if (opnum < start)
-    //     {
-    //         return NULL;
-    //     }
-
-    //     if (opnum - start > entries.size() - 1)
-    //     {
-    //         return NULL;
-    //     }
-
-    //     LogEntry *entry = &entries[opnum - start];
-    //     ASSERT(entry->viewstamp.opnum == opnum);
-    //     return entry;
-    // }
-
+    /************** Sorted Log ***************/
     LogEntry &
-    Log::InsertSortedFromUnsorted(viewstamp_t vs, LogEntry &entry, LogEntryState state, uint64_t shardTag)
+    Log::AppendSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t sortedTs)
     {
-        if (entries.empty())
+        if (sortedLog.empty())
         {
             ASSERT(vs.opnum == start);
         }
@@ -170,33 +155,42 @@ namespace replication
         {
             ASSERT(vs.opnum == LastOpnum() + 1);
         }
+        auto entry = unorderedEntries[shardTag];
 
         entry.viewstamp = vs;
         entry.state = state;
-
-        // TODO Anja we actually want to sort based on the sortedtimestamp!!!!
-        entries.push_back(entry);
-
-        unorderedEntries.erase(shardTag);
-        return *Find(vs.opnum);
+        entry.sortTimestamp = sortedTs;
+        sortedLog.insert({shardTag, sortedTs});
+        return *FindUnsorted(shardTag);
     }
 
-    void
-    Log::ResortSorted(LogEntry &entry, LogEntryState state)
+    LogEntry *
+    Log::FindSorted(uint64_t shardTag)
     {
-        if (entries.empty())
+        auto it = findByFirst(sortedLog, shardTag);
+        if (it != sortedLog.end())
         {
-            ASSERT(entry.viewstamp.opnum == start);
+            return FindUnsorted(shardTag);
         }
         else
         {
-            ASSERT(entry.viewstamp.opnum == LastOpnum() + 1);
+            Debug("didn't find it in the sorted log!");
+            return NULL;
         }
+    }
 
-        entry.state = state;
+    LogEntry &
+    Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t finalSortedTs)
+    {
+        // Remove this tag from the sorted log
+        bool deleted = deleteByFirst(sortedLog, shardTag);
+        if (!deleted)
+        {
+            Panic("Couldn't resort the entry -- couldn't delete it with old sort timestamp");
+        }
+        auto entry = unorderedEntries[shardTag];
 
-        // TODO Anja we actually want to sort based on the sortedtimestamp!!!!
-        // entries.push_back(entry);
+        return AppendSorted(vs, state, shardTag, finalSortedTs);
     }
 
     void SetPrepared(LogEntry &entry)
