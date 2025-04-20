@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.10)
 project(IOCL_Python LANGUAGES CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Set RPATH properties
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 # Find Python development headers
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
@@ -30,7 +35,7 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
 file(GLOB SourceFiles "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
 
 # Create a library for the Python module
-add_library(iocl_python_lib ${SourceFiles} ${PROTO_SRCS} ${PROTO_HDRS})
+add_library(iocl_python_lib ${SourceFiles} ${PROTO_SRCS}) # Include PROTO_SRCS here
 
 # Include additional project directories
 target_include_directories(iocl_python_lib PRIVATE
@@ -42,13 +47,12 @@ target_include_directories(iocl_python_lib PRIVATE
     ${CMAKE_SOURCE_DIR}/store/benchmark/async 
     ${CMAKE_SOURCE_DIR}/store/common
     ${CMAKE_SOURCE_DIR}/store/common/frontend
+    ${PROTO_HDRS} # Include generated headers for the library
 )
 
 # Create the Python module
 pybind11_add_module(redisstorepython 
     binding.cc 
-    ${PROTO_SRCS} 
-    ${PROTO_HDRS}
 )
 
 # Link libraries
@@ -59,6 +63,8 @@ target_link_libraries(redisstorepython PRIVATE
     rss
     Common
     StoreCommon
+    BenchmarkMicro
+    BenchmarkAsync
 )
 
 # Ensure include directories are set for the Python module
@@ -69,4 +75,5 @@ target_include_directories(redisstorepython PRIVATE
     ${CMAKE_SOURCE_DIR}/store/benchmark/async  # Add this line
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}
+${PROTO_HDRS} # Include generated headers for the library
 )
