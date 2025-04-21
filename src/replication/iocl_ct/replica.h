@@ -70,7 +70,10 @@ namespace replication
             proto::PrepareMessage2 lastPrepare2;
             unsigned int batchSize;
             opnum_t lastBatchEnd2;
-            std::unordered_set<LogEntry *> thebatch;
+            // maps lastBatchId to a tuple of <acks, set of pointers to entries>
+            std::unordered_map<int, std::tuple<int, std::unordered_set<LogEntry *>>> thebatchs;
+            int lastBatch;
+            int lastBatchEnd;
             // IOCL specifics
             uint64_t shardTimestamp;
             uint64_t lastExecutedTimestamp;

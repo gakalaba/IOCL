@@ -72,9 +72,9 @@ namespace replication
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd2 = 0;
-            lastBatchEnd = 0;
-            lastUnsorted = 0;
             lastExecutedTimestamp = 0;
+            lastBatch = 0;
+            lastBatchEnd = 0;
 
             if (batchSize > 1)
             {
@@ -361,12 +361,16 @@ namespace replication
         {
             Debug("Inside CloseBatch");
             ASSERT(AmLeader());
+            ASSERT(lastBatchEnd < lastBatch);
+            auto s = std::get<1>(thebatchs[lastBatchEnd]);
+            ASSERT(s.size() == batchSize);
 
             RDebug("Sending batched prepare");
             /* Send prepare messages */
             PrepareMessage p;
+            p.set_batchid(lastBatchEnd);
 
-            for (const auto &entry_ptr : thebatch)
+            for (const auto &entry_ptr : s)
             {
                 Request *r = p.add_requests();
                 *r = entry_ptr->request;
@@ -380,8 +384,7 @@ namespace replication
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
-
-            thebatch.clear();
+            lastBatchEnd = lastBatch;
 
             resendPrepareTimeout->Reset();
         }
@@ -406,7 +409,7 @@ namespace replication
             {
                 // TODO understand if this already includes the arrivalTS????
                 // cuz if not then we also have to replicate the predlist etc.
-                Request *r = p2.add_request();
+                Request *r = p2.add_requests();
                 const LogEntry *entry = log.Find(i);
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
@@ -687,11 +690,21 @@ namespace replication
                 {
                     RDebug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    auto b = &log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
-                    thebatch.insert(b);
-
-                    if (thebatch.size() > batchSize)
+                    lastBatch++;
+                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    if (lastBatch - lastBatchEnd + 1 > batchSize)
                     {
+                        if (thebatchs.find(lastBatchEnd) != thebatchs.end())
+                        {
+                            auto t = thebatchs[lastBatchEnd];
+                            std::get<1>(t).insert(&entry);
+                        }
+                        else
+                        {
+                            std::unordered_set<LogEntry *> s = {};
+                            s.insert(&entry);
+                            thebatchs[lastBatchEnd] = std::make_tuple(1, s);
+                        }
                         CloseBatch();
                     }
                 }
@@ -749,10 +762,10 @@ namespace replication
             {
                 log.AppendUnsorted(req, msg.shardtags(i), LOG_STATE_PREPARED, msg.arrivalts(i), std::vector<Successor *>{}, std::vector<Predecessor *>{}, 0, 0);
                 UpdateClientTable(req);
-                reply.add_shardtags(msg.shardtags(i));
                 i++;
             }
             ASSERT(i == msg.requests().size());
+            reply.set_batchid(msg.batchid());
 
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))
@@ -779,10 +792,16 @@ namespace replication
                 return;
             }
 
-            PredecessorReplyMessage a;
-            if (auto msgs =
-                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+            uint64_t batchId = msg.batchid();
+
+            ASSERT(batchId >= 0 && batchId < lastBatchEnd);
+            auto t = thebatchs[batchId];
+            std::get<0>(t)++;
+
+            // If this batch got a quorum of ACKs/is replicated!!
+            if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
             {
+                PredecessorReplyMessage a;
                 /*
                  * We have a quorum of PrepareOK messages for this
                  * batch.
@@ -796,15 +815,15 @@ namespace replication
                  * call appropriate helpers
                  */
                 // TODO Anja think about fast path here....
-                for (auto &shardTag : msg.shardtags())
+                auto s = std::get<1>(t);
+                for (const auto &entry_ptr : s)
                 {
-                    auto entry = log.FindUnsorted(shardTag);
-                    log.SetPrepared(*entry);
+                    log.SetPrepared(*entry_ptr);
 
                     /* Send PredecessorReply messages to the other replicas */
-                    a.set_arrivalts(entry->arrivalTimestamp);
-                    a.set_p(shardTag);
-                    for (auto it = entry->successors.begin(); it != entry->successors.end(); it++)
+                    a.set_arrivalts(entry_ptr->arrivalTimestamp);
+                    a.set_p(entry_ptr->myShardTag);
+                    for (auto it = entry_ptr->successors.begin(); it != entry_ptr->successors.end(); it++)
                     {
                         a.set_s((*it)->perShardTag);
                         // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
@@ -814,6 +833,7 @@ namespace replication
                         }
                     }
                 }
+                thebatchs.erase(batchId);
 
                 nullCommitTimeout->Reset();
             }
