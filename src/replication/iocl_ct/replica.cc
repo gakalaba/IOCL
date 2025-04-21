@@ -219,12 +219,10 @@ namespace replication
 
                 PrepareOKMessage2 reply;
                 reply.set_view(view);
-                reply.set_opnum(i);
                 reply.set_replicaidx(myIdx);
 
-                RDebug("Sending PREPAREOK " FMT_VIEWSTAMP
-                       " for new uncommitted operation",
-                       reply.view(), reply.opnum());
+                RDebug("Sending PREPAREOK for new uncommitted operation",
+                       reply.view());
 
                 if (!(transport->SendMessageToReplica(
                         this, configuration.GetLeaderIndex(view), reply)))
@@ -377,7 +375,6 @@ namespace replication
                 // add an arrival timestamp for each request we replicate in the first round
                 p.add_arrivalts(entry_ptr->arrivalTimestamp);
                 p.add_shardtags(entry_ptr->myShardTag);
-                // TODO ANJA for right now, we're skipping the unordered map on the replicas AND the predecessor list... those are just on the leader???
             }
 
             if (!(transport->SendMessageToAll(this, p)))
@@ -393,38 +390,31 @@ namespace replication
         {
             Debug("Inside CloseBatch2");
             ASSERT(AmLeader());
-            ASSERT(lastBatchEnd2 < lastOp);
+            auto s = std::get<1>(thebatchs2[lastBatchEnd2]);
+            // ASSERT(lastBatchEnd2 < lastOp);
 
-            opnum_t batchStart = lastBatchEnd2 + 1;
-
-            RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
-                   batchStart, lastOp);
+            RDebug("Sending batched prepare from %d to %d",
+                   lastBatchEnd2, lastBatch2);
             /* Send prepare messages */
-            PrepareMessage2 p2;
-            p2.set_view(view);
-            p2.set_opnum(lastOp);
-            p2.set_batchstart(batchStart);
+            PrepareMessage2 pp;
+            pp.set_view(view);
+            pp.set_batchid(lastBatchEnd2);
 
-            for (opnum_t i = batchStart; i <= lastOp; i++)
+            for (const auto &entry_ptr : s)
             {
-                // TODO understand if this already includes the arrivalTS????
-                // cuz if not then we also have to replicate the predlist etc.
-                Request *r = p2.add_requests();
-                const LogEntry *entry = log.Find(i);
-                ASSERT(entry != NULL);
-                ASSERT(entry->viewstamp.view == view);
-                ASSERT(entry->viewstamp.opnum == i);
-                *r = entry->request;
-                // add an arrival timestamp for each request we replicate in the first round
-                p2.add_sortedts(entry->sortTimestamp);
+                Request *r = pp.add_requests();
+                ASSERT(entry_ptr->viewstamp.view == view);
+                *r = entry_ptr->request;
+                pp.add_shardtags(entry_ptr->myShardTag);
+                pp.add_sortedts(entry_ptr->sortTimestamp);
             }
-            lastPrepare2 = p2;
+            lastPrepare2 = pp;
 
-            if (!(transport->SendMessageToAll(this, p2)))
+            if (!(transport->SendMessageToAll(this, pp)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
-            lastBatchEnd2 = lastOp;
+            lastBatchEnd2 = lastBatch2;
 
             resendPrepareTimeout->Reset();
             closeBatch2Timeout->Stop();
@@ -690,21 +680,12 @@ namespace replication
                 {
                     RDebug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    lastBatch++;
                     auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    // Add the request to the current pending batch
+                    addToPendingBatch(entry);
+                    // Flush out the batch if it's hit batchSize
                     if (lastBatch - lastBatchEnd + 1 > batchSize)
                     {
-                        if (thebatchs.find(lastBatchEnd) != thebatchs.end())
-                        {
-                            auto t = thebatchs[lastBatchEnd];
-                            std::get<1>(t).insert(&entry);
-                        }
-                        else
-                        {
-                            std::unordered_set<LogEntry *> s = {};
-                            s.insert(&entry);
-                            thebatchs[lastBatchEnd] = std::make_tuple(1, s);
-                        }
                         CloseBatch();
                     }
                 }
@@ -856,8 +837,8 @@ namespace replication
         void IOCL_CTReplica::HandlePrepare2(const TransportAddress &remote,
                                             const PrepareMessage2 &msg)
         {
-            RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
-                   msg.view(), msg.batchstart(), msg.opnum());
+            RDebug("Received PREPARE < view = %d, batchid = %d",
+                   msg.view(), msg.batchid());
 
             if (this->status != STATUS_NORMAL)
             {
@@ -875,7 +856,7 @@ namespace replication
             {
                 RequestStateTransfer();
                 pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+                    std::pair<TransportAddress *, PrepareMessage2>(remote.clone(), msg));
                 return;
             }
 
@@ -883,58 +864,33 @@ namespace replication
             {
                 RPanic("Unexpected PREPARE: I'm the leader of this view");
             }
-
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
-
             viewChangeTimeout->Reset();
 
-            if (msg.opnum() <= this->lastOp)
-            {
-                RDebug("Ignoring PREPARE; already prepared that operation");
-                // Resend the prepareOK message
-                PrepareOKMessage reply;
-                reply.set_view(msg.view());
-                reply.set_opnum(msg.opnum());
-                reply.set_replicaidx(myIdx);
-                if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
-                {
-                    RWarning("Failed to send PrepareOK message to leader");
-                }
-                return;
-            }
-
-            if (msg.batchstart() > this->lastOp + 1)
+            if (msg.batchid() > this->lastOp + 1)
             {
                 RequestStateTransfer();
                 pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+                    std::pair<TransportAddress *, PrepareMessage2>(remote.clone(), msg));
                 return;
             }
 
             /* Add operations to the log */
-            opnum_t op = msg.batchstart() - 1;
-            for (auto &req : msg.request())
+            uint64_t op = msg.batchid();
+            int i = 0;
+            for (auto &req : msg.requests())
             {
-                op++;
-                if (op <= lastOp)
-                {
-                    continue;
-                }
-                this->lastOp++;
-
                 // TODO ANJA this is supposed to be ApendUnsorted
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                log.ResortSorted(viewstamp_t(msg.view(), op + i), LOG_STATE_READY, msg.shardtags(i), msg.sortedts(i));
                 UpdateClientTable(req);
+                i++;
+                this->lastOp++;
             }
-            ASSERT(op == msg.opnum());
+            ASSERT(i == msg.requests().size());
 
             /* Build reply and send it to the leader */
-            PrepareOKMessage reply;
+            PrepareOKMessage2 reply;
             reply.set_view(msg.view());
-            reply.set_opnum(msg.opnum());
+            reply.set_batchid(msg.batchid());
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
@@ -948,8 +904,8 @@ namespace replication
                                               const PrepareOKMessage2 &msg)
         {
             {
-                RDebug("Received PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
-                       msg.view(), msg.opnum(), msg.replicaidx());
+                RDebug("Received PREPAREOK for view=%d and batchid=%d from replica %d",
+                       msg.view(), msg.batchid(), msg.replicaidx());
 
                 if (this->status != STATUS_NORMAL)
                 {
@@ -974,13 +930,18 @@ namespace replication
                     RWarning("Ignoring PREPAREOK because I'm not the leader");
                     return;
                 }
+                uint64_t batchId = msg.batchid();
 
-                viewstamp_t vs = {msg.view(), msg.opnum()};
-                if (auto msgs =
-                        (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+                ASSERT(batchId >= 0 && batchId < lastBatchEnd2);
+                auto t = thebatchs2[batchId];
+                std::get<0>(t)++;
+
+                // If this batch got a quorum of ACKs/is replicated!!
+
+                if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
                 {
                     /*
-                     * We have a quorum of PrepareOK messages for this
+                     * We have a quorum of PrepareOK2 messages for this
                      * opnumber. Execute it and all previous operations.
                      *
                      * (Note that we might have already executed it. That's fine,
@@ -989,12 +950,6 @@ namespace replication
                      * This also notifies the client of the result.
                      */
                     CommitUpTo(msg.opnum());
-
-                    if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                    {
-                        return;
-                    }
-
                     /*
                      * Send COMMIT message to the other replicas.
                      *
@@ -1009,6 +964,8 @@ namespace replication
                     {
                         RWarning("Failed to send COMMIT message to all replicas");
                     }
+
+                    thebatchs2.erase(batchId);
 
                     nullCommitTimeout->Reset();
                 }
@@ -1195,14 +1152,15 @@ namespace replication
                 }
 
                 // If this is the nth predecessor ACK, compute a new timestamp
-                if (entry->acks == entry->predecessors.size())
+                if (entry->acks == entry->predecessors.size() && entry->state == LOG_STATE_PREPARED)
                 {
                     IOCL_CTReplica::assignSortedTs(*entry);
                 }
 
                 // If this is the nth predecessor ACK2, compute a new timestamp as well
-                if (entry->acks2 == entry->predecessors.size())
+                if (entry->acks2 == entry->predecessors.size() && entry->state == LOG_STATE_ASSIGNED)
                 {
+                    ASSERT(entry->acks == entry->acks2);
                     IOCL_CTReplica::finalizeEntry(*entry);
                 }
             }
@@ -1216,7 +1174,7 @@ namespace replication
         void IOCL_CTReplica::assignSortedTs(LogEntry &entry)
         {
             // Step 2.
-            ASSERT(entry.state >= LOG_STATE_PREPARED);
+            ASSERT(entry.state == LOG_STATE_PREPARED);
             entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastExecutedTimestamp);
             // Insert into orderedLog, sorted by sortedTimestamp
 
@@ -1254,8 +1212,62 @@ namespace replication
             v.view = this->view;
             v.opnum = this->lastOp;
             log.ResortSorted(entry.viewstamp, LOG_STATE_READY, entry.myShardTag, entry.sortTimestamp);
-            // TODO Anja batching here!!!!
-            CloseBatch2();
+            // Add if it is the head
+            if (log.IsAtHead(entry))
+            {
+                IOCL_CTReplica::addToPendingBatch2(entry);
+            }
+            // Flush out the batch if it's hit batchSize
+            if (lastBatch - lastBatchEnd + 1 > batchSize)
+            {
+                CloseBatch2();
+            }
+        }
+
+        void IOCL_CTReplica::addToPendingBatch(LogEntry &entry)
+        {
+            // Add the request to the current pending batch
+            if (thebatchs.find(lastBatchEnd) != thebatchs.end())
+            {
+                auto t = thebatchs[lastBatchEnd];
+                std::get<1>(t).insert(&entry);
+            }
+            else
+            {
+                std::unordered_set<LogEntry *> s = {};
+                s.insert(&entry);
+                thebatchs[lastBatchEnd] = std::make_tuple(1, s);
+            }
+            lastBatch++;
+        }
+
+        void IOCL_CTReplica::addToPendingBatch2(LogEntry &entry)
+        {
+            if (thebatchs2.find(lastBatchEnd2) != thebatchs2.end())
+            {
+                auto t = thebatchs2[lastBatchEnd2];
+                std::get<1>(t).insert(&entry);
+                lastBatch2++;
+                // now go through all my pending readies and add them to the batch as well
+                for (auto &ptr : entry.pendingReadies)
+                {
+                    std::get<1>(t).insert(ptr);
+                    lastBatch2++;
+                }
+            }
+            else
+            {
+                std::unordered_set<LogEntry *> s = {};
+                s.insert(&entry);
+                thebatchs2[lastBatchEnd2] = std::make_tuple(1, s);
+                lastBatch2++
+                    // now go through all my pending readies and add them to the batch as well
+                    for (auto &ptr : entry.pendingReadies)
+                {
+                    std::get<1>(t).insert(ptr);
+                    lastBatch2++;
+                }
+            }
         }
 
         // void IOCL_CTReplica::sendMessageToSuccessorList(std::vector<replication::Successor *> &successors, google::protobuf::Message &msg)
@@ -1466,13 +1478,13 @@ namespace replication
             SendPrepareOKs(oldLastOp);
 
             // Process pending prepares
-            std::list<std::pair<TransportAddress *, PrepareMessage>> pending =
+            std::list<std::pair<TransportAddress *, PrepareMessage2>> pending =
                 pendingPrepares;
             pendingPrepares.clear();
             for (auto &msgpair : pendingPrepares)
             {
                 RDebug("Processing pending prepare message");
-                HandlePrepare(*msgpair.first, msgpair.second);
+                HandlePrepare2(*msgpair.first, msgpair.second);
                 delete msgpair.first;
             }
         }

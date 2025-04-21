@@ -66,14 +66,16 @@ namespace replication
             opnum_t lastOp;
             view_t lastRequestStateTransferView;
             opnum_t lastRequestStateTransferOpnum;
-            std::list<std::pair<TransportAddress *, proto::PrepareMessage>> pendingPrepares;
+            std::list<std::pair<TransportAddress *, proto::PrepareMessage2>> pendingPrepares;
             proto::PrepareMessage2 lastPrepare2;
             unsigned int batchSize;
-            opnum_t lastBatchEnd2;
             // maps lastBatchId to a tuple of <acks, set of pointers to entries>
             std::unordered_map<int, std::tuple<int, std::unordered_set<LogEntry *>>> thebatchs;
             int lastBatch;
             int lastBatchEnd;
+            int lastBatch2;
+            int lastBatchEnd2;
+            std::unordered_map<int, std::tuple<int, std::unordered_set<LogEntry *>>> thebatchs2;
             // IOCL specifics
             uint64_t shardTimestamp;
             uint64_t lastExecutedTimestamp;
@@ -119,6 +121,8 @@ namespace replication
             void ResendPrepare();
             void CloseBatch2();
             void CloseBatch();
+            void addToPendingBatch(LogEntry &entry);
+            void addToPendingBatch2(LogEntry &entry);
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);

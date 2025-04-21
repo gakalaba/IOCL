@@ -63,17 +63,16 @@ message PrepareOKMessage {
 
 message PrepareMessage2 {
     required uint64 view = 1;
-    required uint64 opnum = 2;
-    required uint64 batchstart = 3;
+    required uint64 batchId = 3;
     repeated replication.Request requests = 4;
     repeated uint64 shardTags = 5;
-    repeated uint64 arrivalTs = 6;
+    repeated uint64 sortedTs = 6;
 
 }
 
 message PrepareOKMessage2 {
     required uint64 view = 1;
-    required uint64 opnum = 2;
+    required uint64 batchId = 2;
     required uint32 replicaIdx = 3;
 }
 

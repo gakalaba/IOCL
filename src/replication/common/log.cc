@@ -208,12 +208,21 @@ namespace replication
         bool deleted = deleteByFirst(sortedLog, shardTag);
         if (!deleted)
         {
-            Panic("Couldn't resort the entry -- couldn't delete it with old sort timestamp");
+            Debug("Couldn't resort the entry -- couldn't delete it with old sort timestamp");
         }
         auto entry = unorderedEntries[shardTag];
         entry.viewstamp = vs;
 
         return AppendSorted(state, shardTag, finalSortedTs);
+    }
+
+    bool Log::IsAtHead(LogEntry &entry)
+    {
+        // walk backwards until lastExecuted??
+        // if i find an entry that is state < LOG_STATE_READY and on the same key,
+        // ADD MYSELF TO ITS PENDING SET and then return false
+        // otherwise return true
+        return true;
     }
 
     void SetPrepared(LogEntry &entry)

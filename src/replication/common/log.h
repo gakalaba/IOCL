@@ -46,16 +46,16 @@ namespace replication
 
     enum LogEntryState
     {
-        LOG_STATE_COMMITTED,
-        LOG_STATE_PREPARED,
+        // LOG_STATE_COMMITTED,
+        // LOG_STATE_PREPARED,
         LOG_STATE_SPECULATIVE,  // specpaxos only
         LOG_STATE_FASTPREPARED, // fastpaxos only
         /* IOCL specifics */
         LOG_STATE_ARRIVED,
-        // LOG_STATE_PREPARED,
+        LOG_STATE_PREPARED,
         LOG_STATE_ASSIGNED,
-        LOG_STATE_READY // all acks have arrived
-        // LOG_STATE_COMMITTED
+        LOG_STATE_READY, // all acks have arrived
+        LOG_STATE_COMMITTED
     };
 
     struct Predecessor
@@ -135,6 +135,7 @@ namespace replication
         LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
+        bool IsAtHead(LogEntry &entry);
         bool InSorted(uint64_t shardTag);
         LogEntry &ResortSorted(viewstamp_t vs, LogEntryState state,
                                uint64_t shardTag, uint64_t finalSortedTs);
