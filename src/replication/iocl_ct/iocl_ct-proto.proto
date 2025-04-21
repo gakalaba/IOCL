@@ -15,6 +15,7 @@ message ReplyMessage {
     required uint64 opnum = 2;
     required uint64 clientreqid = 3;
     required bytes reply = 4;
+    required uint64 shardTag = 5;
 }
 
 message SuccessorRequestMessage {

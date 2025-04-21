@@ -135,10 +135,10 @@ namespace replication
         LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
-        bool IsAtHead(LogEntry &entry);
+        bool IsAtHead(std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator &it);
         bool InSorted(uint64_t shardTag);
-        LogEntry &ResortSorted(viewstamp_t vs, LogEntryState state,
-                               uint64_t shardTag, uint64_t finalSortedTs);
+        std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator &ResortSorted(viewstamp_t vs, LogEntryState state,
+                                                                                                            uint64_t shardTag, uint64_t finalSortedTs);
 
         void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);

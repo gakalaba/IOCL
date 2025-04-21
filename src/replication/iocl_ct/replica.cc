@@ -168,6 +168,7 @@ namespace replication
                 reply.set_view(entry->viewstamp.view);
                 reply.set_opnum(entry->viewstamp.opnum);
                 reply.set_clientreqid(entry->request.clientreqid());
+                reply.set_shardtag(entry->myShardTag);
 
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
@@ -1211,9 +1212,9 @@ namespace replication
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
-            log.ResortSorted(entry.viewstamp, LOG_STATE_READY, entry.myShardTag, entry.sortTimestamp);
+            auto it = log.ResortSorted(entry.viewstamp, LOG_STATE_READY, entry.myShardTag, entry.sortTimestamp);
             // Add if it is the head
-            if (log.IsAtHead(entry))
+            if (log.IsAtHead(it))
             {
                 IOCL_CTReplica::addToPendingBatch2(entry);
             }
