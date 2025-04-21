@@ -142,7 +142,8 @@ namespace replication
                                 const proto::PrepareMessage2 &msg);
             void HandlePrepareOK2(const TransportAddress &remote,
                                   const proto::PrepareOKMessage2 &msg);
-            void assignSortedTs(LogEntry &entry, uint64_t shardTag);
+            void assignSortedTs(LogEntry &entry);
+            void finalizeEntry(LogEntry &entry);
             // void addOutstandingPredecessor(const google::protobuf::Message &msg, bool arrival);
             void addOutstandingPredecessor(const proto::PredecessorReplyMessage &msg);
             void addOutstandingPredecessor2(const proto::PredecessorReplyMessage2 &msg);

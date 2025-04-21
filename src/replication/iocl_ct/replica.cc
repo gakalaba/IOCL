@@ -679,7 +679,7 @@ namespace replication
                     /* Add the request to my log(s) */
                     auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
-                    log.AppendSorted(v, LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
+                    log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
                     log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
 
                     // TODO Anja add batching!
@@ -802,6 +802,7 @@ namespace replication
             if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
             {
                 PredecessorReplyMessage a;
+                PredecessorReplyMessage2 aa;
                 /*
                  * We have a quorum of PrepareOK messages for this
                  * batch.
@@ -811,25 +812,38 @@ namespace replication
                  *
                  * Mark the entries as replicated
                  *
-                 * any of the ones that are replicated AND coordinated:
-                 * call appropriate helpers
+                 * Check if we've gotten any timestamps back from our predecessors
+                 *
+                 * Check if we've got any successors registered
                  */
-                // TODO Anja think about fast path here....
                 auto s = std::get<1>(t);
                 for (const auto &entry_ptr : s)
                 {
                     log.SetPrepared(*entry_ptr);
-
-                    /* Send PredecessorReply messages to the other replicas */
-                    a.set_arrivalts(entry_ptr->arrivalTimestamp);
-                    a.set_p(entry_ptr->myShardTag);
-                    for (auto it = entry_ptr->successors.begin(); it != entry_ptr->successors.end(); it++)
+                    if (entry_ptr->acks == entry_ptr->predecessors.size())
                     {
-                        a.set_s((*it)->perShardTag);
-                        // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
-                        if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
+                        // Send sorted timestamp!
+                        IOCL_CTReplica::assignSortedTs(*entry_ptr);
+                        if (entry_ptr->acks2 == entry_ptr->predecessors.size())
                         {
-                            RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
+                            // Do final sort and replicated it
+                            IOCL_CTReplica::finalizeEntry(*entry_ptr);
+                        }
+                    }
+                    else
+                    {
+                        ASSERT(entry_ptr->acks2 < entry_ptr->predecessors.size());
+                        /* Send arrival timestamp in PredecessorReply messages to the registered successors */
+                        a.set_arrivalts(entry_ptr->arrivalTimestamp);
+                        a.set_p(entry_ptr->myShardTag);
+                        for (auto it = entry_ptr->successors.begin(); it != entry_ptr->successors.end(); it++)
+                        {
+                            a.set_s((*it)->perShardTag);
+                            // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
+                            if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
+                            {
+                                RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
+                            }
                         }
                     }
                 }
@@ -1086,13 +1100,13 @@ namespace replication
             else if (!inSorted && entry)
             {
                 ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
-                a.set_arrivalts(entry->arrivalTimestamp);
-                a.set_shardidx(groupIdx);
                 // Add this successor for the next round of timestamp replies
                 entry->successors.push_back(s);
                 // If it's been prepared, send the correct timestamp to this asking successor
                 if (entry->state == LOG_STATE_PREPARED)
                 {
+                    a.set_arrivalts(entry->arrivalTimestamp);
+                    a.set_shardidx(groupIdx);
                     // Only send the ack once it's replicated the arrival timestamp!
                     if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, a)))
                     {
@@ -1117,6 +1131,7 @@ namespace replication
             }
             else if (!inSorted && !entry)
             {
+                // Entry never arrived yet
                 IOCL_CTReplica::addOutstandingPredecessor(msg);
             }
             else if (!inSorted && entry)
@@ -1133,10 +1148,9 @@ namespace replication
                 entry->acks++;
 
                 // If this is the nth predecessor ACK, compute a new timestamp
-                if (entry->acks == entry->predecessors.size())
+                if (entry->acks == entry->predecessors.size() && entry->state == LOG_STATE_PREPARED)
                 {
-                    // Step 2.
-                    IOCL_CTReplica::assignSortedTs(*entry, msg.s());
+                    IOCL_CTReplica::assignSortedTs(*entry);
                 }
             }
         }
@@ -1157,14 +1171,12 @@ namespace replication
                 entry->predecessors[msg.predidx()]->sortedTimestamp = msg.sortedts();
                 if (entry->acks2 == entry->predecessors.size())
                 {
-                    // Step 3.
-                    entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastExecutedTimestamp);
-                    log.ResortSorted(entry->viewstamp, LOG_STATE_READY, msg.s(), entry->sortTimestamp);
-                    CloseBatch2();
+                    IOCL_CTReplica::finalizeEntry(*entry);
                 }
             }
             else if (!inSorted && !entry)
             {
+                // Entry has never arrived yet
                 IOCL_CTReplica::addOutstandingPredecessor2(msg);
             }
             else if (!inSorted && entry)
@@ -1185,39 +1197,38 @@ namespace replication
                 // If this is the nth predecessor ACK, compute a new timestamp
                 if (entry->acks == entry->predecessors.size())
                 {
-                    // Step 2.
-                    IOCL_CTReplica::assignSortedTs(*entry, msg.s());
+                    IOCL_CTReplica::assignSortedTs(*entry);
                 }
 
                 // If this is the nth predecessor ACK2, compute a new timestamp as well
                 if (entry->acks2 == entry->predecessors.size())
                 {
-                    // Step 3.
-                    entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastExecutedTimestamp);
-                    log.ResortSorted(entry->viewstamp, LOG_STATE_READY, msg.s(), entry->sortTimestamp);
-                    CloseBatch2();
+                    IOCL_CTReplica::finalizeEntry(*entry);
                 }
             }
         }
 
-        void IOCL_CTReplica::assignSortedTs(LogEntry &entry, uint64_t shardTag)
+        /* This function does:
+         * 1. assigns a sorted timestamp
+         * 2. modifies the entry and adds it to the sorted log
+         * 3. sends the sorted timestamp (PredecessorReplyMessage2) to all registered successors
+         */
+        void IOCL_CTReplica::assignSortedTs(LogEntry &entry)
         {
+            // Step 2.
+            ASSERT(entry.state >= LOG_STATE_PREPARED);
             entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastExecutedTimestamp);
             // Insert into orderedLog, sorted by sortedTimestamp
-            /* Assign it an opnum */
-            viewstamp_t v; // TODO Anja is this when we wanna do this??
-            ++this->lastOp;
-            v.view = this->view;
-            v.opnum = this->lastOp;
-            log.AppendSorted(v, LOG_STATE_ASSIGNED, shardTag, entry.sortTimestamp);
+
+            log.AppendSorted(LOG_STATE_ASSIGNED, entry.myShardTag, entry.sortTimestamp);
             // Send ACK to all successors
             PredecessorReplyMessage2 aa;
-            aa.set_p(shardTag);
+            aa.set_p(entry.myShardTag);
             aa.set_sortedts(entry.sortTimestamp);
             for (auto it = entry.successors.begin(); it != entry.successors.end(); it++)
             {
                 aa.set_s((*it)->perShardTag);
-                aa.set_predidx((*it)->predIdx); // TODO ANJA is this right???
+                aa.set_predidx((*it)->predIdx);
                 // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
                 if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, aa)))
                 {
@@ -1225,8 +1236,26 @@ namespace replication
                 }
             }
 
-            // // delete the successor list!!!!!!
-            // delete entry.successors;
+            // delete the successor list!!!!!!
+            for (auto ptr : entry.successors)
+            {
+                delete ptr;
+            }
+            entry.successors.clear();
+        }
+
+        void IOCL_CTReplica::finalizeEntry(LogEntry &entry)
+        {
+            // Step 3.
+            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
+            /* Assign it an opnum */
+            viewstamp_t v;
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+            log.ResortSorted(entry.viewstamp, LOG_STATE_READY, entry.myShardTag, entry.sortTimestamp);
+            // TODO Anja batching here!!!!
+            CloseBatch2();
         }
 
         // void IOCL_CTReplica::sendMessageToSuccessorList(std::vector<replication::Successor *> &successors, google::protobuf::Message &msg)

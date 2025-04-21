@@ -132,7 +132,7 @@ namespace replication
                                  std::vector<Predecessor *> &&predecessors,
                                  uint64_t acks, uint64_t acks2);
         LogEntry *FindUnsorted(uint64_t shardTag);
-        LogEntry &AppendSorted(viewstamp_t vs, LogEntryState state,
+        LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
         bool InSorted(uint64_t shardTag);

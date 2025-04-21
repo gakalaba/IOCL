@@ -153,19 +153,10 @@ namespace replication
 
     /************** Sorted Log ***************/
     LogEntry &
-    Log::AppendSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t sortedTs)
+    Log::AppendSorted(LogEntryState state, uint64_t shardTag, uint64_t sortedTs)
     {
-        if (sortedLog.empty())
-        {
-            ASSERT(vs.opnum == start);
-        }
-        else
-        {
-            ASSERT(vs.opnum == LastOpnum() + 1);
-        }
         auto entry = unorderedEntries[shardTag];
 
-        entry.viewstamp = vs;
         entry.state = state;
         entry.sortTimestamp = sortedTs;
         sortedLog.insert({shardTag, sortedTs});
@@ -205,6 +196,14 @@ namespace replication
     LogEntry &
     Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t finalSortedTs)
     {
+        if (sortedLog.empty())
+        {
+            ASSERT(vs.opnum == start);
+        }
+        else
+        {
+            ASSERT(vs.opnum == LastOpnum() + 1);
+        }
         // Remove this tag from the sorted log
         bool deleted = deleteByFirst(sortedLog, shardTag);
         if (!deleted)
@@ -212,8 +211,9 @@ namespace replication
             Panic("Couldn't resort the entry -- couldn't delete it with old sort timestamp");
         }
         auto entry = unorderedEntries[shardTag];
+        entry.viewstamp = vs;
 
-        return AppendSorted(vs, state, shardTag, finalSortedTs);
+        return AppendSorted(state, shardTag, finalSortedTs);
     }
 
     void SetPrepared(LogEntry &entry)
