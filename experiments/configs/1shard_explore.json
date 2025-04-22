@@ -8,12 +8,12 @@
       "client_processes_per_client_node"
     ]
   ],
-  "replication_protocol": "vr",
+  "replication_protocol": "iocl_ct",
   "client_protocol_mode": "span-lock",
   "server_names": [
+    "us-east-1-0",
     "us-east-1-1",
-    "us-east-1-2",
-    "eu-west-1-0"
+    "us-east-1-2"
   ],
   "consistency": [
     "lin"
@@ -28,47 +28,27 @@
   "num_shards": 1,
   "shards": [
     [
+      "us-east-1-0",
       "us-east-1-1",
-      "us-east-1-2",
-      "eu-west-1-0"
+      "us-east-1-2"
     ]
   ],
   "client_total": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_processes_per_client_node": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0"
+    "client-1-0"
   ],
   "server_regions": {
     "us-east-1": [
       "us-east-1-0",
       "us-east-1-1",
       "us-east-1-2",
-      "client-0-0"
-    ],
-    "eu-west-1": [
-      "eu-west-1-0",
-      "eu-west-1-1",
-      "eu-west-1-2",
       "client-1-0"
-    ],
-    "us-west-1": [
-      "us-west-1-0",
-      "us-west-1-1",
-      "us-west-1-2",
-      "client-2-0"
     ]
   },
   "server_port": 7087,
@@ -122,8 +102,8 @@
     5,
     6
   ],
-  "client_debug_output": false,
-  "server_debug_output": false,
+  "client_debug_output": true,
+  "server_debug_output": true,
   "client_debug_stats": false,
   "server_debug_stats": false,
   "client_experiment_length": 40,
