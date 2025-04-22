@@ -7,7 +7,8 @@ package replication.iocl_ct.proto;
 message RequestMessage {
     required replication.Request req = 1;
     required uint64 shardTag = 2;
-    repeated uint64 predlist = 3;
+    required uint64 key = 3;
+    repeated uint64 predlist = 4;
 }
 
 message ReplyMessage {

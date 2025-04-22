@@ -44,6 +44,7 @@ namespace replication
     {
         this->initialHash = initialHash;
         this->start = start;
+        firstUncommittedEntry = NULL;
         if (start == 1)
         {
             ASSERT(initialHash == EMPTY_HASH);
@@ -106,13 +107,14 @@ namespace replication
                         uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
                         std::vector<Predecessor *> &&predecessors,
-                        uint64_t acks, uint64_t acks2)
+                        uint64_t acks, uint64_t acks2, uint64_t key)
     {
         LogEntry entry;
         entry.request = req;
         entry.state = state;
         entry.arrivalTimestamp = arrivalTs;
         entry.myShardTag = shardTag;
+        entry.key = key;
         if (!successors.empty())
         {
             entry.successors = std::move(successors);
@@ -133,10 +135,6 @@ namespace replication
 
         unorderedEntries[shardTag] = entry;
         return *FindUnsorted(shardTag);
-
-        // unorderedEntries.push_back(entry);
-
-        // TagToUnorderedIdx[shardTag] = unorderedEntries.size() - 1;
     }
 
     LogEntry *Log::FindUnsorted(uint64_t shardTag)
@@ -160,6 +158,10 @@ namespace replication
         entry.state = state;
         entry.sortTimestamp = sortedTs;
         sortedLog.insert({shardTag, sortedTs});
+        if (firstUncommittedEntry == NULL)
+        {
+            firstUncommittedEntry = &entry;
+        }
         return *FindUnsorted(shardTag);
     }
 
@@ -221,35 +223,36 @@ namespace replication
     bool Log::IsAtHead(void *it_ptr)
     {
         auto it = *((std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator *)it_ptr);
-        // ASSERT(it != sortedLog.end());
-        // auto entry = FindUnsorted(std::get<0>(*it)); // O(1)
-        // while (true)
-        // {
-        //     // walk backwards until lastExecuted??
-        //     auto prevIt = std::prev(it);
-        //     auto prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
-        //     if (prev_entry_ptr->key == entry->key && prev_entry_ptr->state < LOG_STATE_READY)
-        //     {
-        //         // if i find an entry that is state < LOG_STATE_READY and on the same key,
-        //         // ADD MYSELF TO ITS PENDING SET and then return false
-        //         prev_entry_ptr->pendingReadies.insert(entry);
-        //         // and my descendents
-        //         for (auto e : entry->pendingReadies)
-        //         {
-        //             if (e->sortedTimestamp > prev_entry_ptr)
-        //             {
-        //                 prev_entr_ptr->pendingReadies.insert(e);
-        //             }
-        //             else
-        //             {
-        //                 IsAtHead(findByFirst(sortedLog, e->myShardTag));
-        //             }
-        //         }
-        //         return false;
-        //     }
-        //     if (prevIt == topUncommittedIt)
-        //         break;
-        // }
+        ASSERT(it != sortedLog.end());
+        auto entry = FindUnsorted(std::get<0>(*it)); // O(1)
+        while (true)
+        {
+            // walk backwards until lastExecuted??
+            auto prevIt = std::prev(it);
+            auto prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
+            if (prev_entry_ptr->key == entry->key && prev_entry_ptr->state < LOG_STATE_READY)
+            {
+                // if i find an entry that is state < LOG_STATE_READY and on the same key,
+                // ADD MYSELF TO ITS PENDING SET and then return false
+                prev_entry_ptr->pendingReadies.insert(entry);
+                // and my descendents
+                for (auto e : entry->pendingReadies)
+                {
+                    if (e->sortTimestamp > prev_entry_ptr->sortTimestamp)
+                    {
+                        prev_entry_ptr->pendingReadies.insert(e);
+                    }
+                    else
+                    {
+                        auto this_it = findByFirst(sortedLog, e->myShardTag);
+                        IsAtHead((void *)(&this_it));
+                    }
+                }
+                return false;
+            }
+            if (prevIt == findByFirst(sortedLog, firstUncommittedEntry->myShardTag))
+                break;
+        }
         // ADD MYSELF TO ITS PENDING SET and then return false
         // otherwise return true
         return true;

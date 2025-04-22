@@ -692,7 +692,7 @@ namespace replication
                     RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
                     /* Add the request to my log(s) */
-                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2, msg.key());
                     entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
                     log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
                     log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
@@ -705,7 +705,7 @@ namespace replication
                 {
                     RDebug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2, msg.key());
                     // Add the request to the current pending batch
                     addToPendingBatch(entry);
                     // Flush out the batch if it's hit batchSize
@@ -766,7 +766,7 @@ namespace replication
             int i;
             for (auto &req : msg.requests())
             {
-                log.AppendUnsorted(req, msg.shardtags(i), LOG_STATE_PREPARED, msg.arrivalts(i), std::vector<Successor *>{}, std::vector<Predecessor *>{}, 0, 0);
+                log.AppendUnsorted(req, msg.shardtags(i), LOG_STATE_PREPARED, msg.arrivalts(i), std::vector<Successor *>{}, std::vector<Predecessor *>{}, 0, 0, 0);
                 UpdateClientTable(req);
                 i++;
             }
