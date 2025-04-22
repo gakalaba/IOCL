@@ -493,7 +493,7 @@ int main(int argc, char **argv)
     }
     case PROTO_IOCL_CT:
     {
-        Debug("huhuhuh");
+        Debug("Starting IOCL replica!");
         replica = new replication::iocl_ct::IOCL_CTReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),

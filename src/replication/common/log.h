@@ -91,7 +91,6 @@ namespace replication
         uint64_t acks;
         uint64_t acks2;
         std::unordered_set<LogEntry *> pendingReadies;
-        uint64_t key;
 
         LogEntry() { replyMessage = NULL; }
         LogEntry(const LogEntry &x)
@@ -132,7 +131,7 @@ namespace replication
                                  uint64_t arrivalTs,
                                  std::vector<Successor *> &&successors,
                                  std::vector<Predecessor *> &&predecessors,
-                                 uint64_t acks, uint64_t acks2, uint64_t key);
+                                 uint64_t acks, uint64_t acks2);
         LogEntry *FindUnsorted(uint64_t shardTag);
         LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);

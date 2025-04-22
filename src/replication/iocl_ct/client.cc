@@ -39,6 +39,7 @@
 #include "replication/common/request.pb.h"
 #include "replication/iocl_ct/client.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
+#include "replication/common/iocl_utils.h"
 
 namespace replication
 {
@@ -50,6 +51,7 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
+            seqno = 0;
             Debug("IOCL_CTClient created");
         }
 
@@ -138,6 +140,9 @@ namespace replication
             reqMsg.mutable_req()->set_op(req->request);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            reqMsg.set_shardtag(CreateTag(clientid, seqno));
+            // TODO Anja: set the predlist
+            seqno++;
 
             Debug("SENDING REQUEST: %lu %s", clientid, req);
             // XXX Try sending only to (what we think is) the leader first

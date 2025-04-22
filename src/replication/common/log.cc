@@ -107,14 +107,13 @@ namespace replication
                         uint64_t arrivalTs,
                         std::vector<Successor *> &&successors,
                         std::vector<Predecessor *> &&predecessors,
-                        uint64_t acks, uint64_t acks2, uint64_t key)
+                        uint64_t acks, uint64_t acks2)
     {
         LogEntry entry;
         entry.request = req;
         entry.state = state;
         entry.arrivalTimestamp = arrivalTs;
         entry.myShardTag = shardTag;
-        entry.key = key;
         if (!successors.empty())
         {
             entry.successors = std::move(successors);
@@ -219,6 +218,12 @@ namespace replication
         return (void *)(&it);
     }
 
+    bool Commute(LogEntry *a, LogEntry *b)
+    {
+        // TODO Anja
+        return true;
+    }
+
     // We know the sorted log has length >= 1 at this point
     bool Log::IsAtHead(void *it_ptr)
     {
@@ -230,7 +235,7 @@ namespace replication
             // walk backwards until lastExecuted??
             auto prevIt = std::prev(it);
             auto prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
-            if (prev_entry_ptr->key == entry->key && prev_entry_ptr->state < LOG_STATE_READY)
+            if (Commute(prev_entry_ptr, entry) && prev_entry_ptr->state < LOG_STATE_READY)
             {
                 // if i find an entry that is state < LOG_STATE_READY and on the same key,
                 // ADD MYSELF TO ITS PENDING SET and then return false

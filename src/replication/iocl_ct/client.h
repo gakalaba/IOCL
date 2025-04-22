@@ -106,6 +106,9 @@ namespace replication
             void HandleUnloggedReply(const TransportAddress &remote,
                                      const proto::UnloggedReplyMessage &msg);
             void UnloggedRequestTimeoutCallback(const uint64_t reqId);
+
+        private:
+            int seqno;
         };
 
     } // namespace iocl_ct
