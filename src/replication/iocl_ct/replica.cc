@@ -143,24 +143,48 @@ namespace replication
             return (configuration.GetLeaderIndex(view) == myIdx);
         }
 
-        void IOCL_CTReplica::CommitUpTo(opnum_t upto)
+        uint64_t FoldL(const std::vector<Predecessor *> &predecessors, bool arrival)
         {
-            while (lastCommitted < upto)
+            if (predecessors.empty())
+            {
+                Panic("Called FoldL on empty predecessor list");
+                return 0;
+            }
+            auto v = arrival ? predecessors.front()->arrivalTimestamp : predecessors.front()->sortedTimestamp;
+            for (auto it = predecessors.begin(); it != predecessors.end(); ++it)
+            {
+                auto e = arrival ? (*it)->arrivalTimestamp : (*it)->sortedTimestamp;
+                if (e > v)
+                {
+                    v = e + 1;
+                }
+                else
+                {
+                    v++;
+                }
+            }
+            return v;
+        }
+
+        void IOCL_CTReplica::CommitUpTo(uint64_t batchId)
+        {
+            auto s = std::get<1>(thebatchs2[batchId]);
+            for (auto entry : s)
             {
                 lastCommitted++;
 
                 /* Find operation in log */
-                const LogEntry *entry = log.Find(lastCommitted);
-                if (entry == nullptr)
-                {
-                    RPanic("Did not find operation " FMT_OPNUM " in log",
-                           lastCommitted);
-                }
+                // const LogEntry *entry = log.Find(lastCommitted);
+                // if (entry == nullptr)
+                // {
+                //     RPanic("Did not find operation " FMT_OPNUM " in log",
+                //            lastCommitted);
+                // }
 
                 const Request request = entry->request;
 
                 /* Execute it */
-                RDebug("Executing request " FMT_OPNUM, lastCommitted);
+                RDebug("Executing request with tag %d", entry->myShardTag);
                 ReplyMessage reply;
                 Execute(lastCommitted, entry->request, reply);
                 lastExecutedTimestamp++;
@@ -171,12 +195,13 @@ namespace replication
                 reply.set_shardtag(entry->myShardTag);
 
                 /* Mark it as committed */
-                log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
+                log.SetStatus(*entry, LOG_STATE_COMMITTED);
 
                 // Store reply in the client table
                 ClientTableEntry &cte = clientTable[entry->request.clientid()];
                 if (cte.lastReqId <= entry->request.clientreqid())
                 {
+                    // TODO i think since clients now have outstanding reqs... we can't do this anymore ha
                     cte.lastReqId = entry->request.clientreqid();
                     cte.replied = true;
                     cte.reply = reply;
@@ -193,7 +218,6 @@ namespace replication
                 auto iter = clientAddresses.find(entry->request.clientid());
                 if (iter != clientAddresses.end())
                 {
-                    Debug("sending response to client?");
                     transport->SendMessage(this, *iter->second, reply);
                 }
             }
@@ -314,7 +338,7 @@ namespace replication
             Debug("Sending null commit");
             CommitMessage cm;
             cm.set_view(this->view);
-            cm.set_opnum(this->lastCommitted);
+            cm.set_batchid(this->lastCommitted);
 
             ASSERT(AmLeader());
 
@@ -801,7 +825,7 @@ namespace replication
                 auto s = std::get<1>(t);
                 for (const auto &entry_ptr : s)
                 {
-                    log.SetPrepared(*entry_ptr);
+                    log.SetStatus(*entry_ptr, LOG_STATE_PREPARED);
                     if (entry_ptr->acks == entry_ptr->predecessors.size())
                     {
                         // Send sorted timestamp!
@@ -867,26 +891,28 @@ namespace replication
             }
             viewChangeTimeout->Reset();
 
-            if (msg.batchid() > this->lastOp + 1)
-            {
-                RequestStateTransfer();
-                pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage2>(remote.clone(), msg));
-                return;
-            }
+            // if (msg.batchid() > this->lastOp + 1)
+            // {
+            //     RequestStateTransfer();
+            //     pendingPrepares.push_back(
+            //         std::pair<TransportAddress *, PrepareMessage2>(remote.clone(), msg));
+            //     return;
+            // }
 
             /* Add operations to the log */
             uint64_t op = msg.batchid();
             int i = 0;
+            std::unordered_set<LogEntry *> s = {};
             for (auto &req : msg.requests())
             {
                 // TODO ANJA this is supposed to be ApendUnsorted
-                log.ResortSorted(viewstamp_t(msg.view(), op + i), LOG_STATE_READY, msg.shardtags(i), msg.sortedts(i));
+                log.ResortSorted(viewstamp_t(msg.view(), i + op), LOG_STATE_READY, msg.shardtags(i), msg.sortedts(i));
                 UpdateClientTable(req);
                 i++;
-                this->lastOp++;
+                s.insert(log.FindUnsorted(msg.shardtags(i)));
             }
             ASSERT(i == msg.requests().size());
+            thebatchs2[msg.batchid()] = {0, s};
 
             /* Build reply and send it to the leader */
             PrepareOKMessage2 reply;
@@ -950,7 +976,7 @@ namespace replication
                      *
                      * This also notifies the client of the result.
                      */
-                    CommitUpTo(msg.opnum());
+                    CommitUpTo(msg.batchid());
                     /*
                      * Send COMMIT message to the other replicas.
                      *
@@ -959,7 +985,7 @@ namespace replication
                      */
                     CommitMessage cm;
                     cm.set_view(this->view);
-                    cm.set_opnum(this->lastCommitted);
+                    cm.set_batchid(msg.batchid());
 
                     if (!(transport->SendMessageToAll(this, cm)))
                     {
@@ -976,7 +1002,7 @@ namespace replication
         void IOCL_CTReplica::HandleCommit(const TransportAddress &remote,
                                           const CommitMessage &msg)
         {
-            RDebug("Received COMMIT " FMT_VIEWSTAMP, msg.view(), msg.opnum());
+            RDebug("Received COMMIT for view %d and batchdi %d", msg.view(), msg.batchid());
 
             if (this->status != STATUS_NORMAL)
             {
@@ -1003,19 +1029,19 @@ namespace replication
 
             viewChangeTimeout->Reset();
 
-            if (msg.opnum() <= this->lastCommitted)
-            {
-                RDebug("Ignoring COMMIT; already committed that operation");
-                return;
-            }
+            // if (msg.opnum() <= this->lastCommitted)
+            // {
+            //     RDebug("Ignoring COMMIT; already committed that operation");
+            //     return;
+            // }
 
-            if (msg.opnum() > this->lastOp)
-            {
-                RequestStateTransfer();
-                return;
-            }
+            // if (msg.opnum() > this->lastOp)
+            // {
+            //     RequestStateTransfer();
+            //     return;
+            // }
 
-            CommitUpTo(msg.opnum());
+            CommitUpTo(msg.batchid());
         }
 
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
@@ -1244,45 +1270,27 @@ namespace replication
 
         void IOCL_CTReplica::addToPendingBatch2(LogEntry &entry)
         {
+            std::tuple<int, std::unordered_set<replication::LogEntry *>> t;
             if (thebatchs2.find(lastBatchEnd2) != thebatchs2.end())
             {
-                auto t = thebatchs2[lastBatchEnd2];
+                t = thebatchs2[lastBatchEnd2];
                 std::get<1>(t).insert(&entry);
-                lastBatch2++;
-                // now go through all my pending readies and add them to the batch as well
-                for (auto &ptr : entry.pendingReadies)
-                {
-                    std::get<1>(t).insert(ptr);
-                    lastBatch2++;
-                }
             }
             else
             {
                 std::unordered_set<LogEntry *> s = {};
                 s.insert(&entry);
-                thebatchs2[lastBatchEnd2] = std::make_tuple(1, s);
-                lastBatch2++
-                    // now go through all my pending readies and add them to the batch as well
-                    for (auto &ptr : entry.pendingReadies)
-                {
-                    std::get<1>(t).insert(ptr);
-                    lastBatch2++;
-                }
+                t = std::make_tuple(1, s);
+                thebatchs2[lastBatchEnd2] = t;
+            }
+            lastBatch2++;
+            // now go through all my pending readies and add them to the batch as well
+            for (auto &ptr : entry.pendingReadies)
+            {
+                std::get<1>(t).insert(ptr);
+                lastBatch2++;
             }
         }
-
-        // void IOCL_CTReplica::sendMessageToSuccessorList(std::vector<replication::Successor *> &successors, google::protobuf::Message &msg)
-        // {
-        //     for (auto it = successors.begin(); it != successors.end(); it++)
-        //     {
-        //         msg.set_s((*it)->perShardTag);
-        //         // Sending to shard id, replicaIdx = 0 since that's where the leader is when there's no failures
-        //         if (!(transport->SendMessageToReplica(this, (*it)->shardId, 0, msg)))
-        //         {
-        //             RWarning("Failed to send PredecessorReply to shard %d", (*it)->shardId);
-        //         }
-        //     }
-        // }
 
         void IOCL_CTReplica::addOutstandingPredecessor(const proto::PredecessorReplyMessage &msg)
         {
@@ -1346,29 +1354,6 @@ namespace replication
                 m[msg.predidx()] = newp;
                 outstandingPredecessors[msg.s()] = m;
             }
-        }
-
-        uint64_t FoldL(const std::vector<Predecessor *> &predecessors, bool arrival)
-        {
-            if (predecessors.empty())
-            {
-                Panic("Called FoldL on empty predecessor list");
-                return 0;
-            }
-            auto v = arrival ? predecessors.front()->arrivalTimestamp : predecessors.front()->sortedTimestamp;
-            for (auto it = predecessors.begin(); it != predecessors.end(); ++it)
-            {
-                auto e = arrival ? (*it)->arrivalTimestamp : (*it)->sortedTimestamp;
-                if (e > v)
-                {
-                    v = e + 1;
-                }
-                else
-                {
-                    v++;
-                }
-            }
-            return v;
         }
 
         void IOCL_CTReplica::HandleRequestStateTransfer(

@@ -135,13 +135,13 @@ namespace replication
         LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
-        bool IsAtHead(std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator &it);
+        bool IsAtHead(void *it);
         bool InSorted(uint64_t shardTag);
-        std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator &ResortSorted(viewstamp_t vs, LogEntryState state,
-                                                                                                            uint64_t shardTag, uint64_t finalSortedTs);
+        void *ResortSorted(viewstamp_t vs, LogEntryState state,
+                           uint64_t shardTag, uint64_t finalSortedTs);
 
-        void SetPrepared(LogEntry &entry);
         bool SetStatus(opnum_t opnum, LogEntryState state);
+        void SetStatus(LogEntry &entry, LogEntryState state);
         bool SetRequest(opnum_t op, const Request &req);
         void RemoveAfter(opnum_t opnum);
         LogEntry *Last();

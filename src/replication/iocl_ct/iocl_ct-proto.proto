@@ -79,7 +79,7 @@ message PrepareOKMessage2 {
 
 message CommitMessage {
     required uint64 view = 1;
-    required uint64 opnum = 2;    
+    required uint64 batchId = 2;    
 }
 
 message RequestStateTransferMessage {
