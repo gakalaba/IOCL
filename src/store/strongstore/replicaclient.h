@@ -35,11 +35,13 @@
 #include "lib/message.h"
 #include "lib/transport.h"
 #include "replication/vr/client.h"
+#include "replication/iocl_ct/client.h"
 #include "store/common/frontend/client.h"
 #include "store/common/promise.h"
 #include "store/common/timestamp.h"
 #include "store/common/transaction.h"
 #include "store/strongstore/strong-proto.pb.h"
+#include "store/strongstore/common.h"
 
 namespace strongstore
 {
@@ -61,7 +63,7 @@ namespace strongstore
 
     public:
         /* Constructor needs path to shard config. */
-        ReplicaClient(const transport::Configuration &config, Transport *transport,
+        ReplicaClient(LinearizableProtocol linproto, const transport::Configuration &config, Transport *transport,
                       uint64_t client_id, int shard);
         virtual ~ReplicaClient();
 
@@ -138,7 +140,8 @@ namespace strongstore
         uint64_t client_id_;   // Unique ID for this client.
         int shard_idx_;        // which shard this client accesses
 
-        replication::vr::VRClient *client; // Client proxy.
+        // replication::vr::VRClient *client; // Client proxy.
+        replication::Client *client;
 
         std::unordered_map<uint64_t, PendingPrepare *> pendingPrepares;
         std::unordered_map<uint64_t, PendingCommit *> pendingCommits;

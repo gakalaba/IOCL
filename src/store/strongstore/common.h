@@ -38,6 +38,12 @@ namespace strongstore
         LIN
     };
 
+    enum LinearizableProtocol
+    {
+        VR,
+        IOCL_CT
+    };
+
 } // namespace strongstore
 
 #endif /* _STRONG_COMMON_H_ */

@@ -342,13 +342,19 @@ int main(int argc, char **argv)
         break;
     }
     case PROTO_IOCL_CT:
-    case PROTO_VR:
-    {
-        Debug("Making application request strongstore server");
+        Debug("Making application request IOCL_CT server");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, FLAGS_debug_stats);
+                                         tport, strongstore::LinearizableProtocol::IOCL_CT, FLAGS_debug_stats);
+        break;
+    case PROTO_VR:
+    {
+        Debug("Making application request VR server");
+        server = new strongstore::Server(consistency, shard_config,
+                                         replica_config, FLAGS_server_id,
+                                         FLAGS_group_idx, FLAGS_replica_idx,
+                                         tport, strongstore::LinearizableProtocol::VR, FLAGS_debug_stats);
         break;
     }
     default:
@@ -487,9 +493,8 @@ int main(int argc, char **argv)
     }
     case PROTO_IOCL_CT:
     {
-        // TODO ANJA obv make this new iocl::IOCLReplica
         Debug("huhuhuh");
-        replica = new replication::vr::VRReplica(
+        replica = new replication::iocl_ct::IOCL_CTReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);

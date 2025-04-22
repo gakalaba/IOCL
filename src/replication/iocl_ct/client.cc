@@ -249,5 +249,5 @@ namespace replication
             delete req;
         }
 
-    } // namespace ioclct
+    } // namespace iocl_ct
 } // namespace replication

@@ -35,7 +35,7 @@ namespace strongstore
     using namespace std;
     using namespace proto;
 
-    ReplicaClient::ReplicaClient(const transport::Configuration &config,
+    ReplicaClient::ReplicaClient(LinearizableProtocol linproto, const transport::Configuration &config,
                                  Transport *transport, uint64_t client_id,
                                  int shard)
         : config_{config},
@@ -46,8 +46,17 @@ namespace strongstore
           lastReqId{0}
     {
         Debug("making replica client");
-        client = new replication::vr::VRClient(config_, transport_, shard_idx_,
-                                               client_id_);
+        switch (linproto)
+        {
+        case LinearizableProtocol::VR:
+            client = new replication::vr::VRClient(config_, transport_, shard_idx_,
+                                                   client_id_);
+            break;
+        case LinearizableProtocol::IOCL_CT:
+            client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
+                                                             client_id_);
+            break;
+        }
     }
 
     ReplicaClient::~ReplicaClient() { delete client; }
