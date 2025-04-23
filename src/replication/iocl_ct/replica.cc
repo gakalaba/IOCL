@@ -166,6 +166,23 @@ namespace replication
             return v;
         }
 
+        void PrintBatches(uint64_t batchid, std::unordered_map<int, std::tuple<int, std::unordered_set<replication::LogEntry *>>> b)
+        {
+            if (b.find(batchid) == b.end())
+            {
+                Debug("the batch doesn't have a batch for batchid = %d", batchid);
+            }
+            else
+            {
+                auto s = std::get<1>(b[batchid]);
+                Debug("number of entries in the batch for batchid = %d is %d", batchid, s.size());
+                for (auto p : s)
+                {
+                    Debug("printing entry: %d, entry.tag = %d", p, p->myShardTag);
+                }
+            }
+        }
+
         void IOCL_CTReplica::CommitUpTo(uint64_t batchId)
         {
             auto s = std::get<1>(thebatchs2[batchId]);
@@ -442,6 +459,7 @@ namespace replication
                 RWarning("Failed to send prepare message to all replicas");
             }
             lastBatchEnd2 = lastBatch2;
+            Debug("Setting lastBatchEnd2 to %d", lastBatchEnd2);
 
             resendPrepareTimeout->Reset();
             closeBatch2Timeout->Stop();
@@ -695,7 +713,7 @@ namespace replication
                     RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
                     /* Add the request to my log(s) */
-                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
                     // log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
                     log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
@@ -710,7 +728,7 @@ namespace replication
                 {
                     RDebug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     // Add the request to the current pending batch
                     addToPendingBatch(entry);
                     // Flush out the batch if it's hit batchSize
@@ -941,78 +959,74 @@ namespace replication
         void IOCL_CTReplica::HandlePrepareOK2(const TransportAddress &remote,
                                               const PrepareOKMessage2 &msg)
         {
+            RDebug("Received PREPAREOK for view=%d and batchid=%d from replica %d",
+                   msg.view(), msg.batchid(), msg.replicaidx());
+
+            if (this->status != STATUS_NORMAL)
             {
-                RDebug("Received PREPAREOK for view=%d and batchid=%d from replica %d",
-                       msg.view(), msg.batchid(), msg.replicaidx());
+                RDebug("Ignoring PREPAREOK due to abnormal status");
+                return;
+            }
 
-                if (this->status != STATUS_NORMAL)
+            if (msg.view() < this->view)
+            {
+                RDebug("Ignoring PREPAREOK due to stale view");
+                return;
+            }
+
+            if (msg.view() > this->view)
+            {
+                RequestStateTransfer();
+                return;
+            }
+
+            if (!AmLeader())
+            {
+                RWarning("Ignoring PREPAREOK because I'm not the leader");
+                return;
+            }
+            uint64_t batchId = msg.batchid();
+
+            ASSERT(batchId >= 0 && batchId <= lastBatchEnd2);
+            if (thebatchs2.find(batchId) == thebatchs2.end())
+            {
+                Debug("Ignoring this prepareok2");
+                // Assuming this is an ack for something that already got a quorum
+                return;
+            }
+            auto t = thebatchs2[batchId];
+            std::get<0>(t)++;
+            // If this batch got a quorum of ACKs/is replicated!!
+            if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
+            {
+                /*
+                 * We have a quorum of PrepareOK2 messages for this
+                 * opnumber. Execute it and all previous operations.
+                 *
+                 * (Note that we might have already executed it. That's fine,
+                 * we just won't do anything.)
+                 *
+                 * This also notifies the client of the result.
+                 */
+                CommitUpTo(msg.batchid());
+                /*
+                 * Send COMMIT message to the other replicas.
+                 *
+                 * This can be done asynchronously, so it really ought to be
+                 * piggybacked on the next PREPARE or something.
+                 */
+                CommitMessage cm;
+                cm.set_view(this->view);
+                cm.set_batchid(msg.batchid());
+
+                if (!(transport->SendMessageToAll(this, cm)))
                 {
-                    RDebug("Ignoring PREPAREOK due to abnormal status");
-                    return;
+                    RWarning("Failed to send COMMIT message to all replicas");
                 }
 
-                if (msg.view() < this->view)
-                {
-                    RDebug("Ignoring PREPAREOK due to stale view");
-                    return;
-                }
+                thebatchs2.erase(batchId);
 
-                if (msg.view() > this->view)
-                {
-                    RequestStateTransfer();
-                    return;
-                }
-
-                if (!AmLeader())
-                {
-                    RWarning("Ignoring PREPAREOK because I'm not the leader");
-                    return;
-                }
-                uint64_t batchId = msg.batchid();
-
-                ASSERT(batchId >= 0 && batchId <= lastBatchEnd2);
-                if (thebatchs2.find(batchId) == thebatchs2.end())
-                {
-                    // Assuming this is an ack for something that already got a quorum
-                    return;
-                }
-                auto t = thebatchs2[batchId];
-                std::get<0>(t)++;
-
-                // If this batch got a quorum of ACKs/is replicated!!
-
-                if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
-                // Just doing equal so we don't collect more than we need.. we ignore the > ones
-                {
-                    /*
-                     * We have a quorum of PrepareOK2 messages for this
-                     * opnumber. Execute it and all previous operations.
-                     *
-                     * (Note that we might have already executed it. That's fine,
-                     * we just won't do anything.)
-                     *
-                     * This also notifies the client of the result.
-                     */
-                    CommitUpTo(msg.batchid());
-                    /*
-                     * Send COMMIT message to the other replicas.
-                     *
-                     * This can be done asynchronously, so it really ought to be
-                     * piggybacked on the next PREPARE or something.
-                     */
-                    CommitMessage cm;
-                    cm.set_view(this->view);
-                    cm.set_batchid(msg.batchid());
-
-                    if (!(transport->SendMessageToAll(this, cm)))
-                    {
-                        RWarning("Failed to send COMMIT message to all replicas");
-                    }
-
-                    thebatchs2.erase(batchId);
-
-                    nullCommitTimeout->Reset();
-                }
+                nullCommitTimeout->Reset();
             }
         }
 
