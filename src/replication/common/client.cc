@@ -85,4 +85,12 @@ namespace replication
               type.c_str());
     }
 
+    void Client::InvokeIOCL(const string &request, uint64_t myshardtag,
+                            std::vector<uint64_t> &preds,
+                            continuation_t continuation,
+                            error_continuation_t error_continuation)
+    {
+        Panic("shouldn't be calling this");
+    }
+
 } // namespace replication

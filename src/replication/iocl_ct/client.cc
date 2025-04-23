@@ -82,6 +82,49 @@ namespace replication
             SendRequest(req);
         }
 
+        void IOCL_CTClient::InvokeIOCL(const string &request, uint64_t myshardtag,
+                                       std::vector<uint64_t> &preds,
+                                       continuation_t continuation,
+                                       error_continuation_t error_continuation)
+        {
+            Debug("IOCL_CTClient::InvokeIOCL invoked");
+            // TODO: Currently, invocations never timeout and error_continuation is
+            // never called. It may make sense to set a timeout on the invocation.
+            (void)error_continuation;
+
+            uint64_t reqId = ++lastReqId;
+            Timeout *timer =
+                new Timeout(transport, 500, [this, reqId]()
+                            { ResendRequest(reqId); });
+            PendingRequest *req =
+                new PendingRequest(request, reqId, continuation, timer);
+
+            pendingReqs[reqId] = req;
+            proto::RequestMessage reqMsg;
+            reqMsg.mutable_req()->set_op(req->request);
+            reqMsg.mutable_req()->set_clientid(clientid);
+            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            reqMsg.set_shardtag(myshardtag);
+            for (int i = 0; i < preds.size(); i++)
+            {
+                reqMsg.add_predlist(preds[i]);
+            }
+
+            Debug("SENDING REQUEST: %lu %s", clientid, req);
+            // XXX Try sending only to (what we think is) the leader first
+            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
+            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            {
+                req->timer->Reset();
+            }
+            else
+            {
+                Warning("Could not send request to replicas.");
+                pendingReqs.erase(req->clientReqId);
+                delete req;
+            }
+        }
+
         void IOCL_CTClient::InvokeCoordination(uint64_t p, uint64_t s, uint64_t predIdx, uint64_t sendTo)
         {
             Debug("This client sent a coordination request");

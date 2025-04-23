@@ -353,6 +353,10 @@ namespace strongstore
         double nb_time_alpha_;
 
         bool debug_stats_;
+
+        // IOCL Specific
+        std::unordered_map<uint64_t, uint64_t> seqnos;
+        std::vector<uint64_t> currentOutstanding;
     };
 
 } // namespace strongstore

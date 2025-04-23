@@ -36,6 +36,7 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "store/common/common.h"
+#include "replication/common/iocl_utils.h"
 
 using namespace std;
 
@@ -623,10 +624,20 @@ namespace strongstore
         // Contact the appropriate shard to set the value.
         // TODO ANJA this is wrong way wrong
         int i = (*part_)(key, nshards_, -1, session.participants());
+        if (seqnos.find(i) == seqnos.end())
+        {
+            seqnos[i] = 0;
+        }
 
-        auto rcb1 = [rcb, session = std::ref(session)](int s, const std::string &v)
+        uint64_t myshardtag = replication::CreateTag(client_id_, seqnos[i]);
+        seqnos[i]++;
+
+        auto rcb1 = [rcb, myshardtag, m = std::ref(currentOutstanding), session = std::ref(session)](int s, const std::string &v)
         {
             session.get().set_executing();
+            // remove this from the currentOutstanding set
+            auto it = std::find(m.get().begin(), m.get().end(), myshardtag);
+            m.get().erase(it);
             rcb(s, v);
         };
 
@@ -636,7 +647,9 @@ namespace strongstore
             rtcb(s, v);
         };
 
-        sclients_[i]->SendRequest(req_id, op, key, value, rcb1, rtcb1, timeout);
+        currentOutstanding.push_back(myshardtag);
+
+        sclients_[i]->SendRequest(req_id, op, key, value, currentOutstanding, rcb1, rtcb1, timeout);
     }
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)

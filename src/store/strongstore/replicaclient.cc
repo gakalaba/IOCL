@@ -43,7 +43,8 @@ namespace strongstore
           client_id_(client_id),
           shard_idx_(shard),
           pendingCommits{},
-          lastReqId{0}
+          lastReqId{0},
+          linproto_{linproto}
     {
         Debug("making replica client");
         switch (linproto)
@@ -56,6 +57,8 @@ namespace strongstore
             client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
                                                              client_id_);
             break;
+        default:
+            Panic("not a valid linearizable protocol");
         }
     }
 
@@ -79,10 +82,28 @@ namespace strongstore
         pendingRequest->rcb = rcb;
         pendingRequest->rtcb = rtcb;
 
-        client->Invoke(
-            request_str,
-            bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
+        switch (linproto_)
+        {
+        case LinearizableProtocol::VR:
+            client
+                ->Invoke(
+                    request_str,
+                    bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
+                         std::placeholders::_1, std::placeholders::_2));
+            break;
+        case LinearizableProtocol::IOCL_CT:
+            std::vector<uint64_t> predecessorlist;
+            for (int i = 0; i < msg.predlist_size(); i++)
+            {
+                predecessorlist.push_back(msg.predlist(i));
+            }
+            client
+                ->InvokeIOCL(
+                    request_str, msg.mytag(), predecessorlist,
+                    bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
+                         std::placeholders::_1, std::placeholders::_2));
+            break;
+        }
     }
 
     /* Callback from a shard replica on sendrequest operation completion. */

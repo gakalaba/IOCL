@@ -142,6 +142,7 @@ namespace strongstore
 
         // replication::vr::VRClient *client; // Client proxy.
         replication::Client *client;
+        LinearizableProtocol linproto_;
 
         std::unordered_map<uint64_t, PendingPrepare *> pendingPrepares;
         std::unordered_map<uint64_t, PendingCommit *> pendingCommits;
