@@ -190,21 +190,14 @@ namespace replication
             for (auto entry : s)
             {
                 lastCommitted++;
-
-                /* Find operation in log */
-                // const LogEntry *entry = log.Find(lastCommitted);
-                // if (entry == nullptr)
-                // {
-                //     RPanic("Did not find operation " FMT_OPNUM " in log",
-                //            lastCommitted);
-                // }
+                // TODO Anja update LastExecuted in here!!
 
                 const Request request = entry->request;
 
                 /* Execute it */
                 RDebug("Executing request with tag %d", entry->myShardTag);
                 ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
+                Execute(entry->myShardTag, entry->request, reply);
                 lastExecutedTimestamp++;
 
                 reply.set_view(entry->viewstamp.view);
@@ -663,11 +656,12 @@ namespace replication
                 request.set_clientreqid(msg.req().clientreqid());
 
                 /* Assign it an arrival timestamp */
-                auto arrivalTimestamp = shardTimestamp;
+                Debug("Assign arrival timestamp = %d", shardTimestamp);
+                uint64_t arrivalTimestamp = shardTimestamp;
                 shardTimestamp++;
 
                 /* Add outstanding successors that asked for my timestamp */
-                auto successors = std::vector<Successor *>{};
+                std::vector<Successor *> successors = std::vector<Successor *>{};
                 auto it = outstandingSuccessors.find(msg.shardtag());
                 if (it != outstandingSuccessors.end())
                 {
@@ -676,9 +670,9 @@ namespace replication
                 };
 
                 /* Add outstanding Predecessors that provided their timestamps */
-                auto predecessors = std::vector<Predecessor *>{};
-                auto acks = 0;
-                auto acks2 = 0;
+                std::vector<Predecessor *> predecessors = std::vector<Predecessor *>{};
+                uint64_t acks = 0;
+                uint64_t acks2 = 0;
                 for (int i = 0; i < msg.predlist_size(); ++i)
                 {
                     Predecessor *newp = new Predecessor{msg.predlist(i), 0, -1, -1};
@@ -702,26 +696,12 @@ namespace replication
                 }
 
                 if (acks2 == predecessors.size())
-                // Ready to add to sorted log!
+                // Accounts for 0th requests and requests on fast path
                 {
                     RDebug("ready to add to the SORTED log!");
-                    /* Assign it an opnum */
-                    ++this->lastOp;
-                    v.view = this->view;
-                    v.opnum = this->lastOp;
-
-                    RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
                     /* Add the request to my log(s) */
                     LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
-                    entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
-                    // log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
-                    log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
-                    addToPendingBatch2(entry);
-                    if (lastBatch2 - lastBatchEnd2 + 1 > batchSize)
-                    {
-                        CloseBatch2();
-                    }
+                    IOCL_CTReplica::finalizeEntry(entry);
                 }
                 else
                 // Ready to add to unsorted log!
@@ -730,7 +710,7 @@ namespace replication
                     /* Add the request to my unorderedLog OR sorted log, depending */
                     LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     // Add the request to the current pending batch
-                    addToPendingBatch(entry);
+                    IOCL_CTReplica::addToPendingBatch(entry);
                     // Flush out the batch if it's hit batchSize
                     if (lastBatch - lastBatchEnd + 1 > batchSize)
                     {
@@ -1269,6 +1249,7 @@ namespace replication
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
+            RDebug("For next request, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
             auto it = log.ResortSorted(entry.viewstamp, LOG_STATE_READY, entry.myShardTag, entry.sortTimestamp);
             // Add if it is the head
             if (log.IsAtHead(it))
@@ -1276,7 +1257,7 @@ namespace replication
                 IOCL_CTReplica::addToPendingBatch2(entry);
             }
             // Flush out the batch if it's hit batchSize
-            if (lastBatch - lastBatchEnd + 1 > batchSize)
+            if (lastBatch2 - lastBatchEnd2 + 1 > batchSize)
             {
                 CloseBatch2();
             }
