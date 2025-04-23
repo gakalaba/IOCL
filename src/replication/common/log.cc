@@ -152,7 +152,7 @@ namespace replication
     LogEntry &
     Log::AppendSorted(LogEntryState state, uint64_t shardTag, uint64_t sortedTs)
     {
-        auto entry = unorderedEntries[shardTag];
+        LogEntry &entry = unorderedEntries[shardTag];
 
         entry.state = state;
         entry.sortTimestamp = sortedTs;
@@ -170,7 +170,7 @@ namespace replication
         auto it = findByFirst(sortedLog, shardTag);
         if (it != sortedLog.end())
         {
-            auto retval = FindUnsorted(shardTag);
+            LogEntry *retval = FindUnsorted(shardTag);
             ASSERT(retval != NULL);
             return retval;
         }
@@ -203,7 +203,7 @@ namespace replication
         {
             Debug("entry wasn't in the sorted log before this call");
         }
-        auto entry = unorderedEntries[shardTag];
+        LogEntry &entry = unorderedEntries[shardTag];
         entry.viewstamp = vs;
         entry.state = state;
         entry.sortTimestamp = finalSortedTs;
@@ -220,21 +220,22 @@ namespace replication
     // We know the sorted log has length >= 1 at this point
     bool Log::IsAtHead(void *it_ptr)
     {
+        return true;
         auto it = *((std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator *)it_ptr);
         ASSERT(it != sortedLog.end());
-        auto entry = FindUnsorted(std::get<0>(*it)); // O(1)
+        LogEntry *entry = FindUnsorted(std::get<0>(*it)); // O(1)
         while (true)
         {
             // walk backwards until lastExecuted??
             auto prevIt = std::prev(it);
-            auto prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
+            LogEntry *prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
             if (Commute(prev_entry_ptr, entry) && prev_entry_ptr->state < LOG_STATE_READY)
             {
                 // if i find an entry that is state < LOG_STATE_READY and on the same key,
                 // ADD MYSELF TO ITS PENDING SET and then return false
                 prev_entry_ptr->pendingReadies.insert(entry);
                 // and my descendents
-                for (auto e : entry->pendingReadies)
+                for (LogEntry *e : entry->pendingReadies)
                 {
                     if (e->sortTimestamp > prev_entry_ptr->sortTimestamp)
                     {

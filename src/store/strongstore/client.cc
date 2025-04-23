@@ -648,8 +648,9 @@ namespace strongstore
         };
 
         currentOutstanding.push_back(myshardtag);
+        outstandingShards.push_back(i);
 
-        sclients_[i]->SendRequest(req_id, op, key, value, currentOutstanding, rcb1, rtcb1, timeout);
+        sclients_[i]->SendRequest(req_id, op, key, value, currentOutstanding, outstandingShards, rcb1, rtcb1, timeout);
     }
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)

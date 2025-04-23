@@ -357,6 +357,7 @@ namespace strongstore
         // IOCL Specific
         std::unordered_map<uint64_t, uint64_t> seqnos;
         std::vector<uint64_t> currentOutstanding;
+        std::vector<uint64_t> outstandingShards;
     };
 
 } // namespace strongstore

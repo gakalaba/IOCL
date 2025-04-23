@@ -268,6 +268,7 @@ namespace strongstore
     void ShardClient::SendRequest(uint64_t transaction_id, const std::string op,
                                   const std::string &key, const std::string &value,
                                   std::vector<uint64_t> &preds,
+                                  std::vector<uint64_t> &predshards,
                                   req_callback rcb, req_timeout_callback rtcb,
                                   uint32_t timeout)
     {
@@ -297,6 +298,7 @@ namespace strongstore
         for (int i = 0; i < n; i++)
         {
             req_.add_predlist(preds[i]);
+            req_.add_predshardlist(predshards[i]);
         }
         req_.set_mytag(preds[n]);
 

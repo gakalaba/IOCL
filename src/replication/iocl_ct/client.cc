@@ -84,6 +84,7 @@ namespace replication
 
         void IOCL_CTClient::InvokeIOCL(const string &request, uint64_t myshardtag,
                                        std::vector<uint64_t> &preds,
+                                       std::vector<uint64_t> &predshardlist,
                                        continuation_t continuation,
                                        error_continuation_t error_continuation)
         {
@@ -105,12 +106,26 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
             reqMsg.set_shardtag(myshardtag);
+            // Send Coordination request messages
+            proto::SuccessorRequestMessage coordReqMsg;
+            coordReqMsg.set_s(myshardtag);
             for (int i = 0; i < preds.size(); i++)
             {
                 reqMsg.add_predlist(preds[i]);
+
+                coordReqMsg.set_p(preds[i]);
+                coordReqMsg.set_predidx(i);
+                uint64_t sendTo = predshardlist[i];
+                coordReqMsg.set_shardidx(sendTo);
+                Debug("SENDING COORD REQUEST to shard: %lu", sendTo);
+                // XXX Try sending only to (what we think is) the leader first
+                if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
+                {
+                    Warning("Could not send request to replicas.");
+                }
             }
 
-            Debug("SENDING REQUEST: %lu %s", clientid, req);
+            Debug("SENDING REQUEST with tag: %d", myshardtag);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
@@ -122,23 +137,6 @@ namespace replication
                 Warning("Could not send request to replicas.");
                 pendingReqs.erase(req->clientReqId);
                 delete req;
-            }
-        }
-
-        void IOCL_CTClient::InvokeCoordination(uint64_t p, uint64_t s, uint64_t predIdx, uint64_t sendTo)
-        {
-            Debug("This client sent a coordination request");
-            proto::SuccessorRequestMessage coordReqMsg;
-            coordReqMsg.set_p(p);
-            coordReqMsg.set_s(s);
-            coordReqMsg.set_predidx(predIdx);
-            coordReqMsg.set_shardidx(group);
-
-            Debug("SENDING Coordination REquest to shard: %lu", sendTo);
-            // XXX Try sending only to (what we think is) the leader first
-            if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
-            {
-                Warning("Could not send request to replicas.");
             }
         }
 

@@ -93,13 +93,15 @@ namespace strongstore
             break;
         case LinearizableProtocol::IOCL_CT:
             std::vector<uint64_t> predecessorlist;
+            std::vector<uint64_t> predecessorshardlist;
             for (int i = 0; i < msg.predlist_size(); i++)
             {
                 predecessorlist.push_back(msg.predlist(i));
+                predecessorshardlist.push_back(msg.predshardlist(i));
             }
             client
                 ->InvokeIOCL(
-                    request_str, msg.mytag(), predecessorlist,
+                    request_str, msg.mytag(), predecessorlist, predecessorshardlist,
                     bind(&ReplicaClient::SendRequestCallback, this, pendingRequest->reqId,
                          std::placeholders::_1, std::placeholders::_2));
             break;

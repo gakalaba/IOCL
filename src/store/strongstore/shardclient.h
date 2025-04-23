@@ -128,6 +128,7 @@ namespace strongstore
         void SendRequest(uint64_t request_id, const std::string op,
                          const std::string &key, const std::string &value,
                          std::vector<uint64_t> &preds,
+                         std::vector<uint64_t> &predshards,
                          req_callback rcb, req_timeout_callback rtcb,
                          uint32_t timeout);
 

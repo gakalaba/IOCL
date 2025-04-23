@@ -88,6 +88,7 @@ namespace replication
                                     void *meta_data) override;
         virtual void InvokeIOCL(const string &request, uint64_t myshardtag,
                                 std::vector<uint64_t> &preds,
+                                std::vector<uint64_t> &predshardlist,
                                 continuation_t continuation,
                                 error_continuation_t error_continuation = nullptr);
 

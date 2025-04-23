@@ -52,6 +52,7 @@ namespace replication
         LOG_STATE_FASTPREPARED, // fastpaxos only
         /* IOCL specifics */
         LOG_STATE_ARRIVED,
+        LOG_STATE_FASTPATH,
         LOG_STATE_PREPARED,
         LOG_STATE_ASSIGNED,
         LOG_STATE_READY, // all acks have arrived
@@ -61,7 +62,6 @@ namespace replication
     struct Predecessor
     {
         uint64_t perShardTag;
-        uint64_t shardId;
         int64_t arrivalTimestamp;
         int64_t sortedTimestamp;
     };
@@ -170,7 +170,6 @@ namespace replication
         {
             bool operator()(const std::tuple<uint64_t, uint64_t> &a, const std::tuple<uint64_t, uint64_t> &b) const
             {
-                Debug("hi! we're comparing by the sortedTimestamps wahoo");
                 return std::get<1>(a) < std::get<1>(b);
             }
         };

@@ -54,6 +54,7 @@ namespace replication
                                 error_continuation_t error_continuation = nullptr);
             virtual void InvokeIOCL(const string &request, uint64_t myshardtag,
                                     std::vector<uint64_t> &preds,
+                                    std::vector<uint64_t> &predshardlist,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation = nullptr);
             virtual void InvokeUnlogged(
@@ -68,7 +69,6 @@ namespace replication
             virtual void ReceiveMessage(const TransportAddress &remote,
                                         const string &type, const string &data,
                                         void *meta_data);
-            virtual void InvokeCoordination(uint64_t p, uint64_t s, uint64_t predIdx, uint64_t sendTo);
 
         protected:
             int view;
