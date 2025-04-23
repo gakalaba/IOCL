@@ -196,19 +196,12 @@ namespace replication
 
     void *Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t finalSortedTs)
     {
-        if (sortedLog.empty())
-        {
-            ASSERT(vs.opnum == start);
-        }
-        else
-        {
-            ASSERT(vs.opnum == LastOpnum() + 1);
-        }
+        ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
         // Remove this tag from the sorted log
         bool deleted = deleteByFirst(sortedLog, shardTag);
         if (!deleted)
         {
-            Debug("Couldn't resort the entry -- couldn't delete it with old sort timestamp");
+            Debug("entry wasn't in the sorted log before this call");
         }
         auto entry = unorderedEntries[shardTag];
         entry.viewstamp = vs;

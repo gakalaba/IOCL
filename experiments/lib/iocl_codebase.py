@@ -232,6 +232,7 @@ class IOCLCodebase:
             '--num_shards', config['num_shards'],
             '--stats_file', stats_file,
             '--clock_error', truetime_error,
+            '--server_load_time', config['server_load_time'],
             '--strong_consistency', config['consistency']]])
 
         if 'message_transport_type' in config['replication_protocol_settings']:

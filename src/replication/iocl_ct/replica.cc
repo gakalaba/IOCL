@@ -147,7 +147,7 @@ namespace replication
         {
             if (predecessors.empty())
             {
-                Panic("Called FoldL on empty predecessor list");
+                Debug("Called FoldL on empty predecessor list");
                 return 0;
             }
             auto v = arrival ? predecessors.front()->arrivalTimestamp : predecessors.front()->sortedTimestamp;
@@ -169,6 +169,7 @@ namespace replication
         void IOCL_CTReplica::CommitUpTo(uint64_t batchId)
         {
             auto s = std::get<1>(thebatchs2[batchId]);
+            Debug("hopefully gonna execute some stuff");
             for (auto entry : s)
             {
                 lastCommitted++;
@@ -215,6 +216,7 @@ namespace replication
                 }
 
                 /* Send reply */
+                Debug("sending reply!");
                 auto iter = clientAddresses.find(entry->request.clientid());
                 if (iter != clientAddresses.end())
                 {
@@ -509,7 +511,7 @@ namespace replication
                 prepare2.ParseFromString(data);
                 HandlePrepare2(remote, prepare2);
             }
-            else if (type == prepareOK.GetTypeName())
+            else if (type == prepareOK2.GetTypeName())
             {
                 prepareOK2.ParseFromString(data);
                 HandlePrepareOK2(remote, prepareOK2);
@@ -684,6 +686,7 @@ namespace replication
                 if (acks2 == predecessors.size())
                 // Ready to add to sorted log!
                 {
+                    RDebug("ready to add to the SORTED log!");
                     /* Assign it an opnum */
                     ++this->lastOp;
                     v.view = this->view;
@@ -694,11 +697,13 @@ namespace replication
                     /* Add the request to my log(s) */
                     auto entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
-                    log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
+                    // log.AppendSorted(LOG_STATE_PREPARED, msg.shardtag(), entry.sortTimestamp);
                     log.ResortSorted(v, LOG_STATE_READY, msg.shardtag(), entry.sortTimestamp);
-
-                    // TODO Anja add batching!
-                    CloseBatch2();
+                    addToPendingBatch2(entry);
+                    if (lastBatch2 - lastBatchEnd2 + 1 > batchSize)
+                    {
+                        CloseBatch2();
+                    }
                 }
                 else
                 // Ready to add to unsorted log!
@@ -801,6 +806,11 @@ namespace replication
             uint64_t batchId = msg.batchid();
 
             ASSERT(batchId >= 0 && batchId < lastBatchEnd);
+            if (thebatchs.find(batchId) == thebatchs.end())
+            {
+                // gonna assume this means we're getting acks past the quorum
+                return;
+            }
             auto t = thebatchs[batchId];
             std::get<0>(t)++;
 
@@ -906,10 +916,11 @@ namespace replication
             for (auto &req : msg.requests())
             {
                 // TODO ANJA this is supposed to be ApendUnsorted
+                log.AppendUnsorted(req, msg.shardtags(i), LOG_STATE_ARRIVED, msg.sortedts(i), {}, {}, 0, 0);
                 log.ResortSorted(viewstamp_t(msg.view(), i + op), LOG_STATE_READY, msg.shardtags(i), msg.sortedts(i));
                 UpdateClientTable(req);
-                i++;
                 s.insert(log.FindUnsorted(msg.shardtags(i)));
+                i++;
             }
             ASSERT(i == msg.requests().size());
             thebatchs2[msg.batchid()] = {0, s};
@@ -959,13 +970,19 @@ namespace replication
                 }
                 uint64_t batchId = msg.batchid();
 
-                ASSERT(batchId >= 0 && batchId < lastBatchEnd2);
+                ASSERT(batchId >= 0 && batchId <= lastBatchEnd2);
+                if (thebatchs2.find(batchId) == thebatchs2.end())
+                {
+                    // Assuming this is an ack for something that already got a quorum
+                    return;
+                }
                 auto t = thebatchs2[batchId];
                 std::get<0>(t)++;
 
                 // If this batch got a quorum of ACKs/is replicated!!
 
                 if (std::get<0>(t) >= prepareOKQuorum.NumRequired())
+                // Just doing equal so we don't collect more than we need.. we ignore the > ones
                 {
                     /*
                      * We have a quorum of PrepareOK2 messages for this
