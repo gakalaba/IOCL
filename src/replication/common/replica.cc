@@ -57,17 +57,17 @@ namespace replication
     void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                                string &res)
     {
-        Debug("Making leader upcall for operation %s", op.c_str());
+        // Debug("Making leader upcall for operation %s", op.c_str());
         app->LeaderUpcall(opnum, op, replicate, res);
-        Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
+        // Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
     }
 
     void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res)
     {
-        Debug("Making upcall for opnum %d operation %s", opnum, op);
+        // Debug("Making upcall for opnum %d operation %s", opnum, op);
         app->ReplicaUpcall(opnum, op, res);
 
-        Debug("Upcall result: %s", res.c_str());
+        // Debug("Upcall result: %s", res.c_str());
     }
 
     void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)

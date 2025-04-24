@@ -88,7 +88,7 @@ namespace replication
                                        continuation_t continuation,
                                        error_continuation_t error_continuation)
         {
-            Debug("IOCL_CTClient::InvokeIOCL invoked");
+            Debug("IOCL_CTClient::InvokeIOCL invoked for request with tag: %d", myshardtag);
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
@@ -117,7 +117,7 @@ namespace replication
                 coordReqMsg.set_predidx(i);
                 uint64_t sendTo = predshardlist[i];
                 coordReqMsg.set_shardidx(sendTo);
-                Debug("SENDING COORD REQUEST to shard: %lu", sendTo);
+                Debug("SENDING %dth COORD REQUEST for predecessor_tag %d to shard %lu", i, preds[i], sendTo);
                 // XXX Try sending only to (what we think is) the leader first
                 if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
                 {
@@ -125,7 +125,6 @@ namespace replication
                 }
             }
 
-            Debug("SENDING REQUEST with tag: %d", myshardtag);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))

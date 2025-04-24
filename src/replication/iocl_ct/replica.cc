@@ -183,6 +183,37 @@ namespace replication
             }
         }
 
+        void PrintState(LogEntryState thestate)
+        {
+            switch (thestate)
+            {
+            case LOG_STATE_SPECULATIVE:
+                Debug("state = LOG_STATE_SPECULATIVE");
+                break;
+            case LOG_STATE_FASTPREPARED:
+                Debug("state = LOG_STATE_FASTPREPARED");
+                break;
+            case LOG_STATE_ARRIVED:
+                Debug("state = LOG_STATE_ARRIVED");
+                break;
+            case LOG_STATE_FASTPATH:
+                Debug("state = LOG_STATE_FASTPATH");
+                break;
+            case LOG_STATE_PREPARED:
+                Debug("state = LOG_STATE_PREPARED");
+                break;
+            case LOG_STATE_ASSIGNED:
+                Debug("state = LOG_STATE_ASSIGNED");
+                break;
+            case LOG_STATE_READY:
+                Debug("state = LOG_STATE_READY");
+                break;
+            case LOG_STATE_COMMITTED:
+                Debug("state = LOG_STATE_COMMITTED");
+                break;
+            }
+        }
+
         void IOCL_CTReplica::CommitUpTo(uint64_t batchId)
         {
             auto s = std::get<1>(thebatchs2[batchId]);
@@ -589,7 +620,7 @@ namespace replication
                 return;
             }
 
-            RDebug("Handling Request--I AM the leader");
+            RDebug("Handling Request with tag %d--I AM the leader", msg.shardtag());
             // Save the client's address
             clientAddresses.erase(msg.req().clientid());
             clientAddresses.insert(
@@ -644,7 +675,7 @@ namespace replication
             // Check whether this request should be committed to replicas
             if (!replicate)
             {
-                RDebug("Not replicating to replicas");
+                Panic("why isn't replicate on???");
                 ReplyMessage reply;
                 reply.set_reply(res);
                 reply.set_view(0);
@@ -656,7 +687,7 @@ namespace replication
             }
             else
             {
-                RDebug("replicating to other replicas!");
+                // RDebug("replicating to other replicas!");
                 Request request;
                 request.set_op(res);
                 request.set_clientid(msg.req().clientid());
@@ -705,7 +736,7 @@ namespace replication
                 if (acks2 == predecessors.size())
                 // Accounts for 0th requests and requests on fast path
                 {
-                    RDebug("ready to add to the SORTED log!");
+                    RDebug("ready to add to the SORTED log on FASTPATH!");
                     /* Add the request to my log(s) */
                     LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     IOCL_CTReplica::finalizeEntry(entry, LOG_STATE_FASTPATH);
@@ -880,18 +911,18 @@ namespace replication
         void IOCL_CTReplica::HandlePrepare2(const TransportAddress &remote,
                                             const PrepareMessage2 &msg)
         {
-            RDebug("Received PREPARE < view = %d, batchid = %d",
+            RDebug("Received PREPARE2 < view = %d, batchid = %d",
                    msg.view(), msg.batchid());
 
             if (this->status != STATUS_NORMAL)
             {
-                RDebug("Ignoring PREPARE due to abnormal status");
+                RDebug("Ignoring PREPARE2 due to abnormal status");
                 return;
             }
 
             if (msg.view() < this->view)
             {
-                RDebug("Ignoring PREPARE due to stale view");
+                RDebug("Ignoring PREPARE2 due to stale view");
                 return;
             }
 
@@ -905,7 +936,7 @@ namespace replication
 
             if (AmLeader())
             {
-                RPanic("Unexpected PREPARE: I'm the leader of this view");
+                RPanic("Unexpected PREPARE2: I'm the leader of this view");
             }
             viewChangeTimeout->Reset();
 
@@ -942,25 +973,25 @@ namespace replication
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))
             {
-                RWarning("Failed to send PrepareOK message to leader");
+                RWarning("Failed to send PrepareOK2 message to leader");
             }
         }
 
         void IOCL_CTReplica::HandlePrepareOK2(const TransportAddress &remote,
                                               const PrepareOKMessage2 &msg)
         {
-            RDebug("Received PREPAREOK for view=%d and batchid=%d from replica %d",
+            RDebug("Received PREPAREOK2 for view=%d and batchid=%d from replica %d",
                    msg.view(), msg.batchid(), msg.replicaidx());
 
             if (this->status != STATUS_NORMAL)
             {
-                RDebug("Ignoring PREPAREOK due to abnormal status");
+                RDebug("Ignoring PREPAREOK2 due to abnormal status");
                 return;
             }
 
             if (msg.view() < this->view)
             {
-                RDebug("Ignoring PREPAREOK due to stale view");
+                RDebug("Ignoring PREPAREOK2 due to stale view");
                 return;
             }
 
@@ -972,7 +1003,7 @@ namespace replication
 
             if (!AmLeader())
             {
-                RWarning("Ignoring PREPAREOK because I'm not the leader");
+                RWarning("Ignoring PREPAREOK2 because I'm not the leader");
                 return;
             }
             uint64_t batchId = msg.batchid();
@@ -1069,6 +1100,7 @@ namespace replication
                                                 const proto::SuccessorRequestMessage &msg)
         {
             ASSERT(AmLeader());
+            Debug("Inside handle coordination! successor tag %d is looking for predecessor tag %d", msg.s(), msg.p());
             LogEntry *entry = log.FindUnsorted(msg.p());
             bool inSorted = log.InSorted(msg.p());
             PredecessorReplyMessage a;
@@ -1084,7 +1116,8 @@ namespace replication
                 // This is probably a late successor
                 // Fast path to second round
                 // Send sortedTs to this successor
-                Debug("the state = %d", entry->state);
+                RDebug("The predecessor is in the sorted log");
+                PrintState(entry->state);
                 ASSERT(entry->state == LOG_STATE_ASSIGNED || entry->state == LOG_STATE_READY || entry->state == LOG_STATE_COMMITTED || entry->state == LOG_STATE_FASTPATH);
                 if (entry->state != LOG_STATE_FASTPATH)
                 {
@@ -1093,7 +1126,7 @@ namespace replication
                     aa.set_s(msg.s());
                     aa.set_predidx(msg.predidx());
                     aa.set_sortedts(entry->sortTimestamp);
-                    Debug("the predeessor's sorted timestamp is %d", entry->sortTimestamp);
+                    Debug("We are sending the predeessor's sorted timestamp which is is %d", entry->sortTimestamp);
                     if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, aa)))
                     {
                         RWarning("Failed to send PredecessorReplyMessage2 from HandleCoordination");
@@ -1101,6 +1134,7 @@ namespace replication
                 }
                 else
                 {
+                    Debug("The predecessor hasn't been replicated yet, so not sending anything to the successor at this time");
                     // else we'll send it from HandlePrepareOK2
                     entry->successors.push_back(s);
                 }
@@ -1109,16 +1143,20 @@ namespace replication
             {
                 // If the request isn't there yet, add it to the outstandingSuccessors map
                 // Add this successor for the next round of timestamp replies
+                RDebug("The predecessor has not arrived at this shard yet, not sending anything");
                 outstandingSuccessors[msg.p()].push_back(s);
             }
             else if (!inSorted && entry)
             {
+                RDebug("The predecessor is in the UNsorted log");
+                PrintState(entry->state);
                 ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
                 // Add this successor for the next round of timestamp replies
                 entry->successors.push_back(s);
                 // If it's been prepared, send the correct timestamp to this asking successor
                 if (entry->state == LOG_STATE_PREPARED)
                 {
+                    Debug("we are sending the predecessor's arrival timestamp which is %d", entry->arrivalTimestamp);
                     a.set_arrivalts(entry->arrivalTimestamp);
                     // Only send the ack once it's replicated the arrival timestamp!
                     if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, a)))
@@ -1133,6 +1171,7 @@ namespace replication
                                                     const proto::PredecessorReplyMessage &msg)
         {
             ASSERT(AmLeader());
+            Debug("Inside handleCoordinationResp! predecessor tag %d is ack2ing successor tag %d", msg.p(), msg.s());
             // The entry should be in the unsorted log
             LogEntry *entry = log.FindUnsorted(msg.s());
             bool inSorted = log.InSorted(msg.s());
@@ -1172,12 +1211,13 @@ namespace replication
                                                      const proto::PredecessorReplyMessage2 &msg)
         {
             ASSERT(AmLeader());
+            Debug("Inside handleCoordinationREsp2! predecessor tag %d is ack2ing successor tag %d", msg.p(), msg.s());
             // This could be ariving for an entry that never came yet or for an entry that never got the first round ACK!
             LogEntry *entry = log.FindUnsorted(msg.s());
             bool inSorted = log.InSorted(msg.s());
             if (inSorted)
             {
-                Debug("in sorted");
+                Debug("The successor is in the sorted log");
                 ASSERT(entry->state == LOG_STATE_ASSIGNED || entry->state == LOG_STATE_READY || entry->state == LOG_STATE_COMMITTED);
 
                 // Entry is in the sorted log!
@@ -1190,13 +1230,13 @@ namespace replication
             }
             else if (!inSorted && !entry)
             {
-                Debug("not here yet");
+                Debug("the successor has not arrived at this shard yet");
                 // Entry has never arrived yet
                 IOCL_CTReplica::addOutstandingPredecessor2(msg);
             }
             else if (!inSorted && entry)
             {
-                Debug("in unsorted");
+                Debug("the successor is in the UNsorted log");
                 ASSERT(entry->state == LOG_STATE_ARRIVED || entry->state == LOG_STATE_PREPARED);
 
                 // Entry is in the unsorted map... probably has been replicated...
@@ -1281,7 +1321,7 @@ namespace replication
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
-            RDebug("For next request, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+            RDebug("For this request, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
             auto it = log.ResortSorted(entry.viewstamp, logstate, entry.myShardTag, entry.sortTimestamp);
             // Add if it is the head
             if (log.IsAtHead(it))

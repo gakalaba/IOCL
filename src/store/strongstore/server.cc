@@ -272,7 +272,7 @@ namespace strongstore
 
     void Server::HandleSendRequest(const TransportAddress &remote, proto::IOCLRequest &msg)
     {
-        Debug("Calling HandleSendRequest! with msg %s: msg.op = %s, msg.key = %s, msg.value = %s", msg, msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
+        Debug("Calling HandleSendRequest! %s(key=%s, val=%s)", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
         auto reply = new PendingRequestReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
@@ -1637,7 +1637,7 @@ namespace strongstore
     void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                               string &response)
     {
-        Debug("Received LeaderUpcall in strongstore server: %lu %s", opnum, op.c_str());
+        // Debug("Received LeaderUpcall in strongstore server: %lu %s", opnum, op.c_str());
 
         Request request;
         IOCLRequest ioclrequest;
@@ -1661,7 +1661,7 @@ namespace strongstore
             ioclrequest.ParseFromString(op);
             replicate = true;
             response = op;
-            Debug("was able to parse IOCLRequest! it looks like %s", ioclrequest);
+            Debug("was able to parse IOCLRequest! it has shardtag = %d", ioclrequest.mytag());
         }
     }
 
@@ -1673,7 +1673,7 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
+        // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         IOCLRequest ioclrequest;
         if (consistency_ == LIN)
         {
