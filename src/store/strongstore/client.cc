@@ -36,7 +36,7 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "store/common/common.h"
-#include "replication/common/iocl_utils.h"
+#include "store/common/iocl_utils.h"
 
 using namespace std;
 
@@ -629,7 +629,7 @@ namespace strongstore
             seqnos[i] = 0;
         }
 
-        uint64_t myshardtag = replication::CreateTag(client_id_, seqnos[i]);
+        uint64_t myshardtag = CreateTag(client_id_, seqnos[i]);
         seqnos[i]++;
 
         auto rcb1 = [rcb, myshardtag, m = std::ref(currentOutstanding), session = std::ref(session)](int s, const std::string &v)

@@ -39,7 +39,7 @@
 #include "replication/common/request.pb.h"
 #include "replication/iocl_ct/client.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
-#include "replication/common/iocl_utils.h"
+#include "store/common/iocl_utils.h"
 
 namespace replication
 {

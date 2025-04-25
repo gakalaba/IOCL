@@ -40,7 +40,7 @@
 #include "lib/transport.h"
 #include "lib/viewstamp.h"
 #include "replication/common/request.pb.h"
-#include "replication/common/iocl_utils.h"
+#include "replication/common/iocl_log.h"
 
 namespace replication
 {

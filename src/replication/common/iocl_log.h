@@ -28,30 +28,13 @@
  *
  **********************************************************************/
 
-#ifndef _COMMON_IOCL_UTILS_H_
-#define _COMMON_IOCL_UTILS_H_
+#ifndef _COMMON_IOCL_LOG_H_
+#define _COMMON_IOCL_LOG_H_
 
 #include "lib/message.h"
 
 namespace replication
 {
-    uint64_t IntToPid(uint64_t tag)
-    {
-        uint64_t pid = (tag >> 32) & 0xFFFFFFFF;
-        return pid;
-    }
-
-    uint64_t IntToSeqno(uint64_t tag)
-    {
-        uint64_t seqno = (tag & 0xFFFFFFFF);
-        return seqno;
-    }
-
-    uint64_t CreateTag(uint64_t pid, uint64_t seqno)
-    {
-        return (pid << 32) | (seqno & 0xFFFFFFFF);
-    }
-
     // Custom comparator to compare tuples by the first element and break ties by insertion order
     struct CompareByFirstAndInsertionOrder
     {
@@ -144,4 +127,4 @@ namespace replication
 
 } // namespace replication
 
-#endif /* _COMMON_IOCL_UTILS_H_ */
+#endif /* _COMMON_IOCL_LOG_H_ */
