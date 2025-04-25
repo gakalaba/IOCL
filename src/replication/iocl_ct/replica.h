@@ -81,6 +81,7 @@ namespace replication
             uint64_t lastExecutedTimestamp;
 
             Log log;
+            // OrderedLog sortedLog;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {
@@ -122,7 +123,7 @@ namespace replication
             void CloseBatch2();
             void CloseBatch();
             void addToPendingBatch(LogEntry &entry);
-            void addToPendingBatch2(LogEntry &entry);
+            void addToPendingBatch2(int count);
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);

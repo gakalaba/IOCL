@@ -152,23 +152,25 @@ namespace replication
     LogEntry &
     Log::AppendSorted(LogEntryState state, uint64_t shardTag, uint64_t sortedTs)
     {
+        ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
         LogEntry &entry = unorderedEntries[shardTag];
 
         entry.state = state;
         entry.sortTimestamp = sortedTs;
-        sortedLog.insert({shardTag, sortedTs});
-        if (firstUncommittedEntry == NULL)
-        {
-            firstUncommittedEntry = &entry;
-        }
+        sortedLog.insert(sortedTs, shardTag);
         return *FindUnsorted(shardTag);
     }
 
     LogEntry *
     Log::FindSorted(uint64_t shardTag)
     {
-        auto it = findByFirst(sortedLog, shardTag);
-        if (it != sortedLog.end())
+        LogEntry *ep = FindUnsorted(shardTag);
+        if (ep == NULL)
+        {
+            Debug("not in sorted or unsorted");
+            return NULL;
+        }
+        if (sortedLog.isIn(ep->sortTimestamp, ep->myShardTag))
         {
             LogEntry *retval = FindUnsorted(shardTag);
             ASSERT(retval != NULL);
@@ -183,32 +185,34 @@ namespace replication
 
     bool Log::InSorted(uint64_t shardTag)
     {
-        auto it = findByFirst(sortedLog, shardTag);
-        if (it != sortedLog.end())
+        Debug("looking inside sorted log for tag %d", shardTag);
+        LogEntry *ep = FindUnsorted(shardTag);
+        if (ep == NULL)
         {
-            return true;
-        }
-        else
-        {
+            Debug("not in sorted or unsorted");
             return false;
         }
+        return sortedLog.isIn(ep->sortTimestamp, ep->myShardTag);
     }
 
-    void *Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t finalSortedTs)
+    void Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, uint64_t finalSortedTs)
     {
+        // Assert it's in UNsorted
         ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
         // Remove this tag from the sorted log
-        bool deleted = deleteByFirst(sortedLog, shardTag);
-        if (!deleted)
-        {
-            Debug("entry wasn't in the sorted log before this call");
-        }
         LogEntry &entry = unorderedEntries[shardTag];
         entry.viewstamp = vs;
         entry.state = state;
+        Debug("Old version is <sortedtimestamp = %d, shardTag = %d>", entry.sortTimestamp, shardTag);
+        sortedLog.deleteElem(entry.sortTimestamp, shardTag);
+        Debug("assigning new timestamp = %d", finalSortedTs);
         entry.sortTimestamp = finalSortedTs;
-        auto it = std::get<0>(sortedLog.insert({shardTag, finalSortedTs}));
-        return (void *)(&it);
+        Debug("Calling ResortSorted with <sortedTimestamp=%d, shardTag = %d>", finalSortedTs, shardTag);
+        sortedLog.insert(finalSortedTs, shardTag); // TODO Anja: should this be insert or insertWithSameOrder??
+        PrintSortedLog();
+        Debug("and let's just see if we can find it!");
+        sortedLog.isIn(finalSortedTs, shardTag);
+        return;
     }
 
     bool Commute(LogEntry *a, LogEntry *b)
@@ -218,43 +222,92 @@ namespace replication
     }
 
     // We know the sorted log has length >= 1 at this point
-    bool Log::IsAtHead(void *it_ptr)
+    // TODO Anja pass in commute function when replicas are instantiated
+    int Log::MoveSortedToLog(uint64_t shardTag)
     {
-        return true;
-        auto it = *((std::set<std::tuple<uint64_t, uint64_t>, replication::Log::CompareBySecond>::iterator *)it_ptr);
-        ASSERT(it != sortedLog.end());
-        LogEntry *entry = FindUnsorted(std::get<0>(*it)); // O(1)
-        while (true)
+        LogEntry *ep = FindUnsorted(shardTag);
+        LogEntry *maybehead;
+        ASSERT(ep != NULL);
+        ASSERT(ep->state == LOG_STATE_READY || ep->state == LOG_STATE_FASTPATH);
+        bool sawself = false;
+        int found = 0;
+
+        auto it = sortedLog.begin();
+        while (it != sortedLog.end())
         {
-            // walk backwards until lastExecuted??
-            auto prevIt = std::prev(it);
-            LogEntry *prev_entry_ptr = FindUnsorted(std::get<0>(*prevIt));
-            if (Commute(prev_entry_ptr, entry) && prev_entry_ptr->state < LOG_STATE_READY)
+            // save iterator!!
+            auto nextIt = std::next(it);
+
+            maybehead = FindUnsorted(std::get<1>(*it));
+            if (!sawself && (maybehead->sortTimestamp == ep->sortTimestamp && maybehead->myShardTag == shardTag))
             {
-                // if i find an entry that is state < LOG_STATE_READY and on the same key,
-                // ADD MYSELF TO ITS PENDING SET and then return false
-                prev_entry_ptr->pendingReadies.insert(entry);
-                // and my descendents
-                for (LogEntry *e : entry->pendingReadies)
-                {
-                    if (e->sortTimestamp > prev_entry_ptr->sortTimestamp)
-                    {
-                        prev_entry_ptr->pendingReadies.insert(e);
-                    }
-                    else
-                    {
-                        auto this_it = findByFirst(sortedLog, e->myShardTag);
-                        IsAtHead((void *)(&this_it));
-                    }
-                }
-                return false;
+                sawself = true; // i am the head of the log, there is a contiguous run of nonzero size
+                found++;
+                // delete self from sorted log and add to final log
+                sortedLog.deleteElem(ep->sortTimestamp, ep->myShardTag);
+                entries.push_back(*ep);
+                ASSERT(found == 1);
             }
-            if (prevIt == findByFirst(sortedLog, firstUncommittedEntry->myShardTag))
-                break;
+            else if (!sawself && !Commute(ep, maybehead))
+            {
+                // Found an entry earlier in the log that hasn't been made ready yet that I don't commute with... I must wait
+                ASSERT(maybehead->state == LOG_STATE_ASSIGNED);
+                ASSERT(found == 0);
+                return 0;
+            }
+            else if (sawself && !Commute(ep, maybehead))
+            {
+                // maybehead == nothead
+                ASSERT(maybehead->sortTimestamp >= ep->sortTimestamp);
+                if (maybehead->state == LOG_STATE_READY || maybehead->state == LOG_STATE_FASTPATH)
+                {
+                    found++;
+                    sortedLog.deleteElem(maybehead->sortTimestamp, maybehead->myShardTag);
+                    entries.push_back(*maybehead);
+                }
+                else
+                {
+                    return found;
+                }
+            }
+
+            // move to next iterator
+            it = nextIt;
         }
-        // ADD MYSELF TO ITS PENDING SET and then return false
-        // otherwise return true
-        return true;
+        Panic("what happened???");
+    }
+
+    void Log::PrintSortedLog()
+    {
+        auto printLogEntry = [&](uint64_t shardtag, int i)
+        {
+            LogEntry *ep = FindUnsorted(shardtag);
+            Debug("         SortedLog[%d] = LogEntry{tag=%d, arrivalts = %d, sortedts = %d, %s}", i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str());
+        };
+        sortedLog.print(printLogEntry);
+    }
+
+    std::string Log::PrintState(LogEntryState logstate)
+    {
+        switch (logstate)
+        {
+        case LOG_STATE_SPECULATIVE:
+            return "state = LOG_STATE_SPECULATIVE";
+        case LOG_STATE_FASTPREPARED:
+            return "state = LOG_STATE_FASTPREPARED";
+        case LOG_STATE_ARRIVED:
+            return "state = LOG_STATE_ARRIVED";
+        case LOG_STATE_FASTPATH:
+            return "state = LOG_STATE_FASTPATH";
+        case LOG_STATE_PREPARED:
+            return "state = LOG_STATE_PREPARED";
+        case LOG_STATE_ASSIGNED:
+            return "state = LOG_STATE_ASSIGNED";
+        case LOG_STATE_READY:
+            return "state = LOG_STATE_READY";
+        case LOG_STATE_COMMITTED:
+            return "state = LOG_STATE_COMMITTED";
+        }
     }
 
     bool

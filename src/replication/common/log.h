@@ -40,6 +40,7 @@
 #include "lib/transport.h"
 #include "lib/viewstamp.h"
 #include "replication/common/request.pb.h"
+#include "replication/common/iocl_utils.h"
 
 namespace replication
 {
@@ -136,10 +137,12 @@ namespace replication
         LogEntry &AppendSorted(LogEntryState state,
                                uint64_t shardTag, uint64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
-        bool IsAtHead(void *it);
         bool InSorted(uint64_t shardTag);
-        void *ResortSorted(viewstamp_t vs, LogEntryState state,
-                           uint64_t shardTag, uint64_t finalSortedTs);
+        void ResortSorted(viewstamp_t vs, LogEntryState state,
+                          uint64_t shardTag, uint64_t finalSortedTs);
+        int MoveSortedToLog(uint64_t shardtag);
+        void PrintSortedLog();
+        std::string PrintState(LogEntryState logstate);
 
         bool SetStatus(opnum_t opnum, LogEntryState state);
         void SetStatus(LogEntry &entry, LogEntryState state);
@@ -166,52 +169,7 @@ namespace replication
         bool useHash;
         // IOCL specifics
         // .find(), .end(), .insert(), .erase()
-        struct CompareBySecond
-        {
-            bool operator()(const std::tuple<uint64_t, uint64_t> &a, const std::tuple<uint64_t, uint64_t> &b) const
-            {
-                return std::get<1>(a) < std::get<1>(b);
-            }
-        };
-
-        bool deleteByFirst(std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> &s, uint64_t firstElement)
-        {
-            // Create a tuple with the first element you want to search for and a placeholder for the second
-            std::tuple<uint64_t, uint64_t> keyToFind = {firstElement, 0}; // The second element doesn't matter
-
-            // Use lower_bound to find the first element greater than or equal to the key
-            auto it = s.lower_bound(keyToFind);
-
-            // Check if the iterator points to a valid element and if the first element matches
-            if (it != s.end() && std::get<0>(*it) == firstElement)
-            {
-                s.erase(it); // Erase the element from the set
-                return true; // Successfully erased
-            }
-
-            return false; // Element not found
-        };
-
-        std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond>::iterator findByFirst(
-            std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> &s, uint64_t firstElement)
-        {
-
-            // Create a tuple with the first element you want to search for and a placeholder for the second
-            std::tuple<uint64_t, uint64_t> keyToFind = {firstElement, 0}; // The second element doesn't matter
-
-            // Use lower_bound to find the first element greater than or equal to the key
-            auto it = s.lower_bound(keyToFind);
-
-            // Check if the iterator points to a valid element and if the first element matches
-            if (it != s.end() && std::get<0>(*it) == firstElement)
-            {
-                return it; // Found the element
-            }
-
-            return s.end(); // Not found
-        };
-
-        std::set<std::tuple<uint64_t, uint64_t>, CompareBySecond> sortedLog; // tuple<tag, sortedTs>
+        IOCLog sortedLog; // tuple<tag, sortedTs>
         std::unordered_map<uint64_t, LogEntry> unorderedEntries;
         LogEntry *firstUncommittedEntry;
     };
