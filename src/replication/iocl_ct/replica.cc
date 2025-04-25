@@ -74,6 +74,7 @@ namespace replication
             lastBatchEnd2 = 0;
             lastBatch = 0;
             lastBatchEnd = 0;
+            lastBatch2 = 0;
 
             if (batchSize > 1)
             {
@@ -442,6 +443,8 @@ namespace replication
             pp.set_view(view);
             pp.set_batchid(lastBatchEnd2);
 
+            ASSERT(s.size() > 0);
+
             for (const auto &entry_ptr : s)
             {
                 Request *r = pp.add_requests();
@@ -706,12 +709,7 @@ namespace replication
                     RDebug("ready to add to the SORTED log on FASTPATH!");
                     /* Add the request to my log(s) */
                     LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
-                    Debug('hi');
-                    log.PrintSortedLog();
-                    Debug("hmm");
                     IOCL_CTReplica::finalizeEntry(entry, LOG_STATE_FASTPATH);
-                    Debug("UMM is the entry in the sorted log now? %d", log.InSorted(msg.shardtag()));
-                    Debug("UMMM 2 is the entry in the sorted log now? %d", log.InSorted(entry.myShardTag));
                 }
                 else
                 // Ready to add to unsorted log!
@@ -1280,8 +1278,13 @@ namespace replication
         {
             // Step 2.
             ASSERT(entry.state == LOG_STATE_PREPARED);
-            uint64_t lastCommittedTimestamp = log.Find(lastCommitted)->sortTimestamp;
-            entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastCommittedTimestamp);
+            LogEntry *p = log.Find(lastCommitted);
+            uint64_t lastCommittedTimestamp = 0;
+            if (p)
+            {
+                lastCommittedTimestamp = p->sortTimestamp;
+            }
+            entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastCommittedTimestamp + 1);
             Debug("new sorted timestamp is %d", entry.sortTimestamp);
             // Insert into orderedLog, sorted by sortedTimestamp
             Debug("inserting into sorted log");
@@ -1293,18 +1296,26 @@ namespace replication
         void IOCL_CTReplica::finalizeEntry(LogEntry &entry, LogEntryState logstate)
         {
             // Step 3.
-            uint64_t lastCommittedTimestamp = log.Find(lastCommitted)->sortTimestamp;
-            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastCommittedTimestamp);
+            LogEntry *p = log.Find(lastCommitted);
+            uint64_t lastCommittedTimestamp = 0;
+            if (p)
+            {
+                lastCommittedTimestamp = p->sortTimestamp;
+            }
+            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastCommittedTimestamp + 1);
             Debug("final timestamp is %d", entry.sortTimestamp);
             /* Assign it an opnum */
             viewstamp_t v;
+            Debug("this->lastOp = %d", this->lastOp);
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
-            RDebug("For this request, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-            Debug("ok so before ResortSorted on %d, this is the sorted log:", entry.myShardTag);
+            Debug("after ++: this->lastOp = %d", this->lastOp);
+            RDebug("For this request, assigning v.view = %d, v.opnum = %d", v.view, v.opnum);
+            Debug("entry.viewstamp.opnum = %d", entry.viewstamp.opnum);
             log.PrintSortedLog();
-            log.ResortSorted(entry.viewstamp, logstate, entry.myShardTag, entry.sortTimestamp);
+            log.ResortSorted(v, logstate, entry.myShardTag, entry.sortTimestamp);
+            Debug("entry.viewstamp.opnum after = %d", entry.viewstamp.opnum);
             Debug("now after resortSorted on %d, here's the sorted log:", entry.myShardTag);
             log.PrintSortedLog();
             // Add if it is the head, send out contiguous run of ready entries!!
@@ -1339,23 +1350,30 @@ namespace replication
 
         void IOCL_CTReplica::addToPendingBatch2(int count)
         {
+            Debug("addToPendingBatch2 adding %d batched requests", count);
             std::tuple<int, std::unordered_set<replication::LogEntry *>> t;
             for (int i = 0; i < count; i++)
             {
+                lastBatch2++;
                 // TODO Anja: make sure this index is right oofgh
                 if (thebatchs2.find(lastBatchEnd2) != thebatchs2.end())
                 {
+                    Debug("adding to existing batch for batchid %d", lastBatchEnd2);
                     t = thebatchs2[lastBatchEnd2];
-                    std::get<1>(t).insert(log.Find(lastBatch2 + i));
+                    LogEntry *batchedEntry = log.Find(lastBatch2 + i);
+                    ASSERT(batchedEntry != NULL);
+                    std::get<1>(t).insert(batchedEntry);
                 }
                 else
                 {
+                    Debug("starting new batch for batchid = %d, and looking in log entries for opnum %d", lastBatchEnd2, lastBatch2 + i);
                     std::unordered_set<LogEntry *> s = {};
-                    s.insert(log.Find(lastBatch2 + i));
+                    LogEntry *batchedEntry = log.Find(lastBatch2 + i);
+                    ASSERT(batchedEntry != NULL);
+                    s.insert(batchedEntry);
                     t = std::make_tuple(1, s);
                     thebatchs2[lastBatchEnd2] = t;
                 }
-                lastBatch2++;
             }
         }
 

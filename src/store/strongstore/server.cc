@@ -1133,7 +1133,7 @@ namespace strongstore
     void Server::SendRequestCallback(PendingRequestReply *reply, uint64_t transaction_id, int status,
                                      string retval)
     {
-        Debug("got this status %d and this retval %s", status, retval);
+        Debug("got this status %d and this retval %s", status, retval.c_str());
 
         uint64_t client_id = reply->rid.client_id();
         uint64_t client_req_id = reply->rid.client_req_id();

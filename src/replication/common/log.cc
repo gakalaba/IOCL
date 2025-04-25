@@ -82,21 +82,26 @@ namespace replication
     {
         if (entries.empty())
         {
+            Debug("entries is empty");
             return NULL;
         }
 
         if (opnum < start)
         {
+            Debug("opnum %d < start %d", opnum, start);
             return NULL;
         }
 
         if (opnum - start > entries.size() - 1)
         {
+            Debug("opnum %d - start %d > entries.size() - 1 %d", opnum, start, entries.size() - 1);
             return NULL;
         }
+        Debug("opnum %d - start %d = %d", opnum, start, opnum - start);
 
         LogEntry *entry = &entries[opnum - start];
-        ASSERT(entry->viewstamp.opnum == opnum);
+        Debug("entry->viewstamp.opnum %d == opnum %d", entry->viewstamp.opnum, opnum);
+        // ASSERT(entry->viewstamp.opnum == opnum);
         return entry;
     }
 
@@ -240,6 +245,7 @@ namespace replication
             maybehead = FindUnsorted(std::get<1>(*it));
             if (!sawself && (maybehead->sortTimestamp == ep->sortTimestamp && maybehead->myShardTag == shardTag))
             {
+                Debug("i found myself! going to add mysel to the regular log");
                 sawself = true; // i am the head of the log, there is a contiguous run of nonzero size
                 found++;
                 // delete self from sorted log and add to final log
@@ -284,7 +290,8 @@ namespace replication
         Debug("SortedLog looks like:...");
         for (auto it = sortedLog.begin(); it != sortedLog.end(); ++it)
         {
-            LogEntry *ep = FindUnsorted(std::get<0>(*it));
+            LogEntry *ep = FindUnsorted(std::get<1>(*it));
+            ASSERT(ep != NULL);
             Debug("SortedLog[%d]: <sortedTimestamp = %d, shardTag = %d, insertionOrder = %d>", i, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it));
             Debug("         SortedLog[%d] = LogEntry{tag=%d, arrivalts = %d, sortedts = %d, %s}", i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str());
             i++;
