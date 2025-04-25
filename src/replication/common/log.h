@@ -91,7 +91,6 @@ namespace replication
         std::vector<Successor *> successors;
         uint64_t acks;
         uint64_t acks2;
-        std::unordered_set<LogEntry *> pendingReadies;
 
         LogEntry() { replyMessage = NULL; }
         LogEntry(const LogEntry &x)
@@ -171,7 +170,6 @@ namespace replication
         // .find(), .end(), .insert(), .erase()
         IOCLog sortedLog; // tuple<tag, sortedTs>
         std::unordered_map<uint64_t, LogEntry> unorderedEntries;
-        LogEntry *firstUncommittedEntry;
     };
 
 #include "replication/common/log-impl.h"

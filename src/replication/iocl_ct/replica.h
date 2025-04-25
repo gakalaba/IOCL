@@ -78,7 +78,6 @@ namespace replication
             std::unordered_map<int, std::tuple<int, std::unordered_set<LogEntry *>>> thebatchs2;
             // IOCL specifics
             uint64_t shardTimestamp;
-            uint64_t lastExecutedTimestamp;
 
             Log log;
             // OrderedLog sortedLog;

@@ -98,14 +98,12 @@ namespace replication
         }
 
         // Print the set for debugging
-        void print(std::function<void(uint64_t, int)> logPrinter) const
+        void print() const
         {
             int i = 0;
             for (const auto &entry : sortedLog)
             {
                 Debug("SortedLog[%d]: <sortedTimestamp = %d, shardTag = %d, insertionOrder = %d>", i, std::get<0>(entry), std::get<1>(entry), std::get<2>(entry));
-                logPrinter(std::get<1>(entry), i);
-                i++;
             }
         }
 

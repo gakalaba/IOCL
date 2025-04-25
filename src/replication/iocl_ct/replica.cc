@@ -72,7 +72,6 @@ namespace replication
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd2 = 0;
-            lastExecutedTimestamp = 0;
             lastBatch = 0;
             lastBatchEnd = 0;
 
@@ -205,7 +204,6 @@ namespace replication
                 RDebug("Executing request with tag %d", entry->myShardTag);
                 ReplyMessage reply;
                 Execute(entry->myShardTag, entry->request, reply);
-                lastExecutedTimestamp++;
 
                 reply.set_view(entry->viewstamp.view);
                 reply.set_opnum(entry->viewstamp.opnum);
@@ -708,6 +706,9 @@ namespace replication
                     RDebug("ready to add to the SORTED log on FASTPATH!");
                     /* Add the request to my log(s) */
                     LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    Debug('hi');
+                    log.PrintSortedLog();
+                    Debug("hmm");
                     IOCL_CTReplica::finalizeEntry(entry, LOG_STATE_FASTPATH);
                     Debug("UMM is the entry in the sorted log now? %d", log.InSorted(msg.shardtag()));
                     Debug("UMMM 2 is the entry in the sorted log now? %d", log.InSorted(entry.myShardTag));
@@ -1279,7 +1280,8 @@ namespace replication
         {
             // Step 2.
             ASSERT(entry.state == LOG_STATE_PREPARED);
-            entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastExecutedTimestamp);
+            uint64_t lastCommittedTimestamp = log.Find(lastCommitted)->sortTimestamp;
+            entry.sortTimestamp = std::max(FoldL(entry.predecessors, true), lastCommittedTimestamp);
             Debug("new sorted timestamp is %d", entry.sortTimestamp);
             // Insert into orderedLog, sorted by sortedTimestamp
             Debug("inserting into sorted log");
@@ -1291,7 +1293,8 @@ namespace replication
         void IOCL_CTReplica::finalizeEntry(LogEntry &entry, LogEntryState logstate)
         {
             // Step 3.
-            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastExecutedTimestamp);
+            uint64_t lastCommittedTimestamp = log.Find(lastCommitted)->sortTimestamp;
+            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastCommittedTimestamp);
             Debug("final timestamp is %d", entry.sortTimestamp);
             /* Assign it an opnum */
             viewstamp_t v;

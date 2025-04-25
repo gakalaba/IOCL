@@ -51,16 +51,21 @@ namespace micro
     {
         Debug("BASIC_APP_REQUEST %lu %lu", GetNumKeys(), op_index);
         srand(time(0));
-        uint64_t percentage_writes = 75; // todo CHANGE THIS
-        if ((rand() % 100) < percentage_writes)
+        uint64_t percentage_writes = 75; // TODO Anja CHANGE THIS
+        // if ((rand() % 100) < percentage_writes)
+        if (op_index % 2 == 0)
         {
-            Debug("Sending Put");
-            return Put(GetKey(op_index - 1), GetKey(op_index - 1));
+            // Debug("Sending Put(%d, %d)", GetKey(op_index - 1), GetKey(op_index - 1));
+            // return Put(GetKey(op_index - 1), GetKey(op_index - 1));
+            Debug("Sending Put(%s, %s)", std::to_string(op_index), std::to_string(op_index));
+            return Put(std::to_string(op_index), std::to_string(op_index));
         }
         else
         {
-            Debug("sending Get");
-            return Get(GetKey(op_index - 1));
+            // Debug("sending Get(%d)", GetKey(op_index - 1));
+            // return Get(GetKey(op_index - 1));
+            Debug("sending Get(%s)", std::to_string(op_index));
+            return Get(std::to_string(op_index));
         }
     }
 

@@ -44,7 +44,6 @@ namespace replication
     {
         this->initialHash = initialHash;
         this->start = start;
-        firstUncommittedEntry = NULL;
         if (start == 1)
         {
             ASSERT(initialHash == EMPTY_HASH);
@@ -274,17 +273,22 @@ namespace replication
             // move to next iterator
             it = nextIt;
         }
-        Panic("what happened???");
+        // If we got here, we popped off a contiguous run of ready entries
+        // and there shouldn't be anymore on this key in the log
+        return found;
     }
 
     void Log::PrintSortedLog()
     {
-        auto printLogEntry = [&](uint64_t shardtag, int i)
+        int i = 0;
+        Debug("SortedLog looks like:...");
+        for (auto it = sortedLog.begin(); it != sortedLog.end(); ++it)
         {
-            LogEntry *ep = FindUnsorted(shardtag);
+            LogEntry *ep = FindUnsorted(std::get<0>(*it));
+            Debug("SortedLog[%d]: <sortedTimestamp = %d, shardTag = %d, insertionOrder = %d>", i, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it));
             Debug("         SortedLog[%d] = LogEntry{tag=%d, arrivalts = %d, sortedts = %d, %s}", i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str());
-        };
-        sortedLog.print(printLogEntry);
+            i++;
+        }
     }
 
     std::string Log::PrintState(LogEntryState logstate)
