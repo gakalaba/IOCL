@@ -128,6 +128,7 @@ namespace strongstore
                           string &response) override;
         void ReplicaUpcall(opnum_t opnum, const string &op,
                            string &response) override;
+        bool CommuteFn(const string &op1, const string &op2) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 

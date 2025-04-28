@@ -83,4 +83,10 @@ namespace replication
         app->UnloggedUpcall(op, res);
     }
 
+    // IOCL
+    bool Replica::CommuteFn(const string &op1, const string &op2)
+    {
+        return app->CommuteFn(op1, op2);
+    }
+
 } // namespace replication

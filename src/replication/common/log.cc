@@ -219,12 +219,6 @@ namespace replication
         return;
     }
 
-    bool Commute(LogEntry *a, LogEntry *b)
-    {
-        // TODO Anja
-        return true;
-    }
-
     // We know the sorted log has length >= 1 at this point
     // TODO Anja pass in commute function when replicas are instantiated
     int Log::MoveSortedToLog(uint64_t shardTag)
@@ -253,14 +247,14 @@ namespace replication
                 entries.push_back(*ep);
                 ASSERT(found == 1);
             }
-            else if (!sawself && !Commute(ep, maybehead))
+            else if (!sawself && !commutefn(ep->request.op(), maybehead->request.op()))
             {
                 // Found an entry earlier in the log that hasn't been made ready yet that I don't commute with... I must wait
                 ASSERT(maybehead->state == LOG_STATE_ASSIGNED);
                 ASSERT(found == 0);
                 return 0;
             }
-            else if (sawself && !Commute(ep, maybehead))
+            else if (sawself && !commutefn(ep->request.op(), maybehead->request.op()))
             {
                 // maybehead == nothead
                 ASSERT(maybehead->sortTimestamp >= ep->sortTimestamp);

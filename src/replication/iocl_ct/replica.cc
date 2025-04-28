@@ -114,6 +114,12 @@ namespace replication
                 _Latency_Init(&upcall_to_exec_lat_, "upcall_to_exec");
                 _Latency_Init(&exec_to_sent_lat_, "exec_to_sent");
             }
+            // IOCL
+            std::function<bool(const string &, const string &)> f = [this](const string &a, const string &b)
+            {
+                return CommuteFn(a, b);
+            };
+            log.RegisterCommuteFunction(f);
         }
 
         // Destructor
@@ -1306,16 +1312,12 @@ namespace replication
             Debug("final timestamp is %d", entry.sortTimestamp);
             /* Assign it an opnum */
             viewstamp_t v;
-            Debug("this->lastOp = %d", this->lastOp);
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
-            Debug("after ++: this->lastOp = %d", this->lastOp);
             RDebug("For this request, assigning v.view = %d, v.opnum = %d", v.view, v.opnum);
-            Debug("entry.viewstamp.opnum = %d", entry.viewstamp.opnum);
             log.PrintSortedLog();
             log.ResortSorted(v, logstate, entry.myShardTag, entry.sortTimestamp);
-            Debug("entry.viewstamp.opnum after = %d", entry.viewstamp.opnum);
             Debug("now after resortSorted on %d, here's the sorted log:", entry.myShardTag);
             log.PrintSortedLog();
             // Add if it is the head, send out contiguous run of ready entries!!

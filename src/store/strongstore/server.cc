@@ -1840,6 +1840,17 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    bool Server::CommuteFn(const string &op1, const string &op2)
+    {
+        ASSERT(consistency_ == LIN);
+        IOCLRequest o1;
+        IOCLRequest o2;
+        o1.ParseFromString(op1);
+        o2.ParseFromString(op2);
+        Debug("inside Server App Commutefn: op1 = %s, op2 = %s", o1.op().c_str(), o2.op().c_str());
+        return (o1.key() != o2.key());
+    }
+
     void Server::UnloggedUpcall(const string &op, string &response)
     {
         NOT_IMPLEMENTED();

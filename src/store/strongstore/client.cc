@@ -635,7 +635,7 @@ namespace strongstore
         auto rcb1 = [rcb, myshardtag, m = std::ref(currentOutstanding), session = std::ref(session)](int s, const std::string &v)
         {
             session.get().set_executing();
-            // remove this from the currentOutstanding set
+            // remove this from the currentOutstanding set O(N)
             auto it = std::find(m.get().begin(), m.get().end(), myshardtag);
             m.get().erase(it);
             rcb(s, v);

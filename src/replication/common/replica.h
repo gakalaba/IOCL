@@ -77,6 +77,7 @@ namespace replication
         {
             Debug("Wrong LeaderStatusUpcall");
         };
+        virtual bool CommuteFn(const string &op1, const string &op2) { return false; };
     };
 
     class Replica : public TransportReceiver
@@ -97,6 +98,7 @@ namespace replication
         void UnloggedUpcall(const string &op, string &res);
         template <class MSG>
         void ExecuteUnlogged(const UnloggedRequest &msg, MSG &reply);
+        bool CommuteFn(const string &op1, const string &op2);
 
     protected:
         transport::Configuration configuration;

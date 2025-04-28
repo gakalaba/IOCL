@@ -34,6 +34,7 @@
 #include <google/protobuf/message.h>
 
 #include <map>
+#include <functional>
 
 #include "lib/assert.h"
 #include "lib/message.h"
@@ -140,6 +141,10 @@ namespace replication
         void ResortSorted(viewstamp_t vs, LogEntryState state,
                           uint64_t shardTag, uint64_t finalSortedTs);
         int MoveSortedToLog(uint64_t shardtag);
+        void RegisterCommuteFunction(std::function<bool(const std::string &, const std::string &)> f)
+        {
+            commutefn = f;
+        }
         void PrintSortedLog();
         std::string PrintState(LogEntryState logstate);
 
@@ -170,6 +175,7 @@ namespace replication
         // .find(), .end(), .insert(), .erase()
         IOCLog sortedLog; // tuple<tag, sortedTs>
         std::unordered_map<uint64_t, LogEntry> unorderedEntries;
+        std::function<bool(const std::string &, const std::string &)> commutefn;
     };
 
 #include "replication/common/log-impl.h"
