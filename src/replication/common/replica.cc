@@ -72,7 +72,7 @@ namespace replication
 
     void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)
     {
-        Debug("Making executable upcall for opnum %d operation %s and key %s and value %s", opnum, op, k, v);
+        Debug("Making executable upcall for opnum %lu operation %s and key %s and value %s", opnum, op.c_str(), k.c_str(), v.c_str());
         app->ReplicaUpcall(opnum, op, k, v, res);
 
         Debug("Upcall result: %s", res.c_str());

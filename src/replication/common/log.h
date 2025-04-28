@@ -85,8 +85,8 @@ namespace replication
         opnum_t prevClientReqOpnum;
         ::google::protobuf::Message *replyMessage;
         // IOCL specifics
-        uint64_t arrivalTimestamp;
-        uint64_t sortTimestamp;
+        int64_t arrivalTimestamp;
+        int64_t sortTimestamp;
         uint64_t myShardTag;
         std::vector<Predecessor *> predecessors;
         std::vector<Successor *> successors;
@@ -129,17 +129,17 @@ namespace replication
         // IOCL specifics
         LogEntry &AppendUnsorted(const Request &req, uint64_t shardTag,
                                  LogEntryState state,
-                                 uint64_t arrivalTs,
+                                 int64_t arrivalTs,
                                  std::vector<Successor *> &&successors,
                                  std::vector<Predecessor *> &&predecessors,
                                  uint64_t acks, uint64_t acks2);
         LogEntry *FindUnsorted(uint64_t shardTag);
         LogEntry &AppendSorted(LogEntryState state,
-                               uint64_t shardTag, uint64_t sortedTs);
+                               uint64_t shardTag, int64_t sortedTs);
         LogEntry *FindSorted(uint64_t shardTag);
         bool InSorted(uint64_t shardTag);
         void ResortSorted(viewstamp_t vs, LogEntryState state,
-                          uint64_t shardTag, uint64_t finalSortedTs);
+                          uint64_t shardTag, int64_t finalSortedTs);
         int MoveSortedToLog(uint64_t shardtag);
         void RegisterCommuteFunction(std::function<bool(const std::string &, const std::string &)> f)
         {

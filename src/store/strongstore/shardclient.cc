@@ -276,7 +276,7 @@ namespace strongstore
         Debug("[shard %i] Sending REQUEST %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
-        Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
+        Debug("Storing the request in pendingReqs with transactionid = %lu and its reqid = %lu", transaction_id, req_id);
         PendingRequest *pendingReq = new PendingRequest(transaction_id, req_id);
         pendingReqs[req_id] = pendingReq;
         pendingReq->op = op;
@@ -310,7 +310,7 @@ namespace strongstore
     {
         Debug("shard client got IOCLReply!");
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the transaction_id = %d", req_id);
+        Debug("the transaction_id = %lu", req_id);
         int status = reply.status();
         string retval = reply.return_value();
 

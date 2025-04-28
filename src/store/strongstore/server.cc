@@ -82,7 +82,7 @@ namespace strongstore
                    uint64_t server_id, int shard_idx, int replica_idx,
                    Transport *transport, LinearizableProtocol linproto, bool debug_stats)
         : PingServer(transport),
-          tt_{NULL},                 // filler, will not use
+          tt_{0},                    // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
           shard_config_{shard_config},
           replica_config_{replica_config},
@@ -1661,7 +1661,7 @@ namespace strongstore
             ioclrequest.ParseFromString(op);
             replicate = true;
             response = op;
-            Debug("was able to parse IOCLRequest! it has shardtag = %d", ioclrequest.mytag());
+            Debug("was able to parse IOCLRequest! it has shardtag = %lu", ioclrequest.mytag());
         }
     }
 

@@ -56,14 +56,14 @@ namespace replication
         IOCLog() : insertion_counter(0) {}
 
         // Insert a tuple with a unique second element
-        void insert(uint64_t sortedTimestamp, uint64_t shardTag)
+        void insert(int64_t sortedTimestamp, uint64_t shardTag)
         {
             std::tuple<uint64_t, uint64_t, size_t> entry = std::make_tuple(sortedTimestamp, shardTag, insertion_counter++);
             sortedLog.insert(entry);
         }
 
         // Find method: first search by first element, then by second element
-        bool isIn(uint64_t sortedTimestamp, uint64_t shardTag)
+        bool isIn(int64_t sortedTimestamp, uint64_t shardTag)
         {
             auto it = sortedLog.lower_bound(std::make_tuple(sortedTimestamp, 0, 0)); // Find range for the first element
             while (it != sortedLog.end() && std::get<0>(*it) == sortedTimestamp)
@@ -80,7 +80,7 @@ namespace replication
         }
 
         // Custom delete method: delete by first and second element (O(log n + k))
-        void deleteElem(uint64_t sortedTimestamp, uint64_t shardTag)
+        void deleteElem(int64_t sortedTimestamp, uint64_t shardTag)
         {
             auto it = sortedLog.lower_bound(std::make_tuple(sortedTimestamp, 0, 0)); // Find range for the first element
             while (it != sortedLog.end() && std::get<0>(*it) == sortedTimestamp)
@@ -89,12 +89,12 @@ namespace replication
                 {
                     // Delete the matching element
                     sortedLog.erase(it);
-                    Debug("Deleted elem <sortedTimestamp = %d, shardTag = %d>", std::get<0>(*it), std::get<1>(*it));
+                    Debug("Deleted elem <sortedTimestamp = %ld, shardTag = %lu>", std::get<0>(*it), std::get<1>(*it));
                     return; // Element deleted, exit function
                 }
                 ++it;
             }
-            Debug("Element <sortedTimestamp = %d, shardTag = %d> not found", sortedTimestamp, shardTag);
+            Debug("Element <sortedTimestamp = %ld, shardTag = %lu> not found", sortedTimestamp, shardTag);
         }
 
         // Print the set for debugging
@@ -103,7 +103,7 @@ namespace replication
             int i = 0;
             for (const auto &entry : sortedLog)
             {
-                Debug("SortedLog[%d]: <sortedTimestamp = %d, shardTag = %d, insertionOrder = %d>", i, std::get<0>(entry), std::get<1>(entry), std::get<2>(entry));
+                Debug("SortedLog[%d]: <sortedTimestamp = %ld, shardTag = %lu, insertionOrder = %lu>", i, std::get<0>(entry), std::get<1>(entry), std::get<2>(entry));
             }
         }
 
@@ -119,7 +119,7 @@ namespace replication
         }
 
     private:
-        std::set<std::tuple<uint64_t, uint64_t, size_t>, CompareByFirstAndInsertionOrder> sortedLog;
+        std::set<std::tuple<int64_t, uint64_t, size_t>, CompareByFirstAndInsertionOrder> sortedLog;
         size_t insertion_counter; // Counter to track insertion order
     };
 

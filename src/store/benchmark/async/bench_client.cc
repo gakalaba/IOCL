@@ -113,7 +113,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
 void BenchmarkClient::SendNext()
 {
-    Debug("[%lu] SendNext", n_sessions_started_);
+    Debug("[%d] SendNext", n_sessions_started_);
     n_sessions_started_++;
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -177,7 +177,7 @@ void BenchmarkClient::SendNext()
 
 void BenchmarkClient::SendNextIOCL()
 {
-    Debug("[%lu] SendNextIOCL", n_sessions_started_);
+    Debug("[%d] SendNextIOCL", n_sessions_started_);
     n_sessions_started_++;
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -378,7 +378,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
-    Debug("opindex == %d and ss.fanout() == %d", op_index, ss.fanout());
+    Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
     if (op_index == ss.fanout())
     {
         Debug("we've sent fanout number of requests, no longer sending more");
@@ -400,7 +400,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
         break;
 
     default:
-        Panic("unsupported opeartion type %lu", op.type);
+        Panic("unsupported opeartion type %d", op.type);
     }
     client.SendRequest(session, op_str, op.key, op.value, rcb, rtcb, timeout_);
 
@@ -441,7 +441,7 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     auto &ss = search->second;
     ss.incr_responses();
-    Debug("fanout = %d and responses = %d", ss.transaction()->Fanout(), ss.responses());
+    Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
@@ -488,7 +488,7 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
 
     auto &ss = search->second;
     ss.incr_responses();
-    Debug("fanout = %d and responses = %d", ss.transaction()->Fanout(), ss.responses());
+    Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
@@ -522,7 +522,7 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
 
     auto &ss = search->second;
     ss.incr_responses();
-    Debug("current number of responses recieved = %d, looking for %d", ss.responses(), ss.fanout());
+    Debug("current number of responses recieved = %lu, looking for %lu", ss.responses(), ss.fanout());
 
     if (status == REPLY_OK)
     {
@@ -542,7 +542,7 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
                 // Send Next App Request
                 if (!cooldownStarted)
                 {
-                    Debug("next arrival in session %lu us", 0);
+                    Debug("next arrival in session %d us", 0);
                     transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
                     OnReply(session_id, 0, false);
                 }

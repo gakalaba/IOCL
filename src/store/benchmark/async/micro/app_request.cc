@@ -57,15 +57,15 @@ namespace micro
         {
             // Debug("Sending Put(%d, %d)", GetKey(op_index - 1), GetKey(op_index - 1));
             // return Put(GetKey(op_index - 1), GetKey(op_index - 1));
-            Debug("Sending Put(%s, %s)", std::to_string(op_index), std::to_string(op_index));
-            return Put(std::to_string(op_index), std::to_string(op_index));
+            Debug("Sending Put(%s, %s)", std::to_string(op_index).c_str(), std::to_string(op_index).c_str());
+            return Put(std::to_string(op_index), std::to_string(420));
         }
         else
         {
             // Debug("sending Get(%d)", GetKey(op_index - 1));
             // return Get(GetKey(op_index - 1));
-            Debug("sending Get(%s)", std::to_string(op_index));
-            return Get(std::to_string(op_index));
+            Debug("sending Get(%s)", std::to_string(op_index).c_str());
+            return Get(std::to_string(0));
         }
     }
 

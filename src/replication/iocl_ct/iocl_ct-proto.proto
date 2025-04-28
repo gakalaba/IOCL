@@ -27,14 +27,14 @@ message SuccessorRequestMessage {
 
 message PredecessorReplyMessage {
     required uint64 p = 1;
-    required uint64 arrivalTs = 2;
+    required int64 arrivalTs = 2;
     required uint64 s = 3;
     required uint64 predIdx = 4;
 }
 
 message PredecessorReplyMessage2 {
     required uint64 p = 1;
-    required uint64 sortedTs = 2;
+    required int64 sortedTs = 2;
     required uint64 s = 3;
     required uint64 predIdx = 4;
 }
@@ -52,7 +52,7 @@ message PrepareMessage {
     required uint64 batchId = 1;
     repeated replication.Request requests = 2;
     repeated uint64 shardTags = 3;
-    repeated uint64 arrivalTs = 4;
+    repeated int64 arrivalTs = 4;
 }
 
 message PrepareOKMessage {
@@ -65,7 +65,7 @@ message PrepareMessage2 {
     required uint64 batchId = 3;
     repeated replication.Request requests = 4;
     repeated uint64 shardTags = 5;
-    repeated uint64 sortedTs = 6;
+    repeated int64 sortedTs = 6;
 
 }
 
