@@ -82,7 +82,6 @@ namespace replication
     {
         if (entries.empty())
         {
-            Debug("entries is empty");
             return NULL;
         }
 
@@ -104,85 +103,70 @@ namespace replication
     }
 
     /************** Unordered Log ****************/
-    LogEntry &
+    LogEntry *
     Log::AppendUnsorted(const Request &req, uint64_t shardTag, LogEntryState state,
                         int64_t arrivalTs,
                         std::vector<Successor *> &&successors,
                         std::vector<Predecessor *> &&predecessors,
                         uint64_t acks, uint64_t acks2)
     {
-        LogEntry entry;
-        entry.request = req;
-        entry.state = state;
-        entry.arrivalTimestamp = arrivalTs;
-        entry.myShardTag = shardTag;
+        LogEntry *entry = new LogEntry;
+        entry->request = req;
+        entry->state = state;
+        entry->arrivalTimestamp = arrivalTs;
+        entry->myShardTag = shardTag;
+        entry->sortTimestamp = -1;
         if (!successors.empty())
         {
-            entry.successors = std::move(successors);
+            entry->successors = std::move(successors);
         }
 
         if (!predecessors.empty())
         {
-            entry.predecessors = std::move(predecessors);
+            entry->predecessors = std::move(predecessors);
         }
 
         if (useHash)
         {
-            entry.hash = ComputeHash(LastHash(), entry);
+            entry->hash = ComputeHash(LastHash(), *entry);
         }
 
-        entry.acks = acks;
-        entry.acks2 = acks2;
+        entry->acks = acks;
+        entry->acks2 = acks2;
 
-        unorderedEntries[shardTag] = entry;
-        return *FindUnsorted(shardTag);
+        auto retval = unorderedEntries.insert({shardTag, entry});
+        return retval.first->second;
     }
 
     LogEntry *Log::FindUnsorted(uint64_t shardTag)
     {
-        if (unorderedEntries.find(shardTag) != unorderedEntries.end())
+        auto it = unorderedEntries.find(shardTag);
+        if (it != unorderedEntries.end())
         {
-            return &(unorderedEntries[shardTag]);
+            return it->second;
         }
-        else
-        {
-            return NULL;
-        }
+        return NULL;
     }
 
     /************** Sorted Log ***************/
-    LogEntry &
+    LogEntry *
     Log::AppendSorted(LogEntryState state, uint64_t shardTag, int64_t sortedTs)
     {
         ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
-        LogEntry &entry = unorderedEntries[shardTag];
+        LogEntry *entry = FindUnsorted(shardTag);
 
-        entry.state = state;
-        entry.sortTimestamp = sortedTs;
+        entry->state = state;
+        entry->sortTimestamp = sortedTs;
         sortedLog.insert(sortedTs, shardTag);
-        return *FindUnsorted(shardTag);
+        return entry;
     }
 
     LogEntry *
-    Log::FindSorted(uint64_t shardTag)
+    Log::FindSorted(uint64_t opnum)
     {
-        LogEntry *ep = FindUnsorted(shardTag);
-        if (ep == NULL)
-        {
-            Debug("not in sorted or unsorted");
-            return NULL;
-        }
-        if (sortedLog.isIn(ep->sortTimestamp, ep->myShardTag))
-        {
-            LogEntry *retval = FindUnsorted(shardTag);
-            ASSERT(retval != NULL);
-            return retval;
-        }
-        else
-        {
-            Debug("didn't find it in the sorted log!");
-            return NULL;
-        }
+        LogEntry *entry = (LogEntry *)(sortedLog.get(opnum - start));
+        // ASSERT(entry->viewstamp.opnum == opnum);
+        return entry;
     }
 
     bool Log::InSorted(uint64_t shardTag)
@@ -204,16 +188,14 @@ namespace replication
         Debug("printing log at beginning of resortSorted");
         PrintSortedLog();
         // Remove this tag from the sorted log
-        LogEntry &entry = unorderedEntries[shardTag];
-        entry.viewstamp = vs;
-        entry.state = state;
-        Debug("Old version is <sortedtimestamp = %ld, shardTag = %lu>", entry.sortTimestamp, shardTag);
-        sortedLog.deleteElem(entry.sortTimestamp, shardTag);
-        Debug("assigning new timestamp = %ld", finalSortedTs);
-        entry.sortTimestamp = finalSortedTs;
-        Debug("Calling ResortSorted with <sortedTimestamp=%ld, shardTag = %lu>", finalSortedTs, shardTag);
+        LogEntry *entry = FindUnsorted(shardTag);
+        entry->viewstamp = vs;
+        entry->state = state;
+        // Debug("Old version is <sortedtimestamp = %ld, shardTag = %lu>", entry->sortTimestamp, shardTag);
+        sortedLog.deleteElem(entry->sortTimestamp, shardTag);
+        entry->sortTimestamp = finalSortedTs;
+        Debug("ResortSorted is inserting with <sortedTimestamp=%ld, shardTag = %lu>", finalSortedTs, shardTag);
         sortedLog.insert(finalSortedTs, shardTag); // TODO Anja: should this be insert or insertWithSameOrder??
-        PrintSortedLog();
         return;
     }
 
@@ -242,7 +224,7 @@ namespace replication
                 found++;
                 // delete self from sorted log and add to final log
                 sortedLog.deleteElem(ep->sortTimestamp, ep->myShardTag);
-                entries.push_back(*ep);
+                sortedLog.appendFinal(ep);
                 ASSERT(found == 1);
             }
             else if (!sawself && !commutefn(ep->request.op(), maybehead->request.op()))
@@ -260,7 +242,7 @@ namespace replication
                 {
                     found++;
                     sortedLog.deleteElem(maybehead->sortTimestamp, maybehead->myShardTag);
-                    entries.push_back(*maybehead);
+                    sortedLog.appendFinal(maybehead);
                 }
                 else
                 {
@@ -273,6 +255,8 @@ namespace replication
         }
         // If we got here, we popped off a contiguous run of ready entries
         // and there shouldn't be anymore on this key in the log
+        Debug("we were able to find a contiguous run of %d entries", found);
+        PrintSortedLog();
         return found;
     }
 
@@ -282,7 +266,7 @@ namespace replication
         Debug("SortedLog looks like:...");
         for (auto it = sortedLog.begin(); it != sortedLog.end(); ++it)
         {
-            LogEntry *ep = FindUnsorted(std::get<1>(*it));
+            const LogEntry *ep = FindUnsorted(std::get<1>(*it));
             ASSERT(ep != NULL);
             Debug("SortedLog[%d]: <sortedTimestamp = %ld, shardTag = %lu, insertionOrder = %lu>", i, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it));
             Debug("         SortedLog[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
@@ -291,20 +275,21 @@ namespace replication
         }
 
         i = 0;
-        for (auto m : unorderedEntries)
+        for (const auto m : unorderedEntries)
         {
-            LogEntry &ep = m.second;
             Debug("Unsorted[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
-                  i, ep.myShardTag, ep.arrivalTimestamp, ep.sortTimestamp, PrintState(ep.state).c_str(), ep.predecessors.size(), ep.successors.size());
+                  i, m.second->myShardTag, m.second->arrivalTimestamp, m.second->sortTimestamp, PrintState(m.second->state).c_str(), m.second->predecessors.size(), m.second->successors.size());
             i++;
         }
 
         i = 0;
-        while (i < entries.size())
+        while (true)
         {
-            LogEntry &ep = entries[i];
-            Debug("entries[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
-                  i, ep.myShardTag, ep.arrivalTimestamp, ep.sortTimestamp, PrintState(ep.state).c_str(), ep.predecessors.size(), ep.successors.size());
+            const LogEntry *ep = (LogEntry *)(sortedLog.get(i));
+            if (!ep)
+                return;
+            Debug("finalEntries[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
+                  i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str(), ep->predecessors.size(), ep->successors.size());
             i++;
         }
     }

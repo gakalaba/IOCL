@@ -118,8 +118,27 @@ namespace replication
             return sortedLog.end();
         }
 
+        void appendFinal(void *ep)
+        {
+            finalLog.push_back(ep);
+        }
+
+        void *get(uint64_t opnum)
+        {
+            if (opnum >= finalLog.size())
+            {
+                return NULL;
+            }
+            if (finalLog.empty())
+            {
+                return NULL;
+            }
+            return finalLog[opnum];
+        }
+
     private:
         std::set<std::tuple<int64_t, uint64_t, size_t>, CompareByFirstAndInsertionOrder> sortedLog;
+        std::vector<void *> finalLog;
         size_t insertion_counter; // Counter to track insertion order
     };
 

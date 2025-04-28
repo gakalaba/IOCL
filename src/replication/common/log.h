@@ -127,16 +127,16 @@ namespace replication
         LogEntry *Find(opnum_t opnum);
         // LogEntry *Find(uint64_t opnum);
         // IOCL specifics
-        LogEntry &AppendUnsorted(const Request &req, uint64_t shardTag,
+        LogEntry *AppendUnsorted(const Request &req, uint64_t shardTag,
                                  LogEntryState state,
                                  int64_t arrivalTs,
                                  std::vector<Successor *> &&successors,
                                  std::vector<Predecessor *> &&predecessors,
                                  uint64_t acks, uint64_t acks2);
         LogEntry *FindUnsorted(uint64_t shardTag);
-        LogEntry &AppendSorted(LogEntryState state,
+        LogEntry *AppendSorted(LogEntryState state,
                                uint64_t shardTag, int64_t sortedTs);
-        LogEntry *FindSorted(uint64_t shardTag);
+        LogEntry *FindSorted(uint64_t opnum);
         bool InSorted(uint64_t shardTag);
         void ResortSorted(viewstamp_t vs, LogEntryState state,
                           uint64_t shardTag, int64_t finalSortedTs);
@@ -174,7 +174,7 @@ namespace replication
         // IOCL specifics
         // .find(), .end(), .insert(), .erase()
         IOCLog sortedLog; // tuple<tag, sortedTs>
-        std::unordered_map<uint64_t, LogEntry> unorderedEntries;
+        std::unordered_map<uint64_t, LogEntry *> unorderedEntries;
         std::function<bool(const std::string &, const std::string &)> commutefn;
     };
 

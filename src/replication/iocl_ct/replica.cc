@@ -716,21 +716,17 @@ namespace replication
                 {
                     Debug("ready to add to the SORTED log on FASTPATH!");
                     /* Add the request to my log(s) */
-                    Debug("AppendSorted)");
-                    LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    LogEntry *entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
                     log.PrintSortedLog();
-                    log.PrintSortedLog();
-                    log.PrintSortedLog();
-                    Debug("finalizeEntry..");
                     IOCL_CTReplica::finalizeEntry(entry, LOG_STATE_FASTPATH);
-                    log.PrintSortedLog();
                 }
                 else
                 // Ready to add to unsorted log!
                 {
                     Debug("Received REQUEST, adding to Unsorted log");
                     /* Add the request to my unorderedLog OR sorted log, depending */
-                    LogEntry &entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    LogEntry *entry = log.AppendUnsorted(request, msg.shardtag(), LOG_STATE_ARRIVED, arrivalTimestamp, std::move(successors), std::move(predecessors), acks, acks2);
+                    log.PrintSortedLog();
                     // Add the request to the current pending batch
                     IOCL_CTReplica::addToPendingBatch(entry);
                     // Flush out the batch if it's hit batchSize
@@ -869,7 +865,7 @@ namespace replication
                             RDebug("Got all acks2!!");
                             // Do final sort and replicated it
                             ASSERT(log.InSorted(entry_ptr->myShardTag));
-                            IOCL_CTReplica::finalizeEntry(*entry_ptr);
+                            IOCL_CTReplica::finalizeEntry(entry_ptr);
                         }
                     }
                     else
@@ -1136,6 +1132,7 @@ namespace replication
                 // else we'll send it from HandlePrepareOK2
                 entry->successors.push_back(s);
                 Debug("added this successor %lu for a total of %lu successors", msg.s(), entry->successors.size());
+                log.PrintSortedLog();
             }
             break;
             case (LOG_STATE_ARRIVED):
@@ -1248,7 +1245,7 @@ namespace replication
                 if (entry->acks2 == entry->predecessors.size())
                 {
                     ASSERT(log.InSorted(entry->myShardTag));
-                    IOCL_CTReplica::finalizeEntry(*entry);
+                    IOCL_CTReplica::finalizeEntry(entry);
                 }
                 break;
             case (LOG_STATE_FASTPATH):
@@ -1298,7 +1295,7 @@ namespace replication
                     Debug("finalizing entry");
                     ASSERT(entry->acks == entry->acks2);
                     ASSERT(log.InSorted(entry->myShardTag));
-                    IOCL_CTReplica::finalizeEntry(*entry);
+                    IOCL_CTReplica::finalizeEntry(entry);
                 }
                 break;
             default:
@@ -1340,7 +1337,7 @@ namespace replication
         {
             // Step 2.
             ASSERT(entry.state == LOG_STATE_PREPARED);
-            LogEntry *p = log.Find(lastCommitted);
+            LogEntry *p = log.FindSorted(lastCommitted);
             uint64_t lastCommittedTimestamp = 0;
             if (p)
             {
@@ -1355,31 +1352,27 @@ namespace replication
             IOCL_CTReplica::notifySuccessorsACK2(entry);
         }
 
-        void IOCL_CTReplica::finalizeEntry(LogEntry &entry, LogEntryState logstate)
+        void IOCL_CTReplica::finalizeEntry(LogEntry *entry, LogEntryState logstate)
         {
-            log.PrintSortedLog();
             // Step 3.
-            LogEntry *p = log.Find(lastCommitted);
-            log.PrintSortedLog();
+            LogEntry *p = log.FindSorted(lastCommitted);
             uint64_t lastCommittedTimestamp = 0;
             if (p)
             {
                 lastCommittedTimestamp = p->sortTimestamp;
             }
-            entry.sortTimestamp = std::max(FoldL(entry.predecessors, false), lastCommittedTimestamp + 1);
-            log.PrintSortedLog();
+            entry->sortTimestamp = std::max(FoldL(entry->predecessors, false), lastCommittedTimestamp + 1);
             /* Assign it an opnum */
             viewstamp_t v;
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
             Debug("For this request, assigning v.view = %lu, v.opnum = %lu", v.view, v.opnum);
-            log.PrintSortedLog();
-            log.ResortSorted(v, logstate, entry.myShardTag, entry.sortTimestamp);
-            Debug("now after resortSorted on %lu, here's the sorted log:", entry.myShardTag);
+            log.ResortSorted(v, logstate, entry->myShardTag, entry->sortTimestamp);
+            Debug("now after resortSorted on %lu, here's the sorted log:", entry->myShardTag);
             log.PrintSortedLog();
             // Add if it is the head, send out contiguous run of ready entries!!
-            int count = log.MoveSortedToLog(entry.myShardTag);
+            int count = log.MoveSortedToLog(entry->myShardTag);
             if (count > 0)
             {
                 IOCL_CTReplica::addToPendingBatch2(count);
@@ -1391,18 +1384,18 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::addToPendingBatch(LogEntry &entry)
+        void IOCL_CTReplica::addToPendingBatch(LogEntry *entry)
         {
             // Add the request to the current pending batch
             if (thebatchs.find(lastBatchEnd) != thebatchs.end())
             {
                 auto t = thebatchs[lastBatchEnd];
-                std::get<1>(t).insert(&entry);
+                std::get<1>(t).insert(entry);
             }
             else
             {
                 std::unordered_set<LogEntry *> s = {};
-                s.insert(&entry);
+                s.insert(entry);
                 thebatchs[lastBatchEnd] = std::make_tuple(1, s);
             }
             lastBatch++;
@@ -1420,7 +1413,7 @@ namespace replication
                 {
                     Debug("adding to existing batch for batchid %d", lastBatchEnd2);
                     t = thebatchs2[lastBatchEnd2];
-                    LogEntry *batchedEntry = log.Find(lastBatch2 + i);
+                    LogEntry *batchedEntry = log.FindSorted(lastBatch2 + i);
                     ASSERT(batchedEntry != NULL);
                     std::get<1>(t).insert(batchedEntry);
                 }
@@ -1428,7 +1421,7 @@ namespace replication
                 {
                     Debug("starting new batch for batchid = %d, and looking in log entries for opnum %d", lastBatchEnd2, lastBatch2 + i);
                     std::unordered_set<LogEntry *> s = {};
-                    LogEntry *batchedEntry = log.Find(lastBatch2 + i);
+                    LogEntry *batchedEntry = log.FindSorted(lastBatch2 + i);
                     ASSERT(batchedEntry != NULL);
                     s.insert(batchedEntry);
                     t = std::make_tuple(1, s);
