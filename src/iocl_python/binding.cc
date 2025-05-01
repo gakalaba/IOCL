@@ -27,6 +27,8 @@
 #include "store/common/truetime.h"
 #include "store/strongstore/client.h"
 #include "store/strongstore/networkconfig.h"
+#include <iostream>  // for std::cout
+#include <cstdint>   // for uint64_t
 
 enum protomode_t
 {
@@ -336,14 +338,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     std::vector<Client *> clients;
     std::vector<BenchmarkClient *> benchClients;
     std::vector<std::thread *> threads;
-
-    // Note: Transport and Partitioner are abstract classes, so you'll need to provide concrete implementations
-    // This is a placeholder and needs to be replaced with actual initialization
-    Transport *tport = nullptr; // Concrete transport implementation needed
-    Partitioner *part = nullptr; // Concrete partitioner implementation needed
-
-    // Note: UniformKeySelector might need to be replaced with a concrete implementation
-    KeySelector *keySelector = nullptr; // Concrete key selector implementation needed
+    
+    Transport *tport = nullptr; 
+    tport = new TCPTransport(0.0, 0.0, 0, false);
+    Partitioner *part = nullptr;
+    part = new DefaultPartitioner();
+    KeySelector *keySelector = new UniformKeySelector(keys); 
 
     // Determine bench_mode from FLAGS_bench_mode
     BenchmarkClientMode bench_mode = (FLAGS_bench_mode == "open") ? OPEN : CLOSED;
@@ -367,11 +367,10 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-    // Ensure BenchmarkClient is initialized
+
     if (!benchmarkClient) {
         benchmarkClient = CreateBenchmarkClient();
     }
-
     // Call SendAsynchRequest from BenchmarkClient
     std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
     
@@ -380,7 +379,6 @@ std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, requ
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
 std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
-    // Ensure BenchmarkClient is initialized
     if (!benchmarkClient) {
         benchmarkClient = CreateBenchmarkClient();
     }
@@ -410,13 +408,17 @@ py::object value_to_python(const request_utils::Value& val) {
 // Python-accessible function to call CustomInit() on the BenchmarkClient.
 // This function will return the session_id.
 uint64_t CustomInitSession() {
-    // Ensure BenchmarkClient is initialized
     if (!benchmarkClient) {
         benchmarkClient = CreateBenchmarkClient();
+        if (!benchmarkClient) {
+            return 0; // Return invalid session ID
+        }
     }
 
     // Call CustomInit() to get the session_id
-    return benchmarkClient->CustomInit();
+    uint64_t session_id = benchmarkClient->CustomInit();
+
+    return session_id;
 }
 
 // Python binding module

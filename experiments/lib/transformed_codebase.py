@@ -201,10 +201,13 @@ class TransformedCodebase:
                 else:
                     client_command = 'setenv DEBUG all; %s' % client_command
 
-        # client_command = '(cd %s; %s) & ' % (exp_directory, client_command)
-        python_cmd = f"python {os.path.join(config['src_directory'], 'app_sync.py')}"
-        client_command = python_cmd
-        client_command = '(cd %s; %s) & ' % (config['base_python_directory'], client_command)
+        lib_path = "/users/akalaba/IOCL/src/build/store/benchmark/async"
+        python_cmd = f"python_simple_sync.py"
+        client_command = (
+            f'export LD_LIBRARY_PATH={lib_path}:$LD_LIBRARY_PATH && '
+            f'(cd {config["base_python_directory"]}; source redis-chat/bin/activate; python {python_cmd})'
+        )
+
         print("CLIENT COMMAND + ", repr(client_command))
         return client_command
 
