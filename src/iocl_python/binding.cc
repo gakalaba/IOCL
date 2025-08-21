@@ -2,7 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
-#include "store/benchmark/async/bench_client.h"
+#include "/users/akalaba/IOCL/src/store/benchmark/async/bench_client.h"
 #include "store/benchmark/async/micro/micro_client.h"
 #include "store/common/backend/redis_store.h"
 #include "store/common/frontend/request_utils.h"
@@ -338,6 +338,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     std::vector<Client *> clients;
     std::vector<BenchmarkClient *> benchClients;
     std::vector<std::thread *> threads;
+    // Mock the key vector
+    std::vector<std::string> keys;
+
+    // Dummy key 
+    std::string key = "0000000000";
+    keys.emplace_back(key);
     
     Transport *tport = nullptr; 
     tport = new TCPTransport(0.0, 0.0, 0, false);
@@ -363,6 +369,27 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         FLAGS_client_issue_concurrent
         // FLAGS_transformed_app
     );
+}
+
+// SendRequest - Synchronous version that chains request and response
+std::pair<bool, request_utils::Value> SendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
+
+    if (!benchmarkClient) {
+        benchmarkClient = CreateBenchmarkClient();
+    }
+    
+    // Call SendAsynchRequest from BenchmarkClient and get the command ID
+    std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
+    
+    // Extract the command ID from the result (assuming it's the second element)
+    uint64_t commandId = std::get<1>(result).type == request_utils::ValueType::STRING ? 
+                        std::stoull(std::get<1>(result).str) : 0;
+    
+    // Immediately await the response using the command ID
+    std::tuple<request_utils::Value, uint64_t> response = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
+    
+    // Return the response value and success status
+    return {std::get<1>(response) == 0, std::get<0>(response)};
 }
 
 // AsyncSendRequest - Asynchronous version of SendRequest
@@ -467,6 +494,16 @@ PYBIND11_MODULE(redisstorepython, m) {
 
     // Expose BenchmarkClient creation
     m.def("create_benchmark_client", &CreateBenchmarkClient, "Create a BenchmarkClient instance");
+
+    // Wrapper for SendRequest to handle Python types
+    m.def("send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {
+        // Convert Python objects to Value
+        request_utils::Value newVal = python_to_value(new_values);
+        request_utils::Value oldVal = python_to_value(old_values);
+
+        // Call SendRequest
+        return SendRequest(session_id, op, keys, newVal, oldVal);
+    }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncSendRequest to handle Python types
     m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {

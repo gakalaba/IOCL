@@ -8,7 +8,11 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Find Python development headers
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(PythonInterp 3.6 REQUIRED)
+find_package(PythonLibs 3.6 REQUIRED)
+
+include_directories(/usr/include/python3.6m)
+link_libraries(${PYTHON_LIBRARIES})
 
 # Explicitly set pybind11 include directory
 set(PYBIND11_DIR "/users/akalaba/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11")
