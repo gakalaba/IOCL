@@ -434,7 +434,7 @@ namespace strongstore
         Debug("[%lu] BeginIOCL", req_id);
 
         // Timestamp start_ts{tt_.Now().latest(), client_id_};
-
+        
         // session.start_transaction(tid, start_ts);
         sessions_by_transaction_id_.emplace(req_id, session);
 
@@ -645,6 +645,10 @@ namespace strongstore
 
         auto req_id = session.transaction_id();
 
+        std::cout << "[Client::SendAsynchRequest] Called with req_id=" << req_id
+                << ", optype=" << static_cast<int>(optype)
+                << ", key=" << key << std::endl;
+
         Debug("SendAsynchRequest request_id = [%lu]", req_id);
 
         ASSERT(session.executing());
@@ -653,13 +657,19 @@ namespace strongstore
         // TODO ANJA this is wrong way wrong
         int i = (*part_)(key, nshards_);
 
+        std::cout << "[Client::SendAsynchRequest] Shard index: " << i << std::endl;
+
         auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, request_utils::Value retval, int req_id)
         {
+            std::cout << "[Client::SendAsynchRequest::rcb1] Callback for req_id=" << req_id << std::endl;
             session.get().set_executing();
             return trcb(s, retval, req_id);
         };
 
+        std::cout << "[Client::SendAsynchRequest] Sending request to shard client..." << std::endl;
         sclients_[i]->SendAsynchRequest(req_id, optype, key, oldValue, newValue, rcb1);
+        std::cout << "[Client::SendAsynchRequest] Request sent." << std::endl;
+
         return req_id;
     }
 

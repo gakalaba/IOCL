@@ -26,7 +26,7 @@ find_package(Libevent REQUIRED)
 include_directories(${LIBEVENT_INCLUDE_DIR})
 link_libraries(${LIBEVENT_LIB})
 
-# require gflags
+# require 
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/gflags)
 link_libraries(gflags::gflags)
 

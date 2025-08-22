@@ -111,20 +111,22 @@ uint64_t BenchmarkClient::CustomInit()
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
+    std::cout << "[CustomInit] created session" << std::endl;
 
-    // auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
-    // auto appreq = GetNextAppRequest();
-    // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    auto appreq = GetNextAppRequest();
+    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
-    // session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+    std::cout << "[CustomInit] emplace called" << std::endl;
 
-    // auto &ss = session_states_.find(sid)->second;
-    // _Latency_StartRec(ss.lat());
+    auto &ss = session_states_.find(sid)->second;
+    _Latency_StartRec(ss.lat());
 
-    // auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
-    // auto btcb = []() {};
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    auto btcb = []() {};
 
-    // client.BeginIOCL(session, bcb, btcb, timeout_);
+    client.BeginIOCL(session, bcb, btcb, timeout_);
     return sid;
 }
 
@@ -966,8 +968,15 @@ void BenchmarkClient::Finish()
 // Transformed IOCL Apps!!
 std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t session_id, request_utils::Operation opType, int64_t key, Value newValue, Value oldValue)
 {
+    std::cout << "[SendAsynchRequest] Called with session_id=" << session_id
+              << ", opType=" << static_cast<int>(opType)
+              << ", key=" << key << std::endl;
+
     Debug("SendAsynchRequest");
     auto search = session_states_.find(session_id);
+    if (search == session_states_.end()) {
+        std::cout << "[SendAsynchRequest] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+    }
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
@@ -978,18 +987,24 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
+    std::cout << "[SendAsynchRequest] About to dispatch operation..." << std::endl;
+
     switch (opType)
     {
     case request_utils::Operation::GET:
+        std::cout << "[SendAsynchRequest] Operation: GET" << std::endl;
         break;
 
     case request_utils::Operation::PUT:
+        std::cout << "[SendAsynchRequest] Operation: PUT" << std::endl;
         break;
 
     default:
-        Panic("NOT YET SUPPORTEDunsupported opeartion type %lu", opType);
+        std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
+        Panic("NOT YET SUPPORTEDunsupported operation type %lu", opType);
     }
     auto commandId = client.SendAsynchRequest(session, opType, key, newValue, oldValue, rcb);
+    std::cout << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }
 
@@ -1002,19 +1017,29 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
 {
     Debug("Called AwaitAsynchResponse!");
-    //TODO need to increment the request id!!
+    std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
+              << ", commandId=" << commandId << std::endl;
+
+    // TODO need to increment the request id!!
     if (replies_map_.find(commandId) != replies_map_.end())
     {
         Debug("Got a response!");
+        std::cout << "[AwaitAsynchResponse] Got a response for commandId=" << commandId << std::endl;
+
         auto search = session_states_.find(session_id);
+        if (search == session_states_.end()) {
+            std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+        }
         ASSERT(search != session_states_.end());
 
         auto &ss = search->second;
-        //TODO ANJA somehwere in here we need to increment the transaction id!!
+        // TODO ANJA somehwere in here we need to increment the transaction id!!
+        std::cout << "[AwaitAsynchResponse] Returning value for commandId=" << commandId << std::endl;
 
         // right now we don't delete the value... for the purposes of double await? TODO ANJA see with austin
         return std::make_tuple(replies_map_[commandId], 0);
     }
+    std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", will retry..." << std::endl;
     // Wait until the response is in this map....
     transport_.Timer(1, std::bind(&BenchmarkClient::AwaitAsynchResponse, this, session_id, commandId));
 }
