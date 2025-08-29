@@ -31,6 +31,7 @@
 #include <valgrind/callgrind.h>
 
 #include <csignal>
+#include <thread>
 
 #include "lib/io_utils.h"
 #include "lib/tcptransport.h"
@@ -186,6 +187,7 @@ DEFINE_string(stats_file, "", "path to file for server stats");
  * Benchmark settings.
  */
 DEFINE_string(keys_path, "", "path to file containing keys in the system");
+DEFINE_uint64(server_load_time, 5, "number of seconds to wait on the servers to load");
 DEFINE_uint64(num_keys, 0, "number of keys to generate");
 DEFINE_string(data_file_path, "",
               "path to file containing key-value pairs to be loaded");
@@ -362,6 +364,7 @@ int main(int argc, char **argv)
     size_t loaded = 0;
     size_t stored = 0;
     std::vector<int> txnGroups;
+    auto start_time = std::chrono::steady_clock::now();
     if (FLAGS_data_file_path.empty() && FLAGS_keys_path.empty())
     {
         if (FLAGS_num_keys > 0)
@@ -462,6 +465,11 @@ int main(int argc, char **argv)
             }
         }
         in.close();
+    }
+    auto end_time = start_time + std::chrono::seconds(FLAGS_server_load_time);
+    while (std::chrono::steady_clock::now() < end_time)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for a short period to avoid busy-waiting
     }
     Notice("Done loading server.");
 
