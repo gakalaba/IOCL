@@ -350,7 +350,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, FLAGS_debug_stats);
+                                         tport, FLAGS_debug_stats, true);
         break;
     }
     default:

@@ -123,7 +123,7 @@ uint64_t BenchmarkClient::CustomInit()
     auto &ss = session_states_.find(sid)->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    auto bcb = []() {}; // Don't need to jump right into issueing requests, this will be done by the python app
     auto btcb = []() {};
 
     client.BeginIOCL(session, bcb, btcb, timeout_);
@@ -997,6 +997,58 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
 
     case request_utils::Operation::PUT:
         std::cout << "[SendAsynchRequest] Operation: PUT" << std::endl;
+        break;
+
+    case request_utils::Operation::INCR:
+        std::cout << "[SendAsynchRequest] Operation: INCR" << std::endl;
+        break;
+
+    case request_utils::Operation::SET:
+        std::cout << "[SendAsynchRequest] Operation: SET" << std::endl;
+        break;
+
+    case request_utils::Operation::SADD:
+        std::cout << "[SendAsynchRequest] Operation: SADD" << std::endl;
+        break;
+
+    case request_utils::Operation::EXISTS:
+        std::cout << "[SendAsynchRequest] Operation: EXISTS" << std::endl;
+        break;
+
+    case request_utils::Operation::HMGET:
+        std::cout << "[SendAsynchRequest] Operation: HMGET" << std::endl;
+        break;
+
+    case request_utils::Operation::HSET:
+        std::cout << "[SendAsynchRequest] Operation: HSET" << std::endl;
+        break;
+
+    case request_utils::Operation::HMSET
+        std::cout << "[SendAsynchRequest] Operation: HMSET" << std::endl;
+        break;
+
+    case request_utils::Operation::HGETALL:
+        std::cout << "[SendAsynchRequest] Operation: HGETALL" << std::endl;
+        break;
+
+    case request_utils::Operation::ZADD:
+        std::cout << "[SendAsynchRequest] Operation: ZADD" << std::endl;
+        break;
+
+    case request_utils::Operation::ZINCRBY:
+        std::cout << "[SendAsynchRequest] Operation: ZINCRBY" << std::endl;
+        break;
+
+    case request_utils::Operation::ZSCORE:
+        std::cout << "[SendAsynchRequest] Operation: ZSCORE" << std::endl;
+        break;
+
+    case request_utils::Operation::ZRANGE:
+        std::cout << "[SendAsynchRequest] Operation: ZRANGE" << std::endl;
+        break;
+
+    case request_utils::Operation::ZREVRANGE:
+        std::cout << "[SendAsynchRequest] Operation: ZEVRANGE" << std::endl;
         break;
 
     default:
