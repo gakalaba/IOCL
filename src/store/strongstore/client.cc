@@ -433,9 +433,9 @@ namespace strongstore
 
         Debug("[%lu] BeginIOCL", req_id);
 
-        // Timestamp start_ts{tt_.Now().latest(), client_id_};
+        Timestamp start_ts{tt_.Now().latest(), client_id_};
         
-        // session.start_transaction(tid, start_ts);
+        session.start_transaction(req_id, start_ts);
         sessions_by_transaction_id_.emplace(req_id, session);
 
         // for (uint64_t i = 0; i < nshards_; i++)
