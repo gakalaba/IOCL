@@ -1023,7 +1023,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
         std::cout << "[SendAsynchRequest] Operation: HSET" << std::endl;
         break;
 
-    case request_utils::Operation::HMSET
+    case request_utils::Operation::HMSET:
         std::cout << "[SendAsynchRequest] Operation: HMSET" << std::endl;
         break;
 
