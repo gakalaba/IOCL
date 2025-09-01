@@ -1,0 +1,37 @@
+20250302-192352-2808 15397 * main            (server.cc:208):    Starting server.
+20250302-192404-8217 15397 * main            (server.cc:464):    Done loading server.
+20250302-192404-8230 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8231 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8232 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8233 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8234 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8234 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8235 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192404-8235 15397 ! TCPOutgoingEventCallback (tcptransport.cc:851): Error on outgoing TCP connection to server: Connection refused
+20250302-192405-3221 15397 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 1
+20250302-192405-3225 15397 * HandleRequest   (replica.cc:503):   [0] Ignoring stale request
+20250302-192405-3228 15397 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 2
+20250302-192405-3230 15397 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 3
+20250302-192405-3232 15397 * HandleRequest   (replica.cc:503):   [0] Ignoring stale request
+20250302-192405-3233 15397 * HandleRequest   (replica.cc:503):   [0] Ignoring stale request
+20250302-192405-3234 15397 ! ResendRequest   (client.cc:147):    Client timeout; resending request: 4
+20250302-192405-3235 15397 * ResendPrepare   (replica.cc:348):   [0] Resending prepare
+20250302-192405-3238 15397 * HandleRequest   (replica.cc:525):   [0] Received duplicate request but no reply available; ignoring
+20250302-192405-3248 15397 * HandleRequestStateTransfer (replica.cc:832):   [0] Sending state transfer from <0,0> to <0,0>
+20250302-192405-3250 15397 * HandleRequestStateTransfer (replica.cc:832):   [0] Sending state transfer from <0,0> to <0,0>
+20250302-192446-9846 15397 * Cleanup         (server.cc:523):    Gracefully exiting after signal 15.
+Inserted events:
+  0x5573ff290f20 [fd  9] Read Persist Internal
+  0x5573ff28e420 [fd  10] Read Persist
+  0x5573ff290a20 [fd  11] Read Persist
+  0x557454ff00a0 [fd  14] Read Persist
+  0x55745501aa80 [fd  15] Read Persist
+  0x557455018170 [fd  16] Read Persist
+  0x557454fee9a0 [fd  18] Read Persist
+  0x557455018600 [fd  20] Read Persist
+  0x557455018a70 [fd  21] Read Persist
+  0x557455018ec0 [fd  22] Read Persist
+  0x557455019280 [fd  23] Read Persist
+  0x5574550174e0 [fd  -1] Timeout=1743643487.702131
+Active events:
+20250302-192446-9850 15397 * Cleanup         (server.cc:527):    Exporting stats to /mnt/extra/experiments/2025-04-02-19-23-49/out/server-0-0-0-stats-0.json.

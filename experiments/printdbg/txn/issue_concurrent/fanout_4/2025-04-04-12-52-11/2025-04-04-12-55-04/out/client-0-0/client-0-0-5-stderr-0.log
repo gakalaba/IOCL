@@ -1,0 +1,42 @@
+20250304-125513-7906 01840 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250304-125524-6625 01840 * WarmupDone      (bench_client.cc:719): Completed warmup period of 10 seconds with 1258 requests
+20250304-125545-6627 01840 * Finish          (bench_client.cc:917): Completed 7340 requests in 21.002555 seconds
+20250304-125545-6627 01840 * Finish          (bench_client.cc:918): 1 outstanding transactions.
+Session continued: 0
+last_service: spanner-5-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: spanner-5-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: spanner-5-1804289383, current_state: 2
+20250304-125553-6627 01840 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-55-04/out/client-0-0-5-stats-0.json.
+20250304-125555-6665 01840 * Cleanup         (bench_client.cc:741): Aborting 0 outstanding transactions.
+20250304-125555-6666 01840 * CooldownDone    (bench_client.cc:771): Finished cooldown period.
+20250304-125555-6697 01840 * CooldownDone    (bench_client.cc:778): Median latency is 2699987 ns (2699 us)
+20250304-125555-6698 01840 * CooldownDone    (bench_client.cc:787): Average latency is 2796951 ns (2796 us)
+20250304-125555-6698 01840 * CooldownDone    (bench_client.cc:791): 90th percentile latency is 3240560 ns (3240 us)
+20250304-125555-6698 01840 * CooldownDone    (bench_client.cc:795): 95th percentile latency is 3473366 ns (3473 us)
+20250304-125555-6699 01840 * CooldownDone    (bench_client.cc:799): 99th percentile latency is 3940726 ns (3940 us)
+20250304-125555-6699 01840 * LATENCY total: 1167 us 2796 us/2097 us 105 ms (7341 samples, 20 s total)
+20250304-125555-6699 01840 *    1048 us |        244 | =
+20250304-125555-6699 01840 *    2097 us |       7049 | ==================================================
+20250304-125555-6699 01840 *    4194 us |         38 | 
+20250304-125555-6700 01840 *    8388 us |          3 | 
+20250304-125555-6700 01840 *      16 ms |          3 | 
+20250304-125555-6700 01840 *      33 ms |          3 | 
+20250304-125555-6700 01840 *      67 ms |          1 | 
+Inserted events:
+  0x56298561a390 [fd  7] Read Persist Internal
+  0x56298562bee0 [fd  9] Read Persist
+Active events:
+20250304-125555-6701 01840 * main            (benchmark.cc:803): Cleaning up after experiment.
+20250304-125555-6702 01840 * FlushStats      (benchmark.cc:843): Flushing stats to /mnt/extra/experiments/2025-04-04-12-55-04/out/client-0-0-5-stats-0.json.

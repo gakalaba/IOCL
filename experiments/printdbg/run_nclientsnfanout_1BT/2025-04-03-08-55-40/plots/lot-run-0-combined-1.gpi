@@ -1,0 +1,14 @@
+set datafile separator ','
+set title "\nclient\\\_total=2\n"
+set key bottom right
+set xlabel 'Time (ms)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2025-04-03-08-55-40/plots/lot-run-0-combined-1.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2025-04-03-08-55-40/2025-04-03-08-55-40/2025-04-03-08-56-39/out/plots/lot-run-0-combined.csv' title "consistency=ss" ls 1 with lines

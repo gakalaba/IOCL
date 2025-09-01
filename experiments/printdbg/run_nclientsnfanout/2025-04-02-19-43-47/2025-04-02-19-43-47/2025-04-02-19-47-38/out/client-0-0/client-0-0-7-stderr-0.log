@@ -1,0 +1,41 @@
+20250302-194747-8695 02045 * main            (benchmark.cc:397): Starting benchmark.
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250302-194758-7108 02045 * WarmupDone      (bench_client.cc:675): Completed warmup period of 10 seconds with 780 requests
+20250302-194819-7153 02045 * Finish          (bench_client.cc:873): Completed 2382 requests in 21.009263 seconds
+20250302-194819-7154 02045 * Finish          (bench_client.cc:874): 1 outstanding transactions.
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: , current_state: 0
+20250302-194827-7112 02045 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-02-19-47-38/out/client-0-0-7-stats-0.json.
+20250302-194829-7156 02045 * Cleanup         (bench_client.cc:697): Aborting 0 outstanding transactions.
+20250302-194829-7157 02045 * CooldownDone    (bench_client.cc:727): Finished cooldown period.
+20250302-194829-7178 02045 * CooldownDone    (bench_client.cc:734): Median latency is 8632916 ns (8632 us)
+20250302-194829-7179 02045 * CooldownDone    (bench_client.cc:743): Average latency is 8739652 ns (8739 us)
+20250302-194829-7180 02045 * CooldownDone    (bench_client.cc:747): 90th percentile latency is 9814733 ns (9814 us)
+20250302-194829-7180 02045 * CooldownDone    (bench_client.cc:751): 95th percentile latency is 10265317 ns (10 ms)
+20250302-194829-7181 02045 * CooldownDone    (bench_client.cc:755): 99th percentile latency is 11360997 ns (11 ms)
+20250302-194829-7181 02045 * LATENCY total: 5376 us 8739 us/8388 us 162 ms (2383 samples, 20 s total)
+20250302-194829-7182 02045 *    4194 us |        978 | ==================================
+20250302-194829-7182 02045 *    8388 us |       1402 | ==================================================
+20250302-194829-7183 02045 *      16 ms |          0 |
+20250302-194829-7183 02045 *      33 ms |          1 | 
+20250302-194829-7183 02045 *      67 ms |          1 | 
+20250302-194829-7184 02045 *     134 ms |          1 | 
+Inserted events:
+  0x55bab3d48390 [fd  7] Read Persist Internal
+  0x55bab3d59560 [fd  9] Read Persist
+Active events:
+20250302-194829-7187 02045 * main            (benchmark.cc:802): Cleaning up after experiment.
+20250302-194829-7188 02045 * FlushStats      (benchmark.cc:842): Flushing stats to /mnt/extra/experiments/2025-04-02-19-47-38/out/client-0-0-7-stats-0.json.
