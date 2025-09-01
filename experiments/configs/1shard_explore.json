@@ -11,9 +11,9 @@
   "replication_protocol": "vr",
   "client_protocol_mode": "span-lock",
   "server_names": [
+    "us-east-1-0",
     "us-east-1-1",
-    "us-east-1-2",
-    "eu-west-1-0"
+    "us-east-1-2"
   ],
   "consistency": [
     "lin"
@@ -28,24 +28,16 @@
   "num_shards": 1,
   "shards": [
     [
+      "us-east-1-0",
       "us-east-1-1",
-      "us-east-1-2",
-      "eu-west-1-0"
+      "us-east-1-2"
     ]
   ],
   "client_total": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_processes_per_client_node": [
-    1,
-    2,
-    4,
-    8,
-    16
+    1
   ],
   "client_threads_per_process": 1,
   "clients": [
