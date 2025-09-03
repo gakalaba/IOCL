@@ -113,20 +113,23 @@ uint64_t BenchmarkClient::CustomInit()
     Debug("session id: %lu", sid);
     std::cout << "[CustomInit] created session" << std::endl;
 
+    // don't need these two -> dummy values to call for emplace 
     auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
     auto appreq = GetNextAppRequest();
-    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
-
+    // don't need
+    // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+    // move to sendAsync function, GetFanout() --> 0 
     session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
     std::cout << "[CustomInit] emplace called" << std::endl;
 
-    auto &ss = session_states_.find(sid)->second;
-    _Latency_StartRec(ss.lat());
+    // auto &ss = session_states_.find(sid)->second;
+    // don't need
+    //_Latency_StartRec(ss.lat());
 
     auto bcb = []() {}; // Don't need to jump right into issueing requests, this will be done by the python app
     auto btcb = []() {};
-
-    client.BeginIOCL(session, bcb, btcb, timeout_);
+    // remove
+    // client.BeginIOCL(session, bcb, btcb, timeout_);
     return sid;
 }
 

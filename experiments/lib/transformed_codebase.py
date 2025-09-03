@@ -199,6 +199,45 @@ class TransformedCodebase:
         #                                           len(config['pin_client_processes'])]
         #     client_command = 'taskset 0x%x %s' % (1 << core, client_command)
 
+        python_dir = config["base_python_directory"]
+        python_cmd = config["python_app_name"]
+
+        # Build the client command with all config paths
+        client_command = "".join(
+            [
+                str(x)
+                for x in [
+                    "cd ",
+                    python_dir,
+                    "; source ",
+                    config["python_venv"],
+                    "; python ",
+                    python_cmd,
+                    " --clientid=",
+                    client_id,
+                    " --explen=",
+                    config["client_experiment_length"],
+                    " --warmup_secs=",
+                    config["client_ramp_up"],
+                    " --cooldown_secs=",
+                    config["client_ramp_down"],
+                    " --client_host=",
+                    client_host,
+                    " --replica_config_paths=",
+                    ",".join(shard_config_paths),
+                    " --net_config_path=",
+                    network_config_path,
+                    " --num_shards=",
+                    config["num_shards"],
+                ]
+            ]
+        )
+        ld_library_path = (
+            "/users/akalaba/IOCL/src/build/store/benchmark/async:"
+            "/users/akalaba/IOCL/src/build/lib:"
+            "/users/akalaba/IOCL/src/build/rss"
+        )
+        client_command = f"export LD_LIBRARY_PATH={ld_library_path}:$LD_LIBRARY_PATH; {client_command}"
         if "run_locally" in config and config["run_locally"]:
             stdout_file = os.path.join(
                 exp_directory,
@@ -269,45 +308,6 @@ class TransformedCodebase:
                 else:
                     client_command = "setenv DEBUG all; %s" % client_command
 
-        python_dir = config["base_python_directory"]
-        python_cmd = config["python_app_name"]
-
-        # Build the client command with all config paths
-        client_command = "".join(
-            [
-                str(x)
-                for x in [
-                    "cd ",
-                    python_dir,
-                    "; source ",
-                    config["python_venv"],
-                    "; python ",
-                    python_cmd,
-                    " --clientid=",
-                    client_id,
-                    " --explen=",
-                    config["client_experiment_length"],
-                    " --warmup_secs=",
-                    config["client_ramp_up"],
-                    " --cooldown_secs=",
-                    config["client_ramp_down"],
-                    " --client_host=",
-                    client_host,
-                    " --replica_config_paths=",
-                    ",".join(shard_config_paths),
-                    " --net_config_path=",
-                    network_config_path,
-                    " --num_shards=",
-                    config["num_shards"],
-                ]
-            ]
-        )
-        ld_library_path = (
-            "/users/akalaba/IOCL/src/build/store/benchmark/async:"
-            "/users/akalaba/IOCL/src/build/lib:"
-            "/users/akalaba/IOCL/src/build/rss"
-        )
-        client_command = f"export LD_LIBRARY_PATH={ld_library_path}:$LD_LIBRARY_PATH; {client_command}"
         print("CLIENT COMMAND + ", repr(client_command))
         return client_command
 
