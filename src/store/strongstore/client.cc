@@ -643,7 +643,14 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto req_id = session.transaction_id();
+        if (session.transaction_id() != static_cast<uint64_t>(-1))
+        {
+            sessions_by_transaction_id_.erase(session.transaction_id());
+        }
+
+        auto req_id = next_transaction_id_++;
+        // austin: we're replacing this with next_transaction_id_++?
+        // auto req_id = session.transaction_id();
 
         std::cout << "[Client::SendAsynchRequest] Called with req_id=" << req_id
                 << ", optype=" << static_cast<int>(optype)
