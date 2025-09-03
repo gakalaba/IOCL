@@ -617,6 +617,9 @@ namespace strongstore
         auto req_id = session.transaction_id();
 
         Debug("SendRequest[%lu]: %s(%s, %s)", req_id, op.c_str(), key.c_str(), value.c_str());
+        std::cout << "Client SendRequest[" << req_id << "]: "
+          << op << "(" << key << ", " << value << ")"
+          << std::endl;
 
         ASSERT(session.executing());
 

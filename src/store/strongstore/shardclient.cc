@@ -58,6 +58,7 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         Debug("Got message wahoo");
+        std::cout << "[Server] Goit a message" << std::endl;
         if (type == get_reply_.GetTypeName())
         {
             get_reply_.ParseFromString(data);
@@ -304,6 +305,10 @@ namespace strongstore
                                         request_utils::Value newValue, transformed_callback trcb)
     {
         // Send the operation to appropriate shard.
+        std::cout << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
+              << ", op=" << static_cast<int>(optype)
+              << ", key=" << key
+              << std::endl;
         Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
 
         uint64_t req_id = last_req_id_++;
@@ -444,16 +449,20 @@ namespace strongstore
     // IOCL receive the response
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {
-        Debug("shard client got IOCLReply!");
+        std::cout << "[ShardClient::HandleSendRequestReply] got IOCLReply!" << std::endl;
+
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the transaction_id = %d", req_id);
+        std::cout << "[ShardClient::HandleSendRequestReply] transaction_id=" << req_id << std::endl;
+
         int status = reply.status();
-        string retval = reply.return_value();
+        std::string retval = reply.return_value();
 
         auto itr = pendingReqs.find(req_id);
         if (itr == pendingReqs.end())
         {
-            Debug("[%d][%lu] SendRequestREply for request not stored in PendingReqs.", shard_idx_, req_id);
+            std::cout << "[ShardClient::HandleSendRequestReply] [shard=" << shard_idx_
+                    << "][req_id=" << req_id << "] reply for request not stored in PendingReqs."
+                    << std::endl;
             Panic("huhuhuhuhuh");
             return; // stale request
         }
@@ -464,8 +473,11 @@ namespace strongstore
         pendingReqs.erase(itr);
         delete req;
 
-        Debug("[%lu] [shard %i] Received SendRequest reply with status %d and return value %s",
-              transaction_id, shard_idx_, status, retval.c_str());
+        std::cout << "[ShardClient::HandleSendRequestReply] [txn_id=" << transaction_id
+                << "][shard=" << shard_idx_
+                << "] received reply with status=" << status
+                << ", return_value=" << retval
+                << std::endl;
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 

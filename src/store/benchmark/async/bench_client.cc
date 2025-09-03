@@ -1065,6 +1065,9 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
 
 void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
 {
+    std::cout << "[AsynchRequestCallback] Called with session_id=" << session_id
+        << ", status=" << status
+        << ", commandId=" << commandId << std::endl;
     replies_map_[commandId] = retval;
     return;
 }
