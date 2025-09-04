@@ -289,6 +289,7 @@ void TCPTransport::ConnectTCP(
                   pair<TCPTransportAddress, TransportReceiver *>>(bev, dstSrc));
     // mtx.unlock();
 
+    Debug("setting tcpreadable callback..");
     bufferevent_setcb(bev, TCPReadableCallback, NULL,
                       TCPOutgoingEventCallback, info);
     if (bufferevent_socket_connect(bev,
@@ -498,6 +499,7 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
       return false;
     }
     Latency_End(&sockWriteLat);*/
+    Debug("Wrote %lu bytes to TCP buffer", totalLen);
     return true;
 }
 
@@ -551,6 +553,7 @@ int TCPTransport::Timer(uint64_t ms, timer_callback_t cb)
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
 
+    Debug("Putting callback on timer for %lu ms", ms);
     return TimerInternal(tv, std::move(cb));
 }
 
@@ -683,6 +686,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
 
     if (what & EV_READ)
     {
+        Debug("ok.. in TCPAcceptCallback from fd %d", fd);
         int newfd;
         struct sockaddr_in sin;
         socklen_t sinLength = sizeof(sin);
@@ -713,6 +717,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         // Create a buffered event
         bev = bufferevent_socket_new(transport->libeventBase, newfd,
                                      BEV_OPT_CLOSE_ON_FREE);
+        Debug("setting the callback to TCPReadableCallback");
         bufferevent_setcb(bev, TCPReadableCallback, NULL,
                           TCPIncomingEventCallback, info);
         if (bufferevent_enable(bev, EV_READ | EV_WRITE) < 0)
@@ -736,12 +741,14 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
 
 void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 {
+    Debug("got readable callbackk...");
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
     struct evbuffer *evbuf = bufferevent_get_input(bev);
 
     while (evbuffer_get_length(evbuf) > 0)
     {
+        Debug("here");
         uint32_t *magic;
         magic = (uint32_t *)evbuffer_pullup(evbuf, sizeof(*magic));
         if (magic == NULL)

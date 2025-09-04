@@ -309,6 +309,7 @@ namespace strongstore
               << ", op=" << static_cast<int>(optype)
               << ", key=" << key
               << std::endl;
+        std::cout << "[shard " << shard_idx_ << "] Sending ASYNCH REQUEST" << std::endl;
         Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
 
         uint64_t req_id = last_req_id_++;
@@ -328,6 +329,7 @@ namespace strongstore
         switch (optype)
         {
         case request_utils::Operation::PUT:
+            std::cout << "should be here" << std::endl;
             treq_.mutable_op()->set_op(AsynchOperation::PUT);
             break;
         case request_utils::Operation::GET:
@@ -443,6 +445,8 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
 
+        std::cout << "got here at end with shard_idx = " << shard_idx_ << " and replica = " << replica_ << "and treq_ = " << treq_.DebugString() << std::endl;
+        std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
         transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
     }
 

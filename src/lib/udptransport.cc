@@ -901,7 +901,6 @@ int UDPTransport::Timer(uint64_t ms, timer_callback_t cb)
     struct timeval tv;
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
-
     return TimerInternal(tv, cb);
 }
 

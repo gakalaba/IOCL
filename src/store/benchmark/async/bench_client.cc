@@ -28,6 +28,7 @@
 #include "store/benchmark/async/bench_client.h"
 
 #include <sys/time.h>
+#include <sys/eventfd.h>
 
 #include <algorithm>
 #include <sstream>
@@ -1069,6 +1070,14 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
         << ", status=" << status
         << ", commandId=" << commandId << std::endl;
     replies_map_[commandId] = retval;
+    if (efd_map_.find(commandId) != efd_map_.end()) {
+        int efd = efd_map_[commandId];
+        efd_map_.erase(commandId);
+        uint64_t val = 1;
+        if (write(efd, &val, sizeof(val)) != sizeof(val)) {
+            Panic("eventfd write failed");
+        }
+    }
     return;
 }
 
@@ -1095,9 +1104,14 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
         std::cout << "[AwaitAsynchResponse] Returning value for commandId=" << commandId << std::endl;
 
         // right now we don't delete the value... for the purposes of double await? TODO ANJA see with austin
-        return std::make_tuple(replies_map_[commandId], 0);
+        return std::make_tuple(replies_map_[commandId], -1);
     }
-    std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", will retry..." << std::endl;
-    // Wait until the response is in this map....
-    transport_.Timer(1, std::bind(&BenchmarkClient::AwaitAsynchResponse, this, session_id, commandId));
+    Debug("response not available!");
+    std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", creating efd..." << std::endl;
+    int efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (efd == -1) {
+        Panic("eventfd creation failed");
+    }
+    efd_map_[efd] = commandId;
+    return std::make_tuple(Value{}, efd); // this is just a file descriptor (int)
 }

@@ -269,6 +269,7 @@ private:
     bool issueConcurrent;
     bool isTransformed;
     std::unordered_map<uint64_t, request_utils::Value> replies_map_;
+    std::unordered_map<uint64_t, int> efd_map_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

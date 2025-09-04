@@ -86,7 +86,7 @@ void PanicOnSignal(int signo);
 
 // This is not a mistake.  We actually want exactly one of these flags
 // per file that uses the Debug macro.
-static __attribute__((unused)) signed char _Message_FileDebugFlag = -1;
+static __attribute__((unused)) signed char _Message_FileDebugFlag = 1;
 
 #define Debug(msg...)                                   \
         do {                                            \

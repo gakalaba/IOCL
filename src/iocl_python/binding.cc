@@ -583,15 +583,16 @@ std::pair<bool, request_utils::Value> SendRequest(uint64_t session_id, request_u
                         std::stoull(std::get<1>(result).str) : 0;
     
     std::cout << "[SendRequest] Got command ID: " << commandId << ", awaiting response..." << std::endl;
-    
+
     // Immediately await the response using the command ID
     std::tuple<request_utils::Value, uint64_t> response = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
-    
-    bool success = std::get<1>(response) == 0;
-    std::cout << "[SendRequest] Response received, success=" << success << std::endl;
+
+    // bool success = std::get<1>(response) == 0;
+    int efd = std::get<1>(response);
+    std::cout << "[SendRequest] Response received, efd=" << efd << std::endl;
     
     // Return the response value and success status
-    return {success, std::get<0>(response)};
+    return {efd, std::get<0>(response)};
 }
 
 // AsyncSendRequest - Asynchronous version of SendRequest
