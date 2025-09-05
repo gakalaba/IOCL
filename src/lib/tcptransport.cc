@@ -553,7 +553,6 @@ int TCPTransport::Timer(uint64_t ms, timer_callback_t cb)
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
 
-    Debug("Putting callback on timer for %lu ms", ms);
     return TimerInternal(tv, std::move(cb));
 }
 
@@ -825,15 +824,17 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
     {
         Warning("Error on incoming TCP connection: %s",
                 evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-        bufferevent_free(bev);
-        return;
     }
-    else if (what & BEV_EVENT_ERROR)
+    else if (what & BEV_EVENT_EOF)
     {
-        Warning("EOF on incoming TCP connection.");
-        bufferevent_free(bev);
-        return;
+        Warning("EOF on incoming TCP connection: %s",
+                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+    } else {
+        Warning("Error on incoming TCP connection, what = %d, error: %s", what, 
+                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
     }
+    bufferevent_free(bev);
+    return;
 }
 
 void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,
