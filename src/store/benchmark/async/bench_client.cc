@@ -1108,10 +1108,21 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     }
     Debug("response not available!");
     std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", creating efd..." << std::endl;
+    
+    // Create the event file descriptor
     int efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (efd == -1) {
+        std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
         Panic("eventfd creation failed");
     }
+
+    // Log the created efd and the commandId it maps to
+    std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
+
+    // Map the efd to the commandId
     efd_map_[efd] = commandId;
-    return std::make_tuple(Value{}, efd); // this is just a file descriptor (int)
+    std::cout << "[AwaitAsynchResponse] Mapped efd=" << efd << " to commandId=" << commandId << std::endl;
+
+    // Return the Value object and the efd
+    return std::make_tuple(Value{}, efd);
 }

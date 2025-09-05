@@ -564,36 +564,36 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 
 
 // SendRequest - Synchronous version that chains request and response
-std::pair<bool, request_utils::Value> SendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-    std::cout << "[SendRequest] Called with session_id=" << session_id 
-              << ", op=" << static_cast<int>(op) 
-              << ", key=" << key << std::endl;
+// std::pair<bool, request_utils::Value> SendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
+//     std::cout << "[SendRequest] Called with session_id=" << session_id 
+//               << ", op=" << static_cast<int>(op) 
+//               << ", key=" << key << std::endl;
 
-    if (!benchmarkClient) {
-        std::cout << "[SendRequest] Creating new benchmark client" << std::endl;
-        benchmarkClient = CreateBenchmarkClient();
-    }
+//     if (!benchmarkClient) {
+//         std::cout << "[SendRequest] Creating new benchmark client" << std::endl;
+//         benchmarkClient = CreateBenchmarkClient();
+//     }
     
-    // Call SendAsynchRequest from BenchmarkClient and get the command ID
-    std::cout << "[SendRequest] Calling SendAsynchRequest..." << std::endl;
-    std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
+//     // Call SendAsynchRequest from BenchmarkClient and get the command ID
+//     std::cout << "[SendRequest] Calling SendAsynchRequest..." << std::endl;
+//     std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
     
-    // Extract the command ID from the result (assuming it's the second element)
-    uint64_t commandId = std::get<1>(result).type == request_utils::ValueType::STRING ? 
-                        std::stoull(std::get<1>(result).str) : 0;
+//     // Extract the command ID from the result (assuming it's the second element)
+//     uint64_t commandId = std::get<1>(result).type == request_utils::ValueType::STRING ? 
+//                         std::stoull(std::get<1>(result).str) : 0;
     
-    std::cout << "[SendRequest] Got command ID: " << commandId << ", awaiting response..." << std::endl;
+//     std::cout << "[SendRequest] Got command ID: " << commandId << ", awaiting response..." << std::endl;
 
-    // Immediately await the response using the command ID
-    std::tuple<request_utils::Value, uint64_t> response = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
+//     // Immediately await the response using the command ID
+//     std::tuple<request_utils::Value, uint64_t> response = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
 
-    // bool success = std::get<1>(response) == 0;
-    int efd = std::get<1>(response);
-    std::cout << "[SendRequest] Response received, efd=" << efd << std::endl;
+//     // bool success = std::get<1>(response) == 0;
+//     int efd = std::get<1>(response);
+//     std::cout << "[SendRequest] Response received, efd=" << efd << std::endl;
     
-    // Return the response value and success status
-    return {efd, std::get<0>(response)};
-}
+//     // Return the response value and success status
+//     return {efd, std::get<0>(response)};
+// }
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
@@ -615,7 +615,7 @@ std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, requ
 }
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
-std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
+std::pair<bool, uint64_t> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
     std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
               << ", commandId=" << commandId << std::endl;
               
@@ -628,10 +628,16 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
     // Call AwaitAsynchResponse from BenchmarkClient
     std::tuple<request_utils::Value, uint64_t> result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
     
-    bool success = std::get<1>(result) == 0;
-    std::cout << "[AsyncGetResponse] Response received, success=" << success << std::endl;
-    
-    return {success, std::get<0>(result)};
+    // Extract the efd and determine success
+    uint64_t efd = std::get<1>(result);
+    bool success = (efd != 0); // Success is determined by whether the efd is valid
+
+    std::cout << "[AsyncGetResponse] Response received, success=" 
+              << success 
+              << ", efd=" << efd 
+              << std::endl;
+
+    return {success, efd};
 }
 
 // Helper function to convert Value to Python objects
@@ -806,14 +812,14 @@ PYBIND11_MODULE(redisstorepython, m) {
     // m.def("set_double_flag", &SetDoubleFlag, "Set a double gflag value");
 
     // Wrapper for SendRequest to handle Python types
-    m.def("send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {
-        // Convert Python objects to Value
-        request_utils::Value newVal = python_to_value(new_values);
-        request_utils::Value oldVal = python_to_value(old_values);
+    // m.def("send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {
+    //     // Convert Python objects to Value
+    //     request_utils::Value newVal = python_to_value(new_values);
+    //     request_utils::Value oldVal = python_to_value(old_values);
 
-        // Call SendRequest
-        return SendRequest(session_id, op, keys, newVal, oldVal);
-    }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
+    //     // Call SendRequest
+    //     return SendRequest(session_id, op, keys, newVal, oldVal);
+    // }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncSendRequest to handle Python types
     m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {
