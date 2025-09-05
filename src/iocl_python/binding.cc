@@ -615,29 +615,30 @@ std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, requ
 }
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
-std::pair<bool, uint64_t> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
+std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
     std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
               << ", commandId=" << commandId << std::endl;
-              
+
     if (!benchmarkClient) {
         std::cout << "[AsyncGetResponse] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
     }
 
     std::cout << "[AsyncGetResponse] Calling AwaitAsynchResponse..." << std::endl;
-    // Call AwaitAsynchResponse from BenchmarkClient
     std::tuple<request_utils::Value, uint64_t> result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
-    
-    // Extract the efd and determine success
+
+    request_utils::Value value = std::get<0>(result);
     uint64_t efd = std::get<1>(result);
-    bool success = (efd != 0); // Success is determined by whether the efd is valid
 
-    std::cout << "[AsyncGetResponse] Response received, success=" 
-              << success 
-              << ", efd=" << efd 
-              << std::endl;
-
-    return {success, efd};
+    if (efd == static_cast<uint64_t>(-1)) {
+        // Response is ready, return the Value object
+        std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
+        return {true, value};
+    } else {
+        // Response is not ready, return false and a Value containing the efd as a string
+        std::cout << "[AsyncGetResponse] Response not ready, efd=" << efd << std::endl;
+        return {false, request_utils::Value(std::to_string(efd))};
+    }
 }
 
 // Helper function to convert Value to Python objects
