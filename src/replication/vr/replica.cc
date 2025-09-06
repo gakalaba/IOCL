@@ -97,6 +97,7 @@ namespace replication
 
             if (AmLeader())
             {
+                Debug("ok here i will see it after this");
                 nullCommitTimeout->Start();
             }
             else
@@ -350,6 +351,7 @@ namespace replication
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
+            resendPrepareTimeout->Reset();
         }
 
         void VRReplica::CloseBatch()
