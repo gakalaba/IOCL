@@ -136,6 +136,8 @@ namespace strongstore
                                uint64_t key, request_utils::Value oldValue,
                                request_utils::Value newValue, transformed_callback rcb);
 
+        void HandleShowConnections();
+
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
                       const Timestamp &min_read_timestamp,

@@ -113,6 +113,7 @@ public:
 
     virtual bool IsIOCL() = 0;
 
+    virtual void HandleShowConnections() = 0;
     virtual uint64_t SendAsynchRequest(Session &session, request_utils::Operation optype,
                                        uint64_t key, request_utils::Value newValue, request_utils::Value oldValue,
                                        transformed_callback trcb) = 0;

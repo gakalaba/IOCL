@@ -246,6 +246,7 @@ namespace strongstore
                       commit_callback ccb, commit_timeout_callback ctcb,
                       uint32_t timeout) override;
         bool IsIOCL() override;
+        void HandleShowConnections() override;
         uint64_t SendAsynchRequest(Session &session, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb) override;
 
     private:

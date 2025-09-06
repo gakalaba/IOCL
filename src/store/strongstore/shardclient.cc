@@ -445,9 +445,12 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
 
-        std::cout << "got here at end with shard_idx = " << shard_idx_ << " and replica = " << replica_ << "and treq_ = " << treq_.DebugString() << std::endl;
         std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
         transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
+    }
+
+    void ShardClient::HandleShowConnections() {
+        transport_->ShowConnections();
     }
 
     // IOCL receive the response

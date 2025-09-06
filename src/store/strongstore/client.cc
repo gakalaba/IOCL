@@ -683,6 +683,14 @@ namespace strongstore
         return req_id;
     }
 
+    void Client::HandleShowConnections()
+    {
+        for (auto s : sclients_)
+        {
+            s->HandleShowConnections();
+        }
+    }
+
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
     {
