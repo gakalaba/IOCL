@@ -97,6 +97,16 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
 BenchmarkClient::~BenchmarkClient()
 {
     Debug("session_states_.size(): %lu", session_states_.size());
+    auto search = session_states_.find(0);
+    if (search == session_states_.end()) {
+        std::cout << "[AwaitAsynchResponse] ERROR: session_id " << 0 << " not found in session_states_!" << std::endl;
+    }
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+    client.HandleShowConnections();
 }
 
 uint64_t BenchmarkClient::CustomInit()
@@ -131,6 +141,9 @@ uint64_t BenchmarkClient::CustomInit()
     auto btcb = []() {};
     // remove
     // client.BeginIOCL(session, bcb, btcb, timeout_);
+    Debug("ANJAAAAAA we should be starting the event loop....");
+    transport_.RunTransformed();
+    std::cout << "do we print after run transformed?" << std::endl;
     return sid;
 }
 
@@ -1084,6 +1097,19 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
 {
     Debug("Called AwaitAsynchResponse!");
+    /////
+    auto search = session_states_.find(session_id);
+    if (search == session_states_.end()) {
+        std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+    }
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+    client.HandleShowConnections();
+    ///////
+
     std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
               << ", commandId=" << commandId << std::endl;
 
