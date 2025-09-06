@@ -106,6 +106,7 @@ public:
     virtual bool SendMessageToGroup(TransportReceiver *src,
                                     int groupIdx,
                                     const Message &m) = 0;
+    virtual void ShowConnections() = 0;
     /* Send message to failure coordinator
      */
     virtual bool SendMessageToFC(TransportReceiver *src,
@@ -115,6 +116,7 @@ public:
     virtual bool CancelTimer(int id) = 0;
     virtual void CancelAllTimers() = 0;
     virtual void Run() = 0;
+    virtual void RunTransformed() = 0;
     virtual void Stop() = 0;
     virtual void Close(TransportReceiver *receiver) = 0;
     virtual void Flush();

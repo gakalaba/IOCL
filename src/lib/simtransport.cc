@@ -215,6 +215,11 @@ SimulatedTransport::LookupMulticastAddress(const transport::Configuration *cfg)
     return NULL;
 }
 
+void SimulatedTransport::RunTransformed()
+{
+    Panic("Unimplemented");
+}
+
 void SimulatedTransport::Run()
 {
     LookupAddresses();
@@ -254,6 +259,11 @@ void SimulatedTransport::AddFilter(int id, filter_t filter)
 void SimulatedTransport::RemoveFilter(int id)
 {
     filters.erase(id);
+}
+
+void ShowConnections()
+{
+    Panic("unimplemented");
 }
 
 int SimulatedTransport::Timer(uint64_t ms, timer_callback_t cb)

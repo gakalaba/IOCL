@@ -646,6 +646,11 @@ void UDPTransport::Run()
     event_base_dispatch(libeventBase);
 }
 
+void UDPTransport::RunTransformed()
+{
+    Panic("Not implemented");
+}
+
 void UDPTransport::Stop()
 {
     // tp.stop();
@@ -739,6 +744,10 @@ void UDPTransport::OnReadable(int fd)
 
         ProcessPacket(fd, sender, senderSize, msgbuf, sz);
     } while (0);
+}
+void UDPTransport::ShowConnections()
+{
+    Panic("Not implemented");
 }
 
 void UDPTransport::ProcessPacket(int fd, sockaddr_in sender, socklen_t senderSize,

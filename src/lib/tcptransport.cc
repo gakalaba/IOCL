@@ -457,7 +457,6 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
                        dataLen + sizeof(dataLen) +
                        sizeof(totalLen) +
                        sizeof(uint32_t));
-
     Debug("Message is %lu total bytes", totalLen);
 
     char buf[totalLen];
@@ -500,6 +499,7 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     }
     Latency_End(&sockWriteLat);*/
     Debug("Wrote %lu bytes to TCP buffer", totalLen);
+    ShowConnections();
     return true;
 }
 
@@ -512,6 +512,43 @@ void TCPTransport::Run()
 {
     int ret = event_base_dispatch(libeventBase);
     Debug("event_base_dispatch returned %d.", ret);
+}
+
+void keep_alive_cb(evutil_socket_t fd, short what, void *arg) {
+    (void)fd;
+    (void)what;
+    (void)arg;
+    Debug("hit interval");
+    // Do nothing — just keeps the loop alive
+}
+
+void TCPTransport::RunTransformed()
+{
+    Debug("calling RunTransformed...");
+    auto ev = event_new(libeventBase,
+                                  -1,
+                                  EV_PERSIST | EV_TIMEOUT,
+                                  keep_alive_cb,
+                                  NULL);
+    struct timeval interval;
+    interval.tv_sec = 0;        // 0 full seconds
+    interval.tv_usec = 50000;   // 50,000 microseconds = 50 ms
+    event_add(ev, &interval);
+    int ret = event_base_dispatch(libeventBase);
+    Debug("non-exiting even_base_loop for transformed applications returned %d.", ret);
+}
+
+void TCPTransport::ShowConnections()
+{
+    Debug("Current TCP connections:");
+    int i = 0;
+    for (auto &kv : tcpOutgoing)
+    {
+        Debug("anja");
+        Debug("Have %dth outgoing connection to %s:%d", i, inet_ntoa(kv.first.first.addr.sin_addr),
+          htons(kv.first.first.addr.sin_port));
+        i++;
+    }
 }
 
 void TCPTransport::Stop()
@@ -580,6 +617,7 @@ int TCPTransport::TimerInternal(struct timeval &tv, timer_callback_t cb)
     timers[info->id] = info;
 
     event_add(info->ev, &tv);
+    // event_base_dump_events(libeventBase, stderr);
 
     return info->id;
 }
@@ -827,8 +865,8 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
     }
     else if (what & BEV_EVENT_EOF)
     {
-        Warning("EOF on incoming TCP connection: %s",
-                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        Warning("EOF on incoming TCP connection. Client closed the connection.");
+        Warning("Error: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
     } else {
         Warning("Error on incoming TCP connection, what = %d, error: %s", what, 
                 evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));

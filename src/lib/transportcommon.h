@@ -57,6 +57,10 @@ public:
             delete kv.second;
         }
     }
+    virtual void ShowConnections() override
+    {
+        Panic("unimplemented");
+    }
 
     virtual bool
     SendMessage(TransportReceiver *src, const TransportAddress &dst,

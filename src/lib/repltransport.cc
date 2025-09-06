@@ -120,6 +120,11 @@ void ReplTransport::Register(TransportReceiver *receiver,
     RegisterConfiguration(receiver, config, groupIdx, replicaIdx);
 }
 
+void ReplTransport::ShowConnections()
+{
+    Panic("Unimplemented");
+}
+
 int ReplTransport::Timer(uint64_t ms, timer_callback_t cb)
 {
     timer_id_++;
@@ -289,6 +294,11 @@ bool ReplTransport::RunOne()
             std::cout << usage << std::endl;
         }
     }
+}
+
+void ReplTransport::RunTransformed()
+{
+    Panic("Unimplemented");
 }
 
 void ReplTransport::Run()

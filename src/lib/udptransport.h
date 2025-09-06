@@ -76,6 +76,7 @@ public:
                           int groupIdx,
                           int replicaIdx) override;
     virtual void Run() override;
+    virtual void RunTransformed() override;
     virtual void Stop() override;
     virtual void Close(TransportReceiver *receiver) override;
     virtual int Timer(uint64_t ms, timer_callback_t cb) override;
@@ -137,6 +138,7 @@ private:
     bool SendMessageInternal(TransportReceiver *src,
                              const UDPTransportAddress &dst,
                              const Message &m) override;
+    void ShowConnections() override;
 
     UDPTransportAddress
     LookupAddress(const transport::ReplicaAddress &addr);

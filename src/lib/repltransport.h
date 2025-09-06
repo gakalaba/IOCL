@@ -246,12 +246,14 @@ public:
 
     // Launch the REPL.
     virtual void Run() override;
+    virtual void RunTransformed() override;
     virtual void Stop() override;
     virtual void Close(TransportReceiver *receiver) override;
 
 protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ReplTransportAddress &dst, const Message &m) override;
+    virtual void ShowConnections() override;
     virtual ReplTransportAddress
     LookupAddress(const transport::Configuration &cfg,
                   int groupIdx,
