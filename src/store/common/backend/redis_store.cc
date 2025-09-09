@@ -13,9 +13,11 @@ namespace redis
     // Dispatcher function for commands.
     Value RedisStore::execute(const Command &cmd)
     {
+        std::cout << "inside execute" << std::endl;
         switch (cmd.op)
         {
         case Operation::PUT:
+            std::cout << "Executing PUT for key: " << cmd.key << " with value type: " << static_cast<int>(cmd.value.type) << std::endl;
             put(cmd.key, cmd.value);
             return cmd.value;
         case Operation::GET:

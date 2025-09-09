@@ -1692,6 +1692,7 @@ namespace strongstore
 
         Request request;
         IOCLRequest ioclrequest;
+        TransformedIOCLRequest transioclrequest;
         if (consistency_ != LIN)
         {
             request.ParseFromString(op);
@@ -1709,10 +1710,20 @@ namespace strongstore
         }
         else
         {
-            ioclrequest.ParseFromString(op);
-            replicate = true;
-            response = op;
-            Debug("was able to parse IOCLRequest! it looks like %s", ioclrequest);
+            if (!transformed_)
+            {
+                ioclrequest.ParseFromString(op);
+                replicate = true;
+                response = op;
+                Debug("was able to parse IOCLRequest! it looks like %s", ioclrequest);
+            }
+            else
+            {
+                transioclrequest.ParseFromString(op);
+                replicate = true;
+                response = op;
+                Debug("was able to parse TransformedIOCLRequest! it looks like %s", transioclrequest);
+            }
         }
     }
 
@@ -2031,8 +2042,10 @@ namespace strongstore
 
         // Execute the command
         int status = REPLY_OK;
+        Debug("calling execute!");
         redis::Value retval = transformed_store_.execute(c);
 
+        Debug("Ok, returned from execute!");
         TransformedIOCLReply reply;
         reply.set_status(status);
         reply.mutable_rid()->set_client_id(req.rid().client_id());
@@ -2072,6 +2085,7 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
         reply.SerializeToString(&response);
+        Debug("the response was %s", response.c_str());
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

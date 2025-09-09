@@ -499,7 +499,7 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     }
     Latency_End(&sockWriteLat);*/
     Debug("Wrote %lu bytes to TCP buffer", totalLen);
-    ShowConnections();
+    // ShowConnections();
     return true;
 }
 
@@ -535,7 +535,7 @@ void TCPTransport::RunTransformed()
     interval.tv_usec = 50000;   // 50,000 microseconds = 50 ms
     event_add(ev, &interval);
     int ret = event_base_dispatch(libeventBase);
-    Debug("non-exiting even_base_loop for transformed applications returned %d.", ret);
+    // Debug("non-exiting even_base_loop for transformed applications returned %d.", ret);
 }
 
 void TCPTransport::ShowConnections()
@@ -544,7 +544,6 @@ void TCPTransport::ShowConnections()
     int i = 0;
     for (auto &kv : tcpOutgoing)
     {
-        Debug("anja");
         Debug("Have %dth outgoing connection to %s:%d", i, inet_ntoa(kv.first.first.addr.sin_addr),
           htons(kv.first.first.addr.sin_port));
         i++;

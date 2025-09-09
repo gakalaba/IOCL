@@ -107,7 +107,6 @@ BenchmarkClient::~BenchmarkClient()
     auto &ss = search->second;
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
-    client.HandleShowConnections();
 }
 
 void BenchmarkClient::PlsWork()
@@ -1110,18 +1109,6 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
 {
     Debug("Called AwaitAsynchResponse!");
-    /////
-    auto search = session_states_.find(session_id);
-    if (search == session_states_.end()) {
-        std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
-    }
-    ASSERT(search != session_states_.end());
-
-    auto &ss = search->second;
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-    client.HandleShowConnections();
-    ///////
 
     std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
               << ", commandId=" << commandId << std::endl;

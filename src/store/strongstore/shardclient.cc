@@ -507,25 +507,32 @@ namespace strongstore
         case AsynchValue::STRING:
             retval.type = request_utils::ValueType::STRING;
             retval.str = reply.return_value().str();
+            Debug("retval has type STRING and value %s", retval.str.c_str());
             break;
         case AsynchValue::LIST:
             retval.type = request_utils::ValueType::LIST;
+            Debug("retval has type LIST");
             for (int i = 0; i < reply.return_value().list_size(); ++i)
             {
+                Debug("retval[%d] = %s", i, reply.return_value().list(i).c_str());
                 retval.list.push_back(reply.return_value().list(i));
             }
             break;
         case AsynchValue::SET:
+            Debug("retval has type SET");
             retval.type = request_utils::ValueType::SET;
             for (int i = 0; i < reply.return_value().set_size(); ++i)
             {
+                Debug("revalt[%d] = %s", i, reply.return_value().set(i).c_str());
                 retval.set.insert(reply.return_value().set(i));
             }
             break;
         case AsynchValue::HASH:
+            Debug("retval has type HASH");
             retval.type = request_utils::ValueType::HASH;
             for (const auto &entry : reply.return_value().hash())
             {
+                Debug("retval[%s] = %s", entry.first.c_str(), entry.second.c_str());
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
 
@@ -552,9 +559,8 @@ namespace strongstore
         pendingAsynchReqs.erase(itr);
         delete req;
 
-        Debug("[%lu] [shard %i] Received SendRequest reply with status %d and return value",
+        Debug("[%lu] [shard %i] Received SendRequest reply with status %d",
               transaction_id, shard_idx_, status);
-
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
         Debug("the name of the callback we're about to call is %s", trcb);
         trcb(status, retval, transaction_id);
