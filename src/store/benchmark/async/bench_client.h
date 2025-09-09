@@ -72,6 +72,8 @@ public:
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
+    void PlsWork();
+
     void Start(bench_done_callback bdcb);
     uint64_t CustomInit();
 

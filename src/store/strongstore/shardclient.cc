@@ -556,7 +556,7 @@ namespace strongstore
               transaction_id, shard_idx_, status);
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-
+        Debug("the name of the callback we're about to call is %s", trcb);
         trcb(status, retval, transaction_id);
     }
 

@@ -26,6 +26,7 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/bench_client.h"
+#include <thread>
 
 #include <sys/time.h>
 #include <sys/eventfd.h>
@@ -109,6 +110,12 @@ BenchmarkClient::~BenchmarkClient()
     client.HandleShowConnections();
 }
 
+void BenchmarkClient::PlsWork()
+{
+    Debug("PlsWork being called....");
+    transport_.RunTransformed();
+}
+
 uint64_t BenchmarkClient::CustomInit()
 {
 
@@ -142,7 +149,9 @@ uint64_t BenchmarkClient::CustomInit()
     // remove
     // client.BeginIOCL(session, bcb, btcb, timeout_);
     Debug("ANJAAAAAA we should be starting the event loop....");
-    transport_.RunTransformed();
+    // Start event loop in a background thread
+    // std::thread(transport_.RunTransformed).detach();
+    std::thread(std::bind(&BenchmarkClient::PlsWork, this)).detach();
     std::cout << "do we print after run transformed?" << std::endl;
     return sid;
 }
@@ -1079,19 +1088,23 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
 
 void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
 {
+    Debug("AsynchRequestCallback, with commandId = %d | the size of the efd_map_ is %lu", commandId, efd_map_.size());
     std::cout << "[AsynchRequestCallback] Called with session_id=" << session_id
         << ", status=" << status
         << ", commandId=" << commandId << std::endl;
     replies_map_[commandId] = retval;
+    
     if (efd_map_.find(commandId) != efd_map_.end()) {
         int efd = efd_map_[commandId];
+        Debug("i found the efd!, it's %d", efd);
         efd_map_.erase(commandId);
         uint64_t val = 1;
         if (write(efd, &val, sizeof(val)) != sizeof(val)) {
             Panic("eventfd write failed");
         }
+    } else {
+        Debug("didn't find the efd for commandId %d", commandId);
     }
-    return;
 }
 
 std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
@@ -1141,12 +1154,15 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
         std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
         Panic("eventfd creation failed");
     }
+    Debug("making an efd! it has value %d", efd);
 
     // Log the created efd and the commandId it maps to
     std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
 
     // Map the efd to the commandId
-    efd_map_[efd] = commandId;
+    efd_map_[commandId] = efd;
+    Debug("making an efd! it has value %d and is mapped to commandId %d", efd, commandId);
+    Debug("the side of the efd_map_ is %lu", efd_map_.size());
     std::cout << "[AwaitAsynchResponse] Mapped efd=" << efd << " to commandId=" << commandId << std::endl;
 
     // Return the Value object and the efd
