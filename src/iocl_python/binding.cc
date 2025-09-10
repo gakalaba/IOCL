@@ -348,7 +348,7 @@ static bool GetEnvBool(const char *name, const char *def) {
 }
 
 std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
-    std::cout << "[CreateBenchmarkClient] Minimal micro client creation" << std::endl;
+    // std::cout << "[CreateBenchmarkClient] Minimal micro client creation" << std::endl;
 
     // 1) Transport
     if (!s_transport) {
@@ -370,10 +370,8 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
             keys.emplace_back(key);
         }
         s_keySelector.reset(new UniformKeySelector(keys));
-        std::cout << "[CreateBenchmarkClient] KeySelector created (uniform) with " << keys.size() << " keys at " << s_keySelector.get() << std::endl;
-    } else {
-        std::cout << "[CreateBenchmarkClient] Reusing existing KeySelector at " << s_keySelector.get() << std::endl;
-    }
+        // std::cout << "[CreateBenchmarkClient] KeySelector created (uniform) with " << keys.size() << " keys at " << s_keySelector.get() << std::endl;
+    } 
 
     // 3) Clients vector (empty or placeholder)
     s_clients.clear();
@@ -417,12 +415,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     if (consistency_s == "rss") consistency = strongstore::Consistency::RSS;
     if (consistency_s == "ss")  consistency = strongstore::Consistency::SS;
 
-    std::cout << "[CreateBenchmarkClient] Config: replicas='" << replica_paths
-              << "' net='" << net_config_path
-              << "' host='" << client_host
-              << "' shards=" << num_shards
-              << "' closest_replica=" << closest_replica
-              << "' consistency='" << consistency_s << "'" << std::endl;
+    // std::cout << "[CreateBenchmarkClient] Config: replicas='" << replica_paths
+    //           << "' net='" << net_config_path
+    //           << "' host='" << client_host
+    //           << "' shards=" << num_shards
+    //           << "' closest_replica=" << closest_replica
+    //           << "' consistency='" << consistency_s << "'" << std::endl;
 
     if (!replica_paths.empty() && !net_config_path.empty()) {
         std::cout << "[CreateBenchmarkClient] Attempting to load configs from paths:" << std::endl;
@@ -431,7 +429,7 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         
         std::ifstream net_config_stream(net_config_path);
         if (net_config_stream) {
-            std::cout << "[CreateBenchmarkClient] Successfully opened network config file" << std::endl;
+            // std::cout << "[CreateBenchmarkClient] Successfully opened network config file" << std::endl;
             
             std::stringstream paths(replica_paths);
             std::string path;
@@ -441,29 +439,29 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
             
             int idx = 0;
             while (std::getline(paths, path, ',')) {
-                std::cout << "[CreateBenchmarkClient] Processing replica path: '" << path << "'" << std::endl;
+                // std::cout << "[CreateBenchmarkClient] Processing replica path: '" << path << "'" << std::endl;
                 
                 std::ifstream replica_config_stream(path);
                 if (!replica_config_stream) {
-                    std::cout << "[CreateBenchmarkClient] ERROR: Unable to read replica config '" << path << "'" << std::endl;
+                    // std::cout << "[CreateBenchmarkClient] ERROR: Unable to read replica config '" << path << "'" << std::endl;
                     continue;
                 }
                 
-                std::cout << "[CreateBenchmarkClient] Successfully opened replica config file" << std::endl;
+                // std::cout << "[CreateBenchmarkClient] Successfully opened replica config file" << std::endl;
                 
                 try {
                     replica_configs.emplace_back(replica_config_stream);
-                    std::cout << "[CreateBenchmarkClient] Created transport::Configuration #" << idx << std::endl;
+                    // std::cout << "[CreateBenchmarkClient] Created transport::Configuration #" << idx << std::endl;
                     
                     net_config_stream.clear();
                     net_config_stream.seekg(0);
                     
                     net_configs.emplace_back(replica_configs[idx], net_config_stream);
-                    std::cout << "[CreateBenchmarkClient] Created NetworkConfiguration #" << idx << std::endl;
+                    // std::cout << "[CreateBenchmarkClient] Created NetworkConfiguration #" << idx << std::endl;
                     
                     client_regions.emplace_back(net_configs[idx].GetRegion(client_host));
-                    std::cout << "[CreateBenchmarkClient] Loaded replica config #" << idx
-                              << ", region='" << client_regions.back() << "' from '" << path << "'" << std::endl;
+                    // std::cout << "[CreateBenchmarkClient] Loaded replica config #" << idx
+                    //           << ", region='" << client_regions.back() << "' from '" << path << "'" << std::endl;
                     idx++;
                 } catch (const std::exception& e) {
                     std::cout << "[CreateBenchmarkClient] EXCEPTION creating config #" << idx << ": " << e.what() << std::endl;
@@ -472,32 +470,32 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                 }
             }
             
-            std::cout << "[CreateBenchmarkClient] Config creation summary:" << std::endl;
-            std::cout << "[CreateBenchmarkClient]   Replica configs: " << replica_configs.size() << std::endl;
-            std::cout << "[CreateBenchmarkClient]   Network configs: " << net_configs.size() << std::endl;
-            std::cout << "[CreateBenchmarkClient]   Client regions: " << client_regions.size() << std::endl;
+            // std::cout << "[CreateBenchmarkClient] Config creation summary:" << std::endl;
+            // std::cout << "[CreateBenchmarkClient]   Replica configs: " << replica_configs.size() << std::endl;
+            // std::cout << "[CreateBenchmarkClient]   Network configs: " << net_configs.size() << std::endl;
+            // std::cout << "[CreateBenchmarkClient]   Client regions: " << client_regions.size() << std::endl;
 
             if (!replica_configs.empty() && !net_configs.empty()) {
-                std::cout << "[CreateBenchmarkClient] Creating strongstore clients..." << std::endl;
+                // std::cout << "[CreateBenchmarkClient] Creating strongstore clients..." << std::endl;
                 
                 TrueTime tt{static_cast<uint64_t>(GetEnvU64("IOCL_CLOCK_ERROR", "0"))};
                 for (std::size_t i = 0; i < replica_configs.size(); ++i) {
-                    std::cout << "[CreateBenchmarkClient] Creating client #" << i << "..." << std::endl;
+                    // std::cout << "[CreateBenchmarkClient] Creating client #" << i << "..." << std::endl;
                     
                     try {
                         auto &shard_config = replica_configs[i];
                         auto &net_config = net_configs[i];
                         auto &region = client_regions[i];
                         
-                        std::cout << "[CreateBenchmarkClient] Client #" << i << " params:" << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Consistency: " << static_cast<int>(consistency) << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Client ID: " << GetEnvU64("IOCL_CLIENT_ID", "0") << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Num shards: " << num_shards << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Closest replica: " << closest_replica << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Transport: " << s_transport.get() << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Partitioner: " << s_partitioner.get() << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   Debug stats: " << (debug_stats ? "true" : "false") << std::endl;
-                        std::cout << "[CreateBenchmarkClient]   NB time alpha: " << nb_time_alpha << std::endl;
+                        // std::cout << "[CreateBenchmarkClient] Client #" << i << " params:" << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Consistency: " << static_cast<int>(consistency) << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Client ID: " << GetEnvU64("IOCL_CLIENT_ID", "0") << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Num shards: " << num_shards << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Closest replica: " << closest_replica << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Transport: " << s_transport.get() << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Partitioner: " << s_partitioner.get() << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   Debug stats: " << (debug_stats ? "true" : "false") << std::endl;
+                        // std::cout << "[CreateBenchmarkClient]   NB time alpha: " << nb_time_alpha << std::endl;
                         
                         Client *c = new strongstore::Client(
                             consistency, net_config, region, shard_config,
@@ -505,8 +503,8 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                             s_transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
                         
                         s_clients.push_back(c);
-                        std::cout << "[CreateBenchmarkClient] SUCCESS: Created strongstore::Client #" << i
-                                  << " region='" << region << "' ptr=" << c << std::endl;
+                        // std::cout << "[CreateBenchmarkClient] SUCCESS: Created strongstore::Client #" << i
+                        //           << " region='" << region << "' ptr=" << c << std::endl;
                     } catch (const std::exception& e) {
                         std::cout << "[CreateBenchmarkClient] EXCEPTION creating client #" << i << ": " << e.what() << std::endl;
                     } catch (...) {
@@ -530,16 +528,16 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         s_clients.push_back(nullptr);
         std::cout << "[CreateBenchmarkClient] No real clients created, using placeholder" << std::endl;
     }
-    std::cout << "[CreateBenchmarkClient] Clients ready: " << s_clients.size() << std::endl;
+    // std::cout << "[CreateBenchmarkClient] Clients ready: " << s_clients.size() << std::endl;
 
     // 5) Construct MicroClient
-    std::cout << "[CreateBenchmarkClient] Constructing MicroClient: mode="
-              << ((bench_mode == OPEN) ? "open" : "closed")
-              << " timeout_ms=" << timeout_ms
-              << " mpl=" << mpl
-              << " fanout=" << fanout
-              << " issueConcurrent=" << (issueConcurrent ? 1 : 0)
-              << std::endl;
+    // std::cout << "[CreateBenchmarkClient] Constructing MicroClient: mode="
+    //           << ((bench_mode == OPEN) ? "open" : "closed")
+    //           << " timeout_ms=" << timeout_ms
+    //           << " mpl=" << mpl
+    //           << " fanout=" << fanout
+    //           << " issueConcurrent=" << (issueConcurrent ? 1 : 0)
+    //           << std::endl;
 
     BenchmarkClient *bench = new micro::MicroClient(
         s_keySelector.get(),
@@ -557,7 +555,7 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         issueConcurrent
     );
 
-    std::cout << "[CreateBenchmarkClient] MicroClient created at " << bench << std::endl;
+    // std::cout << "[CreateBenchmarkClient] MicroClient created at " << bench << std::endl;
 
     return std::unique_ptr<BenchmarkClient>(bench);
 }
@@ -597,34 +595,34 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-    std::cout << "[AsyncSendRequest] Called with session_id=" << session_id 
-              << ", op=" << static_cast<int>(op) 
-              << ", key=" << key << std::endl;
+    // std::cout << "[AsyncSendRequest] Called with session_id=" << session_id 
+    //           << ", op=" << static_cast<int>(op) 
+    //           << ", key=" << key << std::endl;
 
     if (!benchmarkClient) {
         std::cout << "[AsyncSendRequest] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
     }
     
-    std::cout << "[AsyncSendRequest] Calling SendAsynchRequest..." << std::endl;
+    // std::cout << "[AsyncSendRequest] Calling SendAsynchRequest..." << std::endl;
     // Call SendAsynchRequest from BenchmarkClient
     std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
     
-    std::cout << "[AsyncSendRequest] SendAsynchRequest completed, returning result" << std::endl;
+    // std::cout << "[AsyncSendRequest] SendAsynchRequest completed, returning result" << std::endl;
     return {std::get<0>(result), std::get<1>(result)};
 }
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
 std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
-    std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
-              << ", commandId=" << commandId << std::endl;
+    // std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
+    //           << ", commandId=" << commandId << std::endl;
 
     if (!benchmarkClient) {
         std::cout << "[AsyncGetResponse] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
     }
 
-    std::cout << "[AsyncGetResponse] Calling AwaitAsynchResponse..." << std::endl;
+    // std::cout << "[AsyncGetResponse] Calling AwaitAsynchResponse..." << std::endl;
     std::tuple<request_utils::Value, uint64_t> result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
 
     request_utils::Value value = std::get<0>(result);
@@ -636,7 +634,7 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
         return {true, value};
     } else {
         // Response is not ready, return false and a Value containing the efd as a string
-        std::cout << "[AsyncGetResponse] Response not ready, efd=" << efd << std::endl;
+        // std::cout << "[AsyncGetResponse] Response not ready, efd=" << efd << std::endl;
         return {false, request_utils::Value(std::to_string(efd))};
     }
 }
@@ -768,8 +766,20 @@ PYBIND11_MODULE(redisstorepython, m) {
     py::enum_<request_utils::Operation>(m, "Operation")
         .value("GET", request_utils::Operation::GET)
         .value("PUT", request_utils::Operation::PUT)
-        // Add other operations as needed
-        ;
+        .value("INCR", request_utils::Operation::INCR)
+        .value("SET", request_utils::Operation::SET)
+        .value("SADD", request_utils::Operation::SADD)
+        .value("EXISTS", request_utils::Operation::EXISTS)
+        .value("HMSET", request_utils::Operation::HMSET)
+        .value("HSET", request_utils::Operation::HSET)
+        .value("HMGET", request_utils::Operation::HMGET)
+        .value("HGETALL", request_utils::Operation::HGETALL)
+        .value("ZADD", request_utils::Operation::ZADD)
+        .value("ZINCRBY", request_utils::Operation::ZINCRBY)
+        .value("ZSCORE", request_utils::Operation::ZSCORE)
+        .value("ZREVRANGE", request_utils::Operation::ZREVRANGE)
+        .value("ZRANGE", request_utils::Operation::ZRANGE)
+        .export_values();  // Optional: allows using Operation.GET, etc. directly
 
     // Expose ValueType enum
     py::enum_<request_utils::ValueType>(m, "ValueType")

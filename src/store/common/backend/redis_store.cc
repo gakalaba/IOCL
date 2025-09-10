@@ -14,10 +14,13 @@ namespace redis
     Value RedisStore::execute(const Command &cmd)
     {
         std::cout << "inside execute" << std::endl;
+        std::cout << "Execution op=" << static_cast<int>(cmd.op)
+                  << " key=" << cmd.key
+                  << " value_type=" << static_cast<int>(cmd.value.type)
+                  << " value_str=" << cmd.value.str << std::endl;
         switch (cmd.op)
         {
         case Operation::PUT:
-            std::cout << "Executing PUT for key: " << cmd.key << " with value type: " << static_cast<int>(cmd.value.type) << std::endl;
             put(cmd.key, cmd.value);
             return cmd.value;
         case Operation::GET:
@@ -210,22 +213,22 @@ namespace redis
     // ZINCRBY: increment the score (stored as string) for the given member.
     Value RedisStore::zincrby(const std::string &key, const std::string &increment, const std::string &member)
     {
-        // init if doesn't exist
         if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
         {
             store[key] = Value::NewHash({});
             store[key].type = ValueType::HASH;
         }
-        std::cout << "Increment for member, " << member << ": " << increment << std::endl;
-        double inc = std::stod(increment);
+
+        double inc = 0.0;
+        try { inc = std::stod(increment); } catch (...) { inc = 0.0; }
+
         double current = 0.0;
         if (store[key].hash.find(member) != store[key].hash.end())
         {
-            current = std::stod(store[key].hash[member]);
+            try { current = std::stod(store[key].hash[member]); } catch (...) { current = 0.0; }
         }
-        current += inc;
-        std::cout << "Incremented: " << current << std::endl;
 
+        current += inc;
         store[key].hash[member] = std::to_string(current);
         return Value::NewString(store[key].hash[member]);
     }
@@ -261,64 +264,36 @@ namespace redis
     // ZRANGE: get all members from the hash, sort them in ascending order by score, and return a sublist with alternating members and scores.
     Value RedisStore::zrange(const std::string &key, int start, int stop)
     {
-
         if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
-        {
-            for (const auto &entry : store)
-            {
-                const std::string &k = entry.first;
-                const Value &v = entry.second;
-
-                std::cout << "  Key: " << k << ", Type: " << static_cast<int>(v.type) << std::endl;
-            }
             return Value::NewList({});
-        }
-
-        for (const auto &entry : store[key].hash)
-        {
-            const std::string &member = entry.first;
-            const std::string &score = entry.second;
-
-            std::cout << "ZRANGE: Member: " << member << ", Score: " << score << std::endl;
-        }
 
         // Convert hash to vector of pairs for sorting
         std::vector<std::pair<std::string, double>> members_scores;
         for (const auto &entry : store[key].hash)
         {
-            const std::string &member = entry.first;
-            const std::string &score_str = entry.second;
-
             try
             {
-                double score = std::stod(score_str);
-                members_scores.emplace_back(member, score);
+                double score = std::stod(entry.second);
+                members_scores.emplace_back(entry.first, score);
             }
-            catch (...)
-            {
-                std::cout << "ZRANGE: Invalid score for member " << member << ": " << score_str << std::endl;
-                continue;
-            }
+            catch (...) { continue; }
         }
 
-        std::cout << "ZRANGE: Sorted members count = " << members_scores.size() << std::endl;
-
-        // Sort in ascending order by score
         std::sort(members_scores.begin(), members_scores.end(),
-                  [](const auto &a, const auto &b)
-                  { return a.second < b.second; });
+                [](const auto &a, const auto &b) { return a.second < b.second; });
 
-        // Adjust indices for negative indexing
-        if (start < 0)
-            start = std::max(0, static_cast<int>(members_scores.size()) + start);
-        if (stop < 0)
-            stop = std::max(0, static_cast<int>(members_scores.size()) + stop);
+        int size = static_cast<int>(members_scores.size());
+        if (size == 0) return Value::NewList({});
+
+        // Handle negative indices
+        if (start < 0) start = std::max(0, size + start);
+        if (stop < 0) stop = std::max(0, size + stop);
 
         // Clamp indices
-        start = std::min(start, static_cast<int>(members_scores.size() - 1));
-        stop = std::min(stop, static_cast<int>(members_scores.size() - 1));
+        start = std::max(0, std::min(start, size - 1));
+        stop = std::max(0, std::min(stop, size - 1));
+        if (start > stop) return Value::NewList({});
 
-        // Extract the range
         std::vector<std::string> result;
         for (int i = start; i <= stop; ++i)
         {

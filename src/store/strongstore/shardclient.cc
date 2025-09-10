@@ -57,8 +57,8 @@ namespace strongstore
                                      const std::string &type,
                                      const std::string &data, void *meta_data)
     {
-        Debug("Got message wahoo");
-        std::cout << "[Server] Goit a message" << std::endl;
+        // Debug("Got message wahoo");
+        // std::cout << "[Server] Goit a message" << std::endl;
         if (type == get_reply_.GetTypeName())
         {
             get_reply_.ParseFromString(data);
@@ -305,15 +305,15 @@ namespace strongstore
                                         request_utils::Value newValue, transformed_callback trcb)
     {
         // Send the operation to appropriate shard.
-        std::cout << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
+        // std::cout << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
               << ", op=" << static_cast<int>(optype)
               << ", key=" << key
               << std::endl;
-        std::cout << "[shard " << shard_idx_ << "] Sending ASYNCH REQUEST" << std::endl;
-        Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
+        // std::cout << "[shard " << shard_idx_ << "] Sending ASYNCH REQUEST" << std::endl;
+        // Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
 
         uint64_t req_id = last_req_id_++;
-        Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
+        // Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
         PendingAsynchRequest *pendingReq = new PendingAsynchRequest(transaction_id, req_id);
         pendingAsynchReqs[req_id] = pendingReq;
         pendingReq->op = optype;
@@ -445,7 +445,7 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
 
-        std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
+        // std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
         transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
     }
 
