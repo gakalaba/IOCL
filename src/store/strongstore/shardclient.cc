@@ -305,7 +305,7 @@ namespace strongstore
                                         request_utils::Value newValue, transformed_callback trcb)
     {
         // Send the operation to appropriate shard.
-        // std::cout << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
+        std::cout << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
               << ", op=" << static_cast<int>(optype)
               << ", key=" << key
               << std::endl;
