@@ -11,9 +11,9 @@
   "replication_protocol": "strong",
   "client_protocol_mode": "span-lock",
   "server_names": [
-    "us-east-1-1",
-    "us-east-1-2",
-    "eu-west-1-0"
+    "us-west-1-0",
+    "us-west-1-1",
+    "us-west-1-2"
   ],
   "consistency": [
     "ss"
@@ -28,9 +28,9 @@
   "num_shards": 1,
   "shards": [
     [
-      "us-east-1-1",
-      "us-east-1-2",
-      "eu-west-1-0"
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
     ]
   ],
   "client_total": [
@@ -49,7 +49,7 @@
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0"
+    "client-2-0"
   ],
   "server_regions": {
     "us-east-1": [
@@ -82,7 +82,7 @@
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.1,
   "rw_num_ops_txn": 1,
-  "server_load_time": 5,
+  "server_load_time": 20,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -97,7 +97,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "newproj",
+  "experiment_name": "mdl",
   "codebase_name": "iocl",
   "pin_client_processes": [
     0,
