@@ -13,7 +13,10 @@
   "server_names": [
     "us-west-1-0",
     "us-west-1-1",
-    "us-west-1-2"
+    "us-west-1-2",
+    "eu-west-1-0",
+    "eu-west-1-1",
+    "eu-west-1-2"
   ],
   "consistency": [
     "ss"
@@ -25,12 +28,17 @@
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
   "fault_tolerance": 1,
-  "num_shards": 1,
+  "num_shards": 2,
   "shards": [
     [
       "us-west-1-0",
       "us-west-1-1",
       "us-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "eu-west-1-2"
     ]
   ],
   "client_total": [
