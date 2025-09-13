@@ -21,48 +21,64 @@ namespace redis
         switch (cmd.op)
         {
         case Operation::PUT:
+            std::cout << "executing PUT" << std::endl;
             put(cmd.key, cmd.value);
             return cmd.value;
         case Operation::GET:
         {
+            std::cout << "executing GET" << std::endl;
             auto val = get(cmd.key);
             return val.is_initialized() ? val.value() : NIL;
         }
         case Operation::INCR:
+            std::cout << "executing INCR" << std::endl;
             return incr(cmd.key);
         case Operation::SET:
+            std::cout << "executing SET" << std::endl;
             return set(cmd.key, cmd.value);
         case Operation::SADD:
+            std::cout << "executing SADD" << std::endl;
             return sadd(cmd.key, cmd.value.str);
         case Operation::EXISTS:
+            std::cout << "executing EXISTS" << std::endl;
             return exists(cmd.key) ? Value::NewString("1") : Value::NewString("0");
         case Operation::HMSET:
+            std::cout << "executing HMSET" << std::endl;
             return hmset(cmd.key, cmd.value.hash);
         case Operation::HSET:
+            std::cout << "executing HSET" << std::endl;
             return hset(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::HMGET:
+            std::cout << "executing HMGET" << std::endl;
             return hmget(cmd.key, cmd.value.str);
         case Operation::HGETALL:
+            std::cout << "executing HGETALL" << std::endl;
             return hgetall(cmd.key);
         case Operation::ZADD:
+            std::cout << "executing ZADD" << std::endl;
             return zadd(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::ZINCRBY:
+            std::cout << "executing ZINCRBY" << std::endl;
             return zincrby(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::ZSCORE:
+            std::cout << "executing ZSCORE" << std::endl;
             return zscore(cmd.key, cmd.value.str);
         case Operation::ZREVRANGE:
         {
+            std::cout << "executing ZREVRANGE" << std::endl;
             int start = std::stoi(cmd.value.str);
             int stop = std::stoi(cmd.oldValue.str);
             return zrevrange(cmd.key, start, stop);
         }
         case Operation::ZRANGE:
         {
+            std::cout << "executing ZRANGE" << std::endl;
             int start = std::stoi(cmd.value.str);
             int stop = std::stoi(cmd.oldValue.str);
             return zrange(cmd.key, start, stop);
         }
         default:
+            std::cout << "cannot execute unsupported operation" << std::endl;
             std::cerr << "Operation not supported.\n";
             return NIL;
         }
@@ -307,19 +323,19 @@ namespace redis
     // ZREVRANGE: get all members from the hash, sort them in descending order by score, and return a sublist.
     Value RedisStore::zrevrange(const std::string &key, int start, int stop)
     {
-
         if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
         {
+            std::cout << "ZREVRANGE: Key not found or not a hash: " << key << std::endl;
             return Value::NewList({});
         }
-
-        // Convert hash to vector of pairs for sorting
+    
+        // convert to hash for sorting
         std::vector<std::pair<std::string, double>> members_scores;
         for (const auto &entry : store[key].hash)
         {
             const std::string &member = entry.first;
             const std::string &score_str = entry.second;
-
+    
             try
             {
                 double score = std::stod(score_str);
@@ -331,30 +347,48 @@ namespace redis
                 continue;
             }
         }
-
-        // Sort in descending order by score
+    
+        // return empty for no valid scores
+        if (members_scores.empty())
+        {
+            std::cout << "ZREVRANGE: No valid scores found for key " << key << std::endl;
+            return Value::NewList({});
+        }
+    
+        // sort descending
         std::sort(members_scores.begin(), members_scores.end(),
                   [](const auto &a, const auto &b)
                   { return a.second > b.second; });
-
-        // Adjust indices for negative indexing
+    
+        int n = static_cast<int>(members_scores.size());
+    
         if (start < 0)
-            start = std::max(0, static_cast<int>(members_scores.size()) + start);
+            start = std::max(0, n + start);
         if (stop < 0)
-            stop = std::max(0, static_cast<int>(members_scores.size()) + stop);
-
-        // Clamp indices
-        start = std::min(start, static_cast<int>(members_scores.size() - 1));
-        stop = std::min(stop, static_cast<int>(members_scores.size() - 1));
-
-        // Extract the range
+            stop = std::max(0, n + stop);
+    
+        // clamping
+        start = std::max(0, std::min(start, n - 1));
+        stop = std::max(0, std::min(stop, n - 1));
+    
+        // If start > stop after clamping, return empty
+        if (start > stop)
+        {
+            std::cout << "ZREVRANGE: Start index greater than stop, returning empty" << std::endl;
+            return Value::NewList({});
+        }
+    
+        // extract range
         std::vector<std::string> result;
         for (int i = start; i <= stop; ++i)
         {
-            result.push_back(members_scores[i].first);
-            result.push_back(std::to_string(members_scores[i].second));
+            result.push_back(members_scores[i].first);              // member
+            result.push_back(std::to_string(members_scores[i].second)); // score
         }
-
+    
+        std::cout << "ZREVRANGE: Returning " << result.size() / 2
+                  << " members from index " << start << " to " << stop << std::endl;
+    
         return Value::NewList(result);
     }
 
