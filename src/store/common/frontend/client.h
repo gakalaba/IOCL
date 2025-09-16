@@ -73,7 +73,7 @@ public:
 
     virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
 
-    virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout){};
+    virtual void BeginLin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout){};
     virtual void Retry(Session &session, begin_callback bcb,
                        begin_timeout_callback btcb, uint32_t timeout) = 0;
 
@@ -109,7 +109,7 @@ public:
 
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
 
-    virtual bool IsIOCL() = 0;
+    virtual bool IsLin() = 0;
 
     inline Stats &GetStats() { return stats; }
 

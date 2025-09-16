@@ -1678,7 +1678,7 @@ namespace strongstore
         if (consistency_ == LIN)
         {
             ioclrequest.ParseFromString(op);
-            ReplicaUpcallIOCL(opnum, ioclrequest, response);
+            ReplicaUpcallLin(opnum, ioclrequest, response);
             return;
         }
         Request request;
@@ -1807,7 +1807,7 @@ namespace strongstore
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcallIOCL(opnum_t opnum, IOCLRequest &req, string &response)
+    void Server::ReplicaUpcallLin(opnum_t opnum, IOCLRequest &req, string &response)
     {
         Debug("Inside new ReplicaUpcall for Requests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
         IOCLReply reply;

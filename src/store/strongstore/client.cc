@@ -110,7 +110,7 @@ namespace strongstore
         Debug("sessions_by_transaction_id_.size(): %lu", sessions_by_transaction_id_.size());
     }
 
-    bool Client::IsIOCL()
+    bool Client::IsLin()
     {
         return (consistency_ == LIN);
     }
@@ -421,7 +421,7 @@ namespace strongstore
         bcb();
     }
 
-    void Client::BeginIOCL(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    void Client::BeginLin(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -432,7 +432,7 @@ namespace strongstore
 
         auto req_id = next_transaction_id_++;
 
-        Debug("[%lu] BeginIOCL", req_id);
+        Debug("[%lu] BeginLin", req_id);
 
         // Timestamp start_ts{tt_.Now().latest(), client_id_};
 

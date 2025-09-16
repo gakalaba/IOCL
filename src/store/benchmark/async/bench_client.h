@@ -75,7 +75,7 @@ public:
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
     void SendNext();
-    void SendNextIOCL();
+    void SendNextLin();
 
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
@@ -187,11 +187,11 @@ private:
     void ExecuteAbort(const uint64_t session_id, transaction_status_t status);
 
     void SendNextInSession(const uint64_t session_id);
-    void SendNextInSessionIOCL(const uint64_t session_id);
+    void SendNextInSessionLin(const uint64_t session_id);
 
     void ExecuteNextOperation(const uint64_t session_id);
 
-    void ExecuteNextOperationIOCL(const uint64_t session_id);
+    void ExecuteNextOperationLin(const uint64_t session_id);
 
     void GetCallback(const uint64_t session_id,
                      int status, const std::string &key, const std::string &val, Timestamp ts);
@@ -213,7 +213,7 @@ private:
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
 
-    inline bool IsIOCL() { return clients_[0]->IsIOCL(); };
+    inline bool IsLin() { return clients_[0]->IsLin(); };
 
     void Finish();
     void WarmupDone();

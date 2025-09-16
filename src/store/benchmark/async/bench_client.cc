@@ -101,9 +101,9 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
     gettimeofday(&startTime, NULL);
 
-    if (IsIOCL())
+    if (IsLin())
     {
-        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextIOCL, this));
+        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextLin, this));
     }
     else
     {
@@ -175,9 +175,9 @@ void BenchmarkClient::SendNext()
     }
 }
 
-void BenchmarkClient::SendNextIOCL()
+void BenchmarkClient::SendNextLin()
 {
-    Debug("[%d] SendNextIOCL", n_sessions_started_);
+    Debug("[%d] SendNextLin", n_sessions_started_);
     n_sessions_started_++;
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -197,10 +197,10 @@ void BenchmarkClient::SendNextIOCL()
     auto &ss = session_states_.find(sid)->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationLin, this, sid);
     auto btcb = []() {};
 
-    client.BeginIOCL(session, bcb, btcb, timeout_);
+    client.BeginLin(session, bcb, btcb, timeout_);
 }
 
 void BenchmarkClient::SendNextInSession(const uint64_t session_id)
@@ -256,7 +256,7 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
     }
 }
 
-void BenchmarkClient::SendNextInSessionIOCL(const uint64_t session_id)
+void BenchmarkClient::SendNextInSessionLin(const uint64_t session_id)
 {
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
@@ -275,12 +275,13 @@ void BenchmarkClient::SendNextInSessionIOCL(const uint64_t session_id)
     auto &client = *clients_[ss.current_client_index()];
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationIOCL, this, sid);
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperationLin, this, sid);
     auto btcb = []() {};
 
-    client.BeginIOCL(session, bcb, btcb, timeout_);
+    client.BeginLin(session, bcb, btcb, timeout_);
 }
 
+// This is for 1BT
 void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 {
     Debug("[%lu] ExecuteNextOperation", session_id);
@@ -361,9 +362,9 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     }
 }
 
-void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
+void BenchmarkClient::ExecuteNextOperationLin(const uint64_t session_id)
 {
-    Debug("[%lu] ExecuteNextOperationIOCL", session_id);
+    Debug("[%lu] ExecuteNextOperationLin", session_id);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
@@ -408,7 +409,7 @@ void BenchmarkClient::ExecuteNextOperationIOCL(const uint64_t session_id)
     {
         Debug("we're about to issue the next operation within this app request without having gotten a response!!!");
         // TODO ANJA should these just be added to the event queue?? or actually issued next
-        ExecuteNextOperationIOCL(session_id);
+        ExecuteNextOperationLin(session_id);
     }
 }
 
@@ -543,7 +544,7 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
                 if (!cooldownStarted)
                 {
                     Debug("next arrival in session %d us", 0);
-                    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionIOCL, this, session_id));
+                    transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextInSessionLin, this, session_id));
                     OnReply(session_id, 0, false);
                 }
                 else
@@ -556,7 +557,7 @@ void BenchmarkClient::ReceiveRequestResponse(const uint64_t session_id,
         else
         {
             Debug("we're gonna issue the next operation that's a part of this apprequest");
-            ExecuteNextOperationIOCL(session_id);
+            ExecuteNextOperationLin(session_id);
         }
     }
     else
