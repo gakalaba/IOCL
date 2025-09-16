@@ -295,10 +295,10 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 
     Operation op = transaction->GetNextOperation(op_index);
     ss.incr_op_index();
-    Debug("Peeking next op");
-    Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
-    bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
-    Debug("nextOpCommit = %d", nextOpCommit);
+    // Debug("Peeking next op");
+    // Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
+    // bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
+    // Debug("nextOpCommit = %d", nextOpCommit);
 
     auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
@@ -345,17 +345,17 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         NOT_REACHABLE();
     }
 
-    Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
-    if (issueConcurrent && !nextOpCommit && (op.type == GET || op.type == PUT || op.type == GET_FOR_UPDATE))
-    {
-        Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
-        // TODO ANJA should these just be added to the event queue?? or actually issued next
-        ExecuteNextOperation(session_id);
-    }
-    else
-    {
-        Debug("Not issueing next op from this fn");
-    }
+    // Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
+    // if (issueConcurrent && !nextOpCommit && (op.type == GET || op.type == PUT || op.type == GET_FOR_UPDATE))
+    // {
+    //     Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
+    //     // TODO ANJA should these just be added to the event queue?? or actually issued next
+    //     ExecuteNextOperation(session_id);
+    // }
+    // else
+    // {
+    //     Debug("Not issueing next op from this fn");
+    // }
 }
 
 void BenchmarkClient::ExecuteNextOperationLin(const uint64_t session_id)
@@ -437,15 +437,16 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
-    ss.incr_responses();
-    Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
+    // ss.incr_responses();
+    // Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
-        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
-        {
-            ExecuteNextOperation(session_id);
-        }
+        ExecuteNextOperation(session_id);
+        // if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
+        // {
+        //     ExecuteNextOperation(session_id);
+        // }
     }
     else if (status == REPLY_FAIL)
     {
@@ -484,15 +485,16 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
-    ss.incr_responses();
-    Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
+    // ss.incr_responses();
+    // Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
-        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
-        {
-            ExecuteNextOperation(session_id);
-        }
+        ExecuteNextOperation(session_id);
+        // if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
+        // {
+        //     ExecuteNextOperation(session_id);
+        // }
     }
     else if (status == REPLY_FAIL)
     {

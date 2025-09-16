@@ -74,16 +74,17 @@ namespace retwis
             lastOp = "follow";
             return new Follow(keySelector, GetRand());
         }
-        else if (ttype < 50)
+        // else if (ttype < 50)
+        else
         {
             lastOp = "post_tweet";
             return new PostTweet(keySelector, GetRand());
         }
-        else
-        {
-            lastOp = "get_timeline";
-            return new GetTimeline(keySelector, GetRand());
-        }
+        // else
+        // {
+        //     lastOp = "get_timeline";
+        //     return new GetTimeline(keySelector, GetRand());
+        // }
     }
 
     AsyncAppRequest *RetwisClient::GetNextAppRequest()
