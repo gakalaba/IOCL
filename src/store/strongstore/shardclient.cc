@@ -244,7 +244,7 @@ namespace strongstore
         }
 
         Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        // TODO ANJA: want to delete this... cuz we're not doing trasnactions!
+
         transactions_[transaction_id].addReadSet(key, ts);
         read_sets_[transaction_id][key] = val;
 

@@ -297,12 +297,8 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     ss.incr_op_index();
     Debug("Peeking next op");
     Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
-    bool nextOpCommit = false;
-    if ((peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT))
-    {
-        // this means we have some in flight operations sent already...
-        nextOpCommit = true;
-    }
+    bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
+    Debug("nextOpCommit = %d", nextOpCommit);
 
     auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
