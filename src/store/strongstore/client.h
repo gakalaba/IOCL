@@ -203,7 +203,7 @@ namespace strongstore
         virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
         // For IOCL
-        virtual void BeginIOCL(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void BeginLin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
         // Begin a retried transaction.
         virtual void Retry(Session &session, begin_callback bcb,
@@ -245,7 +245,7 @@ namespace strongstore
         void ROCommit(Session &session, const std::unordered_set<std::string> &keys,
                       commit_callback ccb, commit_timeout_callback ctcb,
                       uint32_t timeout) override;
-        bool IsIOCL() override;
+        bool IsLin() override;
 
     private:
         const static std::size_t MAX_SHARDS = 16;
