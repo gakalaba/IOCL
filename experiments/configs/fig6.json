@@ -11,6 +11,12 @@
   "replication_protocol": "strong",
   "client_protocol_mode": "span-lock",
   "server_names": [
+    "us-east-1-0",
+    "us-east-1-1",
+    "us-east-1-2",
+    "eu-west-1-0",
+    "eu-west-1-1",
+    "eu-west-1-2",
     "us-west-1-0",
     "us-west-1-1",
     "us-west-1-2"
@@ -25,27 +31,62 @@
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
   "fault_tolerance": 1,
-  "num_shards": 1,
+  "num_shards": 8,
   "shards": [
     [
+      "us-east-1-0",
+      "us-east-1-1",
+      "us-east-1-2"
+    ],
+    [
+      "us-east-1-0",
+      "us-east-1-1",
+      "us-east-1-2"
+    ],
+    [
+      "us-east-1-0",
       "us-west-1-0",
-      "us-west-1-1",
-      "us-west-1-2"
+      "us-west-1-1"
+    ],
+    [
+      "us-east-1-0",
+      "us-west-1-0",
+      "us-west-1-1"
+    ],
+    [
+      "us-east-1-0",
+      "eu-west-1-0",
+      "eu-west-1-1"
+    ],
+    [
+      "us-east-1-0",
+      "eu-west-1-0",
+      "eu-west-1-1"
+    ],
+    [
+      "us-east-1-0",
+      "us-west-1-2",
+      "eu-west-1-2"
+    ],
+    [
+      "us-east-1-0",
+      "us-west-1-2",
+      "eu-west-1-2"
     ]
   ],
   "client_total": [
-    1,
-    2,
-    4,
     8,
-    16
+    16,
+    32,
+    64,
+    128
   ],
   "client_processes_per_client_node": [
-    1,
-    2,
-    4,
     8,
-    16
+    16,
+    32,
+    64,
+    128
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -74,13 +115,13 @@
   "server_port": 7087,
   "truetime_error": 0,
   "client_num_keys": 10000000,
-  "benchmark_name": "micro",
+  "benchmark_name": "retwis",
   "bench_mode": "closed",
   "mpl": 1,
-  "client_key_selector": "zipf",
+  "client_key_selector": "uniform",
   "client_fanout": 4,
   "client_issue_concurrent": true,
-  "client_zipf_coefficient": 0.1,
+  "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
   "server_load_time": 20,
   "server_preload_keys": true,
@@ -113,23 +154,28 @@
     10,
     11,
     12,
-    13
+    13,
+    14,
+    15
   ],
   "pin_server_processes": [
+    0,
+    1,
     2,
     3,
     4,
     5,
-    6
+    6,
+    7
   ],
   "client_debug_output": false,
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 40,
+  "client_experiment_length": 100,
   "client_rand_sleep": 0,
-  "client_ramp_down": 10,
-  "client_ramp_up": 10,
+  "client_ramp_down": 30,
+  "client_ramp_up": 30,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
@@ -194,7 +240,7 @@
       "series_indep_vars_idx": 0,
       "series_titles": [
         "Spanner",
-        "Spanner-VSS"
+        "Spanner-RSS"
       ],
       "x_var_is_config": false,
       "y_var": [
@@ -221,7 +267,7 @@
       "series_indep_vars_idx": 0,
       "series_titles": [
         "Spanner",
-        "Spanner-VSS"
+        "Spanner-RSS"
       ],
       "x_var_is_config": false,
       "y_var": [
@@ -248,7 +294,7 @@
       "series_indep_vars_idx": 0,
       "series_titles": [
         "Spanner",
-        "Spanner-VSS"
+        "Spanner-RSS"
       ],
       "x_var_is_config": false,
       "y_var": [
@@ -268,47 +314,26 @@
       ]
     },
     {
-      "name": "lat-clients",
+      "name": "tput-mean",
       "font": "DejaVu Sans,12",
       "height": 600,
       "width": 800,
       "series_indep_vars_idx": 0,
       "series_titles": [
         "Spanner",
-        "Spanner-VSS"
+        "Spanner-RSS"
       ],
-      "x_var_is_config": true,
-      "x_var": [
-        "client_total"
-      ],
-      "x_label": "Clients",
-      "y_label": "Latency (p90)",
-      "x_indep_vars_idx": 1,
+      "x_var_is_config": false,
       "y_var": [
         "run_stats",
         "combined",
-        "p90",
+        "mean",
         "p50"
-      ]
-    },
-    {
-      "name": "tput-clients",
-      "font": "DejaVu Sans,12",
-      "height": 600,
-      "width": 800,
-      "series_indep_vars_idx": 0,
-      "series_titles": [
-        "Spanner",
-        "Spanner-VSS"
       ],
-      "x_var_is_config": true,
-      "x_var": [
-        "client_total"
-      ],
-      "x_label": "Clients",
-      "y_label": "Throughput (txn/s)",
+      "y_label": "Mean Latency",
+      "x_label": "Throughput (txn/s)",
       "x_indep_vars_idx": 1,
-      "y_var": [
+      "x_var": [
         "run_stats",
         "combined",
         "tput",
