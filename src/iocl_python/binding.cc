@@ -35,6 +35,7 @@
 #include <fstream>
 #include <sstream>
 #include "lib/configuration.h"
+#include <typeinfo>
 
 enum protomode_t
 {
@@ -300,6 +301,9 @@ namespace py = pybind11;
 
 // Global pointer to BenchmarkClient instance.
 std::unique_ptr<BenchmarkClient> benchmarkClient = nullptr;
+
+// Forward declaration
+py::object value_to_python(const request_utils::Value& val);
 
 // Helper function to convert Python objects to Value
 request_utils::Value python_to_value(const py::object& obj) {
@@ -595,27 +599,24 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-    // std::cout << "[AsyncSendRequest] Called with session_id=" << session_id 
-    //           << ", op=" << static_cast<int>(op) 
-    //           << ", key=" << key << std::endl;
-
+    std::cout << "[AsyncSendRequest] op=" << static_cast<int>(op) << std::endl;
+    std::cout << typeid(session_id).name() << typeid(op).name() << typeid(key).name() << typeid(newVal).name() <<  typeid(oldVal).name() << std::endl;
+    
     if (!benchmarkClient) {
         std::cout << "[AsyncSendRequest] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
     }
     
-    // std::cout << "[AsyncSendRequest] Calling SendAsynchRequest..." << std::endl;
-    // Call SendAsynchRequest from BenchmarkClient
     std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
     
-    // std::cout << "[AsyncSendRequest] SendAsynchRequest completed, returning result" << std::endl;
+    // Print the result using value_to_python
+    (void)value_to_python(std::get<1>(result));
+    
     return {std::get<0>(result), std::get<1>(result)};
 }
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
 std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
-    // std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
-    //           << ", commandId=" << commandId << std::endl;
 
     if (!benchmarkClient) {
         std::cout << "[AsyncGetResponse] Creating new benchmark client" << std::endl;
@@ -631,6 +632,10 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
     if (efd == static_cast<uint64_t>(-1)) {
         // Response is ready, return the Value object
         std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
+        // Print actual contents of the Value for debugging
+        std::cout << "[AsyncGetResponse] Value contents:" << std::endl;
+        (void)value_to_python(value);
+        std::cout << "[AsyncGetResponse] caleedddddddddd" << std::endl;
         return {true, value};
     } else {
         // Response is not ready, return false and a Value containing the efd as a string
@@ -641,16 +646,28 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
 
 // Helper function to convert Value to Python objects
 py::object value_to_python(const request_utils::Value& val) {
+    std::cout << "[value_to_python] Value type: " << static_cast<int>(val.type) << std::endl;
     switch (val.type) {
         case request_utils::ValueType::STRING:
+            std::cout << "[value_to_python] STRING: " << val.str << std::endl;
             return py::cast(val.str);
         case request_utils::ValueType::LIST:
+            std::cout << "[value_to_python] LIST: ";
+            for (const auto& item : val.list) std::cout << item << ", ";
+            std::cout << std::endl;
             return py::cast(val.list);
         case request_utils::ValueType::SET:
+            std::cout << "[value_to_python] SET: ";
+            for (const auto& item : val.set) std::cout << item << ", ";
+            std::cout << std::endl;
             return py::cast(val.set);
         case request_utils::ValueType::HASH:
+            std::cout << "[value_to_python] HASH: ";
+            for (const auto& kv : val.hash) std::cout << kv.first << ": " << kv.second << ", ";
+            std::cout << std::endl;
             return py::cast(val.hash);
         default:
+            std::cout << "[value_to_python] NIL or unknown type" << std::endl;
             return py::none();
     }
 }
@@ -833,14 +850,12 @@ PYBIND11_MODULE(redisstorepython, m) {
     // }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncSendRequest to handle Python types
-    m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, int64_t keys, py::object new_values, py::object old_values) {
-        // Convert Python objects to Value
+    m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, uint64_t key, py::object new_values, py::object old_values) {
         request_utils::Value newVal = python_to_value(new_values);
         request_utils::Value oldVal = python_to_value(old_values);
-
-        // Call AsyncSendRequest
-        return AsyncSendRequest(session_id, op, keys, newVal, oldVal);
-    }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
+        auto result = AsyncSendRequest(session_id, op, key, newVal, oldVal);
+        return result;
+    }, py::arg("session_id"), py::arg("op"), py::arg("key"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncGetResponse to handle Python types
     m.def("async_get_response", &AsyncGetResponse, py::arg("session_id"), py::arg("command_id"));
@@ -856,4 +871,8 @@ PYBIND11_MODULE(redisstorepython, m) {
     // Expose transport start function
     m.def("start_transport", &StartTransport,
           "Start the transport layer (required for clients to function)");
+    
+    // Expose value_to_python function
+    m.def("value_to_python", &value_to_python,
+          "Convert a request_utils::Value to a Python object and print debug info");
 }

@@ -325,70 +325,50 @@ namespace redis
     {
         if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
         {
-            std::cout << "ZREVRANGE: Key not found or not a hash: " << key << std::endl;
             return Value::NewList({});
         }
-    
-        // convert to hash for sorting
+
+        // Convert hash to vector of pairs for sorting
         std::vector<std::pair<std::string, double>> members_scores;
         for (const auto &entry : store[key].hash)
         {
             const std::string &member = entry.first;
             const std::string &score_str = entry.second;
-    
-            try
-            {
+            try {
                 double score = std::stod(score_str);
                 members_scores.emplace_back(member, score);
-            }
-            catch (...)
-            {
+            } catch (...) {
                 std::cout << "ZREVRANGE: Invalid score for member " << member << ": " << score_str << std::endl;
                 continue;
             }
         }
-    
-        // return empty for no valid scores
-        if (members_scores.empty())
-        {
-            std::cout << "ZREVRANGE: No valid scores found for key " << key << std::endl;
-            return Value::NewList({});
-        }
-    
-        // sort descending
+
+        // Sort in descending order by score
         std::sort(members_scores.begin(), members_scores.end(),
-                  [](const auto &a, const auto &b)
-                  { return a.second > b.second; });
-    
+                  [](const auto &a, const auto &b) { return a.second > b.second; });
+
         int n = static_cast<int>(members_scores.size());
-    
-        if (start < 0)
-            start = std::max(0, n + start);
-        if (stop < 0)
-            stop = std::max(0, n + stop);
-    
-        // clamping
+        if (n == 0) return Value::NewList({});
+
+        // Adjust indices for negative indexing
+        if (start < 0) start = n + start;
+        if (stop < 0) stop = n + stop;
+
+        // Clamp indices to valid range
         start = std::max(0, std::min(start, n - 1));
         stop = std::max(0, std::min(stop, n - 1));
-    
-        // If start > stop after clamping, return empty
-        if (start > stop)
-        {
-            std::cout << "ZREVRANGE: Start index greater than stop, returning empty" << std::endl;
-            return Value::NewList({});
-        }
-    
-        // extract range
+
+        // If start > stop, return empty list
+        if (start > stop) return Value::NewList({});
+
+        // Extract the range
         std::vector<std::string> result;
         for (int i = start; i <= stop; ++i)
         {
-            result.push_back(members_scores[i].first);              // member
-            result.push_back(std::to_string(members_scores[i].second)); // score
+            result.push_back(members_scores[i].first);
+            result.push_back(std::to_string(members_scores[i].second));
         }
-    
-        std::cout << "ZREVRANGE: Returning " << result.size() / 2
-                  << " members from index " << start << " to " << stop << std::endl;
-    
+
         return Value::NewList(result);
     }
 

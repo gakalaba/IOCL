@@ -997,7 +997,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
     //           << ", opType=" << static_cast<int>(opType)
     //           << ", key=" << key << std::endl;
 
-    // Debug("SendAsynchRequest");
+    Debug("SendAsynchRequest");
     auto search = session_states_.find(session_id);
     if (search == session_states_.end()) {
         std::cout << "[SendAsynchRequest] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
@@ -1080,6 +1080,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
         std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
         Panic("NOT YET SUPPORTEDunsupported operation type %lu", opType);
     }
+    Debug("here?:");
     auto commandId = client.SendAsynchRequest(session, opType, key, newValue, oldValue, rcb);
     // std::cout << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
     return std::make_tuple(true, Value(std::to_string(commandId)));
