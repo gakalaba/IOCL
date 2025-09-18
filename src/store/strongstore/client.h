@@ -113,6 +113,7 @@ namespace strongstore
         State state() const { return state_; }
 
         bool executing() const { return (state_ == EXECUTING); }
+        bool getting() const { return (state_ == GETTING); }
         bool needs_aborts() const { return (state_ == NEEDS_ABORT); }
 
         int current_participant() const { return current_participant_; }

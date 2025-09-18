@@ -56,7 +56,7 @@ namespace retwis
                      double arrival_rate, double think_time, double stay_probability,
                      int mpl,
                      int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
-                     bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts,
+                     bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, bool issueConcurrent,
                      const std::string &latencyFilename = "latency");
 
         virtual ~RetwisClient();
