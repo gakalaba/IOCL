@@ -7,7 +7,7 @@ from utils.experiment_util import *
 from utils.remote_util import *
 
 
-class RssCodebase:
+class IOCLCodebase:
 
     def get_client_cmd(self, config, i, k, run, local_exp_directory,
                        remote_exp_directory):
@@ -78,6 +78,11 @@ class RssCodebase:
             client_command += ' --client_stay_probability %f' % config['client_stay_probability']
         elif bench_mode == 'closed':
             client_command += ' --mpl=%d' % config['mpl']
+
+        if 'client_fanout' in config:
+            client_command += ' --client_fanout %d' % config['client_fanout']
+        if 'client_issue_concurrent' in config:
+            client_command += ' --client_issue_concurrent=%s' % (str(config['client_issue_concurrent']).lower())
 
         if 'client_switch_probability' in config:
             client_command += ' --client_switch_probability %f' %config['client_switch_probability']
