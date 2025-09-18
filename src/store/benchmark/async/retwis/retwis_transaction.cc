@@ -32,7 +32,7 @@ namespace retwis
 
     RetwisTransaction::RetwisTransaction(
         KeySelector *keySelector,
-        int numKeys, std::mt19937 &rand, const std::string ttype) : keySelector(keySelector), ttype_{ttype}
+        int numKeys, std::mt19937 &rand, const std::string ttype, int fanout) : keySelector(keySelector), ttype_{ttype}, fanout_{fanout}
     {
         for (int i = 0; i < numKeys; ++i)
         {

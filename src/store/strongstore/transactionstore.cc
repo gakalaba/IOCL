@@ -177,7 +177,10 @@ namespace strongstore
     void TransactionStore::StartGet(uint64_t transaction_id, const TransportAddress &remote, const std::string &key, bool for_update)
     {
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING);
+        if (pt.state() != READING && pt.state() != READ_WAIT) {
+            Debug("pt.state() is %d", pt.state());
+            Panic("Invalid state for StartGet: %d", pt.state());
+        }
 
         pt.StartGet(remote, key, for_update);
     }
@@ -186,7 +189,7 @@ namespace strongstore
     {
         (void)key;
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING);
+        ASSERT(pt.state() == READING || pt.state() == READ_WAIT);
     }
 
     void TransactionStore::AbortGet(uint64_t transaction_id, const std::string &key)
@@ -204,7 +207,7 @@ namespace strongstore
     {
         (void)key;
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING);
+        ASSERT(pt.state() == READING || pt.state() == READ_WAIT);
 
         pt.set_state(READ_WAIT);
     }

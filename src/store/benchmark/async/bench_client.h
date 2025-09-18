@@ -65,6 +65,7 @@ public:
                     int expDuration, int warmupSec, int cooldownSec,
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
+                    uint64_t fanout, bool issueConcurrent,
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
@@ -104,10 +105,12 @@ private:
     {
     public:
         SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{transaction}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
+        void incr_responses() { responses_++; }
+        uint64_t responses() { return responses_; };
         execute_callback ecb() const { return ecb_; }
 
         Latency_Frame_t *lat() { return &lat_; }
@@ -127,18 +130,21 @@ private:
             current_client_index_ = client_index;
             n_attempts_ = 1;
             op_index_ = 1;
+            responses_ = 0;
         }
 
         void retry_transaction()
         {
             n_attempts_++;
             op_index_ = 1;
+            responses_ = 0;
         }
 
     private:
         Latency_Frame_t lat_;
         std::reference_wrapper<Session> session_;
         AsyncTransaction *transaction_;
+        int responses_ = 0;
         execute_callback ecb_;
         uint64_t n_attempts_;
         std::size_t op_index_;
@@ -207,6 +213,10 @@ private:
     bool cooldownStarted;
 
     BenchmarkClientMode mode_;
+
+    // IOCL stuff
+    bool issueConcurrent = false;
+    uint64_t fanout = 0;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */
