@@ -66,15 +66,41 @@ namespace redis
         case Operation::ZREVRANGE:
         {
             std::cout << "executing ZREVRANGE" << std::endl;
-            int start = std::stoi(cmd.value.str);
-            int stop = std::stoi(cmd.oldValue.str);
+            int start = 1;  // default value
+            int stop = 10;  // default value
+            
+            try {
+                start = std::stoi(cmd.value.str);
+            } catch (...) {
+                std::cout << "ZREVRANGE: Failed to convert start value, using default: " << start << std::endl;
+            }
+            
+            try {
+                stop = std::stoi(cmd.oldValue.str);
+            } catch (...) {
+                std::cout << "ZREVRANGE: Failed to convert stop value, using default: " << stop << std::endl;
+            }
+            
             return zrevrange(cmd.key, start, stop);
         }
         case Operation::ZRANGE:
         {
             std::cout << "executing ZRANGE" << std::endl;
-            int start = std::stoi(cmd.value.str);
-            int stop = std::stoi(cmd.oldValue.str);
+            int start = 1;  // default value
+            int stop = 10;  // default value
+            
+            try {
+                start = std::stoi(cmd.value.str);
+            } catch (...) {
+                std::cout << "ZRANGE: Failed to convert start value, using default: " << start << std::endl;
+            }
+            
+            try {
+                stop = std::stoi(cmd.oldValue.str);
+            } catch (...) {
+                std::cout << "ZRANGE: Failed to convert stop value, using default: " << stop << std::endl;
+            }
+            
             return zrange(cmd.key, start, stop);
         }
         default:

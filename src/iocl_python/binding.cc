@@ -599,8 +599,8 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-    std::cout << "[AsyncSendRequest] op=" << static_cast<int>(op) << std::endl;
-    std::cout << typeid(session_id).name() << typeid(op).name() << typeid(key).name() << typeid(newVal).name() <<  typeid(oldVal).name() << std::endl;
+    // std::cout << "[AsyncSendRequest] op=" << static_cast<int>(op) << std::endl;
+    // std::cout << typeid(session_id).name() << typeid(op).name() << typeid(key).name() << typeid(newVal).name() <<  typeid(oldVal).name() << std::endl;
     
     if (!benchmarkClient) {
         std::cout << "[AsyncSendRequest] Creating new benchmark client" << std::endl;
@@ -631,11 +631,11 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
 
     if (efd == static_cast<uint64_t>(-1)) {
         // Response is ready, return the Value object
-        std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
+        // std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
         // Print actual contents of the Value for debugging
-        std::cout << "[AsyncGetResponse] Value contents:" << std::endl;
+        // std::cout << "[AsyncGetResponse] Value contents:" << std::endl;
         (void)value_to_python(value);
-        std::cout << "[AsyncGetResponse] caleedddddddddd" << std::endl;
+        // std::cout << "[AsyncGetResponse] caleedddddddddd" << std::endl;
         return {true, value};
     } else {
         // Response is not ready, return false and a Value containing the efd as a string
@@ -646,25 +646,25 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
 
 // Helper function to convert Value to Python objects
 py::object value_to_python(const request_utils::Value& val) {
-    std::cout << "[value_to_python] Value type: " << static_cast<int>(val.type) << std::endl;
+    // std::cout << "[value_to_python] Value type: " << static_cast<int>(val.type) << std::endl;
     switch (val.type) {
         case request_utils::ValueType::STRING:
-            std::cout << "[value_to_python] STRING: " << val.str << std::endl;
+            // std::cout << "[value_to_python] STRING: " << val.str << std::endl;
             return py::cast(val.str);
         case request_utils::ValueType::LIST:
-            std::cout << "[value_to_python] LIST: ";
-            for (const auto& item : val.list) std::cout << item << ", ";
-            std::cout << std::endl;
+            // std::cout << "[value_to_python] LIST: ";
+            // for (const auto& item : val.list) std::cout << item << ", ";
+            // std::cout << std::endl;
             return py::cast(val.list);
         case request_utils::ValueType::SET:
-            std::cout << "[value_to_python] SET: ";
-            for (const auto& item : val.set) std::cout << item << ", ";
-            std::cout << std::endl;
+            // std::cout << "[value_to_python] SET: ";
+            // for (const auto& item : val.set) std::cout << item << ", ";
+            // std::cout << std::endl;
             return py::cast(val.set);
         case request_utils::ValueType::HASH:
-            std::cout << "[value_to_python] HASH: ";
-            for (const auto& kv : val.hash) std::cout << kv.first << ": " << kv.second << ", ";
-            std::cout << std::endl;
+            // std::cout << "[value_to_python] HASH: ";
+            // for (const auto& kv : val.hash) std::cout << kv.first << ": " << kv.second << ", ";
+            // std::cout << std::endl;
             return py::cast(val.hash);
         default:
             std::cout << "[value_to_python] NIL or unknown type" << std::endl;
