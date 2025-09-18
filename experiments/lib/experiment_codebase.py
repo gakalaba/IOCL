@@ -1,7 +1,8 @@
-from .rss_codebase import RssCodebase
+from .iocl_codebase import IOCLCodebase
+
 
 __BUILDERS__ = {
-    "rss": RssCodebase()
+    "iocl": IOCLCodebase()
 }
 
 
