@@ -329,11 +329,13 @@ namespace strongstore
         switch (optype)
         {
         case request_utils::Operation::PUT:
-            std::cout << "should be here" << std::endl;
             treq_.mutable_op()->set_op(AsynchOperation::PUT);
             break;
         case request_utils::Operation::GET:
             treq_.mutable_op()->set_op(AsynchOperation::GET);
+            break;
+        case request_utils::Operation::SET:
+            treq_.mutable_op()->set_op(AsynchOperation::SET);
             break;
         case request_utils::Operation::INCR:
             treq_.mutable_op()->set_op(AsynchOperation::INCR);

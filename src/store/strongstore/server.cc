@@ -1928,6 +1928,9 @@ namespace strongstore
         case AsynchOperation::GET:
             c.op = Operation::GET;
             break;
+        case AsynchOperation::SET:
+            c.op = Operation::SET; 
+            break;
         case AsynchOperation::INCR:
             c.op = Operation::INCR;
             break;
