@@ -82,6 +82,8 @@ public:
 
     inline const Stats &GetStats() const { return stats; }
 
+    inline uint64_t GetFanout() { return fanout; };
+
 protected:
     virtual AsyncTransaction *GetNextTransaction() = 0;
 
