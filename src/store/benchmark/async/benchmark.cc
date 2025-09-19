@@ -45,6 +45,7 @@
 #include "store/benchmark/async/common/uniform_key_selector.h"
 #include "store/benchmark/async/common/zipf_key_selector.h"
 #include "store/benchmark/async/retwis/retwis_client.h"
+#include "store/benchmark/async/micro/micro_client.h"
 #include "store/common/partitioner.h"
 #include "store/common/stats.h"
 #include "store/common/truetime.h"
@@ -61,6 +62,7 @@ enum benchmode_t
 {
     BENCH_UNKNOWN,
     BENCH_RETWIS,
+    BENCH_MICRO,
 };
 
 enum keysmode_t
@@ -161,8 +163,8 @@ DEFINE_validator(strong_consistency, &ValidateStrongConsistency);
 
 DEFINE_double(nb_time_alpha, 1.0, "multiple for non-block time estimates.");
 
-const std::string benchmark_args[] = {"retwis"};
-const benchmode_t benchmodes[]{BENCH_RETWIS};
+const std::string benchmark_args[] = {"retwis", "micro"};
+const benchmode_t benchmodes[]{BENCH_RETWIS, BENCH_MICRO};
 static bool ValidateBenchmark(const char *flagname, const std::string &value)
 {
     int n = sizeof(benchmark_args);
@@ -215,6 +217,7 @@ DEFINE_uint64(message_timeout, 10000, "length of timeout for messages in ms.");
 DEFINE_uint64(max_backoff, 5000, "max time to sleep after aborting.");
 DEFINE_uint64(client_fanout, 0, "number of concurrent requests at a time issued by client");
 DEFINE_bool(client_issue_concurrent, false, "whether a client issues concurrent or sequential requests.");
+DEFINE_uint32(client_read_percentage, 500, "percentage of reads in the workload");
 
 const std::string partitioner_args[] = {"default", "warehouse_dist_items",
                                         "warehouse"};
@@ -519,7 +522,7 @@ int main(int argc, char **argv)
 
     // parse retwis settings
     std::vector<std::string> keys;
-    if (benchMode == BENCH_RETWIS)
+    if (benchMode == BENCH_RETWIS || benchMode == BENCH_MICRO)
     {
         if (FLAGS_keys_path.empty())
         {
@@ -720,19 +723,21 @@ int main(int argc, char **argv)
         clients.push_back(client);
     }
 
-    switch (benchMode)
-    {
-    case BENCH_RETWIS:
-        break;
-    default:
-        NOT_REACHABLE();
-    }
+    // switch (benchMode)
+    // {
+    // case BENCH_RETWIS:
+    //     break;
+    // default:
+    //     NOT_REACHABLE();
+    // }
+    FLAGS_client_read_percentage = ((100 * FLAGS_client_read_percentage) / 1000);
 
     uint32_t seed = FLAGS_client_id << 4;
     BenchmarkClient *bench;
     switch (benchMode)
     {
     case BENCH_RETWIS:
+        Debug("we'res tarting the retwis??");
         bench = new retwis::RetwisClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,
@@ -745,6 +750,23 @@ int main(int argc, char **argv)
             FLAGS_max_attempts,
             FLAGS_client_issue_concurrent);
         break;
+    case BENCH_MICRO:
+        Debug("we're starting the microooooo, FLAGS_client_issue_concurrent=%d", FLAGS_client_issue_concurrent);
+        bench = new micro::MicroClient(
+            keySelector, clients, FLAGS_message_timeout, *tport, seed,
+            bench_mode,
+            FLAGS_client_switch_probability,
+            FLAGS_client_arrival_rate, FLAGS_client_think_time, FLAGS_client_stay_probability,
+            FLAGS_mpl,
+            FLAGS_exp_duration, FLAGS_warmup_secs, FLAGS_cooldown_secs,
+            FLAGS_tput_interval,
+            FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
+            FLAGS_max_attempts,
+            FLAGS_client_fanout,
+            FLAGS_client_issue_concurrent,
+            FLAGS_client_read_percentage);
+        break;
+
     default:
         NOT_REACHABLE();
     }
@@ -752,6 +774,12 @@ int main(int argc, char **argv)
     switch (benchMode)
     {
     case BENCH_RETWIS:
+        Debug("Retwis");
+        tport->Timer(0, [bench, bdcb]()
+                     { bench->Start(bdcb); });
+        break;
+    case BENCH_MICRO:
+        Debug("MICRO");
         tport->Timer(0, [bench, bdcb]()
                      { bench->Start(bdcb); });
         break;
