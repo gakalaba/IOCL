@@ -1,0 +1,53 @@
+20250818-111510-9601 08447 * main            (benchmark.cc:392): Starting benchmark.
+20250818-111516-2295 08447 * BenchmarkClient (bench_client.cc:82): starting benchclient, issueConcurrent is 1
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20250818-111526-2296 08447 * WarmupDone      (bench_client.cc:549): Completed warmup period of 10 seconds with 1553 requests
+20250818-111542-2300 08447 * Finish          (bench_client.cc:736): Completed 2610 requests in 16.041391 seconds
+20250818-111542-2301 08447 * Finish          (bench_client.cc:737): 1 outstanding transactions.
+Session continued: 0
+last_service: spanner-61-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: spanner-61-1804289383, current_state: 2
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: spanner-61-1804289383, current_state: 2
+20250818-111550-2297 08447 * FlushStats      (benchmark.cc:822): Flushing stats to /mnt/extra/experiments/2025-09-18-11-14-46/out/client-1-0-61-stats-0.json.
+20250818-111552-2320 08447 * Cleanup         (bench_client.cc:571): Aborting 0 outstanding transactions.
+20250818-111552-2321 08447 * CooldownDone    (bench_client.cc:601): Finished cooldown period.
+20250818-111552-2334 08447 * CooldownDone    (bench_client.cc:608): Median latency is 3568243 ns (3568 us)
+20250818-111552-2335 08447 * CooldownDone    (bench_client.cc:617): Average latency is 6092109 ns (6092 us)
+20250818-111552-2336 08447 * CooldownDone    (bench_client.cc:621): 90th percentile latency is 12139461 ns (12 ms)
+20250818-111552-2336 08447 * CooldownDone    (bench_client.cc:625): 95th percentile latency is 13646388 ns (13 ms)
+20250818-111552-2336 08447 * CooldownDone    (bench_client.cc:629): 99th percentile latency is 25394272 ns (25 ms)
+20250818-111552-2336 08447 * LATENCY total: 218 us 6092 us/2097 us 119 ms (2611 samples, 15 s total)
+20250818-111552-2337 08447 *     131 us |          3 | 
+20250818-111552-2337 08447 *     262 us |         30 | =
+20250818-111552-2337 08447 *     524 us |        152 | =========
+20250818-111552-2337 08447 *    1048 us |        772 | ===============================================
+20250818-111552-2338 08447 *    2097 us |        380 | =======================
+20250818-111552-2338 08447 *    4194 us |        401 | ========================
+20250818-111552-2338 08447 *    8388 us |        819 | ==================================================
+20250818-111552-2338 08447 *      16 ms |         35 | ==
+20250818-111552-2338 08447 *      33 ms |         18 | =
+20250818-111552-2339 08447 *      67 ms |          1 | 
+Inserted events:
+  0x55c2163c1f00 [fd  7] Read Persist Internal
+  0x55c2163e13a0 [fd  9] Read Persist
+  0x55c2163e1da0 [fd  10] Read Persist
+  0x55c2163e2150 [fd  11] Read Persist
+  0x55c2163e2a90 [fd  12] Read Persist
+  0x55c2163e3370 [fd  13] Read Persist
+  0x55c2163e38e0 [fd  14] Read Persist
+  0x55c2163e4e50 [fd  15] Read Persist
+  0x55c2163fe390 [fd  16] Read Persist
+Active events:
+20250818-111552-2342 08447 * main            (benchmark.cc:782): Cleaning up after experiment.
+20250818-111552-2343 08447 * FlushStats      (benchmark.cc:822): Flushing stats to /mnt/extra/experiments/2025-09-18-11-14-46/out/client-1-0-61-stats-0.json.
