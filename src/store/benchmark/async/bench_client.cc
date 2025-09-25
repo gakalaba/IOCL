@@ -41,6 +41,7 @@
 #include "lib/timeval.h"
 #include "lib/transport.h"
 #include "store/strongstore/client.h"
+#include <fcntl.h>
 
 DEFINE_LATENCY(op);
 
@@ -1088,22 +1089,34 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
 
 void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
 {
-    // Debug("AsynchRequestCallback, with commandId = %d | the size of the efd_map_ is %lu", commandId, efd_map_.size());
-    // std::cout << "[AsynchRequestCallback] Called with session_id=" << session_id
-    //     << ", status=" << status
-    //     << ", commandId=" << commandId << std::endl;
+    std::cout << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
     replies_map_[commandId] = retval;
     
-    if (efd_map_.find(commandId) != efd_map_.end()) {
-        int efd = efd_map_[commandId];
-        Debug("i found the efd!, it's %d", efd);
-        efd_map_.erase(commandId);
+    auto efd_it = efd_map_.find(commandId);
+    if (efd_it != efd_map_.end()) {
+        int efd = efd_it->second;
+        std::cout << "[AsynchRequestCallback] Found efd=" << efd << " for commandId=" << commandId << std::endl;
+        
+        // Verify the efd is still valid
+        int flags = fcntl(efd, F_GETFD);
+        if (flags == -1) {
+            std::cout << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
+            efd_map_.erase(efd_it);
+            return;
+        }
+        
+        efd_map_.erase(efd_it);
+        
         uint64_t val = 1;
-        if (write(efd, &val, sizeof(val)) != sizeof(val)) {
-            Panic("eventfd write failed");
+        ssize_t written = write(efd, &val, sizeof(val));
+        if (written != sizeof(val)) {
+            std::cout << "[AsynchRequestCallback] ERROR: Failed to write to efd " << efd 
+                     << ", errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
+        } else {
+            std::cout << "[AsynchRequestCallback] Successfully wrote to efd " << efd << std::endl;
         }
     } else {
-        Debug("didn't find the efd for commandId %d", commandId);
+        std::cout << "[AsynchRequestCallback] No efd found for commandId=" << commandId << std::endl;
     }
 }
 
@@ -1137,7 +1150,7 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     // std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", creating efd..." << std::endl;
     
     // Create the event file descriptor
-    int efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    int efd = eventfd(0, EFD_CLOEXEC);
     if (efd == -1) {
         // std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
         Panic("eventfd creation failed");

@@ -617,6 +617,8 @@ std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, requ
 
 // AsyncGetResponse - Retrieve the result of an asynchronous request
 std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint64_t commandId) {
+    // std::cout << "[AsyncGetResponse] Called with session_id=" << session_id 
+    //           << ", commandId=" << commandId << std::endl;
 
     if (!benchmarkClient) {
         std::cout << "[AsyncGetResponse] Creating new benchmark client" << std::endl;
@@ -631,16 +633,22 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
 
     if (efd == static_cast<uint64_t>(-1)) {
         // Response is ready, return the Value object
-        // std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
-        // Print actual contents of the Value for debugging
-        // std::cout << "[AsyncGetResponse] Value contents:" << std::endl;
-        (void)value_to_python(value);
-        // std::cout << "[AsyncGetResponse] caleedddddddddd" << std::endl;
+        std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
         return {true, value};
     } else {
         // Response is not ready, return false and a Value containing the efd as a string
-        // std::cout << "[AsyncGetResponse] Response not ready, efd=" << efd << std::endl;
-        return {false, request_utils::Value(std::to_string(efd))};
+        // Wait for the eventfd to be signaled, then close it
+        uint64_t val = 0;
+        ssize_t read_bytes = read(efd, &val, sizeof(val));
+        if (read_bytes != sizeof(val)) {
+            std::cout << "[AsyncGetResponse] ERROR: Failed to read from efd " << efd << ", errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
+        }
+        close(efd); // Release the fd so the OS can assign a new one next time
+        // After waiting, try again to get the response
+        std::tuple<request_utils::Value, uint64_t> retry_result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
+        request_utils::Value retry_value = std::get<0>(retry_result);
+        // Should now be ready
+        return {true, retry_value};
     }
 }
 
