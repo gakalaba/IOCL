@@ -63,17 +63,17 @@ namespace retwis
     AsyncTransaction *RetwisClient::GetNextTransaction()
     {
         int ttype = GetRand()() % 100;
-        if (ttype < 5)
+        if (ttype < 10)
         {
             lastOp = "add_user";
             return new AddUser(keySelector, GetRand());
         }
-        else if (ttype < 20)
+        else if (ttype < 40)
         {
             lastOp = "follow";
             return new Follow(keySelector, GetRand());
         }
-        else if (ttype < 50)
+        else if (ttype < 100)
         {
             lastOp = "post_tweet";
             return new PostTweet(keySelector, GetRand());
