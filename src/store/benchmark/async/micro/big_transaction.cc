@@ -53,17 +53,12 @@ namespace micro
     Operation BasicBigTransaction::GetNextOperation(std::size_t op_index)
     {
         size_t fanout = GetNumKeys();
-        Notice("BASIC_1_BIG_TRANSACTION with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout, op_index, read_percentage_);
+        Debug("BASIC_1_BIG_TRANSACTION with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout, op_index, read_percentage_);
         if (op_index == 0)
         {
             return BeginRW();
         }
-        else if (op_index == 1)
-        {
-            // Send at least one Get
-            return GetForUpdate(GetKey(op_index - 1));
-        }
-        else if (1 < op_index && op_index <= fanout)
+        else if (0 < op_index && op_index <= fanout)
         {
             srand(time(0));
             if ((rand() % 100) < read_percentage_)
