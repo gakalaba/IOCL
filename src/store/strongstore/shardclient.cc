@@ -273,7 +273,7 @@ namespace strongstore
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
-        Debug("Storing the request in pendingReqs with app_request_id = %d and its reqid = %d", app_request_id, req_id);
+        Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
         PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
         pendingOps[req_id] = pendingOp;
         pendingOp->op = op;
@@ -300,7 +300,7 @@ namespace strongstore
     {
         Debug("shard client got LinearizeableReply!");
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the app_request_id = %d", req_id);
+        Debug("the app_request_id = %lu", req_id);
         int status = reply.status();
         string retval = reply.return_value();
 

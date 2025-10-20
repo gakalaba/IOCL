@@ -1138,7 +1138,7 @@ namespace strongstore
     void Server::SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
                                      string retval)
     {
-        Debug("got this status %d and this retval %s", status, retval);
+        Debug("got this status %d and this retval %s", status, retval.c_str());
 
         uint64_t client_id = reply->rid.client_id();
         uint64_t client_req_id = reply->rid.client_req_id();
@@ -1664,7 +1664,7 @@ namespace strongstore
             linreq.ParseFromString(op);
             replicate = true;
             response = op;
-            Debug("was able to parse LinearizeableOperation! it looks like %s", linreq);
+            Debug("was able to parse LinearizeableOperation!");
         }
     }
 
