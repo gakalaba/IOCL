@@ -42,6 +42,7 @@ namespace strongstore
     using namespace std;
     using namespace proto;
     using namespace replication;
+    TrueTime Server::dummyTT{};
 
     Server::Server(Consistency consistency,
                    const transport::Configuration &shard_config,
@@ -82,7 +83,7 @@ namespace strongstore
                    uint64_t server_id, int shard_idx, int replica_idx,
                    Transport *transport, bool debug_stats)
         : PingServer(transport),
-          tt_{NULL},                 // filler, will not use
+          tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
           shard_config_{shard_config},
           replica_config_{replica_config},

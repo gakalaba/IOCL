@@ -105,6 +105,7 @@ namespace strongstore
                    public replication::AppReplica,
                    public PingServer
     {
+        static TrueTime dummyTT; // definition outside class
     public:
         Server(Consistency consistency,
                const transport::Configuration &shard_config,
