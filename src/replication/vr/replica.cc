@@ -348,6 +348,8 @@ namespace replication
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
+            // Keep retrying
+            resendPrepareTimeout->Reset();
         }
 
         void VRReplica::CloseBatch()

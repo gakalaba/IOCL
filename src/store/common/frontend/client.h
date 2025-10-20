@@ -50,6 +50,9 @@ typedef std::function<void(int, const std::string &, const std::string &)>
 typedef std::function<void(int, const std::string &, const std::string &)>
     put_timeout_callback;
 
+typedef std::function<void(int, const std::string &)> op_callback;
+typedef std::function<void(int, const std::string &)> op_timeout_callback;
+
 typedef std::function<void(transaction_status_t)> commit_callback;
 typedef std::function<void()> commit_timeout_callback;
 
@@ -66,6 +69,8 @@ class Client {
     virtual rss::Session EndSession(Session &session) = 0;
 
     virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
+    virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout){};
+
 
     virtual void Retry(Session &session, begin_callback bcb,
                        begin_timeout_callback btcb, uint32_t timeout) = 0;
@@ -83,6 +88,12 @@ class Client {
     virtual void Put(Session &session, const std::string &key, const std::string &value,
                      put_callback pcb, put_timeout_callback ptcb, uint32_t timeout) = 0;
 
+    // Send an operation to linearizable replication ring directly
+    virtual void SendOperation(Session &session, const std::string op,
+                             const std::string &key, const std::string &value,
+                             op_callback ocb, op_timeout_callback otcb,
+                             uint32_t timeout) = 0;
+
     // Commit all Get(s) and Put(s) since Begin().
     virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
                         uint32_t timeout) = 0;
@@ -95,6 +106,8 @@ class Client {
                           commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout) = 0;
 
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
+
+    virtual bool IsLinearizeable() = 0;
 
     inline Stats &GetStats() { return stats; }
 

@@ -34,6 +34,7 @@
 
 #include "store/benchmark/async/bench_client.h"
 #include "store/benchmark/async/common/key_selector.h"
+#include "store/benchmark/async/micro/app_request.h"
 #include "store/common/frontend/client.h"
 
 namespace micro
@@ -64,6 +65,7 @@ namespace micro
         virtual ~MicroClient();
 
     protected:
+        virtual AsyncAppRequest *GetNextAppRequest() override;
         virtual AsyncTransaction *GetNextTransaction() override;
 
     private:

@@ -122,7 +122,8 @@ namespace replication
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToGroup(this, group, reqMsg))
+            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
+            // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
                 req->timer->Reset();
             }

@@ -62,6 +62,8 @@ class AppReplica {
     // Invoke callback on all replicas
     virtual void ReplicaUpcall(opnum_t opnum, const string &str1,
                                string &str2){};
+    virtual void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
+                                   const string &v, string &retval){};
     // Invoke call back for unreplicated operations run on only one replica
     virtual void UnloggedUpcall(const string &str1, string &str2){};
     // Invoke callback on leader status change
@@ -80,6 +82,8 @@ class Replica : public TransportReceiver {
     void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                       string &res);
     void ReplicaUpcall(opnum_t opnum, const string &op, string &res);
+    void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
+                           const string &v, string &retval);
     template <class MSG>
     void Execute(opnum_t opnum, const Request &msg, MSG &reply);
     void UnloggedUpcall(const string &op, string &res);

@@ -60,11 +60,19 @@ void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
 }
 
 void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res) {
-    Debug("Making upcall for operation %s", op.c_str());
+    Debug("Making upcall for opnum %d operation %s", opnum, op);
     app->ReplicaUpcall(opnum, op, res);
 
     Debug("Upcall result: %s", res.c_str());
 }
+
+void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)
+    {
+        Debug("Making executable upcall for opnum %d operation %s and key %s and value %s", opnum, op, k, v);
+        app->ReplicaUpcall(opnum, op, k, v, res);
+
+        Debug("Upcall result: %s", res.c_str());
+    }
 
 void Replica::UnloggedUpcall(const string &op, string &res) {
     app->UnloggedUpcall(op, res);

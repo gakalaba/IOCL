@@ -167,3 +167,22 @@ message Reply {
      repeated uint64 notify_rws = 4;
      repeated uint64 notify_ros = 5;
 }
+
+message LinearizeableOperation {
+    required RequestIDMessage rid = 1;
+    required uint64 transaction_id = 2;
+    required string op = 3;
+    required string key = 4;
+    required string value = 5;
+}
+
+message LinearizeableReply {
+    required RequestIDMessage rid = 1;
+    // 0 = OK
+    // -1 = failed
+    // -2 = retry
+    // -3 = abstain/no reply
+    required uint64 transaction_id = 2;
+    required int32 status = 3;
+    required string return_value = 4;
+}

@@ -56,6 +56,7 @@ enum protomode_t
 {
     PROTO_UNKNOWN,
     PROTO_STRONG,
+    PROTO_VR
 };
 
 enum benchmode_t
@@ -113,8 +114,8 @@ DEFINE_string(trans_protocol, trans_args[0],
               " passing messages");
 DEFINE_validator(trans_protocol, &ValidateTransMode);
 
-const std::string protocol_args[] = {"span-lock"};
-const protomode_t protomodes[]{PROTO_STRONG};
+const std::string protocol_args[] = {"span-lock", "vr"};
+const protomode_t protomodes[]{PROTO_STRONG, PROTO_VR};
 const strongstore::Mode strongmodes[]{strongstore::Mode::MODE_SPAN_LOCK};
 static bool ValidateProtocolMode(const char *flagname,
                                  const std::string &value)
@@ -136,10 +137,11 @@ DEFINE_string(protocol_mode, protocol_args[0],
               " use during this experiment");
 DEFINE_validator(protocol_mode, &ValidateProtocolMode);
 
-const std::string strong_consistency_args[] = {"ss", "rss"};
+const std::string strong_consistency_args[] = {"ss", "rss", "lin"};
 const strongstore::Consistency strong_consistency[]{
     strongstore::Consistency::SS,
     strongstore::Consistency::RSS,
+    strongstore::Consistency::LIN,
 };
 static bool ValidateStrongConsistency(const char *flagname,
                                       const std::string &value)
@@ -703,6 +705,7 @@ int main(int argc, char **argv)
         Client *client = nullptr;
         switch (mode)
         {
+        case PROTO_VR:
         case PROTO_STRONG:
         {
             auto &shard_config = replica_configs[i];

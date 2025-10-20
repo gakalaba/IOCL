@@ -55,11 +55,21 @@ namespace strongstore
         typedef std::function<void()> abort_callback;
         typedef std::function<void()> abort_timeout_callback;
 
+        // IOCL Project
+        typedef std::function<void(int, string)> op_callback;
+        typedef std::function<void(int, string)> op_timeout_callback;
+
     public:
         /* Constructor needs path to shard config. */
         ReplicaClient(const transport::Configuration &config, Transport *transport,
                       uint64_t client_id, int shard);
         virtual ~ReplicaClient();
+
+        void SendOperation(uint64_t request_id,
+                         strongstore::proto::LinearizeableOperation &msg,
+                         op_callback ocb, op_timeout_callback otcb,
+                         uint32_t timeout);
+
 
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,
@@ -109,9 +119,18 @@ namespace strongstore
             abort_callback acb;
             abort_timeout_callback atcb;
         };
+        struct PendingOperation : public PendingRequest
+        {
+            PendingOperation(uint64_t reqId) : PendingRequest(reqId) {}
+            op_callback ocb;
+            op_timeout_callback otcb;
+        };
 
         bool PrepareCallback(uint64_t reqId, const std::string &,
                              const std::string &);
+
+        bool SendOperationCallback(uint64_t opId, const std::string &,
+                                 const std::string &);
 
         bool CommitCallback(uint64_t reqId, const std::string &,
                             const std::string &);
@@ -129,6 +148,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingPrepare *> pendingPrepares;
         std::unordered_map<uint64_t, PendingCommit *> pendingCommits;
         std::unordered_map<uint64_t, PendingAbort *> pendingAborts;
+        std::unordered_map<uint64_t, PendingOperation *> pendingOperations;
 
         uint64_t lastReqId;
     };

@@ -109,6 +109,11 @@ namespace strongstore
         Debug("sessions_by_transaction_id_.size(): %lu", sessions_by_transaction_id_.size());
     }
 
+    bool Client::IsLinearizeable()
+    {
+        return (consistency_ == LIN);
+    }
+
     void Client::CalculateCoordinatorChoices()
     {
         if (static_cast<std::size_t>(config_.g) > MAX_SHARDS)
@@ -415,6 +420,32 @@ namespace strongstore
         bcb();
     }
 
+    void Client::BeginAppRequest(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    {
+        auto &session = static_cast<StrongSession &>(s);
+
+        if (session.transaction_id() != static_cast<uint64_t>(-1))
+        {
+            sessions_by_transaction_id_.erase(session.transaction_id());
+        }
+
+        auto tid = next_transaction_id_++;
+
+        Debug("[%lu] BeginAppRequest", tid);
+
+        // Timestamp start_ts{tt_.Now().latest(), client_id_};
+
+        // session.start_transaction(tid, start_ts);
+        sessions_by_transaction_id_.emplace(tid, session);
+
+        // for (uint64_t i = 0; i < nshards_; i++)
+        // {
+        //     sclients_[i]->Begin(tid, start_ts);
+        // }
+
+        bcb();
+    }
+
     /* Begins a transaction, retrying the transaction indicated by session.
      */
     void Client::Retry(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
@@ -574,6 +605,37 @@ namespace strongstore
         };
 
         sclients_[i]->Put(tid, key, value, pcb1, ptcb1, timeout);
+    }
+
+    void Client::SendOperation(Session &s, const std::string op,
+                             const std::string &key, const std::string &value,
+                             op_callback ocb, op_timeout_callback otcb,
+                             uint32_t timeout)
+    {
+        auto &session = static_cast<StrongSession &>(s);
+
+        auto arid = session.transaction_id();
+
+        Debug("SendOperation on AppRequest[%lu]: %s(%s, %s)", arid, op.c_str(), key.c_str(), value.c_str());
+
+        ASSERT(session.executing());
+
+        // Contact the appropriate shard to set the value.
+        int i = (*part_)(key, nshards_, -1, session.participants());
+
+        auto ocb1 = [ocb, session = std::ref(session)](int s, const std::string &v)
+        {
+            session.get().set_executing();
+            ocb(s, v);
+        };
+
+        auto otcb1 = [otcb, session = std::ref(session)](int s, const std::string &v)
+        {
+            session.get().set_executing();
+            otcb(s, v);
+        };
+
+        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout);
     }
 
     /* Attempts to commit the ongoing transaction. */

@@ -43,6 +43,7 @@
 #include "replication/vr/replica.h"
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
+#include "store/common/backend/kvstore.h"
 #include "store/common/truetime.h"
 #include "store/server.h"
 #include "store/strongstore/common.h"
@@ -110,6 +111,10 @@ namespace strongstore
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport, const TrueTime &tt,
                bool debug_stats);
+        Server(Consistency consistency, const transport::Configuration &shard_config,
+               const transport::Configuration &replica_config, uint64_t server_id,
+               int groupIdx, int idx, Transport *transport,
+               bool debug_stats);
         ~Server();
 
         // Override TransportReceiver
@@ -176,6 +181,16 @@ namespace strongstore
             RequestID rid;
             std::string key;
         };
+        class PendingOperationReply
+        {
+        public:
+            PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
+                                TransportAddress *remote)
+                : rid{client_id, client_op_id, remote} {}
+            RequestID rid;
+            std::string key;
+            std::string value;
+        };
 
         struct TimestampID
         {
@@ -195,6 +210,9 @@ namespace strongstore
         };
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
+
+        void HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg);
+
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -233,6 +251,8 @@ namespace strongstore
 
         void PrepareCallback(uint64_t transaction_id, int status,
                              Timestamp timestamp);
+        void SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
+                                 string retval);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -256,6 +276,7 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
+        void ReplicaUpcallAppRequest(opnum_t opnum, strongstore::proto::LinearizeableOperation &op, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -265,6 +286,7 @@ namespace strongstore
         TransactionStore transactions_;
         LockTable locks_;
         VersionedKVStore<TimestampID, std::string> store_;
+        KVStore linearizeable_kv_store_;
 
         const transport::Configuration &shard_config_;
         const transport::Configuration &replica_config_;
@@ -283,6 +305,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
 
         proto::Get get_;
+        proto::LinearizeableOperation op_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -291,6 +314,7 @@ namespace strongstore
         proto::Abort abort_;
 
         proto::GetReply get_reply_;
+        proto::LinearizeableReply op_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

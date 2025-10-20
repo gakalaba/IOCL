@@ -200,6 +200,10 @@ namespace strongstore
         // Begin a transaction
         virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
 
+        // Begin an application-level request
+        virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+
+
         // Begin a retried transaction.
         virtual void Retry(Session &session, begin_callback bcb,
                            begin_timeout_callback btcb, uint32_t timeout) override;
@@ -220,6 +224,12 @@ namespace strongstore
                          put_callback pcb, put_timeout_callback ptcb,
                          uint32_t timeout = PUT_TIMEOUT) override;
 
+        // Send a generic operation directly to a linearizeable replication ring
+        virtual void SendOperation(Session &session, const std::string op,
+                                 const std::string &key, const std::string &value,
+                                 op_callback ocb, op_timeout_callback otcb,
+                                 uint32_t timeout = OPERATION_TIMEOUT) override;
+
         // Commit all Get(s) and Put(s) since Begin().
         virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
                             uint32_t timeout) override;
@@ -234,6 +244,8 @@ namespace strongstore
         void ROCommit(Session &session, const std::unordered_set<std::string> &keys,
                       commit_callback ccb, commit_timeout_callback ctcb,
                       uint32_t timeout) override;
+
+        bool IsLinearizeable() override;
 
     private:
         const static std::size_t MAX_SHARDS = 16;

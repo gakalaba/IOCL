@@ -77,6 +77,39 @@ namespace strongstore
         }
     }
 
+    Server::Server(Consistency consistency, const transport::Configuration &shard_config,
+                   const transport::Configuration &replica_config,
+                   uint64_t server_id, int shard_idx, int replica_idx,
+                   Transport *transport, bool debug_stats)
+        : PingServer(transport),
+          tt_{NULL},                 // filler, will not use
+          transactions_{0, SS, tt_}, // filler, will not use
+          shard_config_{shard_config},
+          replica_config_{replica_config},
+          transport_{transport},
+          server_id_{server_id},
+          min_prepare_timestamp_{},
+          shard_idx_{shard_idx},
+          replica_idx_{replica_idx},
+          debug_stats_{debug_stats},
+          consistency_{consistency}
+    {
+        transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
+
+        /*for (int i = 0; i < shard_config_.g; i++)
+        {
+            shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i));
+        }*/
+
+        replica_client_ =
+            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+
+        if (debug_stats_)
+        {
+            _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
+        }
+    }
+
     Server::~Server()
     {
         for (auto s : shard_clients_)
@@ -108,6 +141,11 @@ namespace strongstore
         {
             get_.ParseFromString(data);
             HandleGet(remote, get_);
+        }
+        else if (type == op_.GetTypeName())
+        {
+            op_.ParseFromString(data);
+            HandleSendOperation(remote, op_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -185,6 +223,7 @@ namespace strongstore
             ASSERT(r.wound_rws.size() == 0);
 
             std::pair<TimestampID, std::string> value;
+            // read the value from the store! this doesn't need to be replicated
             ASSERT(store_.get(key, value));
 
             get_reply_.Clear();
@@ -195,6 +234,7 @@ namespace strongstore
             get_reply_.set_val(value.second);
             value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
+            // respond back to the client (shard client)
             transport_->SendMessage(this, remote, get_reply_);
 
             transactions_.FinishGet(transaction_id, key);
@@ -232,6 +272,23 @@ namespace strongstore
         {
             NOT_REACHABLE();
         }
+    }
+
+    void Server::HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg)
+    {
+        Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
+        uint64_t transaction_id = msg.transaction_id();
+
+        auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
+        reply->key = msg.key();
+        reply->value = msg.value();
+
+        replica_client_->SendOperation(
+            transaction_id, msg,
+            std::bind(&Server::SendOperationCallback, this, reply, transaction_id,
+                      std::placeholders::_1, std::placeholders::_2),
+            // this thing is the ptcb
+            [](int, string) {}, OPERATION_TIMEOUT);
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -1077,6 +1134,33 @@ namespace strongstore
         }
     }
 
+    void Server::SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
+                                     string retval)
+    {
+        Debug("got this status %d and this retval %s", status, retval);
+
+        uint64_t client_id = reply->rid.client_id();
+        uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->rid.addr();
+
+        const std::string &key = reply->key;
+        const std::string &val = reply->value;
+
+        Debug("[%lu] SendOperationCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
+
+        op_reply_.Clear();
+        op_reply_.mutable_rid()->set_client_id(client_id);
+        op_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        op_reply_.set_status(status);
+        op_reply_.set_return_value(retval);
+        op_reply_.set_transaction_id(transaction_id);
+
+        transport_->SendMessage(this, *remote, op_reply_);
+
+        delete remote;
+        delete reply;
+    }
+
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {
         // Debug("[%lu] Received PREPARE_OK callback: %d %d", transaction_id, shard_idx_, status);
@@ -1500,6 +1584,7 @@ namespace strongstore
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
         for (auto &write : transaction.getWriteSet())
         {
+            // apply all the buffered writes to the store!
             store_.put(write.first, write.second, {commit_ts, transaction_id});
         }
 
@@ -1533,6 +1618,7 @@ namespace strongstore
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
         for (auto &write : transaction.getWriteSet())
         {
+            // apply all the buffered writes to the store!
             store_.put(write.first, write.second, {commit_ts, transaction_id});
         }
 
@@ -1555,22 +1641,29 @@ namespace strongstore
     void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                               string &response)
     {
-        // Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
+        Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
 
         Request request;
-
-        request.ParseFromString(op);
-
-        switch (request.op())
+        LinearizeableOperation linreq;
+        if (consistency_ != LIN)
         {
-        case strongstore::proto::Request::PREPARE:
-        case strongstore::proto::Request::COMMIT:
-        case strongstore::proto::Request::ABORT:
+            request.ParseFromString(op);
+            switch (request.op())
+            {
+            case strongstore::proto::Request::PREPARE:
+            case strongstore::proto::Request::COMMIT:
+            case strongstore::proto::Request::ABORT:
+                replicate = true;
+                response = op;
+                break;
+            default:
+                Panic("Unrecognized operation.");
+            }
+        } else {
+            linreq.ParseFromString(op);
             replicate = true;
             response = op;
-            break;
-        default:
-            Panic("Unrecognized operation.");
+            Debug("was able to parse LinearizeableOperation! it looks like %s", linreq);
         }
     }
 
@@ -1582,7 +1675,15 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        // Debug("Received Upcall: %lu %s", opnum, op.c_str());
+        Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
+        LinearizeableOperation linreq;
+        if (consistency_ == LIN)
+        {
+            linreq.ParseFromString(op);
+            ReplicaUpcallAppRequest(opnum, linreq, response);
+            return;
+        }
+
         Request request;
         Reply reply;
 
@@ -1709,6 +1810,40 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    // TODO figure out interface for stuff to work with transformed apps
+    void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
+    {
+        Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
+        LinearizeableReply reply;
+
+        string retval;
+        int status = REPLY_OK;
+        if (req.op() == "get")
+        {
+            Debug("the request is get");
+            // TODO ANJA look up how to mutate variables
+            if (!linearizeable_kv_store_.get(req.key(), retval))
+            {
+                status = REPLY_FAIL;
+            };
+        }
+        else if (req.op() == "put")
+        {
+            Debug("the request is put");
+            linearizeable_kv_store_.put(req.key(), req.value());
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        reply.set_status(status);
+        reply.set_return_value(retval);
+        reply.set_transaction_id(req.transaction_id());
+        reply.mutable_rid()->set_client_id(req.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        reply.SerializeToString(&response);
+    }
+
     void Server::UnloggedUpcall(const string &op, string &response)
     {
         NOT_IMPLEMENTED();
@@ -1717,7 +1852,13 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        store_.put(key, value, {timestamp, 0});
+        if (consistency_ == LIN)
+        {
+            linearizeable_kv_store_.put(key, value);
+        }
+        else {
+            store_.put(key, value, {timestamp, 0});
+        }
     }
 
 } // namespace strongstore

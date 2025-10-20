@@ -1,8 +1,8 @@
 /***********************************************************************
  *
- * store/strongstore/common.h:
+ * store/common/frontend/async_apprequest.h:
  *
- * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
+ * Copyright 2025 Anja Kalaba
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -25,19 +25,38 @@
  * SOFTWARE.
  *
  **********************************************************************/
-#ifndef _STRONG_COMMON_H_
-#define _STRONG_COMMON_H_
+#ifndef _ASYNC_APPREQUEST_H_
+#define _ASYNC_APPREQUEST_H_
 
-namespace strongstore
+#include <functional>
+#include <map>
+#include <string>
+
+#include "store/common/frontend/client.h"
+#include "store/common/frontend/transaction_utils.h"
+
+struct StringPointerCompAppReq
 {
-
-    enum Consistency
+    bool operator()(const std::string *a, const std::string *b) const
     {
-        SS,
-        RSS,
-        LIN
-    };
+        return *a < *b;
+    }
+};
 
-} // namespace strongstore
+typedef std::map<const std::string *, const std::string *, StringPointerCompAppReq>
+    ReadValueMapAppReq;
 
-#endif /* _STRONG_COMMON_H_ */
+class AsyncAppRequest
+{
+public:
+    AsyncAppRequest() {}
+    virtual ~AsyncAppRequest() {}
+
+    virtual Operation GetNextOperation(std::size_t op_index) = 0;
+
+    virtual const std::string &GetTransactionType() = 0;
+
+    virtual const int Fanout() = 0;
+};
+
+#endif

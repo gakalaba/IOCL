@@ -1,8 +1,8 @@
 /***********************************************************************
  *
- * store/strongstore/common.h:
+ * store/benchmark/async/micro/app_request.h:
  *
- * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
+ * Copyright 2025 Anja Kalaba
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -25,19 +25,45 @@
  * SOFTWARE.
  *
  **********************************************************************/
-#ifndef _STRONG_COMMON_H_
-#define _STRONG_COMMON_H_
+#ifndef BASIC_APP_REQUEST_H
+#define BASIC_APP_REQUEST_H
 
-namespace strongstore
+#include <functional>
+
+#include "store/common/frontend/async_apprequest.h"
+#include "store/benchmark/async/common/key_selector.h"
+
+namespace micro
 {
 
-    enum Consistency
+    class BasicAppRequest : public AsyncAppRequest
     {
-        SS,
-        RSS,
-        LIN
+    public:
+        BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage);
+        virtual ~BasicAppRequest();
+
+    protected:
+        Operation GetNextOperation(std::size_t op_index) override;
+
+        inline const std::string &GetKey(int i) const
+        {
+            return keySelector->GetKey(keyIdxs[i]);
+        }
+
+        inline size_t GetNumKeys() const { return keyIdxs.size(); };
+
+        virtual const std::string &GetTransactionType() override;
+        virtual const int Fanout() override;
+
+        KeySelector *keySelector;
+
+    private:
+        std::vector<int> keyIdxs;
+        std::string ttype_;
+        int fanout_;
+        uint32_t read_percentage_;
     };
 
-} // namespace strongstore
+} // namespace micro
 
-#endif /* _STRONG_COMMON_H_ */
+#endif /* BASIC_APP_REQUEST_H */

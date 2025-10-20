@@ -42,6 +42,9 @@
 #define ABORT_TIMEOUT 1000
 #define RETRY_TIMEOUT 500000
 
+#define OPERATION_TIMEOUT 1000
+#define OPERATION_RETRIES 5
+
 #include <set>
 #include <vector>
 
@@ -73,6 +76,9 @@ namespace strongstore
 
     typedef std::function<void(int, const std::string &, const std::string &)> put_callback;
     typedef std::function<void(int, const std::string &, const std::string &)> put_timeout_callback;
+
+    typedef std::function<void(int, const std::string &)> op_callback;
+    typedef std::function<void(int, const std::string &)> op_timeout_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -118,6 +124,11 @@ namespace strongstore
         void Put(uint64_t transaction_id, const std::string &key, const std::string &value,
                  put_callback pcb, put_timeout_callback ptcb,
                  uint32_t timeout);
+        
+        void SendOperation(uint64_t app_request_id, const std::string op,
+                         const std::string &key, const std::string &value,
+                         op_callback ocb, op_timeout_callback otcb,
+                         uint32_t timeout);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -204,6 +215,15 @@ namespace strongstore
             ro_commit_timeout_callback ctcb;
             uint64_t n_slow_replies;
         };
+        struct PendingOperation : public PendingRequest
+        {
+            PendingOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
+            std::string op;
+            std::string key;
+            std::string val;
+            op_callback ocb;
+            op_timeout_callback otcb;
+        };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
 
@@ -212,6 +232,7 @@ namespace strongstore
                  uint32_t timeout, bool for_update);
 
         void HandleGetReply(const proto::GetReply &reply);
+        void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -225,6 +246,7 @@ namespace strongstore
         std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
+        std::unordered_map<uint64_t, PendingOperation *> pendingOps;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -233,6 +255,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
+        proto::LinearizeableOperation op_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -242,6 +265,7 @@ namespace strongstore
         proto::Wound wound_;
 
         proto::GetReply get_reply_;
+        proto::LinearizeableReply op_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

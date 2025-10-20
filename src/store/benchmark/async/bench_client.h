@@ -38,6 +38,7 @@
 #include "lib/message.h"
 #include "lib/transport.h"
 #include "store/common/frontend/async_transaction.h"
+#include "store/common/frontend/async_apprequest.h"
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
@@ -73,6 +74,7 @@ public:
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
     void SendNext();
+    void SendNextAppRequest();
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
     inline bool IsFullyDone() { return done; }
@@ -86,6 +88,7 @@ public:
 
 protected:
     virtual AsyncTransaction *GetNextTransaction() = 0;
+    virtual AsyncAppRequest *GetNextAppRequest() = 0;
 
     inline std::mt19937 &GetRand() { return rand_; }
 
@@ -107,12 +110,18 @@ private:
     {
     public:
         SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+
+        SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
+        AsyncAppRequest *apprequest() const { return appreq_; }
+
         void incr_responses() { responses_++; }
         uint64_t responses() { return responses_; };
+        uint64_t fanout() { return fanout_;}
         execute_callback ecb() const { return ecb_; }
 
         Latency_Frame_t *lat() { return &lat_; }
@@ -142,11 +151,23 @@ private:
             responses_ = 0;
         }
 
+        void start_apprequest(Session &session, AsyncAppRequest *apprequest, std::size_t client_index)
+        {
+            session_ = session;
+            appreq_ = apprequest;
+            current_client_index_ = client_index;
+            n_attempts_ = 1;
+            op_index_ = 0;
+            responses_ = 0;
+        }
+
     private:
         Latency_Frame_t lat_;
         std::reference_wrapper<Session> session_;
         AsyncTransaction *transaction_;
+        AsyncAppRequest *appreq_;
         int responses_ = 0;
+        uint64_t fanout_;
         execute_callback ecb_;
         uint64_t n_attempts_;
         std::size_t op_index_;
@@ -157,8 +178,10 @@ private:
     void ExecuteAbort(const uint64_t session_id, transaction_status_t status);
 
     void SendNextInSession(const uint64_t session_id);
+    void SendNextAppRequestInSession(const uint64_t session_id);
 
     void ExecuteNextOperation(const uint64_t session_id);
+    void ExecuteNextAppRequestOperation(const uint64_t session_id);
 
     void GetCallback(const uint64_t session_id,
                      int status, const std::string &key, const std::string &val, Timestamp ts);
@@ -169,11 +192,18 @@ private:
                      int status, const std::string &key, const std::string &val);
     void PutTimeout(const uint64_t session_id,
                     int status, const std::string &key, const std::string &val);
+    void ReceiveOperationResponse(const uint64_t session_id,
+                                int status, const std::string &retval);
+    void SendOperationTimeout(const uint64_t session_id,
+                            int status, const std::string &retval);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
+    void EndAppRequestCallback(const uint64_t session_id);
     void CommitTimeout();
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
+
+    inline bool IsLinearizeable() {return clients_[0]->IsLinearizeable(); };
 
     void Finish();
     void WarmupDone();
@@ -216,7 +246,7 @@ private:
 
     BenchmarkClientMode mode_;
 
-    // IOCL stuff
+    // IOCL Project stuff
     bool issueConcurrent = false;
     uint64_t fanout = 0;
 };

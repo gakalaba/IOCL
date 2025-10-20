@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "store/benchmark/async/micro/big_transaction.h"
+#include "store/benchmark/async/micro/app_request.h"
 
 namespace micro
 {
@@ -66,6 +67,12 @@ namespace micro
     {
         return new BasicBigTransaction(keySelector, GetFanout(), GetRand(), read_percentage_);
     }
+
+    AsyncAppRequest *MicroClient::GetNextAppRequest()
+    {
+        return new BasicAppRequest(keySelector, GetFanout(), GetRand(), read_percentage_);
+    }
+
 
 } // namespace micro
 

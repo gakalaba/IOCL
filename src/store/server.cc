@@ -42,7 +42,8 @@
 enum protocol_t
 {
     PROTO_UNKNOWN,
-    PROTO_STRONG
+    PROTO_STRONG,
+    PROTO_VR
 };
 
 enum transmode_t
@@ -66,10 +67,11 @@ DEFINE_uint64(num_shards, 1, "number of shards in the system");
 DEFINE_bool(debug_stats, false, "record stats related to debugging");
 
 const std::string protocol_args[] = {
-    "strong",
+    "strong", "vr",
 };
 const protocol_t protos[]{
     PROTO_STRONG,
+    PROTO_VR,
 };
 static bool ValidateProtocol(const char *flagname, const std::string &value)
 {
@@ -147,10 +149,11 @@ DEFINE_int64(strong_max_dep_depth, -1,
              "maximum length of dependency chain"
              " [-1 is no maximum] (for StrongStore MVTSO)");
 
-const std::string strong_consistency_args[] = {"ss", "rss"};
+const std::string strong_consistency_args[] = {"ss", "rss", "lin"};
 const strongstore::Consistency strong_consistency[]{
     strongstore::Consistency::SS,
     strongstore::Consistency::RSS,
+    strongstore::Consistency::LIN,
 };
 static bool ValidateStrongConsistency(const char *flagname,
                                       const std::string &value)
@@ -330,10 +333,20 @@ int main(int argc, char **argv)
     {
     case PROTO_STRONG:
     {
+        Debug("Making transactional strongstore server");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
                                          tport, tt, FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_VR:
+    {
+        Debug("Making application request strongstore server");
+        server = new strongstore::Server(consistency, shard_config,
+                                         replica_config, FLAGS_server_id,
+                                         FLAGS_group_idx, FLAGS_replica_idx,
+                                         tport, FLAGS_debug_stats);
         break;
     }
     default:
@@ -454,6 +467,16 @@ int main(int argc, char **argv)
     {
     case PROTO_STRONG:
     {
+        Debug("Making transactional strongstore replica");
+        replica = new replication::vr::VRReplica(
+            replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
+            dynamic_cast<replication::AppReplica *>(server),
+            FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_VR:
+    {
+        Debug("Making linearizable (VR) replica");
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),

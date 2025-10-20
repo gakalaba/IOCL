@@ -33,6 +33,7 @@
 #include "store/benchmark/async/retwis/follow.h"
 #include "store/benchmark/async/retwis/get_timeline.h"
 #include "store/benchmark/async/retwis/post_tweet.h"
+#include "store/benchmark/async/micro/app_request.h"
 
 namespace retwis
 {
@@ -83,6 +84,11 @@ namespace retwis
             lastOp = "get_timeline";
             return new GetTimeline(keySelector, GetRand());
         }
+    }
+
+    AsyncAppRequest *RetwisClient::GetNextAppRequest()
+    {
+        return new micro::BasicAppRequest(keySelector, 0, GetRand(), 0);
     }
 
 } // namespace retwis

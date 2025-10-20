@@ -57,10 +57,16 @@ namespace strongstore
                                      const std::string &type,
                                      const std::string &data, void *meta_data)
     {
+        Debug("Got message wahoo");
         if (type == get_reply_.GetTypeName())
         {
             get_reply_.ParseFromString(data);
             HandleGetReply(get_reply_);
+        }
+        else if (type == op_reply_.GetTypeName())
+        {
+            op_reply_.ParseFromString(data);
+            HandleSendOperationReply(op_reply_);
         }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
@@ -255,6 +261,69 @@ namespace strongstore
         t.addWriteSet(key, value);
 
         pcb(REPLY_OK, key, value);
+    }
+
+    // IOCL issue a request
+    void ShardClient::SendOperation(uint64_t app_request_id, const std::string op,
+                                  const std::string &key, const std::string &value,
+                                  op_callback ocb, op_timeout_callback otcb,
+                                  uint32_t timeout)
+    {
+        // Send the operation to appropriate shard.
+        Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
+
+        uint64_t req_id = last_req_id_++;
+        Debug("Storing the request in pendingReqs with app_request_id = %d and its reqid = %d", app_request_id, req_id);
+        PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
+        pendingOps[req_id] = pendingOp;
+        pendingOp->op = op;
+        pendingOp->key = key;
+        pendingOp->val = value;
+        pendingOp->ocb = ocb;
+        pendingOp->otcb = otcb;
+
+        // TODO: Setup timeout
+        op_.Clear();
+        op_.mutable_rid()->set_client_id(client_id_);
+        op_.mutable_rid()->set_client_req_id(req_id);
+        op_.set_transaction_id(app_request_id);
+        op_.set_key(key);
+        op_.set_value(value);
+        op_.set_op(op);
+
+        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
+    }
+
+    // IOCL receive the response
+    void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
+    {
+        Debug("shard client got LinearizeableReply!");
+        uint64_t req_id = reply.rid().client_req_id();
+        Debug("the app_request_id = %d", req_id);
+        int status = reply.status();
+        string retval = reply.return_value();
+
+        auto itr = pendingOps.find(req_id);
+        if (itr == pendingOps.end())
+        {
+            Debug("[%d][%lu] SendOperationREply for opeartion not stored in PendingOps.", shard_idx_, req_id);
+            Panic("huhuhuhuhuh");
+            return; // stale request
+        }
+
+        PendingOperation *op = itr->second;
+        uint64_t app_request_id = op->transaction_id;
+        op_callback ocb = op->ocb;
+        pendingOps.erase(itr);
+        delete op;
+
+        Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
+              shard_idx_, app_request_id, status, retval.c_str());
+
+        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
+
+        ocb(status, retval);
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

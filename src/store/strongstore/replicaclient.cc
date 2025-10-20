@@ -51,6 +51,51 @@ namespace strongstore
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
+    void ReplicaClient::SendOperation(uint64_t request_id,
+                         strongstore::proto::LinearizeableOperation &msg,
+                         op_callback ocb, op_timeout_callback otcb,
+                         uint32_t timeout)
+    {
+        Debug("[shard %i] SendRequest sending msg", shard_idx_);
+
+        // create request
+        string request_str;
+
+        msg.SerializeToString(&request_str);
+
+        uint64_t reqId = lastReqId++;
+        PendingOperation *pendingOperation = new PendingOperation(reqId);
+        pendingOperations[reqId] = pendingOperation;
+        pendingOperation->ocb = ocb;
+        pendingOperation->otcb = otcb;
+
+        client->Invoke(
+            request_str,
+            bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                 std::placeholders::_1, std::placeholders::_2));
+    }
+
+    /* Callback from a shard replica on sendrequest operation completion. */
+    bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
+                                            const string &reply_str)
+    {
+        LinearizeableReply reply;
+
+        reply.ParseFromString(reply_str);
+
+        Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
+              reply.status());
+        auto itr = this->pendingOperations.find(reqId);
+        ASSERT(itr != this->pendingOperations.end());
+        PendingOperation *pendingOperation = itr->second;
+        op_callback ocb = pendingOperation->ocb;
+        this->pendingOperations.erase(itr);
+        delete pendingOperation;
+        ocb(reply.status(), reply.return_value());
+
+        return true;
+    }
+
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
                                 const Timestamp &prepare_ts, int coordinator,

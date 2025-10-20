@@ -60,13 +60,13 @@ public:
     virtual void ReceiveMessage(const TransportAddress &remote,
                                 const string &type,
                                 const string &data,
-                                void * meta_data) = 0;
+                                void *meta_data) = 0;
 
 protected:
     const TransportAddress *myAddress;
 };
 
-typedef std::function<void (void)> timer_callback_t;
+typedef std::function<void(void)> timer_callback_t;
 
 class Transport
 {
@@ -122,7 +122,7 @@ public:
     /* Dispatch function f to the thread pool
      * handle the result in cb
      */
-    virtual void DispatchTP(std::function<void*()> f, std::function<void(void*)> cb) = 0;
+    virtual void DispatchTP(std::function<void *()> f, std::function<void(void*)> cb) = 0;
 };
 
 class Timeout
