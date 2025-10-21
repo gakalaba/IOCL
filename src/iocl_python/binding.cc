@@ -357,9 +357,9 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     // 1) Transport
     if (!s_transport) {
         s_transport.reset(new TCPTransport(0.0, 0.0, 0, false));
-        std::cout << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
+        std::cerr << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
     } else {
-        std::cout << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
+        std::cerr << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
     }
 
     // 2) Keys + selector
@@ -427,9 +427,9 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     //           << "' consistency='" << consistency_s << "'" << std::endl;
 
     if (!replica_paths.empty() && !net_config_path.empty()) {
-        std::cout << "[CreateBenchmarkClient] Attempting to load configs from paths:" << std::endl;
-        std::cout << "[CreateBenchmarkClient]   Replica paths: '" << replica_paths << "'" << std::endl;
-        std::cout << "[CreateBenchmarkClient]   Network config: '" << net_config_path << "'" << std::endl;
+        // std::cout << "[CreateBenchmarkClient] Attempting to load configs from paths:" << std::endl;
+        // std::cout << "[CreateBenchmarkClient]   Replica paths: '" << replica_paths << "'" << std::endl;
+        // std::cout << "[CreateBenchmarkClient]   Network config: '" << net_config_path << "'" << std::endl;
         
         std::ifstream net_config_stream(net_config_path);
         if (net_config_stream) {
@@ -633,7 +633,7 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
 
     if (efd == static_cast<uint64_t>(-1)) {
         // Response is ready, return the Value object
-        std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
+        // std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
         return {true, value};
     } else {
         // Response is not ready, return false and a Value containing the efd as a string
@@ -682,7 +682,7 @@ py::object value_to_python(const request_utils::Value& val) {
 
 // Cleanup function to properly manage global resources
 void CleanupGlobalResources() {
-    std::cout << "[CleanupGlobalResources] Starting cleanup..." << std::endl;
+    // std::cout << "[CleanupGlobalResources] Starting cleanup..." << std::endl;
     
     // Clean up static resources
     for (auto client : s_clients) {
@@ -751,34 +751,34 @@ bool StartTransport() {
 // Python-accessible function to call CustomInit() on the BenchmarkClient.
 // This function will return the session_id.
 uint64_t CustomInitSession() {
-    std::cout << "[CustomInitSession] Called" << std::endl;
+    // std::cout << "[CustomInitSession] Called" << std::endl;
     
     if (!benchmarkClient) {
-        std::cout << "[CustomInitSession] Creating new benchmark client" << std::endl;
+        // std::cout << "[CustomInitSession] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
         if (!benchmarkClient) {
-            std::cout << "[CustomInitSession] Failed to create benchmark client, returning 0" << std::endl;
+            // std::cout << "[CustomInitSession] Failed to create benchmark client, returning 0" << std::endl;
             return 0; // Return invalid session ID
         }
-        std::cout << "[CustomInitSession] Benchmark client created successfully" << std::endl;
+        // std::cout << "[CustomInitSession] Benchmark client created successfully" << std::endl;
     } else {
-        std::cout << "[CustomInitSession] Using existing benchmark client" << std::endl;
+        std::cerr << "[CustomInitSession] Using existing benchmark client" << std::endl;
     }
 
-    std::cout << "[CustomInitSession] About to call CustomInit()..." << std::endl;
-    std::cout << "[CustomInitSession] Benchmark client pointer: " << benchmarkClient.get() << std::endl;
+    // std::cout << "[CustomInitSession] About to call CustomInit()..." << std::endl;
+    // std::cout << "[CustomInitSession] Benchmark client pointer: " << benchmarkClient.get() << std::endl;
     
     try {
-        std::cout << "[CustomInitSession] Calling CustomInit()..." << std::endl;
+        // std::cout << "[CustomInitSession] Calling CustomInit()..." << std::endl;
         // Call CustomInit() to get the session_id
         uint64_t session_id = benchmarkClient->CustomInit();
-        std::cout << "[CustomInitSession] CustomInit completed successfully, session_id=" << session_id << std::endl;
+        // std::cout << "[CustomInitSession] CustomInit completed successfully, session_id=" << session_id << std::endl;
         return session_id;
     } catch (const std::exception& e) {
-        std::cout << "[CustomInitSession] Exception during CustomInit(): " << e.what() << std::endl;
+        std::cerr << "[CustomInitSession] Exception during CustomInit(): " << e.what() << std::endl;
         return 0;
     } catch (...) {
-        std::cout << "[CustomInitSession] Unknown exception during CustomInit()" << std::endl;
+        std::cerr << "[CustomInitSession] Unknown exception during CustomInit()" << std::endl;
         return 0;
     }
 }

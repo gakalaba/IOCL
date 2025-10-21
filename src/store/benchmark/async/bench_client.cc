@@ -1089,18 +1089,18 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchRequest(const uint64_t sessio
 
 void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
 {
-    std::cout << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
+    std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
     replies_map_[commandId] = retval;
     
     auto efd_it = efd_map_.find(commandId);
     if (efd_it != efd_map_.end()) {
         int efd = efd_it->second;
-        std::cout << "[AsynchRequestCallback] Found efd=" << efd << " for commandId=" << commandId << std::endl;
+        std::cerr << "[AsynchRequestCallback] Found efd=" << efd << " for commandId=" << commandId << std::endl;
         
         // Verify the efd is still valid
         int flags = fcntl(efd, F_GETFD);
         if (flags == -1) {
-            std::cout << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
+            std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
             efd_map_.erase(efd_it);
             return;
         }
@@ -1110,13 +1110,13 @@ void BenchmarkClient::AsynchRequestCallback(const uint64_t session_id, int statu
         uint64_t val = 1;
         ssize_t written = write(efd, &val, sizeof(val));
         if (written != sizeof(val)) {
-            std::cout << "[AsynchRequestCallback] ERROR: Failed to write to efd " << efd 
+            std::cerr << "[AsynchRequestCallback] ERROR: Failed to write to efd " << efd 
                      << ", errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
         } else {
-            std::cout << "[AsynchRequestCallback] Successfully wrote to efd " << efd << std::endl;
+            std::cerr << "[AsynchRequestCallback] Successfully wrote to efd " << efd << std::endl;
         }
     } else {
-        std::cout << "[AsynchRequestCallback] No efd found for commandId=" << commandId << std::endl;
+        std::cerr << "[AsynchRequestCallback] No efd found for commandId=" << commandId << std::endl;
     }
 }
 
