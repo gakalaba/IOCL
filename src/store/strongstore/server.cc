@@ -1831,7 +1831,10 @@ namespace strongstore
         else if (req.op() == "put")
         {
             Debug("the request is put");
-            linearizeable_kv_store_.put(req.key(), req.value());
+            if (!linearizeable_kv_store_.put(req.key(), req.value()))
+            {
+                status = REPLY_FAIL;
+            };
         }
         else
         {
