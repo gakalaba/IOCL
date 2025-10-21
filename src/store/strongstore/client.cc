@@ -85,14 +85,18 @@ namespace strongstore
             _Latency_Init(&commit_lat_, "commit_lat");
         }
 
-        CalculateCoordinatorChoices();
+        if (consistency != LIN) {
+            CalculateCoordinatorChoices();
 
-        rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
+            rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
+        }
     }
 
     Client::~Client()
     {
-        rss::UnregisterRSSService(service_name_);
+        if (consistency_ != LIN) {
+            rss::UnregisterRSSService(service_name_);
+        }
 
         if (debug_stats_)
         {
