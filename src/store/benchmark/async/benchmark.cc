@@ -417,20 +417,21 @@ int main(int argc, char **argv)
 
     // parse protocol and mode
     protomode_t mode = PROTO_UNKNOWN;
-    strongstore::Mode strongmode = strongstore::Mode::MODE_UNKNOWN;
+    // strongstore::Mode strongmode = strongstore::Mode::MODE_UNKNOWN;
     int numProtoModes = sizeof(protocol_args);
     for (int i = 0; i < numProtoModes; ++i)
     {
         if (FLAGS_protocol_mode == protocol_args[i])
         {
             mode = protomodes[i];
-            strongmode = strongmodes[i];
+            // strongmode = strongmodes[i];
             break;
         }
     }
-    if (mode == PROTO_UNKNOWN ||
-        (mode == PROTO_STRONG &&
-         strongmode == strongstore::Mode::MODE_UNKNOWN))
+    // if (mode == PROTO_UNKNOWN ||
+    //     (mode == PROTO_STRONG &&
+    //      strongmode == strongstore::Mode::MODE_UNKNOWN))
+    if (mode == PROTO_UNKNOWN)
     {
         std::cerr << "Unknown protocol or unknown strongmode." << std::endl;
         return 1;
@@ -680,7 +681,7 @@ int main(int argc, char **argv)
         }
         replica_configs.emplace_back(replica_config_stream);
 
-        if (mode == PROTO_STRONG)
+        if (mode == PROTO_STRONG || mode == PROTO_VR)
         {
             net_config_stream.seekg(0);
             net_configs.emplace_back(replica_configs[i], net_config_stream);
