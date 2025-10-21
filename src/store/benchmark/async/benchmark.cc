@@ -831,6 +831,7 @@ int main(int argc, char **argv)
     }
     delete tport;
     delete part;
+    Debug("Goodbye!");
 
     return 0;
 }
@@ -863,5 +864,6 @@ void FlushStats()
         }
 
         total.ExportJSON(FLAGS_stats_file);
+        Notice("All done!");
     }
 }
