@@ -79,9 +79,11 @@
     8,
     16,
     32,
-    64
+    64,
+    128
   ],
   "client_processes_per_client_node": [
+    2,
     4,
     8,
     16,
@@ -90,7 +92,8 @@
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-1-0"
+    "client-1-0",
+    "client-2-0"
   ],
   "server_regions": {
     "us-east-1": [
@@ -119,11 +122,11 @@
   "bench_mode": "closed",
   "mpl": 1,
   "client_key_selector": "uniform",
-  "client_fanout": 10,
+  "client_fanout": 4,
   "client_issue_concurrent": false,
   "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
-  "server_load_time": 20,
+  "server_load_time": 10,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -282,7 +285,7 @@
   "plot_tput_lat_y_label": "Latency (ms)",
   "input_latency_scale": 1000000000,
   "output_latency_scale": 1000,
-  "src_commit_hash": "recreating",
+  "src_commit_hash": "dev/eval/vr_client",
   "stats_file_name": "stats.json",
   "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
   "base_mounted_fs_path": "/mnt/extra",

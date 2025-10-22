@@ -75,13 +75,17 @@
     ]
   ],
   "client_total": [
+    2,
     4,
     8,
     16,
     32,
-    64
+    64,
+    128
   ],
   "client_processes_per_client_node": [
+    1,
+    2,
     4,
     8,
     16,
@@ -90,7 +94,8 @@
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-1-0"
+    "client-1-0",
+    "client-2-0"
   ],
   "server_regions": {
     "us-east-1": [
@@ -123,7 +128,7 @@
   "client_issue_concurrent": false,
   "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
-  "server_load_time": 20,
+  "server_load_time": 10,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -239,7 +244,7 @@
       "width": 800,
       "series_indep_vars_idx": 0,
       "series_titles": [
-        "Spanner",
+        "View-Stamped Replication",
         "Spanner-RSS"
       ],
       "x_var_is_config": false,
