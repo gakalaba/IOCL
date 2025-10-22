@@ -63,12 +63,12 @@ namespace micro
             srand(time(0));
             if ((rand() % 100) < read_percentage_)
             {
-                Debug("sending Get");
+                Debug("sending Get on key = %s", GetKey(op_index - 1).c_str());
                 return GetForUpdate(GetKey(op_index - 1));
             }
             else
             {
-                Debug("Sending Put");
+                Debug("Sending Put on key = %s", GetKey(op_index - 1).c_str());
                 return Put(GetKey(op_index - 1), GetKey(op_index - 1));   
             }
         }

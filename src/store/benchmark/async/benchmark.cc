@@ -250,7 +250,7 @@ DEFINE_validator(partitioner, &ValidatePartitioner);
 DEFINE_string(keys_path, "",
               "path to file containing keys in the system"
               " (for retwis)");
-DEFINE_uint64(num_keys, 0, "number of keys to generate (for retwis");
+DEFINE_uint64(num_keys, 0, "number of keys to generate (for retwis and micro)");
 
 const std::string keys_args[] = {"uniform", "zipf"};
 const keysmode_t keysmodes[]{KEYS_UNIFORM, KEYS_ZIPF};
@@ -591,9 +591,12 @@ int main(int argc, char **argv)
     switch (keySelectionMode)
     {
     case KEYS_UNIFORM:
+        Debug("using uniform key selector");
         keySelector = new UniformKeySelector(keys);
         break;
     case KEYS_ZIPF:
+        Debug("using zipf key selector with coefficient %f",
+              FLAGS_zipf_coefficient);
         keySelector = new ZipfKeySelector(keys, FLAGS_zipf_coefficient);
         break;
     default:

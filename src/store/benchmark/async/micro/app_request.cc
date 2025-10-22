@@ -59,13 +59,13 @@ namespace micro
             srand(time(0));
             if ((rand() % 100) < read_percentage_)
             {
-                Debug("sending Get");
-                return Get(GetKey(op_index - 1));
+                Debug("sending Get on key = %s", GetKey(op_index).c_str());
+                return Get(GetKey(op_index));
             }
             else
             {
-                Debug("Sending Put");
-                return Put(GetKey(op_index - 1), GetKey(op_index - 1));
+                Debug("Sending Put on key = %s", GetKey(op_index).c_str());
+                return Put(GetKey(op_index), GetKey(op_index));
             }   
         }
         else {
