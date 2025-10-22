@@ -58,12 +58,13 @@ namespace strongstore
     {
     public:
         StrongSession()
-            : ::Session(), transaction_id_{static_cast<uint64_t>(-1)}, start_ts_{0, 0}, min_read_ts_{0, 0}, participants_{}, prepares_{}, values_{}, snapshot_ts_{}, current_participant_{-1}, state_{EXECUTING} {}
+            : ::Session(), transaction_id_{static_cast<uint64_t>(-1)}, apprequest_id_{static_cast<uint64_t>(-1)}, start_ts_{0, 0}, min_read_ts_{0, 0}, participants_{}, prepares_{}, values_{}, snapshot_ts_{}, current_participant_{-1}, state_{EXECUTING} {}
 
         StrongSession(rss::Session &&rss_session)
-            : ::Session(std::move(rss_session)), transaction_id_{static_cast<uint64_t>(-1)}, start_ts_{0, 0}, min_read_ts_{0, 0}, participants_{}, prepares_{}, values_{}, snapshot_ts_{}, current_participant_{-1}, state_{EXECUTING} {}
+            : ::Session(std::move(rss_session)), transaction_id_{static_cast<uint64_t>(-1)}, apprequest_id_{static_cast<uint64_t>(-1)}, start_ts_{0, 0}, min_read_ts_{0, 0}, participants_{}, prepares_{}, values_{}, snapshot_ts_{}, current_participant_{-1}, state_{EXECUTING} {}
 
         uint64_t transaction_id() const { return transaction_id_; }
+        uint64_t apprequest_id() const { return apprequest_id_; }
         const Timestamp &start_ts() const { return start_ts_; }
 
         const Timestamp &min_read_ts() const { return min_read_ts_; }
@@ -97,6 +98,12 @@ namespace strongstore
             values_.clear();
             snapshot_ts_ = Timestamp();
             current_participant_ = -1;
+            state_ = EXECUTING;
+        }
+
+        void start_apprequest(uint64_t apprequest_id)
+        {
+            apprequest_id_ = apprequest_id;
             state_ = EXECUTING;
         }
 
@@ -151,6 +158,7 @@ namespace strongstore
 
     private:
         uint64_t transaction_id_;
+        uint64_t apprequest_id_;
         Timestamp start_ts_;
         Timestamp min_read_ts_;
         std::set<int> participants_;
@@ -313,6 +321,7 @@ namespace strongstore
 
         std::unordered_map<uint64_t, StrongSession> sessions_;
         std::unordered_map<uint64_t, StrongSession &> sessions_by_transaction_id_;
+        std::unordered_map<uint64_t, StrongSession &> sessions_by_apprequest_id_;
         std::unordered_map<uint64_t, Timestamp> tmins_;
 
         const strongstore::NetworkConfiguration &net_config_;
@@ -341,6 +350,7 @@ namespace strongstore
         TrueTime &tt_;
 
         uint64_t next_transaction_id_;
+        uint64_t next_apprequest_id;
 
         uint64_t last_req_id_;
         std::unordered_map<uint64_t, PendingRequest *> pending_reqs_;

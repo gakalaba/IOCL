@@ -66,7 +66,7 @@ namespace strongstore
           nb_time_alpha_{nb_time_alpha},
           debug_stats_{debug_stats}
     {
-        Debug("Initializing StrongStore client with id [%lu]", client_id_);
+        Notice("Initializing StrongStore client with id [%lu]", client_id_);
 
         auto wcb = std::bind(&Client::HandleWound, this, std::placeholders::_1);
 
@@ -428,19 +428,19 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        if (session.transaction_id() != static_cast<uint64_t>(-1))
+        if (session.apprequest_id() != static_cast<uint64_t>(-1))
         {
-            sessions_by_transaction_id_.erase(session.transaction_id());
+            sessions_by_apprequest_id_.erase(session.apprequest_id());
         }
 
-        auto tid = next_transaction_id_++;
+        auto arid = next_apprequest_id++;
 
-        Debug("[%lu] BeginAppRequest", tid);
+        Debug("[%lu] BeginAppRequest", arid);
 
         // Timestamp start_ts{tt_.Now().latest(), client_id_};
 
-        // session.start_transaction(tid, start_ts);
-        sessions_by_transaction_id_.emplace(tid, session);
+        session.start_apprequest(arid);
+        sessions_by_apprequest_id_.emplace(arid, session);
 
         // for (uint64_t i = 0; i < nshards_; i++)
         // {
@@ -618,7 +618,7 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto arid = session.transaction_id();
+        auto arid = session.apprequest_id();
 
         Debug("SendOperation on AppRequest[%lu]: %s(%s, %s)", arid, op.c_str(), key.c_str(), value.c_str());
 

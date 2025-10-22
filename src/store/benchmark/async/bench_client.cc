@@ -110,8 +110,8 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
 void BenchmarkClient::SendNext()
 {
-    Debug("[%d] SendNext", n_sessions_started_);
     n_sessions_started_++;
+    Debug("[%d] SendNext", n_sessions_started_);
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
     auto &client = *clients_[client_index];
@@ -174,8 +174,8 @@ void BenchmarkClient::SendNext()
 
 void BenchmarkClient::SendNextAppRequest()
 {
-    Debug("[%d] SendNextAppRequest", n_sessions_started_);
     n_sessions_started_++;
+    Debug("[%d] SendNextAppRequest", n_sessions_started_);
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
     auto &client = *clients_[client_index];
