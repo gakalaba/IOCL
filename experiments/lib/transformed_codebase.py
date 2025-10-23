@@ -184,12 +184,12 @@ class TransformedCodebase:
                 and config["default_remote_shell"] == "bash"
             ):
                 if isinstance(config["client_debug_output"], str):
-                    client_command = "DEBUG=%s %s" % (
+                    client_command = "export DEBUG=%s; %s" % (
                         config["client_debug_output"],
                         client_command,
                     )
                 else:
-                    client_command = "DEBUG=all %s" % client_command
+                    client_command = "export DEBUG=all; %s" % client_command
             else:
                 if isinstance(config["client_debug_output"], str):
                     client_command = "setenv DEBUG %s; %s" % (
