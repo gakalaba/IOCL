@@ -557,11 +557,24 @@ def run_multiple_experiments(config_file, executor):
 
         out_dirs = []
         sub_out_dirs = []
+
+        # handle looping through fanout lists
+        # if ("client_fanout" in config and type(config["client_fanout"]) == int):
+        #     config["client_fanout"] = [config["client_fanout"]]
+        # fanout = 1
+        # if "client_fanout" in config:
+        #     fanout = len(config["client_fanout"])
+        # print("fanout is ", fanout)
         for i in range(len(config[config['experiment_independent_vars_unused'][0][0]])):
             config_new = config.copy()
             config_new['base_local_exp_directory'] = exp_dir
             config_new['experiment_independent_vars_unused'] = config['experiment_independent_vars_unused'][1:]
 
+            # for f in range(fanout):
+            #     print("f is ", f)
+            #     if ("client_fanout" in config):
+            #         config_new['client_fanout'] = config['client_fanout'][f]
+            #     print("just set client_fanout in config_new to ", config_new['client_fanout'])
             for j in range(len(config['experiment_independent_vars_unused'][0])):
                 config_new[config['experiment_independent_vars_unused'][0][j]
                            ] = config[config['experiment_independent_vars_unused'][0][j]][i]
