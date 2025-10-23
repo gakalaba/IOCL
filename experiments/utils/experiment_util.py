@@ -151,6 +151,7 @@ def start_clients(config, local_exp_directory, remote_exp_directory, run):
         for k in range(config["client_processes_per_client_node"]):
             appended_client_commands += get_client_cmd(
                 config, i, k, run, local_exp_directory, remote_exp_directory)
+            appended_client_commands += " & "  # ADD THIS LINE
 
             if k != 0 and k % 128 == 0:
                 if appended_client_commands[-2:] == '& ':

@@ -388,6 +388,7 @@ void FlushStats();
 
 int main(int argc, char **argv)
 {
+    Notice("Starting!");
     gflags::SetUsageMessage(
         "executes transactions from various transactional workload\n"
         "           benchmarks against various distributed replicated "
@@ -766,6 +767,7 @@ int main(int argc, char **argv)
     default:
         NOT_REACHABLE();
     }
+    Notice("aaaand here we go");
 
     switch (benchMode)
     {
@@ -823,6 +825,8 @@ int main(int argc, char **argv)
     }
     delete tport;
     delete part;
+
+    Notice("Goodbye!");
 
     return 0;
 }

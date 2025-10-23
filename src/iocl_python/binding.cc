@@ -352,14 +352,12 @@ static bool GetEnvBool(const char *name, const char *def) {
 }
 
 std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
-    // std::cout << "[CreateBenchmarkClient] Minimal micro client creation" << std::endl;
-
     // 1) Transport
     if (!s_transport) {
         s_transport.reset(new TCPTransport(0.0, 0.0, 0, false));
-        std::cerr << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
+        // std::cerr << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
     } else {
-        std::cerr << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
+        // std::cerr << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
     }
 
     // 2) Keys + selector
@@ -491,24 +489,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                         auto &net_config = net_configs[i];
                         auto &region = client_regions[i];
                         
-                        // std::cout << "[CreateBenchmarkClient] Client #" << i << " params:" << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Consistency: " << static_cast<int>(consistency) << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Client ID: " << GetEnvU64("IOCL_CLIENT_ID", "0") << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Num shards: " << num_shards << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Closest replica: " << closest_replica << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Transport: " << s_transport.get() << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Partitioner: " << s_partitioner.get() << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   Debug stats: " << (debug_stats ? "true" : "false") << std::endl;
-                        // std::cout << "[CreateBenchmarkClient]   NB time alpha: " << nb_time_alpha << std::endl;
-                        
                         Client *c = new strongstore::Client(
                             consistency, net_config, region, shard_config,
                             GetEnvU64("IOCL_CLIENT_ID", "0"), static_cast<int>(num_shards), closest_replica,
                             s_transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
                         
                         s_clients.push_back(c);
-                        // std::cout << "[CreateBenchmarkClient] SUCCESS: Created strongstore::Client #" << i
-                        //           << " region='" << region << "' ptr=" << c << std::endl;
                     } catch (const std::exception& e) {
                         std::cout << "[CreateBenchmarkClient] EXCEPTION creating client #" << i << ": " << e.what() << std::endl;
                     } catch (...) {
@@ -532,16 +518,6 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         s_clients.push_back(nullptr);
         std::cout << "[CreateBenchmarkClient] No real clients created, using placeholder" << std::endl;
     }
-    // std::cout << "[CreateBenchmarkClient] Clients ready: " << s_clients.size() << std::endl;
-
-    // 5) Construct MicroClient
-    // std::cout << "[CreateBenchmarkClient] Constructing MicroClient: mode="
-    //           << ((bench_mode == OPEN) ? "open" : "closed")
-    //           << " timeout_ms=" << timeout_ms
-    //           << " mpl=" << mpl
-    //           << " fanout=" << fanout
-    //           << " issueConcurrent=" << (issueConcurrent ? 1 : 0)
-    //           << std::endl;
 
     BenchmarkClient *bench = new micro::MicroClient(
         s_keySelector.get(),
@@ -558,8 +534,6 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         fanout,
         issueConcurrent
     );
-
-    // std::cout << "[CreateBenchmarkClient] MicroClient created at " << bench << std::endl;
 
     return std::unique_ptr<BenchmarkClient>(bench);
 }
@@ -621,7 +595,7 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
     //           << ", commandId=" << commandId << std::endl;
 
     if (!benchmarkClient) {
-        std::cout << "[AsyncGetResponse] Creating new benchmark client" << std::endl;
+        std::cout << "[ERROR] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
     }
 
@@ -762,7 +736,7 @@ uint64_t CustomInitSession() {
         }
         // std::cout << "[CustomInitSession] Benchmark client created successfully" << std::endl;
     } else {
-        std::cerr << "[CustomInitSession] Using existing benchmark client" << std::endl;
+        // std::cerr << "[CustomInitSession] Using existing benchmark client" << std::endl;
     }
 
     // std::cout << "[CustomInitSession] About to call CustomInit()..." << std::endl;

@@ -298,7 +298,6 @@ namespace strongstore
 
     void Server::HandleAsynchSendRequest(const TransportAddress &remote, proto::TransformedIOCLRequest &msg)
     {
-        std::cout << "[Server::Handling Asynch Request]" << std::endl;
         Debug("Calling HandleSendAsynchRequest!");
         uint64_t transaction_id = msg.rid().client_req_id();
 

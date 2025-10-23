@@ -25,12 +25,47 @@
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
   "fault_tolerance": 1,
-  "num_shards": 1,
+  "num_shards": 8,
   "shards": [
     [
-      "us-east-1-0",
-      "us-east-1-1",
-      "us-east-1-2"
+      "us-west-1-0",
+      "eu-west-1-2",
+      "us-west-1-2"
+    ],
+    [
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
+    ],
+    [
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
+    ],
+    [
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
+    ],
+    [
+      "us-west-1-0",
+      "eu-west-1-0",
+      "eu-west-1-1"
+    ],
+    [
+      "us-west-1-0",
+      "eu-west-1-0",
+      "eu-west-1-1"
+    ],
+    [
+      "us-west-1-0",
+      "eu-west-1-0",
+      "eu-west-1-1"
+    ],
+    [
+      "us-west-1-0",
+      "eu-west-1-2",
+      "eu-west-1-2"
     ]
   ],
   "client_total": [
@@ -114,11 +149,11 @@
     5,
     6
   ],
-  "client_debug_output": true,
-  "server_debug_output": true,
+  "client_debug_output": false,
+  "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 30,
+  "client_experiment_length": 40,
   "client_rand_sleep": 0,
   "client_ramp_down": 10,
   "client_ramp_up": 10,
@@ -344,7 +379,7 @@
   "base_remote_bin_directory_nfs": "/users/akalaba/IOCL",
   "base_remote_exp_directory": "/mnt/extra/experiments",
   "bin_directory_name": "bin",
-  "base_python_directory":"/users/akalaba/redis-chat-transformed/async",
+  "base_python_directory":"/users/akalaba/redis-chat-transformed/sync",
   "python_venv": "/users/akalaba/redis-chat-transformed/redis-chat/bin/activate",
   "client_bin_name": "benchmark",
   "python_app_name": "main.py", 

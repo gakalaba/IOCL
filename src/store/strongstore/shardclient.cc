@@ -58,7 +58,7 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         // Debug("Got message wahoo");
-        // std::cout << "[Server] Goit a message" << std::endl;
+        // //std::cout << "[Server] Goit a message" << std::endl;
         if (type == get_reply_.GetTypeName())
         {
             get_reply_.ParseFromString(data);
@@ -305,11 +305,11 @@ namespace strongstore
                                         request_utils::Value newValue, transformed_callback trcb)
     {
         // Send the operation to appropriate shard.
-        std::cerr << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
-              << ", op=" << static_cast<int>(optype)
-              << ", key=" << key
-              << std::endl;
-        // std::cout << "[shard " << shard_idx_ << "] Sending ASYNCH REQUEST" << std::endl;
+        // std::cerr << "[Shard::SendAsynchRequest] txn_id=" << transaction_id
+        //       << ", op=" << static_cast<int>(optype)
+        //       << ", key=" << key
+        //       << std::endl;
+        // //std::cout << "[shard " << shard_idx_ << "] Sending ASYNCH REQUEST" << std::endl;
         // Debug("[shard %i] Sending ASYNCH REQUEST", shard_idx_);
 
         uint64_t req_id = last_req_id_++;
@@ -447,7 +447,7 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
 
-        // std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
+        // //std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
         transport_->SendMessageToReplica(this, shard_idx_, replica_, treq_);
     }
 
@@ -458,10 +458,10 @@ namespace strongstore
     // IOCL receive the response
     void ShardClient::HandleSendRequestReply(const proto::IOCLReply &reply)
     {
-        std::cout << "[ShardClient::HandleSendRequestReply] got IOCLReply!" << std::endl;
+        //std::cout << "[ShardClient::HandleSendRequestReply] got IOCLReply!" << std::endl;
 
         uint64_t req_id = reply.rid().client_req_id();
-        std::cout << "[ShardClient::HandleSendRequestReply] transaction_id=" << req_id << std::endl;
+        //std::cout << "[ShardClient::HandleSendRequestReply] transaction_id=" << req_id << std::endl;
 
         int status = reply.status();
         std::string retval = reply.return_value();
@@ -469,9 +469,6 @@ namespace strongstore
         auto itr = pendingReqs.find(req_id);
         if (itr == pendingReqs.end())
         {
-            std::cout << "[ShardClient::HandleSendRequestReply] [shard=" << shard_idx_
-                    << "][req_id=" << req_id << "] reply for request not stored in PendingReqs."
-                    << std::endl;
             Panic("huhuhuhuhuh");
             return; // stale request
         }
@@ -482,11 +479,6 @@ namespace strongstore
         pendingReqs.erase(itr);
         delete req;
 
-        std::cout << "[ShardClient::HandleSendRequestReply] [txn_id=" << transaction_id
-                << "][shard=" << shard_idx_
-                << "] received reply with status=" << status
-                << ", return_value=" << retval
-                << std::endl;
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 

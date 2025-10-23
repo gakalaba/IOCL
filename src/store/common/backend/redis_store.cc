@@ -13,98 +13,98 @@ namespace redis
     // Dispatcher function for commands.
     Value RedisStore::execute(const Command &cmd)
     {
-        std::cout << "inside execute" << std::endl;
-        std::cout << "Execution op=" << static_cast<int>(cmd.op)
-                  << " key=" << cmd.key
-                  << " value_type=" << static_cast<int>(cmd.value.type)
-                  << " value_str=" << cmd.value.str << std::endl;
+        //std::cout << "inside execute" << std::endl;
+        //std::cout << "Execution op=" << static_cast<int>(cmd.op)
+                //   << " key=" << cmd.key
+                //   << " value_type=" << static_cast<int>(cmd.value.type)
+                //   << " value_str=" << cmd.value.str << std::endl;
         switch (cmd.op)
         {
         case Operation::PUT:
-            std::cout << "executing PUT" << std::endl;
+            //std::cout << "executing PUT" << std::endl;
             put(cmd.key, cmd.value);
             return cmd.value;
         case Operation::GET:
         {
-            std::cout << "executing GET" << std::endl;
+            //std::cout << "executing GET" << std::endl;
             auto val = get(cmd.key);
             return val.is_initialized() ? val.value() : NIL;
         }
         case Operation::INCR:
-            std::cout << "executing INCR" << std::endl;
+            //std::cout << "executing INCR" << std::endl;
             return incr(cmd.key);
         case Operation::SET:
-            std::cout << "executing SET" << std::endl;
+            //std::cout << "executing SET" << std::endl;
             return set(cmd.key, cmd.value);
         case Operation::SADD:
-            std::cout << "executing SADD" << std::endl;
+            //std::cout << "executing SADD" << std::endl;
             return sadd(cmd.key, cmd.value.str);
         case Operation::EXISTS:
-            std::cout << "executing EXISTS" << std::endl;
+            //std::cout << "executing EXISTS" << std::endl;
             return exists(cmd.key) ? Value::NewString("1") : Value::NewString("0");
         case Operation::HMSET:
-            std::cout << "executing HMSET" << std::endl;
+            //std::cout << "executing HMSET" << std::endl;
             return hmset(cmd.key, cmd.value.hash);
         case Operation::HSET:
-            std::cout << "executing HSET" << std::endl;
+            //std::cout << "executing HSET" << std::endl;
             return hset(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::HMGET:
-            std::cout << "executing HMGET" << std::endl;
+            //std::cout << "executing HMGET" << std::endl;
             return hmget(cmd.key, cmd.value.str);
         case Operation::HGETALL:
-            std::cout << "executing HGETALL" << std::endl;
+            //std::cout << "executing HGETALL" << std::endl;
             return hgetall(cmd.key);
         case Operation::ZADD:
-            std::cout << "executing ZADD" << std::endl;
+            //std::cout << "executing ZADD" << std::endl;
             return zadd(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::ZINCRBY:
-            std::cout << "executing ZINCRBY" << std::endl;
+            //std::cout << "executing ZINCRBY" << std::endl;
             return zincrby(cmd.key, cmd.value.str, cmd.oldValue.str);
         case Operation::ZSCORE:
-            std::cout << "executing ZSCORE" << std::endl;
+            //std::cout << "executing ZSCORE" << std::endl;
             return zscore(cmd.key, cmd.value.str);
         case Operation::ZREVRANGE:
         {
-            std::cout << "executing ZREVRANGE" << std::endl;
+            //std::cout << "executing ZREVRANGE" << std::endl;
             int start = 1;  // default value
             int stop = 10;  // default value
             
             try {
                 start = std::stoi(cmd.value.str);
             } catch (...) {
-                std::cout << "ZREVRANGE: Failed to convert start value, using default: " << start << std::endl;
+                //std::cout << "ZREVRANGE: Failed to convert start value, using default: " << start << std::endl;
             }
             
             try {
                 stop = std::stoi(cmd.oldValue.str);
             } catch (...) {
-                std::cout << "ZREVRANGE: Failed to convert stop value, using default: " << stop << std::endl;
+                //std::cout << "ZREVRANGE: Failed to convert stop value, using default: " << stop << std::endl;
             }
             
             return zrevrange(cmd.key, start, stop);
         }
         case Operation::ZRANGE:
         {
-            std::cout << "executing ZRANGE" << std::endl;
+            //std::cout << "executing ZRANGE" << std::endl;
             int start = 1;  // default value
             int stop = 10;  // default value
             
             try {
                 start = std::stoi(cmd.value.str);
             } catch (...) {
-                std::cout << "ZRANGE: Failed to convert start value, using default: " << start << std::endl;
+                //std::cout << "ZRANGE: Failed to convert start value, using default: " << start << std::endl;
             }
             
             try {
                 stop = std::stoi(cmd.oldValue.str);
             } catch (...) {
-                std::cout << "ZRANGE: Failed to convert stop value, using default: " << stop << std::endl;
+                //std::cout << "ZRANGE: Failed to convert stop value, using default: " << stop << std::endl;
             }
             
             return zrange(cmd.key, start, stop);
         }
         default:
-            std::cout << "cannot execute unsupported operation" << std::endl;
+            //std::cout << "cannot execute unsupported operation" << std::endl;
             std::cerr << "Operation not supported.\n";
             return NIL;
         }
@@ -122,7 +122,7 @@ namespace redis
             return store[key];
         }
         // debug for get
-        std::cout << "Key not found: " << key << "\n";
+        //std::cout << "Key not found: " << key << "\n";
         return boost::none;
     }
 
@@ -246,7 +246,7 @@ namespace redis
             store[key] = Value::NewHash({});
             store[key].type = ValueType::HASH;
         }
-        std::cout << "ZADD: Adding member " << member << " with score " << score << std::endl;
+        //std::cout << "ZADD: Adding member " << member << " with score " << score << std::endl;
         store[key].hash[member] = score;
 
         return Value::NewString("1");
@@ -278,26 +278,26 @@ namespace redis
     // ZSCORE: return the score of a member.
     Value RedisStore::zscore(const std::string &key, const std::string &member)
     {
-        std::cout << "ZSCORE: Searching for key " << key << ", member " << member << std::endl;
+        //std::cout << "ZSCORE: Searching for key " << key << ", member " << member << std::endl;
 
         if (store.find(key) != store.end() && store[key].type == ValueType::HASH)
         {
-            std::cout << "ZSCORE: Key found, hash size: " << store[key].hash.size() << std::endl;
+            //std::cout << "ZSCORE: Key found, hash size: " << store[key].hash.size() << std::endl;
 
             if (store[key].hash.find(member) != store[key].hash.end())
             {
                 std::string score = store[key].hash[member];
-                std::cout << "ZSCORE: Found score for member " << member << ": " << score << std::endl;
+                //std::cout << "ZSCORE: Found score for member " << member << ": " << score << std::endl;
                 return Value::NewString(score);
             }
             else
             {
-                std::cout << "ZSCORE: Member " << member << " not found in hash" << std::endl;
+                //std::cout << "ZSCORE: Member " << member << " not found in hash" << std::endl;
             }
         }
         else
         {
-            std::cout << "ZSCORE: Key " << key << " not found or not a hash" << std::endl;
+            //std::cout << "ZSCORE: Key " << key << " not found or not a hash" << std::endl;
         }
 
         return NIL;
@@ -364,7 +364,7 @@ namespace redis
                 double score = std::stod(score_str);
                 members_scores.emplace_back(member, score);
             } catch (...) {
-                std::cout << "ZREVRANGE: Invalid score for member " << member << ": " << score_str << std::endl;
+                //std::cout << "ZREVRANGE: Invalid score for member " << member << ": " << score_str << std::endl;
                 continue;
             }
         }
