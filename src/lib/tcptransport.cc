@@ -512,6 +512,30 @@ void TCPTransport::Run()
     Debug("event_base_dispatch returned %d.", ret);
 }
 
+void keep_alive_cb(evutil_socket_t fd, short what, void *arg) {
+    (void)fd;
+    (void)what;
+    (void)arg;
+    Debug("hit interval");
+    // Do nothing — just keeps the loop alive
+}
+
+void TCPTransport::RunTransformed()
+{
+    Debug("calling RunTransformed...");
+    auto ev = event_new(libeventBase,
+                                  -1,
+                                  EV_PERSIST | EV_TIMEOUT,
+                                  keep_alive_cb,
+                                  NULL);
+    struct timeval interval;
+    interval.tv_sec = 0;        // 0 full seconds
+    interval.tv_usec = 50000;   // 50,000 microseconds = 50 ms
+    event_add(ev, &interval);
+    int ret = event_base_dispatch(libeventBase);
+    // Debug("non-exiting even_base_loop for transformed applications returned %d.", ret);
+}
+
 void TCPTransport::Stop()
 {
     // Flush();
@@ -817,15 +841,16 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
     {
         Warning("Error on incoming TCP connection: %s",
                 evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-        bufferevent_free(bev);
-        return;
     }
-    else if (what & BEV_EVENT_ERROR)
+    else if (what & BEV_EVENT_EOF)
     {
-        Warning("EOF on incoming TCP connection.");
-        bufferevent_free(bev);
-        return;
+        Warning("EOF on incoming TCP connection. Client closed the connection.");
+        Warning("Error: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+    } else {
+        Warning("Error on incoming TCP connection, what = %d, error: %s", what, 
+                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
     }
+    bufferevent_free(bev);
 }
 
 void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,

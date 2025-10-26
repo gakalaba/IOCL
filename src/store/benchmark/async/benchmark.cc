@@ -219,6 +219,7 @@ DEFINE_uint64(message_timeout, 10000, "length of timeout for messages in ms.");
 DEFINE_uint64(max_backoff, 5000, "max time to sleep after aborting.");
 DEFINE_uint64(client_fanout, 0, "number of concurrent requests at a time issued by client");
 DEFINE_bool(client_issue_concurrent, false, "whether a client issues concurrent or sequential requests.");
+DEFINE_bool(transformed_app, false, "whether we're running a transformed python app.");
 DEFINE_uint32(client_read_percentage, 500, "percentage of reads in the workload");
 
 const std::string partitioner_args[] = {"default", "warehouse_dist_items",

@@ -291,6 +291,11 @@ bool ReplTransport::RunOne()
     }
 }
 
+void ReplTransport::RunTransformed()
+{
+    Panic("Unimplemented");
+}
+
 void ReplTransport::Run()
 {
     bool done = false;

@@ -646,6 +646,11 @@ void UDPTransport::Run()
     event_base_dispatch(libeventBase);
 }
 
+void UDPTransport::RunTransformed()
+{
+    Panic("Unimplemented");
+}
+
 void UDPTransport::Stop()
 {
     // tp.stop();

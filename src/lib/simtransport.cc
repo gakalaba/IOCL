@@ -215,6 +215,11 @@ SimulatedTransport::LookupMulticastAddress(const transport::Configuration *cfg)
     return NULL;
 }
 
+void SimulatedTransport::RunTransformed()
+{
+    Panic("Unimplemented");
+}
+
 void SimulatedTransport::Run()
 {
     LookupAddresses();

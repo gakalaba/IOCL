@@ -76,6 +76,7 @@ public:
                   int groupIdx,
                   int replicaIdx);
     void Run();
+    void RunTransformed();
     void AddFilter(int id, filter_t filter);
     void RemoveFilter(int id);
     int Timer(uint64_t ms, timer_callback_t cb);

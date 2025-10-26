@@ -81,7 +81,6 @@ def calculate_statistics(config, local_out_directory):
             client_op_latencies[i][cid] = opl
         for cid, opt in run_client_op_times.items():
             client_op_times[i][cid] = opt
-
     stats = {}
     stats['aggregate'] = {}
     norm_op_latencies, norm_op_times = calculate_all_op_statistics(

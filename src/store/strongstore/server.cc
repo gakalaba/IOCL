@@ -36,6 +36,9 @@
 #include <memory>
 #include <unordered_set>
 
+using redis::Operation;
+using redis::ValueType;
+
 namespace strongstore
 {
 
@@ -81,7 +84,7 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, bool debug_stats)
+                   Transport *transport, bool debug_stats, bool transformed)
         : PingServer(transport),
           tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -93,7 +96,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency}
+          consistency_{consistency},
+          transformed_{transformed}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -147,6 +151,11 @@ namespace strongstore
         {
             op_.ParseFromString(data);
             HandleSendOperation(remote, op_);
+        }
+        else if (type == trop_.GetTypeName())
+        {
+            trop_.ParseFromString(data);
+            HandleAsynchSendOperation(remote, trop_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -290,6 +299,21 @@ namespace strongstore
                       std::placeholders::_1, std::placeholders::_2),
             // this thing is the ptcb
             [](int, string) {}, OPERATION_TIMEOUT);
+    }
+
+    void Server::HandleAsynchSendOperation(const TransportAddress &remote, proto::TransformedLinOp &msg)
+    {
+        Debug("Calling HandleSendAsynchOperation!");
+        uint64_t transaction_id = msg.rid().client_req_id();
+
+        auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
+
+        typedef std::function<void(string)> transformed_callback;
+
+        replica_client_->SendAsynchOperation(
+            transaction_id, msg,
+            std::bind(&Server::AsynchOperationCallback, this, reply, transaction_id,
+                      std::placeholders::_1));
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -1162,6 +1186,32 @@ namespace strongstore
         delete reply;
     }
 
+    void Server::AsynchOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, string reply_str)
+    {
+        TransformedLinReply tr_reply;
+
+        tr_reply.ParseFromString(reply_str);
+        Debug("Transformed Lin REPLY");
+
+        uint64_t client_id = reply->rid.client_id();
+        uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->rid.addr();
+
+        Debug("[%lu] AsynchOperationCallback", transaction_id);
+
+        // treq_reply_.Clear();
+        // treq_reply_.mutable_rid()->set_client_id(client_id);
+        // treq_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        // treq_reply_.set_status(status);
+        // treq_reply_.set_return_value(retval);
+        // treq_reply_.set_transaction_id(transaction_id);
+
+        transport_->SendMessage(this, *remote, tr_reply);
+
+        delete remote;
+        delete reply;
+    }
+
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {
         // Debug("[%lu] Received PREPARE_OK callback: %d %d", transaction_id, shard_idx_, status);
@@ -1646,6 +1696,7 @@ namespace strongstore
 
         Request request;
         LinearizeableOperation linreq;
+        TransformedLinRequest translinreq;
         if (consistency_ != LIN)
         {
             request.ParseFromString(op);
@@ -1661,10 +1712,17 @@ namespace strongstore
                 Panic("Unrecognized operation.");
             }
         } else {
-            linreq.ParseFromString(op);
-            replicate = true;
-            response = op;
-            Debug("was able to parse LinearizeableOperation!");
+            if (!transformed_) {
+                linreq.ParseFromString(op);
+                replicate = true;
+                response = op;
+                Debug("was able to parse LinearizeableOperation!");
+            } else {
+                translinreq.ParseFromString(op);
+                replicate = true;
+                response = op;
+                Debug("was able to parse TransformedLinRequest!");
+            }
         }
     }
 
@@ -1678,10 +1736,16 @@ namespace strongstore
     {
         Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
+        TransformedLinRequest translinreq;
         if (consistency_ == LIN)
         {
-            linreq.ParseFromString(op);
-            ReplicaUpcallAppRequest(opnum, linreq, response);
+            if (!transformed_) {
+                linreq.ParseFromString(op);
+                ReplicaUpcallAppRequest(opnum, linreq, response);
+            } else {
+                translinreq.ParseFromString(op);
+                ReplicaUpcallTransformed(opnum, translinreq, response);
+            }
             return;
         }
 
@@ -1848,6 +1912,186 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    void Server::ReplicaUpcallTransformed(opnum_t opnum, TransformedLinOp &op, string &response)
+    {
+        Debug("Inside new ReplicaUpcall for ASYNCHRequests");
+        redis::Command c;
+
+        // Setting the command key
+        c.key = std::to_string(op.key());
+
+        // Setting the command op
+        switch (op.mutable_op()->op())
+        {
+        case AsynchOperation::PUT:
+            c.op = Operation::PUT;
+            break;
+        case AsynchOperation::GET:
+            c.op = Operation::GET;
+            break;
+        case AsynchOperation::SET:
+            c.op = Operation::SET; 
+            break;
+        case AsynchOperation::INCR:
+            c.op = Operation::INCR;
+            break;
+        case AsynchOperation::SADD:
+            c.op = Operation::SADD;
+            break;
+        case AsynchOperation::EXISTS:
+            c.op = Operation::EXISTS;
+            break;
+        case AsynchOperation::HMGET:
+            c.op = Operation::HMGET;
+            break;
+        case AsynchOperation::HSET:
+            c.op = Operation::HSET;
+            break;
+        case AsynchOperation::HMSET:
+            c.op = Operation::HMSET;
+            break;
+        case AsynchOperation::HGETALL:
+            c.op = Operation::HGETALL;
+            break;
+        case AsynchOperation::ZADD:
+            c.op = Operation::ZADD;
+            break;
+        case AsynchOperation::ZINCRBY:
+            c.op = Operation::ZINCRBY;
+            break;
+        case AsynchOperation::ZSCORE:
+            c.op = Operation::ZSCORE;
+            break;
+        case AsynchOperation::ZRANGE:
+            c.op = Operation::ZRANGE;
+            break;
+        case AsynchOperation::ZREVRANGE:
+            c.op = Operation::ZREVRANGE;
+            break;
+        default:
+            Panic("Not implemented ops yet");
+        }
+
+        // Setting the command oldValue
+        switch (op.mutable_oldvalue()->type())
+        {
+        case AsynchValue::STRING:
+            c.oldValue.type = ValueType::STRING;
+            c.oldValue.str = op.mutable_oldvalue()->str();
+            break;
+        case AsynchValue::LIST:
+            c.oldValue.type = ValueType::LIST;
+            for (int i = 0; i < op.mutable_oldvalue()->list_size(); ++i)
+            {
+                c.oldValue.list.push_back(op.mutable_oldvalue()->list(i));
+            }
+            break;
+        case AsynchValue::SET:
+            c.oldValue.type = ValueType::SET;
+            for (int i = 0; i < op.mutable_oldvalue()->set_size(); ++i)
+            {
+                c.oldValue.set.insert(op.mutable_oldvalue()->set(i));
+            }
+            break;
+        case AsynchValue::HASH:
+            c.oldValue.type = ValueType::HASH;
+            for (const auto &entry : op.mutable_oldvalue()->hash())
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                c.oldValue.hash[k] = v;
+            }
+            break;
+
+        default:
+            Panic("Not a valid Value type!");
+            break;
+        }
+
+        // Setting the command value
+        switch (op.mutable_newvalue()->type())
+        {
+        case AsynchValue::STRING:
+            c.value.type = ValueType::STRING;
+            c.value.str = op.mutable_newvalue()->str();
+            break;
+        case AsynchValue::LIST:
+            c.value.type = ValueType::LIST;
+            for (int i = 0; i < op.mutable_newvalue()->list_size(); ++i)
+            {
+                c.value.list.push_back(op.mutable_newvalue()->list(i));
+            }
+            break;
+        case AsynchValue::SET:
+            c.value.type = ValueType::SET;
+            for (int i = 0; i < op.mutable_newvalue()->set_size(); ++i)
+            {
+                c.value.set.insert(op.mutable_newvalue()->set(i));
+            }
+            break;
+        case AsynchValue::HASH:
+            c.value.type = ValueType::HASH;
+            for (const auto &entry : op.mutable_newvalue()->hash())
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                c.value.hash[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
+
+        // Execute the command
+        int status = REPLY_OK;
+        Debug("calling execute!");
+        redis::Value retval = redis_store_.execute(c);
+
+        Debug("Ok, returned from execute!");
+        TransformedLinReply reply;
+        reply.set_status(status);
+        reply.mutable_rid()->set_client_id(req.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        // Setting the return value!
+        switch (retval.type)
+        {
+        case ValueType::STRING:
+            reply.mutable_return_value()->set_type(AsynchValue::STRING);
+            reply.mutable_return_value()->set_str(retval.str);
+            break;
+        case ValueType::LIST:
+            reply.mutable_return_value()->set_type(AsynchValue::LIST);
+            for (string s : retval.list)
+            {
+                reply.mutable_return_value()->add_list(s);
+            }
+            break;
+        case ValueType::SET:
+            reply.mutable_return_value()->set_type(AsynchValue::SET);
+            for (string s : retval.set)
+            {
+                reply.mutable_return_value()->add_set(s);
+            }
+            break;
+        case ValueType::HASH:
+            reply.mutable_return_value()->set_type(AsynchValue::HASH);
+            for (const auto &entry : retval.hash)
+            {
+                const std::string &k = entry.first;
+                const std::string &v = entry.second;
+
+                (*reply.mutable_return_value()->mutable_hash())[k] = v;
+            }
+            break;
+        default:
+            Panic("Not a valid Value type!");
+        }
+        reply.SerializeToString(&response);
+        Debug("the response was %s", response.c_str());
+    }
+
     void Server::UnloggedUpcall(const string &op, string &response)
     {
         NOT_IMPLEMENTED();
@@ -1858,7 +2102,11 @@ namespace strongstore
     {
         if (consistency_ == LIN)
         {
-            linearizeable_kv_store_.put(key, value);
+            if (!transformed_) {
+                linearizeable_kv_store_.put(key, value);
+            } else {
+                redis_store_.put(key, value);
+            }
         }
         else {
             store_.put(key, value, {timestamp, 0});

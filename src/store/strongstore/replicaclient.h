@@ -58,6 +58,7 @@ namespace strongstore
         // IOCL Project
         typedef std::function<void(int, string)> op_callback;
         typedef std::function<void(int, string)> op_timeout_callback;
+        typedef std::function<void(string)> transformed_callback;
 
     public:
         /* Constructor needs path to shard config. */
@@ -70,6 +71,9 @@ namespace strongstore
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout);
 
+        void SendAsynchOperation(uint64_t request_id,
+                               strongstore::proto::TransformedLinOp &msg,
+                               transformed_callback trcb);
 
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,
@@ -124,6 +128,7 @@ namespace strongstore
             PendingOperation(uint64_t reqId) : PendingRequest(reqId) {}
             op_callback ocb;
             op_timeout_callback otcb;
+            transformed_callback trcb;
         };
 
         bool PrepareCallback(uint64_t reqId, const std::string &,
@@ -131,6 +136,9 @@ namespace strongstore
 
         bool SendOperationCallback(uint64_t opId, const std::string &,
                                  const std::string &);
+
+        bool AsynchOperationCallback(uint64_t opId, const std::string &,
+                                  const std::string &);
 
         bool CommitCallback(uint64_t reqId, const std::string &,
                             const std::string &);

@@ -96,6 +96,44 @@ namespace strongstore
         return true;
     }
 
+    void ReplicaClient::SendAsynchOperation(uint64_t request_id,
+                                          TransformedLinOp &msg,
+                                          transformed_callback trcb)
+    {
+        Debug("[shard %i] SendAsynchOperation sending: %s", shard_idx_, msg);
+
+        // create request
+        string asynch_op_str;
+
+        msg.SerializeToString(&asynch_op_str);
+
+        uint64_t reqId = lastReqId++;
+        PendingOperation *pendingOperation = new PendingOperation(reqId);
+        pendingOperations[reqId] = pendingOperation;
+        pendingOperation->trcb = trcb;
+
+        client->Invoke(
+            asynch_op_str,
+            bind(&ReplicaClient::AsynchOperationCallback, this, pendingOperation->reqId,
+                 std::placeholders::_1, std::placeholders::_2));
+    }
+
+    /* Callback from a shard replica on sendoperation completion. */
+    bool ReplicaClient::AsynchOperationCallback(uint64_t opId, const string &request_str,
+                                              const string &reply_str)
+    {
+        Debug("[shard %i] Received SENDOPERATION callback [%d]", shard_idx_);
+        auto itr = this->pendingOperations.find(opId);
+        ASSERT(itr != this->pendingOperations.end());
+        PendingOperation *pendingOperation = itr->second;
+        transformed_callback trcb = pendingOperation->trcb;
+        this->pendingOperations.erase(itr);
+        delete pendingOperation;
+        trcb(reply_str);
+
+        return true;
+    }
+
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
                                 const Timestamp &prepare_ts, int coordinator,

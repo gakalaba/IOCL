@@ -24,6 +24,7 @@
 #include "store/common/partitioner.h"
 #include "store/common/stats.h"
 #include "store/common/timestamp.h"
+#include "store/common/frontend/request_utils.h"
 
 enum transaction_status_t {
     COMMITTED = 0,
@@ -52,6 +53,7 @@ typedef std::function<void(int, const std::string &, const std::string &)>
 
 typedef std::function<void(int, const std::string &)> op_callback;
 typedef std::function<void(int, const std::string &)> op_timeout_callback;
+typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
 typedef std::function<void(transaction_status_t)> commit_callback;
 typedef std::function<void()> commit_timeout_callback;
@@ -108,6 +110,10 @@ class Client {
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
 
     virtual bool IsLinearizeable() = 0;
+
+    virtual uint64_t SendAsynchOperation(Session &session, request_utils::Operation optype,
+                                       uint64_t key, request_utils::Value newValue, request_utils::Value oldValue,
+                                       transformed_callback trcb) = 0;
 
     inline Stats &GetStats() { return stats; }
 

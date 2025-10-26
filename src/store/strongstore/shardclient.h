@@ -57,6 +57,7 @@
 #include "store/common/transaction.h"
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
+#include "store/common/frontend/request_utils.h"
 
 namespace strongstore
 {
@@ -79,6 +80,7 @@ namespace strongstore
 
     typedef std::function<void(int, const std::string &)> op_callback;
     typedef std::function<void(int, const std::string &)> op_timeout_callback;
+    typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -124,11 +126,15 @@ namespace strongstore
         void Put(uint64_t transaction_id, const std::string &key, const std::string &value,
                  put_callback pcb, put_timeout_callback ptcb,
                  uint32_t timeout);
-        
+
         void SendOperation(uint64_t app_request_id, const std::string op,
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout);
+
+        void SendAsynchRequest(uint64_t req_id, request_utils::Operation optype,
+                                uint64_t key, request_utils::Value oldValue,
+                                request_utils::Value newValue, transformed_callback trcb);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -169,6 +175,17 @@ namespace strongstore
             PendingRequest(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}
             uint64_t transaction_id;
             uint64_t req_id;
+        };
+        struct PendingAsynchOperation
+        {
+            PendingAsynchOperation(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}
+            uint64_t transaction_id;
+            uint64_t req_id;
+            request_utils::Operation op;
+            uint64_t key;
+            request_utils::Value oldVal;
+            request_utils::Value newVal;
+            transformed_callback trcb;
         };
         struct PendingGet : public PendingRequest
         {
@@ -233,6 +250,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
+        void HandleAsynchOperationReply(const proto::TransformedLinReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -247,6 +265,7 @@ namespace strongstore
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
         std::unordered_map<uint64_t, PendingOperation *> pendingOps;
+        std::unordered_map<uint64_t, PendingAsynchOperation *> pendingAsynchOps;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -256,6 +275,7 @@ namespace strongstore
 
         proto::Get get_;
         proto::LinearizeableOperation op_;
+        proto::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -266,6 +286,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
+        proto::TransformedLinReply trop_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

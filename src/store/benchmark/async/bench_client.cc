@@ -26,8 +26,10 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/bench_client.h"
+#include <thread>
 
 #include <sys/time.h>
+#include <sys/eventfd.h>
 
 #include <algorithm>
 #include <sstream>
@@ -39,8 +41,11 @@
 #include "lib/timeval.h"
 #include "lib/transport.h"
 #include "store/strongstore/client.h"
+#include <fcntl.h>
 
 DEFINE_LATENCY(op);
+
+using request_utils::Value;
 
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
                                  Transport &transport, uint64_t id,
@@ -52,6 +57,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  uint32_t abortBackoff, bool retryAborted,
                                  uint32_t maxBackoff, uint32_t maxAttempts,
                                  uint64_t fanout, bool issueConcurrent,
+                                 bool transformed,
                                  const std::string &latencyFilename)
     : transport_(transport),
       session_states_{},
@@ -77,7 +83,9 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       cooldownStarted{false},
       mode_{mode},
       fanout{fanout},
-      issueConcurrent{issueConcurrent}
+      issueConcurrent{issueConcurrent},
+      isTransformed{transformed},
+      replies_map_{}
 {
     Notice("starting benchclient, issueConcurrent: %d; fanout: %lu", issueConcurrent, fanout);
     if (arrival_rate <= 0)
@@ -91,6 +99,61 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
 BenchmarkClient::~BenchmarkClient()
 {
     Debug("session_states_.size(): %lu", session_states_.size());
+    auto search = session_states_.find(0);
+    if (search == session_states_.end()) {
+        //std::cout << "[AwaitAsynchResponse] ERROR: session_id " << 0 << " not found in session_states_!" << std::endl;
+    }
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+}
+
+void BenchmarkClient::StartTransformedEventLoop()
+{
+    Debug("PlsWork being called....");
+    transport_.RunTransformed();
+}
+
+uint64_t BenchmarkClient::CustomInit()
+{
+
+    Debug("[%lu] Starting Transformed App Client", n_sessions_started_);
+    n_sessions_started_++;
+
+    std::size_t client_index = n_sessions_started_ % clients_.size();
+    auto &client = *clients_[client_index];
+
+    auto &session = client.BeginSession();
+    auto sid = session.id();
+
+    Debug("session id: %lu", sid);
+    // //std::cout << "[CustomInit] created session" << std::endl;
+
+    // don't need these two -> dummy values to call for emplace 
+    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    auto appreq = GetNextAppRequest();
+    // don't need
+    // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
+    // move to sendAsync function, GetFanout() --> 0 
+    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+    // //std::cout << "[CustomInit] emplace called" << std::endl;
+
+    // auto &ss = session_states_.find(sid)->second;
+    // don't need
+    //_Latency_StartRec(ss.lat());
+
+    auto bcb = []() {}; // Don't need to jump right into issueing requests, this will be done by the python app
+    auto btcb = []() {};
+    // remove
+    // client.BeginIOCL(session, bcb, btcb, timeout_);
+    // Debug("ANJAAAAAA we should be starting the event loop....");
+    // Start event loop in a background thread
+    // std::thread(transport_.RunTransformed).detach();
+    std::thread(std::bind(&BenchmarkClient::StartTransformedEventLoop, this)).detach();
+    // //std::cout << "do we print after run transformed?" << std::endl;
+    return sid;
 }
 
 void BenchmarkClient::Start(bench_done_callback bdcb)
@@ -921,4 +984,177 @@ void BenchmarkClient::Finish()
 
     uint64_t cooldown_us = cooldownSec * 1e6;
     transport_.TimerMicro(cooldown_us, std::bind(&BenchmarkClient::Cleanup, this));
+}
+
+// Transformed IOCL Apps!!
+std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, Value newValue, Value oldValue)
+{
+    // //std::cout << "[SendAsynchRequest] Called with session_id=" << session_id
+    //           << ", opType=" << static_cast<int>(opType)
+    //           << ", key=" << key << std::endl;
+
+    Debug("SendAsynchOperation");
+    auto search = session_states_.find(session_id);
+    if (search == session_states_.end()) {
+        std::cout << "[SendAsynchOperation] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+    }
+    ASSERT(search != session_states_.end());
+
+    auto &ss = search->second;
+    auto &session = ss.session();
+
+    auto rcb = std::bind(&BenchmarkClient::AsynchOperationCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
+    auto client_index = ss.current_client_index();
+    auto &client = *clients_[client_index];
+
+    // //std::cout << "[SendAsynchRequest] About to dispatch operation..." << std::endl;
+
+    switch (opType)
+    {
+    case request_utils::Operation::GET:
+        // //std::cout << "[SendAsynchRequest] Operation: GET" << std::endl;
+        break;
+
+    case request_utils::Operation::PUT:
+        // //std::cout << "[SendAsynchRequest] Operation: PUT" << std::endl;
+        break;
+
+    case request_utils::Operation::INCR:
+        // //std::cout << "[SendAsynchRequest] Operation: INCR" << std::endl;
+        break;
+
+    case request_utils::Operation::SET:
+        // //std::cout << "[SendAsynchRequest] Operation: SET" << std::endl;
+        break;
+
+    case request_utils::Operation::SADD:
+        // //std::cout << "[SendAsynchRequest] Operation: SADD" << std::endl;
+        break;
+
+    case request_utils::Operation::EXISTS:
+        // //std::cout << "[SendAsynchRequest] Operation: EXISTS" << std::endl;
+        break;
+
+    case request_utils::Operation::HMGET:
+        // //std::cout << "[SendAsynchRequest] Operation: HMGET" << std::endl;
+        break;
+
+    case request_utils::Operation::HSET:
+        // //std::cout << "[SendAsynchRequest] Operation: HSET" << std::endl;
+        break;
+
+    case request_utils::Operation::HMSET:
+        // //std::cout << "[SendAsynchRequest] Operation: HMSET" << std::endl;
+        break;
+
+    case request_utils::Operation::HGETALL:
+        // //std::cout << "[SendAsynchRequest] Operation: HGETALL" << std::endl;
+        break;
+
+    case request_utils::Operation::ZADD:
+        // //std::cout << "[SendAsynchRequest] Operation: ZADD" << std::endl;
+        break;
+
+    case request_utils::Operation::ZINCRBY:
+        // //std::cout << "[SendAsynchRequest] Operation: ZINCRBY" << std::endl;
+        break;
+
+    case request_utils::Operation::ZSCORE:
+        // //std::cout << "[SendAsynchRequest] Operation: ZSCORE" << std::endl;
+        break;
+
+    case request_utils::Operation::ZRANGE:
+        // //std::cout << "[SendAsynchRequest] Operation: ZRANGE" << std::endl;
+        break;
+
+    case request_utils::Operation::ZREVRANGE:
+        // //std::cout << "[SendAsynchRequest] Operation: ZEVRANGE" << std::endl;
+        break;
+
+    default:
+        //std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
+        Panic("NOT YET SUPPORTEDunsupported operation type %lu", opType);
+    }
+    Debug("here?:");
+    auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb);
+    // //std::cout << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
+    return std::make_tuple(true, Value(std::to_string(commandId)));
+}
+
+void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
+{
+    // std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
+    replies_map_[commandId] = retval;
+    
+    auto efd_it = efd_map_.find(commandId);
+    if (efd_it != efd_map_.end()) {
+        int efd = efd_it->second;
+        // std::cerr << "[AsynchRequestCallback] Found efd=" << efd << " for commandId=" << commandId << std::endl;
+        
+        // Verify the efd is still valid
+        int flags = fcntl(efd, F_GETFD);
+        if (flags == -1) {
+            // std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
+            efd_map_.erase(efd_it);
+            return;
+        }
+        
+        efd_map_.erase(efd_it);
+        
+        uint64_t val = 1;
+        ssize_t written = write(efd, &val, sizeof(val));
+    } else {
+        // std::cerr << "[AsynchRequestCallback] No efd found for commandId=" << commandId << std::endl;
+    }
+}
+
+std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId)
+{
+    // Debug("Called AwaitAsynchResponse!");
+
+    // //std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
+    //           << ", commandId=" << commandId << std::endl;
+
+    // TODO need to increment the request id!!
+    if (replies_map_.find(commandId) != replies_map_.end())
+    {
+        Debug("Got a response!");
+        // //std::cout << "[AwaitAsynchResponse] Got a response for commandId=" << commandId << std::endl;
+
+        auto search = session_states_.find(session_id);
+        if (search == session_states_.end()) {
+            //std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+        }
+        ASSERT(search != session_states_.end());
+
+        auto &ss = search->second;
+        // TODO ANJA somehwere in here we need to increment the transaction id!!
+        // //std::cout << "[AwaitAsynchResponse] Returning value for commandId=" << commandId << std::endl;
+
+        // right now we don't delete the value... for the purposes of double await? TODO ANJA see with austin
+        return std::make_tuple(replies_map_[commandId], -1);
+    }
+    // Debug("response not available!");
+    // //std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", creating efd..." << std::endl;
+    
+    // Create the event file descriptor
+    int efd = eventfd(0, EFD_CLOEXEC);
+    if (efd == -1) {
+        // //std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
+        Panic("eventfd creation failed");
+    }
+    // Debug("making an efd! it has value %d", efd);
+
+    // Log the created efd and the commandId it maps to
+    // //std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
+
+    // Map the efd to the commandId
+    efd_map_[commandId] = efd;
+    // Debug("making an efd! it has value %d and is mapped to commandId %d", efd, commandId);
+    // Debug("the side of the efd_map_ is %lu", efd_map_.size());
+    // // //std::cout << "[AwaitAsynchResponse] Mapped efd=" << efd << " to commandId=" << commandId << std::endl;
+
+    // Return the Value object and the efd
+    return std::make_tuple(Value{}, efd);
 }

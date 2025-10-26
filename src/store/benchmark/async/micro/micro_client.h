@@ -60,6 +60,7 @@ namespace micro
                     uint64_t fanout,
                     bool issueConcurrent,
                     uint32_t read_percentage,
+                    bool isTransformed = false,
                     const std::string &latencyFilename = "latency");
 
         virtual ~MicroClient();

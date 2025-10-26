@@ -25,3 +25,38 @@ message TransactionMessage {
     repeated ReadMessage readset = 2;
     repeated WriteMessage writeset = 3;
 }
+
+message AsynchValue {
+    enum ValueType {
+        STRING = 1;
+        LIST = 2;
+        SET = 3;
+        HASH = 4;
+    }
+    required ValueType type = 1;
+    optional string str = 2;
+    repeated string list = 3;
+    repeated string set = 4;
+    map<string, string> hash = 5;
+}
+
+message AsynchOperation {
+    enum OperationType {
+        PUT = 1;
+        GET = 2;
+        INCR = 3;
+        SET = 4;
+        SADD = 5;
+        EXISTS = 6;
+        HMGET = 7;
+        HSET = 8;
+        HMSET = 9;
+        HGETALL = 10;
+        ZADD = 11;
+        ZINCRBY = 12;
+        ZSCORE = 13;
+        ZRANGE = 14;
+        ZREVRANGE = 15;
+     }
+     required OperationType op = 1;
+}

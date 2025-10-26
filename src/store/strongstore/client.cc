@@ -642,6 +642,46 @@ namespace strongstore
         sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout);
     }
 
+    uint64_t Client::SendAsynchOperation(Session &s, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb)
+    {
+        auto &session = static_cast<StrongSession &>(s);
+
+        if (session.transaction_id() != static_cast<uint64_t>(-1))
+        {
+            sessions_by_transaction_id_.erase(session.transaction_id());
+        }
+
+        auto req_id = next_transaction_id_++;
+        // austin: we're replacing this with next_transaction_id_++?
+        // auto req_id = session.transaction_id();
+
+        // //std::cout << "[Client::SendAsynchRequest] Called with req_id=" << req_id
+        //         << ", optype=" << static_cast<int>(optype)
+        //         << ", key=" << key << std::endl;
+
+        // Debug("SendAsynchRequest request_id = [%lu]", req_id);
+
+        ASSERT(session.executing());
+
+        // Contact the appropriate shard to set the value.
+        int i = (*part_)(key, nshards_);
+
+        // //std::cout << "[Client::SendAsynchRequest] Shard index: " << i << std::endl;
+
+        auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, request_utils::Value retval, int req_id)
+        {
+            // //std::cout << "[Client::SendAsynchRequest::rcb1] Callback for req_id=" << req_id << std::endl;
+            session.get().set_executing();
+            return trcb(s, retval, req_id);
+        };
+
+        // //std::cout << "[Client::SendAsynchRequest] Sending request to shard client..." << std::endl;
+        sclients_[i]->SendAsynchOperation(req_id, optype, key, oldValue, newValue, rcb1);
+        // //std::cout << "[Client::SendAsynchRequest] Request sent." << std::endl;
+
+        return req_id;
+    }
+
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
     {

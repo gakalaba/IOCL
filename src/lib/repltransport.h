@@ -246,6 +246,7 @@ public:
 
     // Launch the REPL.
     virtual void Run() override;
+    virtual void RunTransformed() override;
     virtual void Stop() override;
     virtual void Close(TransportReceiver *receiver) override;
 

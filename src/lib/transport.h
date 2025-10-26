@@ -115,6 +115,7 @@ public:
     virtual bool CancelTimer(int id) = 0;
     virtual void CancelAllTimers() = 0;
     virtual void Run() = 0;
+    virtual void RunTransformed() = 0;
     virtual void Stop() = 0;
     virtual void Close(TransportReceiver *receiver) = 0;
     virtual void Flush();

@@ -101,7 +101,7 @@ def set_file_descriptor_limit(limit, remote_user, remote_host):
 
 
 def kill_remote_process_by_name_cmd(remote_process_name, kill_args):
-    cmd = 'pkill%s %s' % (kill_args, remote_process_name)
+    cmd = 'pkill %s %s' % (kill_args, remote_process_name)
     return cmd
 
 

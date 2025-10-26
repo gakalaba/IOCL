@@ -45,6 +45,7 @@ namespace micro
                              int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
                              bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, uint64_t fanout, bool issueConcurrent,
                              uint32_t read_percentage,
+                             bool isTransformed,
                              const std::string &latencyFilename)
         : BenchmarkClient(clients, timeout, transport, id,
                           mode,
@@ -52,7 +53,7 @@ namespace micro
                           arrival_rate, think_time, stay_probability,
                           mpl,
                           expDuration, warmupSec, cooldownSec, abortBackoff,
-                          retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, latencyFilename),
+                          retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, isTransformed, latencyFilename),
           keySelector(keySelector),
           read_percentage_{read_percentage}
     {

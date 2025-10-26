@@ -44,6 +44,7 @@
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
 #include "store/common/backend/kvstore.h"
+#include "store/common/backend/redis_store.h"
 #include "store/common/truetime.h"
 #include "store/server.h"
 #include "store/strongstore/common.h"
@@ -115,7 +116,8 @@ namespace strongstore
         Server(Consistency consistency, const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport,
-               bool debug_stats);
+               bool debug_stats,
+               bool transformed = false);
         ~Server();
 
         // Override TransportReceiver
@@ -214,6 +216,7 @@ namespace strongstore
 
         void HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg);
 
+        void HandleAsynchSendOperation(const TransportAddress &remote, proto::TransformedLinOp &msg);
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -254,6 +257,7 @@ namespace strongstore
                              Timestamp timestamp);
         void SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
                                  string retval);
+        void AsynchOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, string reply_str);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -278,6 +282,7 @@ namespace strongstore
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
         void ReplicaUpcallAppRequest(opnum_t opnum, strongstore::proto::LinearizeableOperation &op, string &response);
+        void ReplicaUpcallTransformed(opnum_t opnum, strongstore::proto::TransformedLinOp &op, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -288,6 +293,8 @@ namespace strongstore
         LockTable locks_;
         VersionedKVStore<TimestampID, std::string> store_;
         KVStore linearizeable_kv_store_;
+        redis::RedisStore redis_store_;
+        bool transformed_;
 
         const transport::Configuration &shard_config_;
         const transport::Configuration &replica_config_;
@@ -307,6 +314,7 @@ namespace strongstore
 
         proto::Get get_;
         proto::LinearizeableOperation op_;
+        proto::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -316,6 +324,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
+        proto::TransformedLinReply trop_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

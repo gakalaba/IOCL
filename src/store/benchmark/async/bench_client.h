@@ -39,6 +39,7 @@
 #include "lib/transport.h"
 #include "store/common/frontend/async_transaction.h"
 #include "store/common/frontend/async_apprequest.h"
+#include "store/common/frontend/request_utils.h"
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
@@ -67,15 +68,23 @@ public:
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
                     uint64_t fanout, bool issueConcurrent,
+                    bool tranformed = false,
                     const std::string &latencyFilename = "");
     virtual ~BenchmarkClient();
 
+    void StartTransformedEventLoop();
+
     void Start(bench_done_callback bdcb);
+    uint64_t CustomInit();
+
     void OnReply(uint64_t transaction_id, int result, bool erase_session);
 
     void SendNext();
     void SendNextAppRequest();
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
+
+    std::tuple<bool, request_utils::Value> SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue);
+    std::tuple<request_utils::Value, uint64_t> AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId);
 
     inline bool IsFullyDone() { return done; }
 
@@ -196,6 +205,9 @@ private:
                                 int status, const std::string &retval);
     void SendOperationTimeout(const uint64_t session_id,
                             int status, const std::string &retval);
+    void AsynchOperationCallback(const uint64_t session_id,
+                               int status, const request_utils::Value retval,
+                               int commandId);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
     void EndAppRequestCallback(const uint64_t session_id);
@@ -204,6 +216,7 @@ private:
     void AbortTimeout();
 
     inline bool IsLinearizeable() {return clients_[0]->IsLinearizeable(); };
+    inline bool IsTransformed() { return isTransformed; };
 
     void Finish();
     void WarmupDone();
@@ -249,6 +262,10 @@ private:
     // IOCL Project stuff
     bool issueConcurrent = false;
     uint64_t fanout = 0;
+    // Transformed App stuff
+    bool isTransformed;
+    std::unordered_map<uint64_t, request_utils::Value> replies_map_;
+    std::unordered_map<uint64_t, int> efd_map_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

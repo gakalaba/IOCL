@@ -52,7 +52,7 @@ namespace retwis
                           arrival_rate, think_time, stay_probability,
                           mpl,
                           expDuration, warmupSec, cooldownSec, abortBackoff,
-                          retryAborted, maxBackoff, maxAttempts, 0, issueConcurrent, latencyFilename),
+                          retryAborted, maxBackoff, maxAttempts, 0, issueConcurrent, false, latencyFilename),
           keySelector(keySelector)
     {
     }

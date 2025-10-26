@@ -186,3 +186,17 @@ message LinearizeableReply {
     required int32 status = 3;
     required string return_value = 4;
 }
+
+message TransformedLinOp {
+    required RequestIDMessage rid = 1;
+    required AsynchOperation op = 2;
+    required uint64 key = 3;
+    required AsynchValue oldValue = 4;
+    required AsynchValue newValue = 5;
+}
+
+message TransformedLinReply {
+    required RequestIDMessage rid = 1;
+    required AsynchValue return_value = 2;
+    required uint64 status = 3;
+}

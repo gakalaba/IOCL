@@ -6,6 +6,7 @@ project(TAPIR VERSION 1.0)
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -43,3 +44,6 @@ add_subdirectory(replication)
 
 # add store executables
 add_subdirectory(store)
+
+# add Python bindings
+add_subdirectory(iocl_python)
