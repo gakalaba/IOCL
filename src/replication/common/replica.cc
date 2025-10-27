@@ -78,4 +78,10 @@ void Replica::UnloggedUpcall(const string &op, string &res) {
     app->UnloggedUpcall(op, res);
 }
 
+// IOCL
+bool Replica::CommuteFn(const string &op1, const string &op2)
+{
+    return app->CommuteFn(op1, op2);
+}
+
 }  // namespace replication

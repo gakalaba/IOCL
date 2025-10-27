@@ -41,55 +41,60 @@
 
 namespace replication {
 
-// A client's request may fail for various reasons. For example, if enough
-// replicas are down, a client's request may time out. An ErrorCode indicates
-// the reason that a client's request failed.
-enum class ErrorCode {
-    // For whatever reason (failed replicas, slow network), the request took
-    // too long and timed out.
-    TIMEOUT,
+    // A client's request may fail for various reasons. For example, if enough
+    // replicas are down, a client's request may time out. An ErrorCode indicates
+    // the reason that a client's request failed.
+    enum class ErrorCode {
+        // For whatever reason (failed replicas, slow network), the request took
+        // too long and timed out.
+        TIMEOUT,
 
-    // For IR, if a client issues a consensus operation and receives a majority
-    // of replies and confirms in different views, then the operation fails.
-    MISMATCHED_CONSENSUS_VIEWS
-};
+        // For IR, if a client issues a consensus operation and receives a majority
+        // of replies and confirms in different views, then the operation fails.
+        MISMATCHED_CONSENSUS_VIEWS
+    };
 
-std::string ErrorCodeToString(ErrorCode err);
+    std::string ErrorCodeToString(ErrorCode err);
 
-class Client : public TransportReceiver {
-   public:
-    using continuation_t =
-        std::function<bool(const string &request, const string &reply)>;
-    using error_continuation_t =
-        std::function<void(const string &request, ErrorCode err)>;
+    class Client : public TransportReceiver {
+    public:
+        using continuation_t =
+            std::function<bool(const string &request, const string &reply)>;
+        using error_continuation_t =
+            std::function<void(const string &request, ErrorCode err)>;
 
-    static const uint32_t DEFAULT_UNLOGGED_OP_TIMEOUT = 1000;  // milliseconds
+        static const uint32_t DEFAULT_UNLOGGED_OP_TIMEOUT = 1000;  // milliseconds
 
-    Client(const transport::Configuration &config, Transport *transport,
-           int group, uint64_t clientid = 0);
-    virtual ~Client();
+        Client(const transport::Configuration &config, Transport *transport,
+            int group, uint64_t clientid = 0);
+        virtual ~Client();
 
-    virtual void Invoke(const string &request, continuation_t continuation,
-                        error_continuation_t error_continuation = nullptr) = 0;
-    virtual void InvokeUnlogged(
-        int replicaIdx, const string &request, continuation_t continuation,
-        error_continuation_t error_continuation = nullptr,
-        uint32_t timeout = DEFAULT_UNLOGGED_OP_TIMEOUT) = 0;
-    virtual void InvokeUnloggedAll(
-        const string &request, continuation_t continuation,
-        error_continuation_t error_continuation = nullptr,
-        uint32_t timeout = DEFAULT_UNLOGGED_OP_TIMEOUT) = 0;
+        virtual void Invoke(const string &request, continuation_t continuation,
+                            error_continuation_t error_continuation = nullptr) = 0;
+        virtual void InvokeUnlogged(
+            int replicaIdx, const string &request, continuation_t continuation,
+            error_continuation_t error_continuation = nullptr,
+            uint32_t timeout = DEFAULT_UNLOGGED_OP_TIMEOUT) = 0;
+        virtual void InvokeUnloggedAll(
+            const string &request, continuation_t continuation,
+            error_continuation_t error_continuation = nullptr,
+            uint32_t timeout = DEFAULT_UNLOGGED_OP_TIMEOUT) = 0;
 
-    virtual void ReceiveMessage(const TransportAddress &remote,
-                                const string &type, const string &data,
-                                void *meta_data) override;
+        virtual void ReceiveMessage(const TransportAddress &remote,
+                                    const string &type, const string &data,
+                                    void *meta_data) override;
+        virtual void InvokeIOCL(const string &request, uint64_t myshardtag,
+                        std::vector<uint64_t> &preds,
+                        std::vector<uint64_t> &predshardlist,
+                        continuation_t continuation,
+                        error_continuation_t error_continuation = nullptr);
 
-   protected:
-    transport::Configuration config;
-    Transport *transport;
-    const int group;
-    uint64_t clientid;
-};
+    protected:
+        transport::Configuration config;
+        Transport *transport;
+        const int group;
+        uint64_t clientid;
+    };
 
 }  // namespace replication
 
