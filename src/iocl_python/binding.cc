@@ -532,7 +532,8 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         expDuration, warmupSec, cooldownSec, tputInterval,
         abortBackoff, retryAborted, maxBackoff, maxAttempts,
         fanout,
-        issueConcurrent
+        issueConcurrent,
+        0
     );
 
     return std::unique_ptr<BenchmarkClient>(bench);

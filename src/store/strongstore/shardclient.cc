@@ -307,7 +307,7 @@ namespace strongstore
         uint64_t req_id = last_req_id_++;
         // Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
         PendingAsynchOperation *pendingOp = new PendingAsynchOperation(transaction_id, req_id);
-        pendingAsynchOps[req_id] = pendingOp;
+        pendingAsynchOperations[req_id] = pendingOp;
         pendingOp->op = optype;
         pendingOp->key = key;
         pendingOp->oldVal = oldValue;
@@ -527,8 +527,8 @@ namespace strongstore
             break;
         }
 
-        auto itr = PendingAsynchOperations.find(req_id);
-        if (itr == PendingAsynchOperations.end())
+        auto itr = pendingAsynchOperations.find(req_id);
+        if (itr == pendingAsynchOperations.end())
         {
             Debug("[%d][%lu] SendRequestASYNCHREply for request not stored in PendingReqs.", shard_idx_, req_id);
             Panic("huhuhuhuhuh");
@@ -538,7 +538,7 @@ namespace strongstore
         PendingAsynchOperation *op = itr->second;
         uint64_t transaction_id = op->transaction_id;
         transformed_callback trcb = op->trcb;
-        PendingAsynchOperations.erase(itr);
+        pendingAsynchOperations.erase(itr);
         delete op;
 
         Debug("[%lu] [shard %i] Received SendRequest reply with status %d",

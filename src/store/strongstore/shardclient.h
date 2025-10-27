@@ -132,7 +132,7 @@ namespace strongstore
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout);
 
-        void SendAsynchRequest(uint64_t req_id, request_utils::Operation optype,
+        void SendAsynchOperation(uint64_t req_id, request_utils::Operation optype,
                                 uint64_t key, request_utils::Value oldValue,
                                 request_utils::Value newValue, transformed_callback trcb);
 
@@ -265,7 +265,7 @@ namespace strongstore
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
         std::unordered_map<uint64_t, PendingOperation *> pendingOps;
-        std::unordered_map<uint64_t, PendingAsynchOperation *> pendingAsynchOps;
+        std::unordered_map<uint64_t, PendingAsynchOperation *> pendingAsynchOperations;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;

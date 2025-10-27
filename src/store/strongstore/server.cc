@@ -1696,7 +1696,7 @@ namespace strongstore
 
         Request request;
         LinearizeableOperation linreq;
-        TransformedLinRequest translinreq;
+        TransformedLinOp translinreq;
         if (consistency_ != LIN)
         {
             request.ParseFromString(op);
@@ -1721,7 +1721,7 @@ namespace strongstore
                 translinreq.ParseFromString(op);
                 replicate = true;
                 response = op;
-                Debug("was able to parse TransformedLinRequest!");
+                Debug("was able to parse TransformedLinOp!");
             }
         }
     }
@@ -1736,7 +1736,7 @@ namespace strongstore
     {
         Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
-        TransformedLinRequest translinreq;
+        TransformedLinOp translinreq;
         if (consistency_ == LIN)
         {
             if (!transformed_) {
@@ -2052,8 +2052,8 @@ namespace strongstore
         Debug("Ok, returned from execute!");
         TransformedLinReply reply;
         reply.set_status(status);
-        reply.mutable_rid()->set_client_id(req.rid().client_id());
-        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        reply.mutable_rid()->set_client_id(op.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(op.rid().client_req_id());
         // Setting the return value!
         switch (retval.type)
         {
