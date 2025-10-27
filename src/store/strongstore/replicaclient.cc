@@ -100,7 +100,7 @@ namespace strongstore
                                           TransformedLinOp &msg,
                                           transformed_callback trcb)
     {
-        Debug("[shard %i] SendAsynchOperation sending: %s", shard_idx_, msg);
+        Debug("[shard %i] SendAsynchOperation sending Transformed LinOp", shard_idx_);
 
         // create request
         string asynch_op_str;
@@ -122,7 +122,7 @@ namespace strongstore
     bool ReplicaClient::AsynchOperationCallback(uint64_t opId, const string &request_str,
                                               const string &reply_str)
     {
-        Debug("[shard %i] Received SENDOPERATION callback [%d]", shard_idx_);
+        Debug("[shard %i] Received SENDOPERATION callback", shard_idx_);
         auto itr = this->pendingOperations.find(opId);
         ASSERT(itr != this->pendingOperations.end());
         PendingOperation *pendingOperation = itr->second;

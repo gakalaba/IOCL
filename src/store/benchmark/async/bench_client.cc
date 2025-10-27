@@ -119,7 +119,7 @@ void BenchmarkClient::StartTransformedEventLoop()
 uint64_t BenchmarkClient::CustomInit()
 {
 
-    Debug("[%lu] Starting Transformed App Client", n_sessions_started_);
+    Debug("[%d] Starting Transformed App Client", n_sessions_started_);
     n_sessions_started_++;
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -1074,7 +1074,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
 
     default:
         //std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
-        Panic("NOT YET SUPPORTEDunsupported operation type %lu", opType);
+        Panic("NOT YET SUPPORTEDunsupported operation type");
     }
     Debug("here?:");
     auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb);

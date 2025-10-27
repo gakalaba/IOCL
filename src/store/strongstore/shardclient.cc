@@ -478,7 +478,7 @@ namespace strongstore
     {
         Debug("shard client got TRANSFORMED LinReply!");
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the transaction_id = %d", req_id);
+        Debug("the transaction_id = %lu", req_id);
         int status = reply.status();
 
         request_utils::Value retval;
@@ -544,7 +544,6 @@ namespace strongstore
         Debug("[%lu] [shard %i] Received SendRequest reply with status %d",
               transaction_id, shard_idx_, status);
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-        Debug("the name of the callback we're about to call is %s", trcb);
         trcb(status, retval, transaction_id);
     }
 
