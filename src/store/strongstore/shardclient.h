@@ -127,6 +127,8 @@ namespace strongstore
         
         void SendOperation(uint64_t app_request_id, const std::string op,
                          const std::string &key, const std::string &value,
+                         std::vector<uint64_t> &preds,
+                         std::vector<uint64_t> &predshards,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout);
 

@@ -36,6 +36,7 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "store/common/common.h"
+#include "store/common/iocl_utils.h"
 
 using namespace std;
 
@@ -627,9 +628,21 @@ namespace strongstore
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
 
-        auto ocb1 = [ocb, session = std::ref(session)](int s, const std::string &v)
+        // Set my seqno
+        if (seqnos.find(i) == seqnos.end())
+        {
+            seqnos[i] = 0;
+        }
+
+        uint64_t myshardtag = CreateTag(client_id_, seqnos[i]);
+        seqnos[i]++;
+
+        auto ocb1 = [ocb, myshardtag, m = std::ref(currentOutstanding), session = std::ref(session)](int s, const std::string &v)
         {
             session.get().set_executing();
+            // remove this from the currentOutstanding set O(N)
+            auto it = std::find(m.get().begin(), m.get().end(), myshardtag);
+            m.get().erase(it);
             ocb(s, v);
         };
 
@@ -639,7 +652,10 @@ namespace strongstore
             otcb(s, v);
         };
 
-        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout);
+        currentOutstanding.push_back(myshardtag);
+        outstandingShards.push_back(i);
+
+        sclients_[i]->SendOperation(arid, op, key, value, currentOutstanding, outstandingShards, ocb1, otcb1, timeout);
     }
 
     /* Attempts to commit the ongoing transaction. */

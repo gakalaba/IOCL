@@ -266,6 +266,8 @@ namespace strongstore
     // IOCL issue a request
     void ShardClient::SendOperation(uint64_t app_request_id, const std::string op,
                                   const std::string &key, const std::string &value,
+                                  std::vector<uint64_t> &preds,
+                                  std::vector<uint64_t> &predshards,
                                   op_callback ocb, op_timeout_callback otcb,
                                   uint32_t timeout)
     {
@@ -290,6 +292,14 @@ namespace strongstore
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);
+
+        // TODO needs to be a map of sequence numbers per shard
+        int n = preds.size() - 1;
+        for (int i = 0; i < n; i++) {
+            op_.add_predlist(preds[i]);
+            op_.add_predshardlist(predshards[i]);
+        }
+        op_.set_mytag(preds[n]);
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);

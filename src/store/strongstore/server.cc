@@ -70,7 +70,7 @@ namespace strongstore
         }
 
         replica_client_ =
-            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+            new ReplicaClient(LinearizableProtocol::VR, replica_config_, transport_, server_id_, shard_idx_);
 
         if (debug_stats_)
         {
@@ -81,7 +81,7 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, bool debug_stats)
+                   Transport *transport, LinearizableProtocol linproto, bool debug_stats)
         : PingServer(transport),
           tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -103,7 +103,7 @@ namespace strongstore
         }*/
 
         replica_client_ =
-            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+            new ReplicaClient(linproto, replica_config_, transport_, server_id_, shard_idx_);
 
         if (debug_stats_)
         {
@@ -1664,7 +1664,7 @@ namespace strongstore
             linreq.ParseFromString(op);
             replicate = true;
             response = op;
-            Debug("was able to parse LinearizeableOperation!");
+            Debug("was able to parse LinearizeableOperation! it has shardtag = %lu", linreq.mytag());
         }
     }
 
@@ -1846,6 +1846,19 @@ namespace strongstore
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         reply.SerializeToString(&response);
+    }
+
+    bool Server::CommuteFn(const string &op1, const string &op2)
+    {
+        ASSERT(consistency_ == LIN);
+        LinearizeableOperation o1;
+        LinearizeableOperation o2;
+
+        o1.ParseFromString(op1);
+        o2.ParseFromString(op2);
+
+        Debug("inside Server App Commutefn: op1 = %s, op2 = %s", o1.op().c_str(), o2.op().c_str());
+        return (o1.key() != o2.key());
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)
