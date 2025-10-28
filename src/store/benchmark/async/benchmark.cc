@@ -685,7 +685,7 @@ int main(int argc, char **argv)
         }
         replica_configs.emplace_back(replica_config_stream);
 
-        if (mode == PROTO_STRONG || mode == PROTO_VR)
+        if (mode == PROTO_STRONG || mode == PROTO_VR || mode == PROTO_IOCL_CT)
         {
             net_config_stream.seekg(0);
             net_configs.emplace_back(replica_configs[i], net_config_stream);
