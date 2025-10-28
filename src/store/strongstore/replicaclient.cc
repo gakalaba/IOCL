@@ -96,7 +96,7 @@ namespace strongstore
                     predecessorlist.push_back(msg.predlist(i));
                     predecessorshardlist.push_back(msg.predshardlist(i));
                 }
-                client->Invoke(
+                client->InvokeIOCL(
                     request_str, msg.mytag(), predecessorlist, predecessorshardlist,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
