@@ -36,187 +36,411 @@
 
 namespace replication {
 
-const string Log::EMPTY_HASH = string(SHA_DIGEST_LENGTH, '\0');
+    const string Log::EMPTY_HASH = string(SHA_DIGEST_LENGTH, '\0');
 
-Log::Log(bool useHash, opnum_t start, string initialHash)
-    : useHash(useHash)
-{
-    this->initialHash = initialHash;
-    this->start = start;
-    if (start == 1) {
-        ASSERT(initialHash == EMPTY_HASH);
-    }
-}
-
-
-LogEntry &
-Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
-{
-    if (entries.empty()) {
-        ASSERT(vs.opnum == start);
-    } else {
-        ASSERT(vs.opnum == LastOpnum()+1);
-    }
-    
-    LogEntry entry;
-    entry.viewstamp = vs;
-    entry.request = req;
-    entry.state = state;
-    if (useHash) {
-        entry.hash = ComputeHash(LastHash(), entry);        
+    Log::Log(bool useHash, opnum_t start, string initialHash)
+        : useHash(useHash)
+    {
+        this->initialHash = initialHash;
+        this->start = start;
+        if (start == 1) {
+            ASSERT(initialHash == EMPTY_HASH);
+        }
     }
 
-    entries.push_back(entry);
-    return *Find(vs.opnum);
-}
+    /**************** Old Log ****************/
+    LogEntry &
+    Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
+    {
+        if (entries.empty()) {
+            ASSERT(vs.opnum == start);
+        } else {
+            ASSERT(vs.opnum == LastOpnum()+1);
+        }
 
-// This really ought to be const
-LogEntry *
-Log::Find(opnum_t opnum)
-{
-    if (entries.empty()) {
+        LogEntry entry;
+        entry.viewstamp = vs;
+        entry.request = req;
+        entry.state = state;
+        if (useHash) {
+            entry.hash = ComputeHash(LastHash(), entry);
+        }
+
+        entries.push_back(entry);
+        return *Find(vs.opnum);
+    }
+
+    // This really ought to be const
+    LogEntry *
+    Log::Find(opnum_t opnum)
+    {
+        if (entries.empty()) {
+            return NULL;
+        }
+
+        if (opnum < start) {
+            Debug("opnum %lu < start %lu", opnum, start);
+            return NULL;
+        }
+
+        if (opnum-start > entries.size()-1) {
+            Debug("opnum %lu - start %lu > entries.size() - 1 %lu", opnum, start, entries.size() - 1);
+            return NULL;
+        }
+
+        LogEntry *entry = &entries[opnum-start];
+        // should we comment out this assert?
+        ASSERT(entry->viewstamp.opnum == opnum);
+        return entry;
+    }
+
+    /************** Unordered Log ****************/
+    LogEntry *
+    Log::AppendUnsorted(const Request &req, uint64_t shardTag, LogEntryState state,
+                        int64_t arrivalTs,
+                        std::vector<Successor *> &&successors,
+                        std::vector<Predecessor *> &&predecessors,
+                        uint64_t acks, uint64_t acks2)
+    {
+        LogEntry *entry = new LogEntry;
+        entry->request = req;
+        entry->state = state;
+        entry->arrivalTimestamp = arrivalTs;
+        entry->myShardTag = shardTag;
+        entry->sortTimestamp = -1;
+        if (!successors.empty())
+        {
+            entry->successors = std::move(successors);
+        }
+
+        if (!predecessors.empty())
+        {
+            entry->predecessors = std::move(predecessors);
+        }
+
+        if (useHash)
+        {
+            entry->hash = ComputeHash(LastHash(), *entry);
+        }
+
+        entry->acks = acks;
+        entry->acks2 = acks2;
+
+        auto retval = unorderedEntries.insert({shardTag, entry});
+        return retval.first->second;
+    }
+
+    LogEntry *Log::FindUnsorted(uint64_t shardTag)
+    {
+        auto it = unorderedEntries.find(shardTag);
+        if (it != unorderedEntries.end())
+        {
+            return it->second;
+        }
         return NULL;
     }
 
-    if (opnum < start) {
-        return NULL;
+    /************** Sorted Log ***************/
+    LogEntry *
+    Log::AppendSorted(LogEntryState state, uint64_t shardTag, int64_t sortedTs)
+    {
+        ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
+        LogEntry *entry = FindUnsorted(shardTag);
+
+        entry->state = state;
+        entry->sortTimestamp = sortedTs;
+        sortedLog.insert(sortedTs, shardTag);
+        return entry;
     }
 
-    if (opnum-start > entries.size()-1) {
-        return NULL;
+    LogEntry *
+    Log::FindSorted(uint64_t opnum)
+    {
+        LogEntry *entry = (LogEntry *)(sortedLog.get(opnum - start));
+        // ASSERT(entry->viewstamp.opnum == opnum);
+        return entry;
     }
 
-    LogEntry *entry = &entries[opnum-start];
-    ASSERT(entry->viewstamp.opnum == opnum);
-    return entry;
-}
-
-
-bool
-Log::SetStatus(opnum_t op, LogEntryState state)
-{
-    LogEntry *entry = Find(op);
-    if (entry == NULL) {
-        return false;
+    bool Log::InSorted(uint64_t shardTag)
+    {
+        Debug("looking inside sorted log for tag %lu", shardTag);
+        LogEntry *ep = FindUnsorted(shardTag);
+        if (ep == NULL)
+        {
+            Debug("not in sorted or unsorted");
+            return false;
+        }
+        return sortedLog.isIn(ep->sortTimestamp, ep->myShardTag);
     }
 
-    entry->state = state;
-    return true;
-}
-
-bool
-Log::SetRequest(opnum_t op, const Request &req)
-{
-    if (useHash) {
-        Panic("Log::SetRequest on hashed log not supported.");
-    }
-    
-    LogEntry *entry = Find(op);
-    if (entry == NULL) {
-        return false;
-    }
-
-    entry->request = req;
-    return true;
-}
-
-void
-Log::RemoveAfter(opnum_t op)
-{
-#if PARANOID
-    // We'd better not be removing any committed entries.
-    for (opnum_t i = op; i <= LastOpnum(); i++) {
-        ASSERT(Find(i)->state != LOG_STATE_COMMITTED);
-    }
-#endif
-
-    if (op > LastOpnum()) {
+    void Log::ResortSorted(viewstamp_t vs, LogEntryState state, uint64_t shardTag, int64_t finalSortedTs)
+    {
+        // Assert it's in UNsorted
+        ASSERT(unorderedEntries.find(shardTag) != unorderedEntries.end());
+        Debug("printing log at beginning of resortSorted");
+        PrintSortedLog();
+        // Remove this tag from the sorted log
+        LogEntry *entry = FindUnsorted(shardTag);
+        entry->viewstamp = vs;
+        entry->state = state;
+        // Debug("Old version is <sortedtimestamp = %ld, shardTag = %lu>", entry->sortTimestamp, shardTag);
+        sortedLog.deleteElem(entry->sortTimestamp, shardTag);
+        entry->sortTimestamp = finalSortedTs;
+        Debug("ResortSorted is inserting with <sortedTimestamp=%ld, shardTag = %lu>", finalSortedTs, shardTag);
+        sortedLog.insert(finalSortedTs, shardTag); // TODO Anja: should this be insert or insertWithSameOrder??
         return;
     }
 
-    Debug("Removing log entries after " FMT_OPNUM, op);
+    // We know the sorted log has length >= 1 at this point
+    // TODO Anja pass in commute function when replicas are instantiated
+    int Log::MoveSortedToLog(uint64_t shardTag)
+    {
+        LogEntry *ep = FindUnsorted(shardTag);
+        LogEntry *maybehead;
+        ASSERT(ep != NULL);
+        ASSERT(ep->state == LOG_STATE_READY || ep->state == LOG_STATE_FASTPATH);
+        bool sawself = false;
+        int found = 0;
 
-    ASSERT(op-start < entries.size());
-    entries.resize(op-start);
+        auto it = sortedLog.begin();
+        while (it != sortedLog.end())
+        {
+            // save iterator!!
+            auto nextIt = std::next(it);
 
-    ASSERT(LastOpnum() == op-1);
-}
+            maybehead = FindUnsorted(std::get<1>(*it));
+            if (!sawself && (maybehead->sortTimestamp == ep->sortTimestamp && maybehead->myShardTag == shardTag))
+            {
+                Debug("i found myself! going to add mysel to the regular log");
+                sawself = true; // i am the head of the log, there is a contiguous run of nonzero size
+                found++;
+                // delete self from sorted log and add to final log
+                sortedLog.deleteElem(ep->sortTimestamp, ep->myShardTag);
+                sortedLog.appendFinal(ep);
+                ASSERT(found == 1);
+            }
+            else if (!sawself && !commutefn(ep->request.op(), maybehead->request.op()))
+            {
+                // Found an entry earlier in the log that hasn't been made ready yet that I don't commute with... I must wait
+                ASSERT(maybehead->state == LOG_STATE_ASSIGNED);
+                ASSERT(found == 0);
+                return 0;
+            }
+            else if (sawself && !commutefn(ep->request.op(), maybehead->request.op()))
+            {
+                // maybehead == nothead
+                ASSERT(maybehead->sortTimestamp >= ep->sortTimestamp);
+                if (maybehead->state == LOG_STATE_READY || maybehead->state == LOG_STATE_FASTPATH)
+                {
+                    found++;
+                    sortedLog.deleteElem(maybehead->sortTimestamp, maybehead->myShardTag);
+                    sortedLog.appendFinal(maybehead);
+                }
+                else
+                {
+                    return found;
+                }
+            }
 
-LogEntry *
-Log::Last()
-{
-    if (entries.empty()) {
-        return NULL;
+            // move to next iterator
+            it = nextIt;
+        }
+        // If we got here, we popped off a contiguous run of ready entries
+        // and there shouldn't be anymore on this key in the log
+        Debug("we were able to find a contiguous run of %d entries", found);
+        PrintSortedLog();
+        return found;
     }
-    
-    return &entries.back();
-}
 
-viewstamp_t
-Log::LastViewstamp() const
-{
-    if (entries.empty()) {
-        return viewstamp_t(0, start-1);
-    } else {
-        return entries.back().viewstamp;
+    void Log::PrintSortedLog()
+    {
+        int i = 0;
+        Debug("SortedLog looks like:...");
+        for (auto it = sortedLog.begin(); it != sortedLog.end(); ++it)
+        {
+            const LogEntry *ep = FindUnsorted(std::get<1>(*it));
+            ASSERT(ep != NULL);
+            Debug("SortedLog[%d]: <sortedTimestamp = %ld, shardTag = %lu, insertionOrder = %lu>", i, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it));
+            Debug("         SortedLog[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
+                  i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str(), ep->predecessors.size(), ep->successors.size());
+            i++;
+        }
+
+        i = 0;
+        for (const auto m : unorderedEntries)
+        {
+            Debug("Unsorted[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
+                  i, m.second->myShardTag, m.second->arrivalTimestamp, m.second->sortTimestamp, PrintState(m.second->state).c_str(), m.second->predecessors.size(), m.second->successors.size());
+            i++;
+        }
+
+        i = 0;
+        while (true)
+        {
+            const LogEntry *ep = (LogEntry *)(sortedLog.get(i));
+            if (!ep)
+                return;
+            Debug("finalEntries[%d] = LogEntry{tag=%lu, arrivalts = %ld, sortedts = %ld, %s, preds.size = %lu, succs.size = %lu}",
+                  i, ep->myShardTag, ep->arrivalTimestamp, ep->sortTimestamp, PrintState(ep->state).c_str(), ep->predecessors.size(), ep->successors.size());
+            i++;
+        }
     }
-}
 
-opnum_t
-Log::LastOpnum() const
-{
-    if (entries.empty()) {
-        return start-1;
-    } else {
-        return entries.back().viewstamp.opnum;
+    std::string Log::PrintState(LogEntryState logstate)
+    {
+        switch (logstate)
+        {
+        case LOG_STATE_SPECULATIVE:
+            return "state = LOG_STATE_SPECULATIVE";
+        case LOG_STATE_FASTPREPARED:
+            return "state = LOG_STATE_FASTPREPARED";
+        case LOG_STATE_ARRIVED:
+            return "state = LOG_STATE_ARRIVED";
+        case LOG_STATE_FASTPATH:
+            return "state = LOG_STATE_FASTPATH";
+        case LOG_STATE_PREPARED:
+            return "state = LOG_STATE_PREPARED";
+        case LOG_STATE_ASSIGNED:
+            return "state = LOG_STATE_ASSIGNED";
+        case LOG_STATE_READY:
+            return "state = LOG_STATE_READY";
+        case LOG_STATE_COMMITTED:
+            return "state = LOG_STATE_COMMITTED";
+        }
     }
-}
 
-opnum_t
-Log::FirstOpnum() const
-{
-    // XXX Not really sure what's appropriate to return here if the
-    // log is empty
-    return start;
-}
+    bool
+    Log::SetStatus(opnum_t op, LogEntryState state)
+    {
+        LogEntry *entry = Find(op);
+        if (entry == NULL) {
+            return false;
+        }
 
-bool
-Log::Empty() const
-{
-    return entries.empty();
-}
-
-const string &
-Log::LastHash() const
-{
-    if (entries.empty()) {
-        return initialHash;
-    } else {
-        return entries.back().hash;
+        entry->state = state;
+        return true;
     }
-}
 
-string
-Log::ComputeHash(string lastHash, const LogEntry &entry)
-{
-    SHA_CTX ctx;
-    unsigned char out[SHA_DIGEST_LENGTH];
+    void Log::SetStatus(LogEntry &entry, LogEntryState state)
+    {
+        entry.state = state;
+    }
 
-    SHA1_Init(&ctx);
-    
-    SHA1_Update(&ctx, lastHash.c_str(), lastHash.size());
-    SHA1_Update(&ctx, &entry.viewstamp, sizeof(entry.viewstamp));
-    uint64_t x;
-    x = entry.request.clientid();
-    SHA1_Update(&ctx, &x, sizeof(x));
-    x = entry.request.clientreqid();
-    SHA1_Update(&ctx, &x, sizeof(x));
-    SHA1_Update(&ctx, entry.request.op().c_str(),
-                entry.request.op().size());
+    bool
+    Log::SetRequest(opnum_t op, const Request &req)
+    {
+        if (useHash) {
+            Panic("Log::SetRequest on hashed log not supported.");
+        }
 
-    SHA1_Final(out, &ctx);
+        LogEntry *entry = Find(op);
+        if (entry == NULL) {
+            return false;
+        }
 
-    return string((char *)out, SHA_DIGEST_LENGTH);
-}
+        entry->request = req;
+        return true;
+    }
+
+    void
+    Log::RemoveAfter(opnum_t op)
+    {
+    #if PARANOID
+        // We'd better not be removing any committed entries.
+        for (opnum_t i = op; i <= LastOpnum(); i++) {
+            ASSERT(Find(i)->state != LOG_STATE_COMMITTED);
+        }
+    #endif
+
+        if (op > LastOpnum()) {
+            return;
+        }
+
+        Debug("Removing log entries after " FMT_OPNUM, op);
+
+        ASSERT(op-start < entries.size());
+        entries.resize(op-start);
+
+        ASSERT(LastOpnum() == op-1);
+    }
+
+    LogEntry *
+    Log::Last()
+    {
+        if (entries.empty()) {
+            return NULL;
+        }
+
+        return &entries.back();
+    }
+
+    viewstamp_t
+    Log::LastViewstamp() const
+    {
+        if (entries.empty()) {
+            return viewstamp_t(0, start-1);
+        } else {
+            return entries.back().viewstamp;
+        }
+    }
+
+    opnum_t
+    Log::LastOpnum() const
+    {
+        if (entries.empty()) {
+            return start-1;
+        } else {
+            return entries.back().viewstamp.opnum;
+        }
+    }
+
+    opnum_t
+    Log::FirstOpnum() const
+    {
+        // XXX Not really sure what's appropriate to return here if the
+        // log is empty
+        return start;
+    }
+
+    bool
+    Log::Empty() const
+    {
+        return entries.empty();
+    }
+
+    const string &
+    Log::LastHash() const
+    {
+        if (entries.empty()) {
+            return initialHash;
+        } else {
+            return entries.back().hash;
+        }
+    }
+
+    string
+    Log::ComputeHash(string lastHash, const LogEntry &entry)
+    {
+        SHA_CTX ctx;
+        unsigned char out[SHA_DIGEST_LENGTH];
+
+        SHA1_Init(&ctx);
+
+        SHA1_Update(&ctx, lastHash.c_str(), lastHash.size());
+        SHA1_Update(&ctx, &entry.viewstamp, sizeof(entry.viewstamp));
+        uint64_t x;
+        x = entry.request.clientid();
+        SHA1_Update(&ctx, &x, sizeof(x));
+        x = entry.request.clientreqid();
+        SHA1_Update(&ctx, &x, sizeof(x));
+        SHA1_Update(&ctx, entry.request.op().c_str(),
+                    entry.request.op().size());
+
+        SHA1_Final(out, &ctx);
+
+        return string((char *)out, SHA_DIGEST_LENGTH);
+    }
+
+    // IOCL Specifics
 
 } // namespace replication
