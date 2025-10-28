@@ -1,0 +1,135 @@
+syntax = "proto2";
+
+import "request.proto";
+
+package replication.iocl_ct.proto;
+
+message RequestMessage {
+    required replication.Request req = 1;
+    required uint64 shardTag = 2;
+    repeated uint64 predlist = 3;
+}
+
+message ReplyMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint64 clientreqid = 3;
+    required bytes reply = 4;
+    required uint64 shardTag = 5;
+}
+
+message SuccessorRequestMessage {
+    required uint64 p = 1;
+    required uint64 s = 2;
+    required uint64 predIdx = 3;
+    required uint64 shardIdx = 4;
+}
+
+message PredecessorReplyMessage {
+    required uint64 p = 1;
+    required int64 arrivalTs = 2;
+    required uint64 s = 3;
+    required uint64 predIdx = 4;
+}
+
+message PredecessorReplyMessage2 {
+    required uint64 p = 1;
+    required int64 sortedTs = 2;
+    required uint64 s = 3;
+    required uint64 predIdx = 4;
+}
+
+message UnloggedRequestMessage {
+    required replication.UnloggedRequest req = 1;
+}
+
+message UnloggedReplyMessage {
+    required bytes reply = 1;
+    required uint64 clientreqid = 2;
+}
+
+message PrepareMessage {
+    required uint64 batchId = 1;
+    repeated replication.Request requests = 2;
+    repeated uint64 shardTags = 3;
+    repeated int64 arrivalTs = 4;
+}
+
+message PrepareOKMessage {
+    required uint32 replicaIdx = 1;
+    required uint64 batchId = 2;
+}
+
+message PrepareMessage2 {
+    required uint64 view = 1;
+    required uint64 batchId = 3;
+    repeated replication.Request requests = 4;
+    repeated uint64 shardTags = 5;
+    repeated int64 sortedTs = 6;
+
+}
+
+message PrepareOKMessage2 {
+    required uint64 view = 1;
+    required uint64 batchId = 2;
+    required uint32 replicaIdx = 3;
+}
+
+message CommitMessage {
+    required uint64 view = 1;
+    required uint64 batchId = 2;    
+}
+
+message RequestStateTransferMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;    
+}
+
+message StateTransferMessage {
+    message LogEntry {
+        required uint64 view = 1;
+        required uint64 opnum = 2;
+        required replication.Request request = 3;
+        optional uint32 state = 4;
+        optional bytes hash = 5;
+    }
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    repeated LogEntry entries = 3;
+}
+
+message StartViewChangeMessage {
+    required uint64 view = 1;
+    required uint32 replicaIdx = 2;
+    required uint64 lastCommitted = 3;
+}
+
+message DoViewChangeMessage {
+    message LogEntry {
+        required uint64 view = 1;
+        required uint64 opnum = 2;
+        required replication.Request request = 3;
+        optional uint32 state = 4;
+        optional bytes hash = 5;
+    }
+    required uint64 view = 1;
+    required uint64 lastNormalView = 2;
+    required uint64 lastOp = 3;
+    required uint64 lastCommitted = 4;
+    repeated LogEntry entries = 5;
+    required uint32 replicaIdx = 6;    
+}
+
+message StartViewMessage {
+    message LogEntry {
+        required uint64 view = 1;
+        required uint64 opnum = 2;
+        required replication.Request request = 3;
+        optional uint32 state = 4;
+        optional bytes hash = 5;
+    }
+    required uint64 view = 1;
+    required uint64 lastOp = 2;
+    required uint64 lastCommitted = 3;
+    repeated LogEntry entries = 4;
+}
