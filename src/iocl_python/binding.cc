@@ -1,5 +1,8 @@
 
 #include <thread>
+#include <sys/eventfd.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -758,6 +761,79 @@ uint64_t CustomInitSession() {
     }
 }
 
+// Dummy functions for measuring Python-C++ communication overhead
+
+// DummyFn: Returns immediately at C++ side
+// Purpose: Measure pure Python-C++ FFI overhead without any I/O
+uint64_t DummyFn() {
+    return 42;
+}
+
+// DummyEFDFn1: Creates an eventfd and returns it immediately
+// Purpose: Measure overhead of EFD creation + FFI
+int DummyEFDFn1() {
+    int efd = eventfd(0, EFD_CLOEXEC);
+    if (efd == -1) {
+        std::cerr << "[DummyEFDFn1] ERROR: Failed to create eventfd, errno=" << errno << std::endl;
+        return -1;
+    }
+    return efd;
+}
+
+// DummyEFDFn2: Takes EFD, spawns thread that sleeps 5s then writes to EFD
+// Purpose: Measure select() granularity and responsiveness
+// Returns: true if thread spawned successfully, false otherwise
+bool DummyEFDFn2(int efd) {
+    if (efd < 0) {
+        std::cerr << "[DummyEFDFn2] ERROR: Invalid efd=" << efd << std::endl;
+        return false;
+    }
+
+    // Verify the efd is valid
+    int flags = fcntl(efd, F_GETFD);
+    if (flags == -1) {
+        std::cerr << "[DummyEFDFn2] ERROR: efd " << efd << " is invalid, errno=" << errno << std::endl;
+        return false;
+    }
+
+    // Spawn a detached thread that will sleep 5 seconds then write to the efd
+    std::thread([efd]() {
+        struct timespec start, before_sleep, after_sleep, before_write, after_write;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+
+        std::cout << "[DummyEFDFn2_Thread] Started at "
+                  << (start.tv_sec * 1000000000ULL + start.tv_nsec) << " ns" << std::endl;
+
+        clock_gettime(CLOCK_MONOTONIC, &before_sleep);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        clock_gettime(CLOCK_MONOTONIC, &after_sleep);
+
+        uint64_t sleep_duration_ns = (after_sleep.tv_sec - before_sleep.tv_sec) * 1000000000ULL +
+                                     (after_sleep.tv_nsec - before_sleep.tv_nsec);
+        std::cout << "[DummyEFDFn2_Thread] Sleep duration: " << sleep_duration_ns << " ns" << std::endl;
+
+        clock_gettime(CLOCK_MONOTONIC, &before_write);
+        uint64_t val = 1;
+        ssize_t written = write(efd, &val, sizeof(val));
+        clock_gettime(CLOCK_MONOTONIC, &after_write);
+
+        if (written != sizeof(val)) {
+            std::cerr << "[DummyEFDFn2_Thread] ERROR: Failed to write to efd " << efd
+                      << ", written=" << written << ", errno=" << errno << std::endl;
+        } else {
+            uint64_t write_duration_ns = (after_write.tv_sec - before_write.tv_sec) * 1000000000ULL +
+                                         (after_write.tv_nsec - before_write.tv_nsec);
+            std::cout << "[DummyEFDFn2_Thread] Write to efd completed in " << write_duration_ns << " ns" << std::endl;
+            std::cout << "[DummyEFDFn2_Thread] Total time from start: "
+                      << ((after_write.tv_sec - start.tv_sec) * 1000000000ULL +
+                          (after_write.tv_nsec - start.tv_nsec)) << " ns" << std::endl;
+        }
+    }).detach();
+
+    std::cout << "[DummyEFDFn2] Thread spawned successfully for efd=" << efd << std::endl;
+    return true;
+}
+
 // Python binding module
 PYBIND11_MODULE(redisstorepython, m) {
     m.doc() = "Redis Store Python Bindings";
@@ -858,4 +934,13 @@ PYBIND11_MODULE(redisstorepython, m) {
     // Expose value_to_python function
     m.def("value_to_python", &value_to_python,
           "Convert a request_utils::Value to a Python object and print debug info");
+
+    // Expose dummy functions for measuring communication overhead
+    m.def("dummy_fn", &DummyFn,
+          "Returns immediately at C++ side - measures pure Python-C++ FFI overhead");
+    m.def("dummy_efd_fn1", &DummyEFDFn1,
+          "Creates an eventfd and returns it immediately - measures EFD creation overhead");
+    m.def("dummy_efd_fn2", &DummyEFDFn2,
+          "Takes EFD, spawns thread that sleeps 5s then writes - measures select() granularity",
+          py::arg("efd"));
 }
