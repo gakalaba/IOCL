@@ -276,6 +276,14 @@ namespace strongstore
 
         uint64_t req_id = last_req_id_++;
         Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
+        Debug("my predecessors: ");
+        for (auto p : preds) {
+            Debug("%lu ", p);
+        }
+        Debug("and each one's shard location:");
+        for (auto ps : predshards) {
+            Debug("%lu ", ps);
+        }
         PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
         pendingOps[req_id] = pendingOp;
         pendingOp->op = op;
@@ -300,6 +308,7 @@ namespace strongstore
             op_.add_predshardlist(predshards[i]);
         }
         op_.set_mytag(preds[n]);
+        Debug("my tag is %lu", preds[n]);
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);

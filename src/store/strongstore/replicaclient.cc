@@ -96,6 +96,7 @@ namespace strongstore
                     predecessorlist.push_back(msg.predlist(i));
                     predecessorshardlist.push_back(msg.predshardlist(i));
                 }
+                Debug("copying over predecessors.. mytag is still %lu", msg.mytag());
                 client->InvokeIOCL(
                     request_str, msg.mytag(), predecessorlist, predecessorshardlist,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,

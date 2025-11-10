@@ -633,8 +633,10 @@ namespace strongstore
         {
             seqnos[i] = 0;
         }
+        Debug("Sending to shard %d with seqno %lu", i, seqnos[i]);
 
         uint64_t myshardtag = CreateTag(client_id_, seqnos[i]);
+        Debug("created myshardtag %lu from pid = %lu and seqno = %lu", myshardtag, client_id_, seqnos[i]);
         seqnos[i]++;
 
         auto ocb1 = [ocb, myshardtag, m = std::ref(currentOutstanding), session = std::ref(session)](int s, const std::string &v)
@@ -654,6 +656,16 @@ namespace strongstore
 
         currentOutstanding.push_back(myshardtag);
         outstandingShards.push_back(i);
+        Debug("current outstanding size: %lu", currentOutstanding.size());
+        Debug("outstanding shards size: %lu", outstandingShards.size());
+        for (auto t : currentOutstanding)
+        {
+            Debug("current outstanding tag: %lu", t);            
+        }
+        for (auto s : outstandingShards)
+        {
+            Debug("outstanding shard: %d", s);            
+        }
 
         sclients_[i]->SendOperation(arid, op, key, value, currentOutstanding, outstandingShards, ocb1, otcb1, timeout);
     }
