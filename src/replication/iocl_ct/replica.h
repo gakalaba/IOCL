@@ -44,10 +44,29 @@
 #include "replication/common/replica.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
 
+
 namespace replication
 {
     namespace iocl_ct
     {
+        enum IoclEntryState {
+            IOCL_STATE_PERSISTED,
+            IOCL_STATE_READY,
+            IOCL_STATE_COMMITTED
+        };
+
+        struct IoclEntry {
+            viewstamp_t viewstamp;
+            IoclEntryState state;
+            Request request;
+            // string hash;
+            // // Speculative client table stuff
+            // opnum_t prevClientReqOpnum;
+            // ::google::protobuf::Message *replyMessage;
+
+            IoclEntry() {}
+            virtual ~IoclEntry() {}
+        };
 
         class IOCL_CTReplica : public Replica
         {
@@ -73,6 +92,8 @@ namespace replication
             opnum_t lastBatchEnd;
 
             Log log;
+            // IOCL_CT specific structures
+            std::unordered_map<Tag, IoclEntry> unorderedBag;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {
@@ -82,6 +103,7 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
+            QuorumSet<viewstamp_t, proto::PrepareOKMessage> unorderedPrepareOKQuorum;
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
             QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;

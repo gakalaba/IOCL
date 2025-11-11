@@ -6,6 +6,7 @@ package replication.iocl_ct.proto;
 
 message RequestMessage {
     required replication.Request req = 1;
+    required uint64 shardTag = 2;
 }
 
 message ReplyMessage {
@@ -35,6 +36,17 @@ message PrepareOKMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint32 replicaIdx = 3;
+}
+
+message UnorderedPrepareMessage {
+    required uint64 view = 1;
+    repeated Request request = 2;
+    repeated uint64 shardTags = 3;
+}
+
+message UnorderedPrepareOKMessage {
+    required uint64 view = 1;
+    repeated uint64 shardTags = 2;
 }
 
 message CommitMessage {
