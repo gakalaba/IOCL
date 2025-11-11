@@ -377,38 +377,24 @@ namespace replication
             resendUnorderedPrepareTimeout->Reset();
         }
 
-        void IOCL_CTReplica::ResendUnorderedPrepare()
-        {
-            ASSERT(AmLeader());
-            RNotice("Resending unordered prepare");
-            if (!(transport->SendMessageToAll(this, lastUnorderedPrepare)))
-            {
-                RWarning("Failed to ressend prepare message to all replicas");
-            }
-            // Keep retrying
-            resendUnorderedPrepareTimeout->Reset();
-        }
-
         void IOCL_CTReplica::CloseUnorderedBatch()
         {
             /* Send the unordered prepare messages */
-            unorderedPrepareQuorum.Clear();
+            unorderedPrepareOKQuorum.Clear();
             UnorderedPrepareMessage up;
             up.set_view(view);
 
             for (const auto &pair : unorderedBag)
             {
                 Request *r = up.add_request();
-                const IoclEntry *entry = pair.second;
-                ASSERT(entry != NULL);
-                ASSERT(entry->viewstamp.view == view);
-                *r = entry->request;
+                const IoclEntry entry = pair.second;
+                ASSERT(entry.viewstamp.view == view);
+                *r = entry.request;
                 up.add_shardtags(pair.first);
             }
             lastUnorderedPrepare = up;
 
-            RDebug("Sending UNORDERED_PREPARE for client request %lu",
-                    msg.req().clientreqid());
+            RDebug("Sending UNORDERED_PREPARE for huge batch");
 
             if (!(transport->SendMessageToAll(this, up)))
             {
@@ -464,7 +450,7 @@ namespace replication
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
             UnorderedPrepareMessage unorderedPrepare;
-            UnorderedPrepareOkMessage unorderedPrepareOK;
+            UnorderedPrepareOKMessage unorderedPrepareOK;
             CommitMessage commit;
             RequestStateTransferMessage requestStateTransfer;
             StateTransferMessage stateTransfer;
@@ -627,7 +613,7 @@ namespace replication
                 v.opnum = 0;
 
                 /* Add the request to the unordered bag */
-                unorderedBag.insert(std::pair<Tag, IoclEntry>(
+                unorderedBag.insert(std::pair<uint64_t, IoclEntry>(
                     msg.shardtag(), IoclEntry{v, IOCL_STATE_PERSISTED, request}));
 
                 RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
@@ -649,12 +635,12 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
-                                      const UnorderedPrepareOkMessage &msg)
+                                      const UnorderedPrepareOKMessage &msg)
         {
             RDebug("Received UNORDERED_PREPAREOK <" FMT_VIEW ",",
                    msg.view());
             // Latency_Start(&rec_to_upcall_lat_);
-
+            viewstamp_t v;
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring UNORDERED_PREPAREOK due to abnormal status");
@@ -682,13 +668,14 @@ namespace replication
             if (auto msgs =
                     (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
             {
-                for (auto &tag : msg.tags())
+                for (auto &tag : msg.shardtags())
                 {
-                    IoclEntry *entry = unorderedBag.find(tag);
-                    if (entry == NULL)
+                    auto pair = unorderedBag.find(tag);
+                    if (pair == unorderedBag.end())
                     {
                         RPanic("Did not find unordered operation with tag");
                     }
+                    IoclEntry entry = pair->second;
 
                     RDebug("Persisted REQUEST unordered, keeps viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
                     /* Assign it a real opnum for this view */
@@ -697,7 +684,7 @@ namespace replication
                     v.opnum = this->lastOp;
 
                     /* Add the request to my log */
-                    log.Append(v, entry->request, LOG_STATE_PREPARED);
+                    log.Append(v, entry.request, LOG_STATE_PREPARED);
                 }
                 
 
@@ -833,8 +820,8 @@ namespace replication
         void IOCL_CTReplica::HandleUnorderedPrepare(const TransportAddress &remote,
                                       const UnorderedPrepareMessage &msg)
         {
-            RDebug("Received UNORDERED_PREPARE <" FMT_VIEW "," FMT_OPNUM ">",
-                   msg.view(), msg.opnum());
+            RDebug("Received UNORDERED_PREPARE <" FMT_VIEW ",",
+                   msg.view());
 
             if (this->status != STATUS_NORMAL)
             {
@@ -851,8 +838,9 @@ namespace replication
             if (msg.view() > this->view)
             {
                 RequestStateTransfer();
-                pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
+                Panic("not implemented");
+                // pendingPrepares.push_back(
+                //     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
                 return;
             }
 
@@ -878,7 +866,7 @@ namespace replication
                 request.set_clientid(req.clientid());
                 request.set_clientreqid(req.clientreqid());
 
-                unorderedBag.insert(std::pair<Tag, IoclEntry>(
+                unorderedBag.insert(std::pair<uint64_t, IoclEntry>(
                     msg.shardtags(i), IoclEntry{v, IOCL_STATE_PERSISTED, request}));
                 /* Populate reply */
                 reply.add_shardtags(msg.shardtags(i));
@@ -889,6 +877,7 @@ namespace replication
 
             /* Complete reply and send it to the leader */
             reply.set_view(msg.view());
+            reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))

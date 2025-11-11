@@ -47,6 +47,7 @@ message UnorderedPrepareMessage {
 message UnorderedPrepareOKMessage {
     required uint64 view = 1;
     repeated uint64 shardTags = 2;
+    required uint32 replicaIdx = 3;
 }
 
 message CommitMessage {

@@ -64,7 +64,9 @@ namespace replication
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
 
-            IoclEntry() {}
+            IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
+                    const Request &request)
+                : viewstamp(viewstamp), state(state), request(request) {}
             virtual ~IoclEntry() {}
         };
 
@@ -88,12 +90,13 @@ namespace replication
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
                 pendingPrepares;
             proto::PrepareMessage lastPrepare;
+            proto::UnorderedPrepareMessage lastUnorderedPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
 
             Log log;
             // IOCL_CT specific structures
-            std::unordered_map<Tag, IoclEntry> unorderedBag;
+            std::unordered_map<uint64_t, IoclEntry> unorderedBag;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {
@@ -103,7 +106,7 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
-            QuorumSet<viewstamp_t, proto::PrepareOKMessage> unorderedPrepareOKQuorum;
+            QuorumSet<viewstamp_t, proto::UnorderedPrepareOKMessage> unorderedPrepareOKQuorum;
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
             QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
@@ -112,7 +115,9 @@ namespace replication
             Timeout *nullCommitTimeout;
             Timeout *stateTransferTimeout;
             Timeout *resendPrepareTimeout;
+            Timeout *resendUnorderedPrepareTimeout;
             Timeout *closeBatchTimeout;
+            Timeout *closeUnorderedBatchTimeout;
 
             Latency_t rec_to_upcall_lat_;
             Latency_t upcall_to_exec_lat_;
@@ -129,7 +134,9 @@ namespace replication
             void SendNullCommit();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
+            void ResendUnorderedPrepare();
             void CloseBatch();
+            void CloseUnorderedBatch();
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);
@@ -140,6 +147,10 @@ namespace replication
                                const proto::PrepareMessage &msg);
             void HandlePrepareOK(const TransportAddress &remote,
                                  const proto::PrepareOKMessage &msg);
+            void HandleUnorderedPrepare(const TransportAddress &remote,
+                               const proto::UnorderedPrepareMessage &msg);
+            void HandleUnorderedPrepareOK(const TransportAddress &remote,
+                                 const proto::UnorderedPrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleRequestStateTransfer(
