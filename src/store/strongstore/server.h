@@ -41,6 +41,8 @@
 #include "lib/transport.h"
 #include "replication/vr/client.h"
 #include "replication/vr/replica.h"
+#include "replication/iocl_ct/client.h"
+#include "replication/iocl_ct/replica.h"
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
 #include "store/common/backend/kvstore.h"
@@ -114,7 +116,7 @@ namespace strongstore
                bool debug_stats);
         Server(Consistency consistency, const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
-               int groupIdx, int idx, Transport *transport,
+               int groupIdx, int idx, Transport *transport, LinearizableProtocol linproto,
                bool debug_stats);
         ~Server();
 

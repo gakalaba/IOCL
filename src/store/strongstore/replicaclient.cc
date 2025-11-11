@@ -35,7 +35,7 @@ namespace strongstore
     using namespace std;
     using namespace proto;
 
-    ReplicaClient::ReplicaClient(const transport::Configuration &config,
+    ReplicaClient::ReplicaClient(LinearizableProtocol linproto, const transport::Configuration &config,
                                  Transport *transport, uint64_t client_id,
                                  int shard)
         : config_{config},
@@ -43,10 +43,22 @@ namespace strongstore
           client_id_(client_id),
           shard_idx_(shard),
           pendingCommits{},
-          lastReqId{0}
+          lastReqId{0},
+          linproto_{linproto}
     {
-        client = new replication::vr::VRClient(config_, transport_, shard_idx_,
-                                               client_id_);
+        Debug("making replica client");
+        switch (linproto) {
+            case LinearizableProtocol::VR:
+                client = new replication::vr::VRClient(config_, transport_, shard_idx_,
+                                                    client_id_);
+                break;
+            case LinearizableProtocol::IOCL_CT:
+                client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
+                                                            client_id_);
+                break;
+            default:
+                Panic("Invalid linearizable protocol");
+        }
     }
 
     ReplicaClient::~ReplicaClient() { delete client; }
@@ -69,10 +81,20 @@ namespace strongstore
         pendingOperation->ocb = ocb;
         pendingOperation->otcb = otcb;
 
-        client->Invoke(
-            request_str,
-            bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
+        switch (linproto_) {
+            case LinearizableProtocol::VR:
+                client->Invoke(
+                    request_str,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
+                break;
+            case LinearizableProtocol::IOCL_CT:
+                client->Invoke(
+                    request_str,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
+                break;
+        }
     }
 
     /* Callback from a shard replica on sendrequest operation completion. */
