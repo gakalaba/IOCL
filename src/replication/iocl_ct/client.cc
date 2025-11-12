@@ -40,7 +40,6 @@
 #include "replication/common/request.pb.h"
 #include "replication/iocl_ct/client.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
-// #include "store/common/iocl_utils.h"
 
 namespace replication
 {
@@ -66,6 +65,13 @@ namespace replication
         void IOCL_CTClient::Invoke(const string &request, continuation_t continuation,
                               error_continuation_t error_continuation)
         {
+            Panic("Should never call this");
+        }
+
+        void IOCL_CTClient::InvokeIOCL(const string &request, uint64_t myshardtag,
+                                continuation_t continuation,
+                                error_continuation_t error_continuation)
+        {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
@@ -78,8 +84,32 @@ namespace replication
                 new PendingRequest(request, reqId, continuation, timer);
 
             pendingReqs[reqId] = req;
-            SendRequest(req);
+
+            /*------------------ Send Request ------------------*/
+            proto::RequestMessage reqMsg;
+            // req->request is the string type of LinearizeableOperation
+            reqMsg.mutable_req()->set_op(request);
+            reqMsg.mutable_req()->set_clientid(clientid);
+            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            Debug("Inside InvokeIOCL: the shardtag is %lu", myshardtag);
+            reqMsg.set_shardtag(myshardtag);
+
+            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
+            // XXX Try sending only to (what we think is) the leader first
+            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
+            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            {
+                req->timer->Reset();
+            }
+            else
+            {
+                Warning("Could not send request to replicas.");
+                pendingReqs.erase(req->clientReqId);
+                delete req;
+            }
         }
+
+
 
         void IOCL_CTClient::InvokeUnlogged(int replicaIdx, const string &request,
                                       continuation_t continuation,
@@ -119,6 +149,7 @@ namespace replication
         void IOCL_CTClient::SendRequest(const PendingRequest *req)
         {
             proto::RequestMessage reqMsg;
+            // req->request is the string type of LinearizeableOperation
             reqMsg.mutable_req()->set_op(req->request);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);

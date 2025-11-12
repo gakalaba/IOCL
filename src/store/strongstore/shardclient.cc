@@ -26,6 +26,7 @@
  *
  **********************************************************************/
 #include "store/strongstore/shardclient.h"
+#include "store/common/iocl_utils.h"
 
 #include "lib/configuration.h"
 
@@ -49,6 +50,7 @@ namespace strongstore
 
         // TODO: Remove hardcoding
         replica_ = 0;
+        seqno = 0;
     }
 
     ShardClient::~ShardClient() {}
@@ -282,6 +284,10 @@ namespace strongstore
         pendingOp->ocb = ocb;
         pendingOp->otcb = otcb;
 
+        uint64_t myshardtag = CreateTag(client_id_, seqno);
+        Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
+        seqno++;
+
         // TODO: Setup timeout
         op_.Clear();
         op_.mutable_rid()->set_client_id(client_id_);
@@ -290,6 +296,7 @@ namespace strongstore
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);
+        op_.set_shardtag(myshardtag);
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);

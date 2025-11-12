@@ -53,6 +53,9 @@ namespace replication
             virtual ~IOCL_CTClient();
             virtual void Invoke(const string &request, continuation_t continuation,
                                 error_continuation_t error_continuation = nullptr);
+            virtual void InvokeIOCL(const string &request, uint64_t myshardtag,
+                                    continuation_t continuation,
+                                    error_continuation_t error_continuation = nullptr);
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,

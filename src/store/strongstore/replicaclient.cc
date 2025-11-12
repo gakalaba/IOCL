@@ -73,7 +73,15 @@ namespace strongstore
         // create request
         string request_str;
 
+        // grab IOCL metadata
+        uint64_t myShardTag = 0;
+        if (msg.has_shardtag()) {
+            myShardTag = msg.shardtag();
+            msg.clear_shardtag();
+        }
+
         msg.SerializeToString(&request_str);
+        // Debug("for the purpose of debugging, i'd like to check the size of both strings: before: %lu VS. after:", request_str.size());
 
         uint64_t reqId = lastReqId++;
         PendingOperation *pendingOperation = new PendingOperation(reqId);
@@ -89,8 +97,9 @@ namespace strongstore
                         std::placeholders::_1, std::placeholders::_2));
                 break;
             case LinearizableProtocol::IOCL_CT:
-                client->Invoke(
+                client->InvokeIOCL(
                     request_str,
+                    myShardTag,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;

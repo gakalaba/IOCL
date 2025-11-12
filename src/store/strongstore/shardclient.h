@@ -282,6 +282,9 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+
+        // IOCL Operation Metadata
+        uint64_t seqno;
     };
 
 } // namespace strongstore

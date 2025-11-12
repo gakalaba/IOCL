@@ -174,6 +174,7 @@ message LinearizeableOperation {
     required string op = 3;
     required string key = 4;
     required string value = 5;
+    optional uint64 shardtag = 6;
 }
 
 message LinearizeableReply {

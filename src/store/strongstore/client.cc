@@ -36,7 +36,6 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "store/common/common.h"
-// #include "store/common/iocl_utils.h"
 
 using namespace std;
 

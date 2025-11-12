@@ -82,4 +82,12 @@ Client::ReceiveMessage(const TransportAddress &remote,
           type.c_str());
 }
 
+void
+Client::InvokeIOCL(const string &request, uint64_t myshardtag,
+                                    continuation_t continuation,
+                                    error_continuation_t error_continuation)
+{
+    Panic("Shouldn't be calling this if not IOCL");
+}
+
 } // namespace replication

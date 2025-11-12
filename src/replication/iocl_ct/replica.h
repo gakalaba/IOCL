@@ -59,14 +59,15 @@ namespace replication
             viewstamp_t viewstamp;
             IoclEntryState state;
             Request request;
+            uint64_t myShardTag;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request)
-                : viewstamp(viewstamp), state(state), request(request) {}
+                    const Request &request, uint64_t shardtag)
+                : viewstamp(viewstamp), state(state), request(request), myShardTag(shardtag) {}
             virtual ~IoclEntry() {}
         };
 
@@ -85,6 +86,7 @@ namespace replication
             view_t view;
             opnum_t lastCommitted;
             opnum_t lastOp;
+            opnum_t lastUnorderedOp;
             view_t lastRequestStateTransferView;
             opnum_t lastRequestStateTransferOpnum;
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
@@ -93,10 +95,12 @@ namespace replication
             proto::UnorderedPrepareMessage lastUnorderedPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
+            opnum_t lastUnorderedBatchEnd;
 
             Log log;
             // IOCL_CT specific structures
             std::unordered_map<uint64_t, IoclEntry> unorderedBag;
+            std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {

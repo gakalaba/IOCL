@@ -40,14 +40,17 @@ message PrepareOKMessage {
 
 message UnorderedPrepareMessage {
     required uint64 view = 1;
-    repeated Request request = 2;
-    repeated uint64 shardTags = 3;
+    required uint64 opnum = 2;
+    required uint64 batchstart = 3;
+    repeated Request request = 4;
+    repeated uint64 shardTags = 5;
 }
 
 message UnorderedPrepareOKMessage {
     required uint64 view = 1;
-    repeated uint64 shardTags = 2;
-    required uint32 replicaIdx = 3;
+    required uint64 opnum = 2;
+    required uint32 batchstart = 3;
+    required uint32 replicaIdx = 4;
 }
 
 message CommitMessage {
