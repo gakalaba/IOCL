@@ -83,7 +83,7 @@ Client::ReceiveMessage(const TransportAddress &remote,
 }
 
 void
-Client::InvokeIOCL(const string &request, uint64_t myshardtag,
+Client::InvokeIOCL(LinearizeableOperation &msg,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation)
 {

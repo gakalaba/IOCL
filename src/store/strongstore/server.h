@@ -214,7 +214,7 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
-        void HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg);
+        void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
@@ -279,7 +279,7 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(opnum_t opnum, strongstore::proto::LinearizeableOperation &op, string &response);
+        void ReplicaUpcallAppRequest(opnum_t opnum, replication::LinearizeableOperation &op, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -308,7 +308,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
 
         proto::Get get_;
-        proto::LinearizeableOperation op_;
+        replication::LinearizeableOperation op_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

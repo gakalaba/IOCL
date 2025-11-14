@@ -71,7 +71,7 @@ class Client : public TransportReceiver {
 
     virtual void Invoke(const string &request, continuation_t continuation,
                         error_continuation_t error_continuation = nullptr) = 0;
-    virtual void InvokeIOCL(const string &request, uint64_t myshardtag,
+    virtual void InvokeIOCL(LinearizeableOperation &msg,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation = nullptr);
     virtual void InvokeUnlogged(

@@ -269,7 +269,10 @@ namespace strongstore
     void ShardClient::SendOperation(uint64_t app_request_id, const std::string op,
                                   const std::string &key, const std::string &value,
                                   op_callback ocb, op_timeout_callback otcb,
-                                  uint32_t timeout)
+                                  uint32_t timeout,
+                                  std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                                  std::list<uint16_t> &outstandingOperationRefCount,
+                                  bool isIOCL)
     {
         // Send the operation to appropriate shard.
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
@@ -284,10 +287,6 @@ namespace strongstore
         pendingOp->ocb = ocb;
         pendingOp->otcb = otcb;
 
-        uint64_t myshardtag = CreateTag(client_id_, seqno);
-        Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
-        seqno++;
-
         // TODO: Setup timeout
         op_.Clear();
         op_.mutable_rid()->set_client_id(client_id_);
@@ -296,7 +295,35 @@ namespace strongstore
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);
-        op_.set_shardtag(myshardtag);
+
+        // Set the optional fields (myshardtag and pred_list) if IOCL
+        if (isIOCL)
+        {
+            uint64_t myshardtag = CreateTag(client_id_, seqno);
+            Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
+            seqno++;
+            op_.set_shardtag(myshardtag);
+
+            // Construct predecessor list
+            auto it1 = outstandingOperationList.begin();
+            auto it2 = outstandingOperationRefCount.begin();
+            pendingOp->pred_list.reserve(outstandingOperationList.size());
+            Debug("about to add %lu predecessor entries", outstandingOperationList.size());
+            while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
+                // increment refcount entry
+                *it2++;
+                // Add this entry to predecessor list and the RPC message
+                op_.add_predlist((*it1).first);
+                op_.add_shardlist((*it1).second);
+                pendingOp->pred_list.push_back(*it1);
+                Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
+                ++it1;
+                ++it2;
+            }
+            // Add self to outstanding operations and refcount lists
+            outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
+            outstandingOperationRefCount.push_back(1);
+        }
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
@@ -321,7 +348,8 @@ namespace strongstore
 
         PendingOperation *op = itr->second;
         uint64_t app_request_id = op->transaction_id;
-        op_callback ocb = op->ocb;
+        op_callback ocb = std::move(op->ocb); // wrapped in move to make efficient
+        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
         pendingOps.erase(itr);
         delete op;
 
@@ -330,7 +358,7 @@ namespace strongstore
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 
-        ocb(status, retval);
+        ocb(status, retval, pred_list);
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

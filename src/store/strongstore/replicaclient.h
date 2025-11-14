@@ -42,6 +42,7 @@
 #include "store/common/transaction.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/strongstore/common.h"
+#include "replication/common/request.pb.h"
 
 namespace strongstore
 {
@@ -68,7 +69,7 @@ namespace strongstore
         virtual ~ReplicaClient();
 
         void SendOperation(uint64_t request_id,
-                         strongstore::proto::LinearizeableOperation &msg,
+                         replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout);
 

@@ -48,11 +48,11 @@ namespace strongstore
     {
         Debug("making replica client");
         switch (linproto) {
-            case LinearizableProtocol::VR:
+            case LinearizableProtocol::PROTO_VR:
                 client = new replication::vr::VRClient(config_, transport_, shard_idx_,
                                                     client_id_);
                 break;
-            case LinearizableProtocol::IOCL_CT:
+            case LinearizableProtocol::PROTO_IOCL_CT:
                 client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
                                                             client_id_);
                 break;
@@ -64,25 +64,13 @@ namespace strongstore
     ReplicaClient::~ReplicaClient() { delete client; }
 
     void ReplicaClient::SendOperation(uint64_t request_id,
-                         strongstore::proto::LinearizeableOperation &msg,
+                         replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout)
     {
         Debug("[shard %i] SendRequest sending msg", shard_idx_);
 
-        // create request
         string request_str;
-
-        // grab IOCL metadata
-        uint64_t myShardTag = 0;
-        if (msg.has_shardtag()) {
-            myShardTag = msg.shardtag();
-            msg.clear_shardtag();
-        }
-
-        msg.SerializeToString(&request_str);
-        // Debug("for the purpose of debugging, i'd like to check the size of both strings: before: %lu VS. after:", request_str.size());
-
         uint64_t reqId = lastReqId++;
         PendingOperation *pendingOperation = new PendingOperation(reqId);
         pendingOperations[reqId] = pendingOperation;
@@ -90,16 +78,18 @@ namespace strongstore
         pendingOperation->otcb = otcb;
 
         switch (linproto_) {
-            case LinearizableProtocol::VR:
+            case LinearizableProtocol::PROTO_VR:
+                // create request
+                msg.SerializeToString(&request_str);
+
                 client->Invoke(
                     request_str,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
-            case LinearizableProtocol::IOCL_CT:
+            case LinearizableProtocol::PROTO_IOCL_CT:
                 client->InvokeIOCL(
-                    request_str,
-                    myShardTag,
+                    msg,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;

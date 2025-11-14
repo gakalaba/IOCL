@@ -40,8 +40,10 @@ namespace strongstore
 
     enum LinearizableProtocol
     {
-        VR,
-        IOCL_CT
+        PROTO_UNKNOWN,
+        PROTO_STRONG,
+        PROTO_VR,
+        PROTO_IOCL_CT
     };
 
 } // namespace strongstore

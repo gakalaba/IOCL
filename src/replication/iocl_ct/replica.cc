@@ -402,6 +402,8 @@ namespace replication
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
+                PredListHolder* pl = up.add_predlists();
+                pl->CopyFrom(entry.predList);
             }
             lastUnorderedPrepare = up;
 
@@ -541,7 +543,7 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleRequest(const TransportAddress &remote,
-                                      const RequestMessage &msg)
+                                      RequestMessage &msg)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
@@ -630,17 +632,24 @@ namespace replication
 
                 /* Add the request to the unordered bag */
                 uint64_t shardtag = msg.shardtag();
+
                 auto it = unorderedBag.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(shardtag),
-                    std::forward_as_tuple(v, IOCL_STATE_PERSISTED, request, shardtag)
-                ).first;
-
+                    std::forward_as_tuple(
+                                    v,
+                                    IOCL_STATE_PERSISTED,
+                                    request,
+                                    shardtag)).first;
                 IoclEntry *entryPtr = &it->second;
+
+                // Grab the msg.predlist() efficiently and store
+                entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
+                // Add entry to "ordered" unorderedBag (for batching)
                 unorderedBagByOpnum.emplace(v.opnum, entryPtr);
 
                 RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-                RDebug("also the shardtag is %lu, and the batchSize is %lu", shardtag, batchSize);
+                RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
                 if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
                 {
                     CloseUnorderedBatch();
@@ -853,7 +862,7 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepare(const TransportAddress &remote,
-                                      const UnorderedPrepareMessage &msg)
+                                      UnorderedPrepareMessage &msg)
         {
             RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM ">",
                    msg.view(), msg.opnum());
@@ -927,6 +936,8 @@ namespace replication
                 ).first;
 
                 IoclEntry *entryPtr = &it->second;
+                // Grab the msg.predlist() efficiently and store
+                entryPtr->predList.Swap(msg.mutable_predlists(i));
                 unorderedBagByOpnum.emplace(op, entryPtr);
                 i++;
             }

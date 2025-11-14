@@ -50,8 +50,8 @@ typedef std::function<void(int, const std::string &, const std::string &)>
 typedef std::function<void(int, const std::string &, const std::string &)>
     put_timeout_callback;
 
-typedef std::function<void(int, const std::string &)> op_callback;
-typedef std::function<void(int, const std::string &)> op_timeout_callback;
+typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_callback;
+typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_timeout_callback;
 
 typedef std::function<void(transaction_status_t)> commit_callback;
 typedef std::function<void()> commit_timeout_callback;
@@ -108,6 +108,7 @@ class Client {
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
 
     virtual bool IsLinearizeable() = 0;
+    virtual bool IsIOCL() = 0;
 
     inline Stats &GetStats() { return stats; }
 

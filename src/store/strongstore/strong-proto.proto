@@ -168,15 +168,6 @@ message Reply {
      repeated uint64 notify_ros = 5;
 }
 
-message LinearizeableOperation {
-    required RequestIDMessage rid = 1;
-    required uint64 transaction_id = 2;
-    required string op = 3;
-    required string key = 4;
-    required string value = 5;
-    optional uint64 shardtag = 6;
-}
-
 message LinearizeableReply {
     required RequestIDMessage rid = 1;
     // 0 = OK

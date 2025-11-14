@@ -7,6 +7,11 @@ package replication.iocl_ct.proto;
 message RequestMessage {
     required replication.Request req = 1;
     required uint64 shardTag = 2;
+    repeated uint64 predList = 3;
+}
+
+message PredListHolder {
+    repeated uint64 predlist = 1;
 }
 
 message ReplyMessage {
@@ -44,6 +49,7 @@ message UnorderedPrepareMessage {
     required uint64 batchstart = 3;
     repeated Request request = 4;
     repeated uint64 shardTags = 5;
+    repeated PredListHolder predLists = 6;
 }
 
 message UnorderedPrepareOKMessage {

@@ -68,7 +68,7 @@ namespace replication
             Panic("Should never call this");
         }
 
-        void IOCL_CTClient::InvokeIOCL(const string &request, uint64_t myshardtag,
+        void IOCL_CTClient::InvokeIOCL(LinearizeableOperation &msg,
                                 continuation_t continuation,
                                 error_continuation_t error_continuation)
         {
@@ -76,23 +76,27 @@ namespace replication
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
 
+            string request_str;
+            msg.SerializeToString(&request_str);
+
             uint64_t reqId = ++lastReqId;
             Timeout *timer =
                 new Timeout(transport, 500, [this, reqId]()
                             { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request, reqId, continuation, timer);
+                new PendingRequest(request_str, reqId, continuation, timer);
 
             pendingReqs[reqId] = req;
 
             /*------------------ Send Request ------------------*/
             proto::RequestMessage reqMsg;
             // req->request is the string type of LinearizeableOperation
-            reqMsg.mutable_req()->set_op(request);
+            reqMsg.mutable_req()->set_op(request_str);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-            Debug("Inside InvokeIOCL: the shardtag is %lu", myshardtag);
-            reqMsg.set_shardtag(myshardtag);
+            reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
+            Debug("Inside InvokeIOCL: the shardtag is %lu", msg.shardtag());
+            reqMsg.set_shardtag(msg.shardtag());
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
@@ -107,6 +111,9 @@ namespace replication
                 pendingReqs.erase(req->clientReqId);
                 delete req;
             }
+
+            // TODO Issue coordination requests
+            // msg.shardlist()
         }
 
 

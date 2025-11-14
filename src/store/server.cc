@@ -348,7 +348,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, strongstore::LinearizableProtocol::IOCL_CT, FLAGS_debug_stats);
+                                         tport, strongstore::LinearizableProtocol::PROTO_IOCL_CT, FLAGS_debug_stats);
         break;
     }
     case PROTO_VR:
@@ -357,7 +357,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, strongstore::LinearizableProtocol::VR, FLAGS_debug_stats);
+                                         tport, strongstore::LinearizableProtocol::PROTO_VR, FLAGS_debug_stats);
         break;
     }
     default:

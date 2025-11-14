@@ -42,7 +42,8 @@ using namespace std;
 namespace strongstore
 {
 
-    Client::Client(Consistency consistency, const NetworkConfiguration &net_config,
+    Client::Client(Consistency consistency, LinearizableProtocol replication_proto,
+                   const NetworkConfiguration &net_config,
                    const std::string &client_region,
                    transport::Configuration &config, uint64_t client_id,
                    int nShards, int closestReplica, Transport *transport,
@@ -63,6 +64,7 @@ namespace strongstore
           tt_{tt},
           next_transaction_id_{client_id_ << 26},
           consistency_{consistency},
+          replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
           debug_stats_{debug_stats}
     {
@@ -116,6 +118,11 @@ namespace strongstore
     bool Client::IsLinearizeable()
     {
         return (consistency_ == LIN);
+    }
+
+    bool Client::IsIOCL()
+    {
+        return (replication_proto_ == PROTO_IOCL_CT);
     }
 
     void Client::CalculateCoordinatorChoices()
@@ -626,20 +633,62 @@ namespace strongstore
 
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
+        ASSERT(i >= 0);
 
-        auto ocb1 = [ocb, session = std::ref(session)](int s, const std::string &v)
+        auto ocb1 = [ocb, m = std::ref(outstandingOperationRefCount_), 
+                          l = std::ref(outstandingOperationList_),
+                          session = std::ref(session)](int s, const std::string &v, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             session.get().set_executing();
-            ocb(s, v);
+            auto it1 = p.begin();
+            auto it2 = m.get().begin();
+            auto it3 = l.get().begin();
+            // m and l are the same length, and p is guaranteed to be a prefix of l
+            // will never loop if VR, since pred_list is empty
+            while (it1 != p.end()) {
+                *it2--;
+                if (*it2 <= 0) {
+                    // remove from both lists
+                    Debug("Removing predecessor entry with tag %lu at shard %u", it1->first, it1->second);
+                    it2 = m.get().erase(it2);
+                    it3 = l.get().erase(it3);
+                } else {
+                    ++it2;
+                    ++it3;
+                }
+                ++it1;
+
+            }
+            ocb(s, v, p);
         };
 
-        auto otcb1 = [otcb, session = std::ref(session)](int s, const std::string &v)
+        auto otcb1 = [otcb, m = std::ref(outstandingOperationRefCount_), 
+                            l = std::ref(outstandingOperationList_),
+                            session = std::ref(session)](int s, const std::string &v, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             session.get().set_executing();
-            otcb(s, v);
+            auto it1 = p.begin();
+            auto it2 = m.get().begin();
+            auto it3 = l.get().begin();
+            // m and l are the same length, and p is guaranteed to be a prefix of l
+            while (it1 != p.end()) {
+                *it2--;
+                if (*it2 <= 0) {
+                    // remove from both lists
+                    Debug("Removing predecessor entry with tag %lu at shard %u", it1->first, it1->second);
+                    it2 = m.get().erase(it2);
+                    it3 = l.get().erase(it3);
+                } else {
+                    ++it2;
+                    ++it3;
+                }
+                ++it1;
+
+            }
+            otcb(s, v, p);
         };
 
-        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout);
+        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
     }
 
     /* Attempts to commit the ongoing transaction. */

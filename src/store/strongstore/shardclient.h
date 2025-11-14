@@ -57,6 +57,7 @@
 #include "store/common/transaction.h"
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
+#include "replication/common/request.pb.h"
 
 namespace strongstore
 {
@@ -77,8 +78,8 @@ namespace strongstore
     typedef std::function<void(int, const std::string &, const std::string &)> put_callback;
     typedef std::function<void(int, const std::string &, const std::string &)> put_timeout_callback;
 
-    typedef std::function<void(int, const std::string &)> op_callback;
-    typedef std::function<void(int, const std::string &)> op_timeout_callback;
+    typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_callback;
+    typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_timeout_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -128,7 +129,10 @@ namespace strongstore
         void SendOperation(uint64_t app_request_id, const std::string op,
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout);
+                         uint32_t timeout,
+                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                         std::list<uint16_t> &outstandingOperationRefCount,
+                         bool isIOCL);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -223,6 +227,7 @@ namespace strongstore
             std::string val;
             op_callback ocb;
             op_timeout_callback otcb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
         };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
@@ -255,7 +260,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
-        proto::LinearizeableOperation op_;
+        replication::LinearizeableOperation op_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
