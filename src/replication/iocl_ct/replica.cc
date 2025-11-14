@@ -476,12 +476,19 @@ namespace replication
             StartViewChangeMessage startViewChange;
             DoViewChangeMessage doViewChange;
             StartViewMessage startView;
+            SuccessorRequestMessage coordReq;
 
             if (type == request.GetTypeName())
             {
                 // Request arrived -- issue unordered prepare
                 request.ParseFromString(data);
                 HandleRequest(remote, request);
+            }
+            else if (type == coordReq.GetTypeName())
+            {
+                // Successor request arrived
+                coordReq.ParseFromString(data);
+                HandleCoordination(remote, coordReq);
             }
             else if (type == unorderedPrepare.GetTypeName())
             {
@@ -1067,6 +1074,20 @@ namespace replication
 
                 nullCommitTimeout->Reset();
             }
+        }
+
+        void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
+                                                const proto::SuccessorRequestMessage &msg)
+        {
+            Debug("Received COORDINATION request asking for predecessor %lu \
+                                from successor %lu for invocation order %lu \
+                                going back to shard index %d",
+                  msg.p(),
+                  msg.s(),
+                  msg.predidx(),
+                  msg.shardidx());
+            // NOTE the shardidx is int32
+            return;
         }
 
         void IOCL_CTReplica::HandleCommit(const TransportAddress &remote,

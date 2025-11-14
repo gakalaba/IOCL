@@ -166,6 +166,8 @@ namespace replication
                                proto::UnorderedPrepareMessage &msg);
             void HandleUnorderedPrepareOK(const TransportAddress &remote,
                                  const proto::UnorderedPrepareOKMessage &msg);
+            void HandleCoordination(const TransportAddress &remote,
+                                 const proto::SuccessorRequestMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleRequestStateTransfer(

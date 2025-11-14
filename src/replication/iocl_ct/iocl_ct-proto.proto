@@ -59,6 +59,19 @@ message UnorderedPrepareOKMessage {
     required uint32 replicaIdx = 4;
 }
 
+message SuccessorRequestMessage {
+    required uint64 p = 1;
+    required uint64 s = 2;
+    required uint64 predIdx = 3;
+    required int32 shardIdx = 4;
+}
+
+message PredecessorReplyMessage {
+    required int64 arrivalTs = 1;
+    required uint64 s = 2;
+    required uint64 predIdx = 3;
+}
+
 message CommitMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;    

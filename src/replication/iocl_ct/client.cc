@@ -51,7 +51,7 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
-            Debug("IOCL_CTClient created");
+            Debug("IOCL_CTClient created, we are group %u with clientid %lu", group, clientid);
         }
 
         IOCL_CTClient::~IOCL_CTClient()
@@ -86,7 +86,24 @@ namespace replication
             reqMsg.set_shardtag(msg.shardtag());
             msg.clear_shardtag();
             msg.clear_predlist();
-            // TODO issue coordination reqeusts here
+            // Issue coordination requests
+            proto::SuccessorRequestMessage coordReqMsg;
+            coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
+            coordReqMsg.set_shardidx(group); // who pred should return to??
+            for (int i = 0; i < reqMsg.predlist().size(); i++)
+            {
+                uint64_t predShardTag = reqMsg.predlist(i);
+                coordReqMsg.set_p(predShardTag);
+                coordReqMsg.set_predidx(i);
+                uint64_t sendTo = msg.shardlist(i);
+                Debug("SENDING %dth COORD REQUEST for predecessor_tag %lu to shard %lu",
+                      i, predShardTag, sendTo);
+                // XXX Try sending only to (what we think is) the leader first
+                if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
+                {
+                    Warning("Could not send request to replicas.");
+                }
+            }
             msg.clear_shardlist();
             Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
 
@@ -120,9 +137,6 @@ namespace replication
                 pendingReqs.erase(req->clientReqId);
                 delete req;
             }
-
-            // TODO Issue coordination requests
-            // msg.shardlist()
         }
 
 
