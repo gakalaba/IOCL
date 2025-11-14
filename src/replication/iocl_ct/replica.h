@@ -61,6 +61,7 @@ namespace replication
             Request request;
             uint64_t myShardTag;
             proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
+            // uint64_t arrivalTs;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
@@ -102,10 +103,16 @@ namespace replication
             opnum_t lastUnorderedBatchEnd;
 
             Log log;
-            // IOCL_CT specific structures
+            // std::map<uint64_t, IoclEntry> orderedLog;
+
+            /*******************************/
+            /* IOCL_CT specific structures */
+            /*******************************/
             std::unordered_map<uint64_t, IoclEntry> unorderedBag;
             std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
+            uint64_t shardTS;
+
             struct ClientTableEntry
             {
                 uint64_t lastReqId;

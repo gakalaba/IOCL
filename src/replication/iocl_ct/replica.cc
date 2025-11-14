@@ -69,10 +69,12 @@ namespace replication
             this->status = STATUS_NORMAL;
             this->view = 0;
             this->lastOp = 0;
+            this->lastUnorderedOp = 0;
             this->lastCommitted = 0;
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
+            lastUnorderedBatchEnd = 0;
 
             if (batchSize > 1)
             {
@@ -87,8 +89,8 @@ namespace replication
                             { SendNullCommit(); });
             this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
                                                      {
-        this->lastRequestStateTransferView = 0;
-        this->lastRequestStateTransferOpnum = 0; });
+                this->lastRequestStateTransferView = 0;
+                this->lastRequestStateTransferOpnum = 0; });
             this->stateTransferTimeout->Start();
             this->resendPrepareTimeout =
                 new Timeout(transport, 500, [this]()
@@ -122,6 +124,7 @@ namespace replication
             // Avoid slow down from rehashing of maps
             unorderedBag.reserve(200000);
             unorderedBagByOpnum.reserve(200000);
+            shardTS = 0;
 
         }
 
@@ -728,16 +731,33 @@ namespace replication
                     ++this->lastOp;
                     v.view = this->view;
                     v.opnum = this->lastOp;
+                    // entry->viewstamp = v;
                     RDebug("Persisted REQUEST unordered, keeps viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
                     /* Add the request to my log */
-                    log.Append(v, entry->request, LOG_STATE_PREPARED);
+                    auto &new_entry = log.Append(v, entry->request, LOG_STATE_PREPARED);
+
+                    /* Assign it an arrival timestamp */
+                    new_entry.arrivalTs = shardTS;
+                    shardTS++;
+
+                    /* For now, set state to READY */
+                    new_entry.other_state = IOCL_STATE_READY;
+
                     /* And also remove it from the unordered bag */
                     Debug("removing from unordered bag!");
                     unorderedBag.erase(entry->myShardTag);
                     unorderedBagByOpnum.erase(pair);
                     Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
                            unorderedBag.size(), unorderedBagByOpnum.size());
+
+                    // /* Move entry from unorderedBag to sorted orderedLog*/
+                    // Debug("moving from unordered bag to ordered log!");
+                    // auto iocle = unorderedBag.extract(entry->myShardTag);
+                    // orderedLog.insert(std::move(iocle));
+                    // unorderedBagByOpnum.erase(pair);
+                    // Debug("size of unorderedBag, unorderedBagByOpnum, and sortedLog are %lu and %lu and %lu respectively",
+                    //        unorderedBag.size(), unorderedBagByOpnum.size(), orderedLog.size());
                 }
                 
 
@@ -852,7 +872,11 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                auto &new_entry = log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                // TODO REMOVE THIS LATER
+                new_entry.other_state = IOCL_STATE_READY;
+                new_entry.arrivalTs = shardTS;
+                shardTS++;
                 UpdateClientTable(req);
                 /* And also remove it from the unordered bag */
                 //TODO
