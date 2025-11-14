@@ -402,6 +402,7 @@ namespace replication
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
+                Debug("adding pred list to UnorderedPrepareMessage");
                 PredListHolder* pl = up.add_predlists();
                 pl->CopyFrom(entry.predList);
             }
@@ -547,6 +548,11 @@ namespace replication
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
+            Debug("Inside HandleRequest, request msg looks like clientid: %lu, clientreqid: %lu, op: %s",
+                  msg.req().clientid(), msg.req().clientreqid(),
+                  (char *)msg.req().op().c_str());
+            Debug("msg shardtag is %lu", msg.shardtag());
+            Debug("msg predlist size is %d", msg.predlist().size());
 
             if (status != STATUS_NORMAL)
             {
@@ -612,59 +618,61 @@ namespace replication
             ClientTableEntry &cte = clientTable[msg.req().clientid()];
 
             // Check whether this request should be committed to replicas
-            if (!replicate)
+            ASSERT(replicate);
+            Request request;
+            request.set_op(res);
+            request.set_clientid(msg.req().clientid());
+            request.set_clientreqid(msg.req().clientreqid());
+
+            /* Assign it an opnum within this view --> this is 
+                strictly to compy with quorum checking which 
+                currently is unique per viewstamp_t */
+            ++this->lastUnorderedOp;
+            v.view = this->view;
+            v.opnum = this->lastUnorderedOp;
+
+            /* Add the request to the unordered bag */
+            uint64_t shardtag = msg.shardtag();
+
+            auto it = unorderedBag.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(shardtag),
+                std::forward_as_tuple(
+                                v,
+                                IOCL_STATE_PERSISTED,
+                                request,
+                                shardtag)).first;
+            IoclEntry *entryPtr = &it->second;
+
+            // Grab the msg.predlist() efficiently and store
+            RDebug("Before swap, incoming size = %d",
+                    msg.predlist().size());
+            RDebug("Before swap, local size = %d",
+                    entryPtr->predList.predlist_size());
+            entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
+            RDebug("After swap, incoming size = %d",
+                    msg.predlist().size());
+            RDebug("After swap, local size = %d",
+                    entryPtr->predList.predlist_size());
+
+            // Add entry to "ordered" unorderedBag (for batching)
+            unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+
+            RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+            RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
+            if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
             {
-                Panic("should always be replicating with IOCL protocol");
+                CloseUnorderedBatch();
             }
             else
             {
-                Request request;
-                request.set_op(res);
-                request.set_clientid(msg.req().clientid());
-                request.set_clientreqid(msg.req().clientreqid());
-
-                /* Assign it an opnum within this view --> this is 
-                   strictly to compy with quorum checking which 
-                   currently is unique per viewstamp_t */
-                ++this->lastUnorderedOp;
-                v.view = this->view;
-                v.opnum = this->lastUnorderedOp;
-
-                /* Add the request to the unordered bag */
-                uint64_t shardtag = msg.shardtag();
-
-                auto it = unorderedBag.emplace(
-                    std::piecewise_construct,
-                    std::forward_as_tuple(shardtag),
-                    std::forward_as_tuple(
-                                    v,
-                                    IOCL_STATE_PERSISTED,
-                                    request,
-                                    shardtag)).first;
-                IoclEntry *entryPtr = &it->second;
-
-                // Grab the msg.predlist() efficiently and store
-                entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
-                // Add entry to "ordered" unorderedBag (for batching)
-                unorderedBagByOpnum.emplace(v.opnum, entryPtr);
-
-                RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-                RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
-                if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
+                RDebug("Keeping in unordered batch");
+                if (!closeUnorderedBatchTimeout->Active())
                 {
-                    CloseUnorderedBatch();
+                    closeUnorderedBatchTimeout->Start();
                 }
-                else
-                {
-                    RDebug("Keeping in unordered batch");
-                    if (!closeUnorderedBatchTimeout->Active())
-                    {
-                        closeUnorderedBatchTimeout->Start();
-                    }
-                }
-                nullCommitTimeout->Reset();
             }
-
+            nullCommitTimeout->Reset();
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
@@ -716,7 +724,7 @@ namespace replication
                     }
                     IoclEntry *entry = pair->second;
 
-                    /* Assign it a real opnum for this view */
+                    /* Assign it a real opnum for this view in the ordered log */
                     ++this->lastOp;
                     v.view = this->view;
                     v.opnum = this->lastOp;
@@ -725,8 +733,11 @@ namespace replication
                     /* Add the request to my log */
                     log.Append(v, entry->request, LOG_STATE_PREPARED);
                     /* And also remove it from the unordered bag */
+                    Debug("removing from unordered bag!");
                     unorderedBag.erase(entry->myShardTag);
                     unorderedBagByOpnum.erase(pair);
+                    Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
+                           unorderedBag.size(), unorderedBagByOpnum.size());
                 }
                 
 
@@ -902,7 +913,7 @@ namespace replication
             if (msg.opnum() <= this->lastUnorderedOp)
             {
                 Panic("hopefully won't be going through this case");
-                RDebug("Ignoring PREPARE; already prepared that operation");
+                RDebug("Ignoring UNORDERED_PREPARE; already prepared that operation");
                 // Resend the prepareOK message
                 PrepareOKMessage reply;
                 reply.set_view(msg.view());
@@ -918,6 +929,7 @@ namespace replication
 
             // Add operations to the unordered bag
             int i = 0;
+            Debug("adding to unordered bag from opnum %lu to %lu", msg.batchstart(), msg.opnum());
             opnum_t op = msg.batchstart() - 1;
             for (const auto &req : msg.request())
             {
@@ -937,7 +949,15 @@ namespace replication
 
                 IoclEntry *entryPtr = &it->second;
                 // Grab the msg.predlist() efficiently and store
+                RDebug("Before swap, incoming size = %d",
+                       msg.predlists(i).predlist_size());
+                RDebug("Before swap, local size = %d",
+                       entryPtr->predList.predlist_size());
                 entryPtr->predList.Swap(msg.mutable_predlists(i));
+                RDebug("After swap, incoming size = %d",
+                       msg.predlists(i).predlist_size());
+                RDebug("After swap, local size = %d",
+                       entryPtr->predList.predlist_size());
                 unorderedBagByOpnum.emplace(op, entryPtr);
                 i++;
             }

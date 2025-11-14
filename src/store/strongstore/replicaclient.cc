@@ -68,7 +68,9 @@ namespace strongstore
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout)
     {
-        Debug("[shard %i] SendRequest sending msg", shard_idx_);
+        Debug("[shard %i] ReplicaClient SendRequest sending msg", shard_idx_);
+        Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
+              msg.DebugString().c_str());
 
         string request_str;
         uint64_t reqId = lastReqId++;
@@ -80,7 +82,9 @@ namespace strongstore
         switch (linproto_) {
             case LinearizableProtocol::PROTO_VR:
                 // create request
+                Debug("Running VR: serializing LinearizeableOperation into string");
                 msg.SerializeToString(&request_str);
+                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
                 client->Invoke(
                     request_str,
@@ -88,6 +92,7 @@ namespace strongstore
                         std::placeholders::_1, std::placeholders::_2));
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
+                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
                 client->InvokeIOCL(
                     msg,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,

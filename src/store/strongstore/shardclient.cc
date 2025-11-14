@@ -299,12 +299,15 @@ namespace strongstore
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)
         {
+            Debug("IT IS IOCL!!! Setting myshardtag and pred_list");
             uint64_t myshardtag = CreateTag(client_id_, seqno);
             Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
             seqno++;
             op_.set_shardtag(myshardtag);
 
             // Construct predecessor list
+            Debug("Before: outstandingOperationRefCount_ size: %lu", outstandingOperationRefCount.size());
+            Debug("Before: outstandingOperationList_ size: %lu", outstandingOperationList.size());
             auto it1 = outstandingOperationList.begin();
             auto it2 = outstandingOperationRefCount.begin();
             pendingOp->pred_list.reserve(outstandingOperationList.size());
@@ -323,6 +326,12 @@ namespace strongstore
             // Add self to outstanding operations and refcount lists
             outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
             outstandingOperationRefCount.push_back(1);
+            Debug("After: outstandingOperationRefCount_ size: %lu", outstandingOperationRefCount.size());
+            Debug("After: outstandingOperationList_ size: %lu", outstandingOperationList.size());
+            Debug("the size of the op is %lu", op_.ByteSizeLong());
+        } else {
+            Debug("Not IOCL, so not setting myshardtag and pred_list");
+            Debug("the size of the op is %lu", op_.ByteSizeLong());
         }
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
@@ -350,6 +359,7 @@ namespace strongstore
         uint64_t app_request_id = op->transaction_id;
         op_callback ocb = std::move(op->ocb); // wrapped in move to make efficient
         std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
+        Debug("moving the pred_list of size %lu", pred_list.size());
         pendingOps.erase(itr);
         delete op;
 

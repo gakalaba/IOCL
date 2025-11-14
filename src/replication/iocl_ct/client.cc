@@ -76,7 +76,20 @@ namespace replication
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
 
+            Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
+                  msg.shardtag(), msg.predlist().size());
+            Debug("size of the message before: %lu", msg.ByteSizeLong());
             string request_str;
+            proto::RequestMessage reqMsg;
+            // We only want to stringify the operation, not the IOCL metadata
+            reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
+            reqMsg.set_shardtag(msg.shardtag());
+            msg.clear_shardtag();
+            msg.clear_predlist();
+            // TODO issue coordination reqeusts here
+            msg.clear_shardlist();
+            Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
+
             msg.SerializeToString(&request_str);
 
             uint64_t reqId = ++lastReqId;
@@ -89,14 +102,10 @@ namespace replication
             pendingReqs[reqId] = req;
 
             /*------------------ Send Request ------------------*/
-            proto::RequestMessage reqMsg;
-            // req->request is the string type of LinearizeableOperation
+            // req->request is the string type of LinearizeableOperation without IOCL metadata
             reqMsg.mutable_req()->set_op(request_str);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-            reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
-            Debug("Inside InvokeIOCL: the shardtag is %lu", msg.shardtag());
-            reqMsg.set_shardtag(msg.shardtag());
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
