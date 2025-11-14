@@ -306,15 +306,12 @@ namespace strongstore
             op_.set_shardtag(myshardtag);
 
             // Construct predecessor list
-            Debug("Before: outstandingOperationRefCount_ size: %lu", outstandingOperationRefCount.size());
-            Debug("Before: outstandingOperationList_ size: %lu", outstandingOperationList.size());
             auto it1 = outstandingOperationList.begin();
             auto it2 = outstandingOperationRefCount.begin();
             pendingOp->pred_list.reserve(outstandingOperationList.size());
-            Debug("about to add %lu predecessor entries", outstandingOperationList.size());
             while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
                 // increment refcount entry
-                *it2++;
+                (*it2)++;
                 // Add this entry to predecessor list and the RPC message
                 op_.add_predlist((*it1).first);
                 op_.add_shardlist((*it1).second);
@@ -326,8 +323,14 @@ namespace strongstore
             // Add self to outstanding operations and refcount lists
             outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
             outstandingOperationRefCount.push_back(1);
-            Debug("After: outstandingOperationRefCount_ size: %lu", outstandingOperationRefCount.size());
-            Debug("After: outstandingOperationList_ size: %lu", outstandingOperationList.size());
+            // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
+            auto itl = outstandingOperationList.begin();
+            auto itr = outstandingOperationRefCount.begin();
+            for (;
+                 itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
+                 ++itl, ++itr) {
+                Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+            }
             Debug("the size of the op is %lu", op_.ByteSizeLong());
         } else {
             Debug("Not IOCL, so not setting myshardtag and pred_list");

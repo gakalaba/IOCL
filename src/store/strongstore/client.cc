@@ -634,61 +634,97 @@ namespace strongstore
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
         ASSERT(i >= 0);
+        bool isIOCL = IsIOCL();
 
-        auto ocb1 = [ocb, m = std::ref(outstandingOperationRefCount_), 
-                          l = std::ref(outstandingOperationList_),
+        auto ocb1 = [this, ocb,
+                          isIOCL,
                           session = std::ref(session)](int s, const std::string &v, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             Debug("returning from SendOperation back to client");
-            Debug("Before: outstandingOperationRefCount_ size: %lu", m.get().size());
-            Debug("Before: outstandingOperationList_ size: %lu", l.get().size());
             session.get().set_executing();
-            auto it1 = p.begin();
-            auto it2 = m.get().begin();
-            auto it3 = l.get().begin();
-            // m and l are the same length, and p is guaranteed to be a prefix of l
-            // will never loop if VR, since pred_list is empty
-            while (it1 != p.end()) {
-                *it2--;
-                if (*it2 <= 0) {
-                    // remove from both lists
-                    Debug("Refcount fell below 0 --> Removing predecessor entry with tag %lu at shard %u", it1->first, it1->second);
-                    it2 = m.get().erase(it2);
-                    it3 = l.get().erase(it3);
-                } else {
-                    ++it2;
-                    ++it3;
+            if (isIOCL) {
+                auto it1 = p.begin();
+                auto it2 = this->outstandingOperationRefCount_.begin();
+                auto it3 = this->outstandingOperationList_.begin();
+                // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
+                // will never loop if VR, since pred_list is empty
+                while (it1 != p.end()) {
+                    (*it2)--;
+                    if ((*it2) <= 0) {
+                        // remove from both lists
+                        Debug("Refcount fell below 0 --> Removing predecessor entry with (tag %lu at shard %u)", it1->first, it1->second);
+                        it2 = this->outstandingOperationRefCount_.erase(it2);
+                        it3 = this->outstandingOperationList_.erase(it3);
+                    } else {
+                        ++it2;
+                        ++it3;
+                    }
+                    ++it1;
                 }
-                ++it1;
-
+                // afterwards, it2 and it3 should be 
+                // pointing to the entry itself, remove it
+                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
+                (*it2)--;
+                if ((*it2) <= 0) {
+                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                    it2 = this->outstandingOperationRefCount_.erase(it2);
+                    it3 = this->outstandingOperationList_.erase(it3);
+                }
+                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount
+                auto itl = this->outstandingOperationList_.begin();
+                auto itr = this->outstandingOperationRefCount_.begin();
+                for (;
+                    itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
+                    ++itl, ++itr) {
+                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+                }
             }
-            Debug("After: outstandingOperationRefCount_ size: %lu", m.get().size());
-            Debug("After: outstandingOperationList_ size: %lu", l.get().size());
             ocb(s, v, p);
         };
 
-        auto otcb1 = [otcb, m = std::ref(outstandingOperationRefCount_), 
-                            l = std::ref(outstandingOperationList_),
+        auto otcb1 = [this, otcb,
+                            isIOCL,
                             session = std::ref(session)](int s, const std::string &v, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             session.get().set_executing();
-            auto it1 = p.begin();
-            auto it2 = m.get().begin();
-            auto it3 = l.get().begin();
-            // m and l are the same length, and p is guaranteed to be a prefix of l
-            while (it1 != p.end()) {
-                *it2--;
-                if (*it2 <= 0) {
-                    // remove from both lists
-                    Debug("Removing predecessor entry with tag %lu at shard %u", it1->first, it1->second);
-                    it2 = m.get().erase(it2);
-                    it3 = l.get().erase(it3);
-                } else {
-                    ++it2;
-                    ++it3;
+            if (isIOCL) {
+                auto it1 = p.begin();
+                auto it2 = this->outstandingOperationRefCount_.begin();
+                auto it3 = this->outstandingOperationList_.begin();
+                // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
+                // will never loop if VR, since pred_list is empty
+                while (it1 != p.end()) {
+                    (*it2)--;
+                    if ((*it2) <= 0) {
+                        // remove from both lists
+                        Debug("Refcount fell below 0 --> Removing predecessor entry with (tag %lu at shard %u)", it1->first, it1->second);
+                        it2 = this->outstandingOperationRefCount_.erase(it2);
+                        it3 = this->outstandingOperationList_.erase(it3);
+                    } else {
+                        ++it2;
+                        ++it3;
+                    }
+                    ++it1;
                 }
-                ++it1;
-
+                // afterwards, it2 and it3 should be 
+                // pointing to the entry itself, remove it
+                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
+                (*it2)--;
+                if ((*it2) <= 0) {
+                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                    it2 = this->outstandingOperationRefCount_.erase(it2);
+                    it3 = this->outstandingOperationList_.erase(it3);
+                }
+                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount
+                auto itl = this->outstandingOperationList_.begin();
+                auto itr = this->outstandingOperationRefCount_.begin();
+                for (;
+                    itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
+                    ++itl, ++itr) {
+                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+                }
             }
             otcb(s, v, p);
         };
