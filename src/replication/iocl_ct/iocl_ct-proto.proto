@@ -62,14 +62,14 @@ message UnorderedPrepareOKMessage {
 message SuccessorRequestMessage {
     required uint64 p = 1;
     required uint64 s = 2;
-    required uint16 predIdx = 3;
+    required uint32 predIdx = 3;
     required int32 shardIdx = 4;
 }
 
 message PredecessorReplyMessage {
     required int64 arrivalTs = 1;
     required uint64 s = 2;
-    required uint16 predIdx = 3;
+    required uint32 predIdx = 3;
 }
 
 message CommitMessage {

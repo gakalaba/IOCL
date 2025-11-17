@@ -90,7 +90,7 @@ namespace replication
             proto::SuccessorRequestMessage coordReqMsg;
             coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
             coordReqMsg.set_shardidx(group); // who pred should return to??
-            for (uint16_t i = 0; i < reqMsg.predlist().size(); i++)
+            for (uint32_t i = 0; i < reqMsg.predlist().size(); i++)
             {
                 uint64_t predShardTag = reqMsg.predlist(i);
                 coordReqMsg.set_p(predShardTag);

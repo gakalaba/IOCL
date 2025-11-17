@@ -372,11 +372,11 @@ namespace replication
         void IOCL_CTReplica::ResendUnorderedPrepare()
         {
             ASSERT(AmLeader());
-            if (unorderedBag.empty())
+            if (unorderedBagByOpnum.empty())
             {
                 return;
             }
-            RNotice("Resending unordered prepare");
+            RNotice("Resending unordered prepare for last message with shardtag = %lu", lastUnorderedPrepare.shardtags(0));
             if (!(transport->SendMessageToAll(this, lastUnorderedPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
@@ -411,7 +411,7 @@ namespace replication
             }
             lastUnorderedPrepare = up;
 
-            RDebug("Sending UNORDERED_PREPARE for batch of size %lu and with opnum = %lu", unorderedBag.size(), up.opnum());
+            RDebug("Sending UNORDERED_PREPARE for batch of size %lu and with opnum = %lu", (lastUnorderedOp-unorderedBatchStart+1), up.opnum());
 
             if (!(transport->SendMessageToAll(this, up)))
             {
@@ -565,9 +565,7 @@ namespace replication
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
-            Debug("Inside HandleRequest, request msg looks like clientid: %lu, clientreqid: %lu, op: %s",
-                  msg.req().clientid(), msg.req().clientreqid(),
-                  (char *)msg.req().op().c_str());
+            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %lu", msg.shardtag(), msg.predlist().size());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
 
@@ -674,9 +672,11 @@ namespace replication
                     entryPtr->predList.predlist_size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
+            Debug("Adding entry to unorderedBag");
             unorderedBagByOpnum.emplace(v.opnum, entryPtr);
 
             /* Go through any outstanding predecessor replies and add them in */
+            Debug("Checking if any predecessor replies are already present");
             auto pit = outstandingCoordinationResps.find(shardtag);
             if (pit != outstandingCoordinationResps.end()) {
                 auto &predAcks = pit->second;
@@ -689,10 +689,12 @@ namespace replication
                     entryPtr->ACKs++;
                 }
                 outstandingCoordinationResps.erase(pit);
+            } else {
+                Debug("Had no pending predecessor replies");
             }
 
 
-            RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+            RDebug("Received Unordered REQUEST, assigning unordered " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
             RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
             if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
             {
@@ -740,13 +742,12 @@ namespace replication
             v.opnum = this->lastOp;
             opnum_t old_key = entry->viewstamp.opnum;
             entry->viewstamp = v;
-            RDebug("Persisted REQUEST unordered, keeps viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+            RDebug("Persisted REQUEST unordered, gets final ordered viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
             /* Add the request to my log */
             auto &new_entry = log.Append(v, entry->request, LOG_STATE_PREPARED);
 
             /* And also remove it from the unordered bag */
-            Debug("removing from unordered bag!");
             unorderedBagByOpnum.erase(old_key);
             Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
                     unorderedBag.size(), unorderedBagByOpnum.size());
@@ -782,7 +783,7 @@ namespace replication
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
                                       const UnorderedPrepareOKMessage &msg)
         {
-            RDebug("Received PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
+            RDebug("Received UNORDERED_PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
                    msg.view(), msg.opnum(), msg.replicaidx());
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
