@@ -43,6 +43,7 @@
 #include "replication/common/quorumset.h"
 #include "replication/common/replica.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
+#include "replication/common/flat_hash_map.hpp"
 
 
 namespace replication
@@ -50,6 +51,7 @@ namespace replication
     namespace iocl_ct
     {
         enum IoclEntryState {
+            IOCL_STATE_ARRIVED,
             IOCL_STATE_PERSISTED,
             IOCL_STATE_READY,
             IOCL_STATE_COMMITTED
@@ -61,7 +63,7 @@ namespace replication
             Request request;
             uint64_t myShardTag;
             proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
-            // uint64_t arrivalTs;
+            uint64_t arrivalTs;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
@@ -112,6 +114,8 @@ namespace replication
             std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
+            ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
+            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
 
             struct ClientTableEntry
             {
@@ -168,6 +172,8 @@ namespace replication
                                  const proto::UnorderedPrepareOKMessage &msg);
             void HandleCoordination(const TransportAddress &remote,
                                  const proto::SuccessorRequestMessage &msg);
+            void HandleCoordinationReply(const TransportAddress &remote,
+                                const proto::PredecessorReplyMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleRequestStateTransfer(

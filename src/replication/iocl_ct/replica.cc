@@ -477,6 +477,7 @@ namespace replication
             DoViewChangeMessage doViewChange;
             StartViewMessage startView;
             SuccessorRequestMessage coordReq;
+            PredecessorReplyMessage coordResp;
 
             if (type == request.GetTypeName())
             {
@@ -489,6 +490,12 @@ namespace replication
                 // Successor request arrived
                 coordReq.ParseFromString(data);
                 HandleCoordination(remote, coordReq);
+            }
+            else if (type == coordResp.GetTypeName())
+            {
+                // Predecessor reply arrived
+                coordResp.ParseFromString(data);
+                HandleCoordinationReply(remote, coordResp);
             }
             else if (type == unorderedPrepare.GetTypeName())
             {
@@ -649,7 +656,7 @@ namespace replication
                 std::forward_as_tuple(shardtag),
                 std::forward_as_tuple(
                                 v,
-                                IOCL_STATE_PERSISTED,
+                                IOCL_STATE_ARRIVED,
                                 request,
                                 shardtag)).first;
             IoclEntry *entryPtr = &it->second;
@@ -733,6 +740,31 @@ namespace replication
                         RPanic("Did not find unordered operation with tag");
                     }
                     IoclEntry *entry = pair->second;
+                    /* Progress state to Persisted */
+                    entry->state = IOCL_STATE_PERSISTED;
+
+                    /* Assign Arrival Timestamp */
+                    entry->arrivalTs = shardTS;
+                    shardTS++;
+
+                    /* If it has any pending successor requests in
+                    outstandingCoordinationReqs, respond to them now */
+                    auto it = outstandingCoordinationReqs.find(entry->myShardTag);
+                    if (it != outstandingCoordinationReqs.end()) {
+                        PredecessorReplyMessage preply;
+                        preply.set_arrivalts(entry->arrivalTs);
+                        for (const auto& succ : it->second) {
+                            preply.set_s(succ.s());
+                            preply.set_predidx(succ.predidx());
+                            Debug("Sending PredecessorReplyMessage with arrivalts = %lu for predidx %d to successor with tag %lu on shard %d",
+                                   entry->arrivalTs, succ.predidx(), succ.s(), succ.shardidx());
+                            if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, preply)))
+                            {
+                                RWarning("Failed to send SuccessorReply message to client");
+                            }
+                        }
+                        outstandingCoordinationReqs.erase(it);
+                    }
 
                     /* Assign it a real opnum for this view in the ordered log */
                     ++this->lastOp;
@@ -1087,6 +1119,30 @@ namespace replication
                   msg.predidx(),
                   msg.shardidx());
             // NOTE the shardidx is int32
+            // if ("I CAN'T FIND msg.p()")
+            // {
+            //     auto &vec = outstandingCoordinationReqs[msg.p()];
+            //     vec.emplace_back(std::move(msg));
+            //     return;
+            // }
+            return;
+        }
+
+        void IOCL_CTReplica::HandleCoordinationReply(const TransportAddress &remote,
+                                                const proto::PredecessorReplyMessage &msg)
+        {
+            Debug("Received COORDINATION_REPLY request responding\
+                                to successor %lu for with arrival ts %lu at invocation order index %lu",
+                  msg.s(),
+                  msg.arrivalts(),
+                  msg.predidx());
+            // NOTE the shardidx is int32
+            // if ("I CAN'T FIND msg.p()")
+            // {
+            //     auto &vec = outstandingCoordinationResps[msg.s()];
+            //     vec.emplace_back(std::move(msg));
+            //     return;
+            // }
             return;
         }
 
