@@ -401,7 +401,7 @@ namespace replication
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
                 Request *r = up.add_request();
-                const IoclEntry entry = *unorderedBagByOpnum[i];
+                const IoclEntry& entry = *unorderedBagByOpnum[i];
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
@@ -651,16 +651,14 @@ namespace replication
             /* Add the request to the unordered bag */
             uint64_t shardtag = msg.shardtag();
 
-            auto it = unorderedBag.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(shardtag),
-                std::forward_as_tuple(
-                                v,
-                                IOCL_STATE_ARRIVED,
-                                request,
-                                shardtag)).first;
-            IoclEntry *entryPtr = &it->second;
-
+            auto [it, inserted] = unorderedBag.emplace(
+                shardtag,
+                std::make_unique<IoclEntry>(
+                    v, IOCL_STATE_ARRIVED, request, shardtag
+                )
+            );
+            ASSERT(inserted);
+            IoclEntry *entryPtr = it->second.get();
             // Grab the msg.predlist() efficiently and store
             RDebug("Before swap, incoming size = %d",
                     msg.predlist().size());
@@ -785,7 +783,6 @@ namespace replication
 
                     /* And also remove it from the unordered bag */
                     Debug("removing from unordered bag!");
-                    unorderedBag.erase(entry->myShardTag);
                     unorderedBagByOpnum.erase(pair);
                     Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
                            unorderedBag.size(), unorderedBagByOpnum.size());
@@ -1004,13 +1001,16 @@ namespace replication
                 this->lastUnorderedOp++;
                 /* Add the request to the unordered bag */
                 uint64_t shardtag = msg.shardtags(i);
-                auto it = unorderedBag.emplace(
-                    std::piecewise_construct,
-                    std::forward_as_tuple(shardtag),
-                    std::forward_as_tuple(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag)
-                ).first;
 
-                IoclEntry *entryPtr = &it->second;
+                auto [it, inserted] = unorderedBag.emplace(
+                    shardtag,
+                    std::make_unique<IoclEntry>(
+                        viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag
+                    )
+                );
+                ASSERT(inserted);
+                IoclEntry *entryPtr = it->second.get();
+
                 // Grab the msg.predlist() efficiently and store
                 RDebug("Before swap, incoming size = %d",
                        msg.predlists(i).predlist_size());

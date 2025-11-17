@@ -105,12 +105,12 @@ namespace replication
             opnum_t lastUnorderedBatchEnd;
 
             Log log;
-            // std::map<uint64_t, IoclEntry> orderedLog;
+            // std::map<uint64_t, IoclEntry*> orderedIndex;
 
             /*******************************/
             /* IOCL_CT specific structures */
             /*******************************/
-            std::unordered_map<uint64_t, IoclEntry> unorderedBag;
+            ska::flat_hash_map<uint64_t, std::unique_ptr<IoclEntry>> unorderedBag;
             std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
