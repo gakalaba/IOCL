@@ -55,9 +55,6 @@ struct LogEntry {
     LogEntryState state;
     Request request;
     string hash;
-    // IOCL -- this will move out of here when we start using sortedLog
-    uint64_t arrivalTs;
-    uint8_t other_state;
     // Speculative client table stuff
     opnum_t prevClientReqOpnum;
     ::google::protobuf::Message *replyMessage;

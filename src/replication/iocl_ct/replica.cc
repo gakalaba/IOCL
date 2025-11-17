@@ -651,12 +651,14 @@ namespace replication
             /* Add the request to the unordered bag */
             uint64_t shardtag = msg.shardtag();
 
-            auto [it, inserted] = unorderedBag.emplace(
+            auto result = unorderedBag.emplace(
                 shardtag,
                 std::make_unique<IoclEntry>(
                     v, IOCL_STATE_ARRIVED, request, shardtag
                 )
             );
+            auto it = result.first;
+            bool inserted = result.second;
             ASSERT(inserted);
             IoclEntry *entryPtr = it->second.get();
             // Grab the msg.predlist() efficiently and store
@@ -665,13 +667,30 @@ namespace replication
             RDebug("Before swap, local size = %d",
                     entryPtr->predList.predlist_size());
             entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
+            entryPtr->predecessorArrivalTs.reserve(entryPtr->predList.predlist_size());
             RDebug("After swap, incoming size = %d",
                     msg.predlist().size());
             RDebug("After swap, local size = %d",
                     entryPtr->predList.predlist_size());
 
-            // Add entry to "ordered" unorderedBag (for batching)
+            /* Add entry to "ordered" unorderedBag (for batching) */
             unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+
+            /* Go through any outstanding predecessor replies and add them in */
+            auto pit = outstandingCoordinationResps.find(shardtag);
+            if (pit != outstandingCoordinationResps.end()) {
+                auto &predAcks = pit->second;
+                for (const auto& resp : predAcks) {
+                    Debug("Reply from predIdx=%u arrivalTs=%lu",
+                        resp.predidx(), resp.arrivalts());
+                    ASSERT(resp.predidx() < entryPtr->predList.predlist_size());
+                    // ASSERT(entryPtr->predecessorArrivalTs[resp.predidx()] == 0);
+                    entryPtr->predecessorArrivalTs[resp.predidx()] = resp.arrivalts();
+                    entryPtr->ACKs++;
+                }
+                outstandingCoordinationResps.erase(pit);
+            }
+
 
             RDebug("Received Unordered REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
             RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
@@ -688,6 +707,76 @@ namespace replication
                 }
             }
             nullCommitTimeout->Reset();
+        }
+
+        uint64_t IOCL_CTReplica::FoldL(const proto::PredListHolder &pl)
+        {
+            // check if empty
+            if (pl.predlist_size() == 0)
+            {
+                return 0;
+            }
+            auto v = pl.predlist(0);
+            for (uint64_t e : pl.predlist())
+            {
+                if (e > v)
+                {
+                    v = e + 1;
+                }
+                else
+                {
+                    v++;
+                }
+            }
+            return v;
+        }
+
+        void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry)
+        {
+            viewstamp_t v;
+            /* Assign it a real opnum for this view in the ordered log */
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+            opnum_t old_key = entry->viewstamp.opnum;
+            entry->viewstamp = v;
+            RDebug("Persisted REQUEST unordered, keeps viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+
+            /* Add the request to my log */
+            auto &new_entry = log.Append(v, entry->request, LOG_STATE_PREPARED);
+
+            /* And also remove it from the unordered bag */
+            Debug("removing from unordered bag!");
+            unorderedBagByOpnum.erase(old_key);
+            Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
+                    unorderedBag.size(), unorderedBagByOpnum.size());
+
+            /* Assign a final TS */
+            entry->finalTs = std::max(entry->arrivalTs, FoldL(entry->predList));
+            Debug("Assigned finalTs = %lu (arrivalTs = %lu)", entry->finalTs, entry->arrivalTs);
+
+            // /* Add reference to entry owned by unorderedBag to sorted orderedLog */
+            // /* RECALL: orderedLog's key is finalTs
+            // Debug("moving from unordered bag to ordered log!");
+            // auto iocle = unorderedBag.extract(entry->myShardTag);
+            // orderedLog.insert(std::move(iocle));
+            // unorderedBagByOpnum.erase(pair);
+            // Debug("size of unorderedBag, unorderedBagByOpnum, and sortedLog are %lu and %lu and %lu respectively",
+            //        unorderedBag.size(), unorderedBagByOpnum.size(), orderedLog.size());
+
+            if (lastOp - lastBatchEnd + 1 > batchSize)
+            {
+                CloseBatch();
+            }
+            else
+            {
+                Panic("should always be batching with IOCL protocol");
+                RDebug("Keeping in batch");
+                if (!closeBatchTimeout->Active())
+                {
+                    closeBatchTimeout->Start();
+                }
+            }
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
@@ -763,51 +852,12 @@ namespace replication
                         }
                         outstandingCoordinationReqs.erase(it);
                     }
-
-                    /* Assign it a real opnum for this view in the ordered log */
-                    ++this->lastOp;
-                    v.view = this->view;
-                    v.opnum = this->lastOp;
-                    // entry->viewstamp = v;
-                    RDebug("Persisted REQUEST unordered, keeps viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
-                    /* Add the request to my log */
-                    auto &new_entry = log.Append(v, entry->request, LOG_STATE_PREPARED);
-
-                    /* Assign it an arrival timestamp */
-                    new_entry.arrivalTs = shardTS;
-                    shardTS++;
-
-                    /* For now, set state to READY */
-                    new_entry.other_state = IOCL_STATE_READY;
-
-                    /* And also remove it from the unordered bag */
-                    Debug("removing from unordered bag!");
-                    unorderedBagByOpnum.erase(pair);
-                    Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
-                           unorderedBag.size(), unorderedBagByOpnum.size());
-
-                    // /* Move entry from unorderedBag to sorted orderedLog*/
-                    // Debug("moving from unordered bag to ordered log!");
-                    // auto iocle = unorderedBag.extract(entry->myShardTag);
-                    // orderedLog.insert(std::move(iocle));
-                    // unorderedBagByOpnum.erase(pair);
-                    // Debug("size of unorderedBag, unorderedBagByOpnum, and sortedLog are %lu and %lu and %lu respectively",
-                    //        unorderedBag.size(), unorderedBagByOpnum.size(), orderedLog.size());
-                }
-                
-
-                if (lastOp - lastBatchEnd + 1 > batchSize)
-                {
-                    CloseBatch();
-                }
-                else
-                {
-                    Panic("should always be batching with IOCL protocol");
-                    RDebug("Keeping in batch");
-                    if (!closeBatchTimeout->Active())
-                    {
-                        closeBatchTimeout->Start();
+                    if (entry->state == IOCL_STATE_PERSISTED &&
+                            entry->ACKs == entry->predList.predlist_size()) {
+                        Debug("All predecessor replies received for shardtag %lu",
+                            entry->myShardTag);
+                        /* Now can progress to READY state */
+                        ReadyRoutine(entry);
                     }
                 }
 
@@ -910,12 +960,10 @@ namespace replication
                 this->lastOp++;
                 auto &new_entry = log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
                 // TODO REMOVE THIS LATER
-                new_entry.other_state = IOCL_STATE_READY;
-                new_entry.arrivalTs = shardTS;
-                shardTS++;
+                // new_entry.other_state = IOCL_STATE_READY;
+                // new_entry.arrivalTs = shardTS;
+                // shardTS++;
                 UpdateClientTable(req);
-                /* And also remove it from the unordered bag */
-                //TODO
             }
             ASSERT(op == msg.opnum());
 
@@ -1002,12 +1050,14 @@ namespace replication
                 /* Add the request to the unordered bag */
                 uint64_t shardtag = msg.shardtags(i);
 
-                auto [it, inserted] = unorderedBag.emplace(
+                auto result = unorderedBag.emplace(
                     shardtag,
                     std::make_unique<IoclEntry>(
                         viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag
                     )
                 );
+                auto it = result.first;
+                bool inserted = result.second;
                 ASSERT(inserted);
                 IoclEntry *entryPtr = it->second.get();
 
@@ -1118,13 +1168,44 @@ namespace replication
                   msg.s(),
                   msg.predidx(),
                   msg.shardidx());
+            auto it = unorderedBag.find(msg.p());
+            if (it == unorderedBag.end()) {
+                Debug("Can't find predecessor with shardtag %lu, storing request for later",
+                      msg.p());
+                auto &vec = outstandingCoordinationReqs[msg.p()];
+                vec.emplace_back(std::move(msg));
+                return;
+            }
+            IoclEntry *entry = it->second.get();
+            Debug("Found predecessor with shardtag %lu, state = %d",
+                  msg.p(), entry->state);
+            /* If not yet persisted, can't respond yet */
+            if (entry->state == IOCL_STATE_ARRIVED) {
+                Debug("Predecessor with shardtag %lu not yet persisted, storing request for later",
+                      msg.p());
+                auto &vec = outstandingCoordinationReqs[msg.p()];
+                vec.emplace_back(std::move(msg));
+                return;
+            }
+            /* assert that there are no outstanding
+               requests for this predecessor in the
+               outstandingCoordinationReqs -- should
+               have been drained when state changed */
+            ASSERT(outstandingCoordinationReqs.find(entry->myShardTag) == outstandingCoordinationReqs.end());
+
+            /* Send reply now */
+            PredecessorReplyMessage preply;
+            preply.set_s(entry->arrivalTs);
+            preply.set_s(msg.s());
+            preply.set_predidx(msg.predidx());
+            Debug("Sending PredecessorReplyMessage with arrivalts = %lu for predidx %d to successor with tag %lu on shard %d",
+                                   entry->arrivalTs, msg.predidx(), msg.s(), msg.shardidx());
+            if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, preply)))
+            {
+                RWarning("Failed to send SuccessorReply message to client");
+            }
             // NOTE the shardidx is int32
-            // if ("I CAN'T FIND msg.p()")
-            // {
-            //     auto &vec = outstandingCoordinationReqs[msg.p()];
-            //     vec.emplace_back(std::move(msg));
-            //     return;
-            // }
+
             return;
         }
 
@@ -1137,12 +1218,35 @@ namespace replication
                   msg.arrivalts(),
                   msg.predidx());
             // NOTE the shardidx is int32
-            // if ("I CAN'T FIND msg.p()")
-            // {
-            //     auto &vec = outstandingCoordinationResps[msg.s()];
-            //     vec.emplace_back(std::move(msg));
-            //     return;
-            // }
+            auto it = unorderedBag.find(msg.s());
+            if (it == unorderedBag.end()) {
+                Debug("Can't find successor with shardtag %lu, storing response for later",
+                      msg.s());
+                auto &vec = outstandingCoordinationResps[msg.s()];
+                vec.emplace_back(std::move(msg));
+                return;
+            }
+            IoclEntry *entry = it->second.get();
+            Debug("A predecessor resplied to us with shardtag arrival_ts = %lu at indx = %u",
+                  msg.arrivalts(), msg.predidx());
+            /* assert that there are no outstanding
+               responses for this successor in the
+               outstandingCoordinationResps -- should
+               have been drained when upon arrival */
+            ASSERT(outstandingCoordinationResps.find(entry->myShardTag) == outstandingCoordinationResps.end());
+            ASSERT(msg.predidx() < entry->predList.predlist_size());
+            // ASSERT(entry->predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
+            entry->predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
+            entry->ACKs++;
+            ASSERT(entry->state == IOCL_STATE_ARRIVED || entry->state == IOCL_STATE_PERSISTED);
+            if (entry->state == IOCL_STATE_PERSISTED &&
+                     entry->ACKs == entry->predList.predlist_size()) {
+                Debug("All predecessor replies received for shardtag %lu",
+                      entry->myShardTag);
+                /* Now can progress to READY state */
+                ReadyRoutine(entry);
+            }
+
             return;
         }
 

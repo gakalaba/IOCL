@@ -64,6 +64,9 @@ namespace replication
             uint64_t myShardTag;
             proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
             uint64_t arrivalTs;
+            uint64_t finalTs;
+            std::vector<uint64_t> predecessorArrivalTs;
+            int ACKs;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
@@ -74,7 +77,8 @@ namespace replication
                 : viewstamp(viewstamp),
                   state(state),
                   request(request),
-                  myShardTag(shardtag) {}
+                  myShardTag(shardtag),
+                  ACKs(0) {}
             virtual ~IoclEntry() {}
         };
 
@@ -156,6 +160,8 @@ namespace replication
             void ResendUnorderedPrepare();
             void CloseBatch();
             void CloseUnorderedBatch();
+            void ReadyRoutine(IoclEntry *entry);
+            uint64_t FoldL(const proto::PredListHolder &pl);
 
             void HandleRequest(const TransportAddress &remote,
                                proto::RequestMessage &msg);
