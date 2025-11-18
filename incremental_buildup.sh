@@ -23,6 +23,6 @@
         wait
         # rm -rf experiments/printdbg/2*/2*/2*/out/plots
         outdir="experiments/printdbg/micro_$(basename "$CONFIG" .json)_${fanout}"
-        mv experiments/printdbg/2* "$outdir"
+        mv experiments/printdbg/2025* "$outdir"
         mv "$outdir/plots/tput-p50.png" "$outdir/tput-p50.png"
     done
