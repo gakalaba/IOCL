@@ -340,6 +340,10 @@ namespace replication
         void IOCL_CTReplica::UpdateClientTable(const Request &req)
         {
             ClientTableEntry &entry = clientTable[req.clientid()];
+            Debug("the request has clientid %lu and clientreqid %lu",
+                   req.clientid(), req.clientreqid());
+            Debug("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
+                   entry.lastReqId, req.clientreqid());
 
             ASSERT(entry.lastReqId <= req.clientreqid());
 
@@ -405,7 +409,7 @@ namespace replication
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
-                Debug("adding pred list to UnorderedPrepareMessage");
+                Debug("adding pred list of size %lu to UnorderedPrepareMessage", entry.predList.predlist_size());
                 PredListHolder* pl = up.add_predlists();
                 pl->CopyFrom(entry.predList);
             }
@@ -568,6 +572,8 @@ namespace replication
             Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %lu", msg.shardtag(), msg.predlist().size());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
+            Debug("is from clientid %lu and clientreqid %lu",
+                   msg.req().clientid(), msg.req().clientreqid());
 
             if (status != STATUS_NORMAL)
             {
@@ -964,6 +970,8 @@ namespace replication
                 // new_entry.other_state = IOCL_STATE_READY;
                 // new_entry.arrivalTs = shardTS;
                 // shardTS++;
+                Debug("Added PREPARE for operation " FMT_VIEWSTAMP,
+                      msg.view(), op);
                 UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
@@ -1038,7 +1046,7 @@ namespace replication
 
             // Add operations to the unordered bag
             int i = 0;
-            Debug("adding to unordered bag from opnum %lu to %lu", msg.batchstart(), msg.opnum());
+            Debug("About to add batch to unordered bag from opnum %lu to %lu", msg.batchstart(), msg.opnum());
             opnum_t op = msg.batchstart() - 1;
             for (const auto &req : msg.request())
             {
@@ -1049,6 +1057,7 @@ namespace replication
                 }
                 this->lastUnorderedOp++;
                 /* Add the request to the unordered bag */
+                Debug("replica is adding req with shardtag %lu to unordered bag", msg.shardtags(i));
                 uint64_t shardtag = msg.shardtags(i);
 
                 auto result = unorderedBag.emplace(
@@ -1162,9 +1171,7 @@ namespace replication
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
                                                 const proto::SuccessorRequestMessage &msg)
         {
-            Debug("Received COORDINATION request asking for predecessor %lu \
-                                from successor %lu for invocation order %lu \
-                                going back to shard index %d",
+            Debug("Received COORDINATION request asking for predecessor %lu from successor %lu for invocation order %lu going back to shard index %d",
                   msg.p(),
                   msg.s(),
                   msg.predidx(),
@@ -1213,8 +1220,7 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationReply(const TransportAddress &remote,
                                                 const proto::PredecessorReplyMessage &msg)
         {
-            Debug("Received COORDINATION_REPLY request responding\
-                                to successor %lu for with arrival ts %lu at invocation order index %lu",
+            Debug("Received COORDINATION_REPLY request responding to successor %lu for with arrival ts %lu at invocation order index %lu",
                   msg.s(),
                   msg.arrivalts(),
                   msg.predidx());
