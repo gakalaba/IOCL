@@ -68,14 +68,14 @@ namespace replication
             uint64_t finalTs;
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
-            uint64_t intkey;
+            const uint64_t intkey;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request, uint64_t shardtag, uint64_t inkey)
+                    const Request &request, uint64_t shardtag, uint64_t intkey)
                 : viewstamp(viewstamp),
                   state(state),
                   request(request),

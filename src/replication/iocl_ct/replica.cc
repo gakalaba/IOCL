@@ -632,7 +632,7 @@ namespace replication
             Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %d", msg.shardtag(), msg.predlist().size());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
-            Debug("msg intkey is %lu", msg.intkey());
+            Debug("handle request msg intkey is %lu", msg.intkey());
             Debug("is from clientid %lu and clientreqid %lu",
                    msg.req().clientid(), msg.req().clientreqid());
 
@@ -743,6 +743,7 @@ namespace replication
             /* Add entry to "ordered" unorderedBag (for batching) */
             Debug("Adding entry to unorderedBag");
             unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            Debug("The entry's inteky is %lu", entryPtr->intkey);
 
             /* Go through any outstanding predecessor replies and add them in */
             Debug("Checking if any predecessor replies are already present");
