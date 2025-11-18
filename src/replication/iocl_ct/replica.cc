@@ -265,7 +265,7 @@ namespace replication
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
-                ASSERT(entry->state == LOG_STATE_PREPARED);
+                ASSERT(entry->state == IOCL_STATE_PREPARED);
                 UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
@@ -456,7 +456,7 @@ namespace replication
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
-                Debug("adding pred list of size %lu to UnorderedPrepareMessage", entry.predList.predlist_size());
+                Debug("adding pred list of size %d to UnorderedPrepareMessage", entry.predList.predlist_size());
                 PredListHolder* pl = up.add_predlists();
                 pl->CopyFrom(entry.predList);
             }
@@ -629,7 +629,7 @@ namespace replication
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
-            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %lu", msg.shardtag(), msg.predlist().size());
+            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %d", msg.shardtag(), msg.predlist().size());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
             Debug("msg intkey is %lu", msg.intkey());
@@ -1294,7 +1294,7 @@ namespace replication
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
                                                 const proto::SuccessorRequestMessage &msg)
         {
-            Debug("Received COORDINATION request asking for predecessor %lu from successor %lu for invocation order %lu going back to shard index %d",
+            Debug("Received COORDINATION request asking for predecessor %lu from successor %lu for invocation order %u going back to shard index %d",
                   msg.p(),
                   msg.s(),
                   msg.predidx(),
@@ -1343,7 +1343,7 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationReply(const TransportAddress &remote,
                                                 const proto::PredecessorReplyMessage &msg)
         {
-            Debug("Received COORDINATION_REPLY request responding to successor %lu for with arrival ts %lu at invocation order index %lu",
+            Debug("Received COORDINATION_REPLY request responding to successor %lu for with arrival ts %lu at invocation order index %u",
                   msg.s(),
                   msg.arrivalts(),
                   msg.predidx());
@@ -1497,7 +1497,7 @@ namespace replication
                     if (entry->viewstamp.view == newEntry.view())
                     {
                         // We already have this operation in our log.
-                        ASSERT(entry->state == LOG_STATE_PREPARED);
+                        ASSERT(entry->state == IOCL_STATE_PREPARED);
 #if PARANOID
 //              ASSERT(entry->request == newEntry.request());
 #endif
@@ -1507,13 +1507,13 @@ namespace replication
                         // Our operation was from an older view, so obviously
                         // it didn't survive a view change. Throw out any
                         // later log entries and replace with this one.
-                        ASSERT(entry->state != LOG_STATE_COMMITTED);
+                        ASSERT(entry->state != IOCL_STATE_COMMITTED);
                         //log.RemoveAfter(newEntry.opnum());
                         lastOp = newEntry.opnum();
                         oldLastOp = lastOp;
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        //AppendInLog(vs, newEntry.request(), LOG_STATE_PREPARED);
+                        //AppendInLog(vs, newEntry.request(), IOCL_STATE_PREPARED);
                     }
                 }
                 else
@@ -1523,7 +1523,7 @@ namespace replication
 
                     lastOp++;
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    //log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    //log.Append(vs, newEntry.request(), IOCL_STATE_PREPARED);
                 }
             }
 

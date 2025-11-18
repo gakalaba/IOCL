@@ -39,7 +39,7 @@
 
 #include "lib/configuration.h"
 #include "lib/latency.h"
-#include "replication/common/log.h"
+// #include "replication/common/log.h"
 #include "replication/common/quorumset.h"
 #include "replication/common/replica.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
