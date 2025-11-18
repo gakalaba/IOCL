@@ -84,8 +84,10 @@ namespace replication
             // We only want to stringify the operation, not the IOCL metadata
             reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
             reqMsg.set_shardtag(msg.shardtag());
+            reqMsg.set_intkey(msg.intkey());
             msg.clear_shardtag();
             msg.clear_predlist();
+            msg.clear_intkey();
             // Issue coordination requests
             proto::SuccessorRequestMessage coordReqMsg;
             coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag

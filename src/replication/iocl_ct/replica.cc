@@ -149,6 +149,48 @@ namespace replication
             }
         }
 
+        void IOCL_CTReplica::AppendToLog(IoclEntry *entry)
+        {
+            opnum_t start = 1;
+            if (log.empty()) {
+                ASSERT(entry->viewstamp.opnum == start);
+            } else {
+                ASSERT(entry->viewstamp.opnum == log.back()->viewstamp.opnum+1);
+            }
+
+            log.push_back(entry);
+        }
+
+        // This really ought to be const
+        IoclEntry *IOCL_CTReplica::FindInLog(opnum_t opnum)
+        {
+            opnum_t start = 1;
+            if (log.empty()) {
+                return NULL;
+            }
+
+            if (opnum < start) {
+                return NULL;
+            }
+
+            if (opnum-start > log.size()-1) {
+                return NULL;
+            }
+
+            IoclEntry *entry = log[opnum-start];
+            ASSERT(entry->viewstamp.opnum == opnum);
+            return entry;
+        }
+
+        viewstamp_t IOCL_CTReplica::LastViewstampOfLog() const
+        {
+            if (log.empty()) {
+                return viewstamp_t(0, 0);
+            } else {
+                return log.back()->viewstamp;
+            }
+        }
+
         bool IOCL_CTReplica::AmLeader() const
         {
             return (configuration.GetLeaderIndex(view) == myIdx);
@@ -161,7 +203,7 @@ namespace replication
                 lastCommitted++;
 
                 /* Find operation in log */
-                const LogEntry *entry = log.Find(lastCommitted);
+                IoclEntry *entry = FindInLog(lastCommitted);
                 if (entry == nullptr)
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log",
@@ -180,7 +222,7 @@ namespace replication
                 reply.set_clientreqid(entry->request.clientreqid());
 
                 /* Mark it as committed */
-                log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
+                entry->state = IOCL_STATE_COMMITTED;
 
                 // Store reply in the client table
                 // ClientTableEntry &cte = clientTable[entry->request.clientid()];
@@ -218,7 +260,7 @@ namespace replication
                     continue;
                 }
 
-                const LogEntry *entry = log.Find(i);
+                const IoclEntry *entry = FindInLog(i);
                 if (!entry)
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
@@ -451,11 +493,24 @@ namespace replication
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
                 Request *r = p.add_request();
-                const LogEntry *entry = log.Find(i);
+                const IoclEntry *entry = FindInLog(i);
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
+                Debug("adding timestamp chain of size %lu to PrepareMessage", entry->predecessorArrivalTs.size());
+                p.add_shardtags(entry->myShardTag);
+                PredListHolder* ts_chain = p.add_timestamp_chains();
+                // loop through predecessorArrivalTs and add to timestamp chain
+                for (auto ts : entry->predecessorArrivalTs) {
+                    ts_chain->add_predlist(ts);
+                }
+                // Add my finalTs at the end
+                ts_chain->add_predlist(entry->finalTs);
+                Debug("The final added ts_chain looks like this:");
+                for (int idx = 0; idx < ts_chain->predlist_size(); idx++) {
+                    Warning("TO DELETE!!!!!!!! ts_chain predlist[%d] = %lu", idx, ts_chain->predlist(idx));
+                }
             }
             lastPrepare = p;
 
@@ -663,7 +718,7 @@ namespace replication
             auto result = unorderedBag.emplace(
                 shardtag,
                 std::make_unique<IoclEntry>(
-                    v, IOCL_STATE_ARRIVED, request, shardtag
+                    v, IOCL_STATE_ARRIVED, request, shardtag, msg.intkey()
                 )
             );
             auto it = result.first;
@@ -746,48 +801,59 @@ namespace replication
 
         void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry)
         {
-            viewstamp_t v;
-            /* Assign it a real opnum for this view in the ordered log */
-            ++this->lastOp;
-            v.view = this->view;
-            v.opnum = this->lastOp;
-            opnum_t old_key = entry->viewstamp.opnum;
-            entry->viewstamp = v;
-            RDebug("Persisted REQUEST unordered, gets final ordered viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
-            /* Add the request to my log */
-            auto &new_entry = log.Append(v, entry->request, LOG_STATE_PREPARED);
-
-            /* And also remove it from the unordered bag */
-            unorderedBagByOpnum.erase(old_key);
-            Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
-                    unorderedBag.size(), unorderedBagByOpnum.size());
-
+            RDebug("ReadyRoutine called for entry with shardtag %lu", entry->myShardTag);
+            /* Remove from subqueue */
+            perKeySubqueues[entry->intkey].erase(entry);    // Erase by pointer identity            
             /* Assign a final TS */
             entry->finalTs = std::max(entry->arrivalTs, FoldL(entry->predList));
             Debug("Assigned finalTs = %lu (arrivalTs = %lu)", entry->finalTs, entry->arrivalTs);
+            /* Reinsert as newly sorted */
+            perKeySubqueues[entry->intkey].insert(entry);
+            /* Assign it ready state */
+            entry->state = IOCL_STATE_READY;
+            Debug("just trickled down the element and marked it as READY... going to see what we can execute");
 
-            // /* Add reference to entry owned by unorderedBag to sorted orderedLog */
-            // /* RECALL: orderedLog's key is finalTs
-            // Debug("moving from unordered bag to ordered log!");
-            // auto iocle = unorderedBag.extract(entry->myShardTag);
-            // orderedLog.insert(std::move(iocle));
-            // unorderedBagByOpnum.erase(pair);
-            // Debug("size of unorderedBag, unorderedBagByOpnum, and sortedLog are %lu and %lu and %lu respectively",
-            //        unorderedBag.size(), unorderedBagByOpnum.size(), orderedLog.size());
-
-            if (lastOp - lastBatchEnd + 1 > batchSize)
-            {
-                CloseBatch();
-            }
-            else
-            {
-                Panic("should always be batching with IOCL protocol");
-                RDebug("Keeping in batch");
-                if (!closeBatchTimeout->Active())
-                {
-                    closeBatchTimeout->Start();
+            while (true) {
+                auto &sq = perKeySubqueues[entry->intkey];
+                if (sq.empty()) {
+                    break;
                 }
+                IoclEntry* head = *sq.begin();
+                ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
+                if (head->state != IOCL_STATE_PERSISTED) {
+                    break;
+                }
+                Debug("Popping ready entry with shardtag %lu from subqueue", head->myShardTag);
+                /* Progress to REQUEST ordered */
+                sq.erase(sq.begin());
+
+                /* Assign it a real opnum for this view in the ordered log */
+                viewstamp_t v;
+                ++this->lastOp;
+                v.view = this->view;
+                v.opnum = this->lastOp;
+                entry->viewstamp = v;
+                RDebug("Persisted REQUEST unordered, gets final ordered viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+                /* Set it as Prepared (since it isn't quite committed yet ) */
+                entry->state = IOCL_STATE_PREPARED;
+
+                /* Add the request to my log */
+                AppendToLog(entry);
+
+                if (lastOp - lastBatchEnd + 1 > batchSize)
+                {
+                    CloseBatch();
+                }
+                else
+                {
+                    Panic("should always be batching with IOCL protocol");
+                    RDebug("Keeping in batch");
+                    if (!closeBatchTimeout->Active())
+                    {
+                        closeBatchTimeout->Start();
+                    }
+                }
+
             }
         }
 
@@ -844,7 +910,11 @@ namespace replication
 
                     /* Assign Arrival Timestamp */
                     entry->arrivalTs = shardTS;
+                    entry->finalTs = entry->arrivalTs; // will be updated later
                     shardTS++;
+
+                    /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                    perKeySubqueues[entry->intkey].insert(entry);
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
@@ -864,6 +934,11 @@ namespace replication
                         }
                         outstandingCoordinationReqs.erase(it);
                     }
+                    /* If it has been persisted, it doesn't need to be retried, 
+                    remove from unorderedBagByOpnum tracker */
+                    unorderedBagByOpnum.erase(entry->viewstamp.opnum);
+                    Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
+                            unorderedBag.size(), unorderedBagByOpnum.size());
                     if (entry->state == IOCL_STATE_PERSISTED &&
                             entry->ACKs == entry->predList.predlist_size()) {
                         Debug("All predecessor replies received for shardtag %lu",
@@ -962,6 +1037,7 @@ namespace replication
 
             /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
+            int i = 0;
             for (auto &req : msg.request())
             {
                 op++;
@@ -970,11 +1046,34 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                auto &new_entry = log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
-                // TODO REMOVE THIS LATER
-                // new_entry.other_state = IOCL_STATE_READY;
-                // new_entry.arrivalTs = shardTS;
-                // shardTS++;
+                uint64_t shardtag = msg.shardtags(i);
+
+                /* Find the entry */
+                auto it = unorderedBag.find(shardtag);
+                if (it == unorderedBag.end()) {
+                    Panic("Replica didn't have request with shardtag %lu in unorderedBag during Prepare",
+                        shardtag);
+                }
+                IoclEntry *entry = it->second.get();
+                /* Update its state */
+                entry->viewstamp.view = msg.view();
+                entry->viewstamp.opnum = op;
+                entry->state = IOCL_STATE_PREPARED;
+                // loop through timestamp_chains and add to predecessorArrivalTs
+                const proto::PredListHolder& ts_chain = msg.timestamp_chains(i);
+                uint64_t N = ts_chain.predlist_size();
+                entry->predecessorArrivalTs.reserve(N);
+                for (int j = 0; j < (N-1); j++) {
+                    uint64_t ts = ts_chain.predlist(j);
+                    entry->predecessorArrivalTs.push_back(ts);
+                    Debug("During Prepare, adding predecessorArrivalTs[%d] = %lu", j, ts);
+                }
+                entry->finalTs = ts_chain.predlist(N-1);
+                /* Add the request to my log */
+                AppendToLog(entry);
+                /* Remove from the batched unorderdBagByOpnum */
+                unorderedBagByOpnum.erase(entry->viewstamp.opnum);
+                
                 Debug("Added PREPARE for operation " FMT_VIEWSTAMP,
                       msg.view(), op);
                 // UpdateClientTable(req);
@@ -1065,10 +1164,13 @@ namespace replication
                 Debug("replica is adding req with shardtag %lu to unordered bag", msg.shardtags(i));
                 uint64_t shardtag = msg.shardtags(i);
 
+                /* For now we don't replicate the intkey at replicas
+                Instead, if a new leader takes over, it can get its key from 
+                the string in the Request */
                 auto result = unorderedBag.emplace(
                     shardtag,
                     std::make_unique<IoclEntry>(
-                        viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag
+                        viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag, 0
                     )
                 );
                 auto it = result.first;
@@ -1250,6 +1352,7 @@ namespace replication
             // ASSERT(entry->predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
             entry->predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
             entry->ACKs++;
+            // Might remove this for dedup
             ASSERT(entry->state == IOCL_STATE_ARRIVED || entry->state == IOCL_STATE_PERSISTED);
             if (entry->state == IOCL_STATE_PERSISTED &&
                      entry->ACKs == entry->predList.predlist_size()) {
@@ -1312,6 +1415,7 @@ namespace replication
         {
             RDebug("Received REQUESTSTATETRANSFER " FMT_VIEWSTAMP, msg.view(),
                    msg.opnum());
+            Panic("Shouldn't be calling HandleRequestStateTransfer");
 
             if (status != STATUS_NORMAL)
             {
@@ -1332,7 +1436,7 @@ namespace replication
             reply.set_view(view);
             reply.set_opnum(lastCommitted);
 
-            log.Dump(msg.opnum() + 1, reply.mutable_entries());
+            //log.Dump(msg.opnum() + 1, reply.mutable_entries());
 
             transport->SendMessage(this, remote, reply);
         }
@@ -1341,6 +1445,7 @@ namespace replication
                                             const StateTransferMessage &msg)
         {
             RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
+            Panic("shouldn't be caling handle state transfer");
 
             if (msg.view() < view)
             {
@@ -1367,7 +1472,7 @@ namespace replication
                 {
                     // We already have an entry with this opnum, but maybe
                     // it's from an older view?
-                    const LogEntry *entry = log.Find(newEntry.opnum());
+                    const IoclEntry *entry = FindInLog(newEntry.opnum());
                     ASSERT(entry->viewstamp.opnum == newEntry.opnum());
                     ASSERT(entry->viewstamp.view <= newEntry.view());
 
@@ -1385,12 +1490,12 @@ namespace replication
                         // it didn't survive a view change. Throw out any
                         // later log entries and replace with this one.
                         ASSERT(entry->state != LOG_STATE_COMMITTED);
-                        log.RemoveAfter(newEntry.opnum());
+                        //log.RemoveAfter(newEntry.opnum());
                         lastOp = newEntry.opnum();
                         oldLastOp = lastOp;
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                        //AppendInLog(vs, newEntry.request(), LOG_STATE_PREPARED);
                     }
                 }
                 else
@@ -1400,7 +1505,7 @@ namespace replication
 
                     lastOp++;
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    //log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
                 }
             }
 
@@ -1431,6 +1536,7 @@ namespace replication
         {
             RDebug("Received STARTVIEWCHANGE " FMT_VIEW " from replica %d", msg.view(),
                    msg.replicaidx());
+            Panic("Shouldn't be calling HandleStartView");
 
             if (msg.view() < view)
             {
@@ -1460,7 +1566,7 @@ namespace replication
                 {
                     DoViewChangeMessage dvc;
                     dvc.set_view(view);
-                    dvc.set_lastnormalview(log.LastViewstamp().view);
+                    dvc.set_lastnormalview(LastViewstampOfLog().view);
                     dvc.set_lastop(lastOp);
                     dvc.set_lastcommitted(lastCommitted);
                     dvc.set_replicaidx(myIdx);
@@ -1477,7 +1583,7 @@ namespace replication
                             ->second.lastcommitted();
                     minCommitted = std::min(minCommitted, lastCommitted);
 
-                    log.Dump(minCommitted, dvc.mutable_entries());
+                    // log.Dump(minCommitted, dvc.mutable_entries());
 
                     if (!(transport->SendMessageToReplica(this, leader, dvc)))
                     {
@@ -1497,6 +1603,7 @@ namespace replication
                    "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
                    msg.view(), msg.replicaidx(), msg.lastnormalview(), msg.lastop(),
                    msg.lastcommitted());
+            Panic("Shouldn't be calling HandleDoViewChange");
 
             if (msg.view() < view)
             {
@@ -1525,8 +1632,8 @@ namespace replication
             {
                 // Find the response with the most up to date log, i.e. the
                 // one with the latest viewstamp
-                view_t latestView = log.LastViewstamp().view;
-                opnum_t latestOp = log.LastViewstamp().opnum;
+                view_t latestView = LastViewstampOfLog().view;
+                opnum_t latestOp = LastViewstampOfLog().opnum;
                 DoViewChangeMessage *latestMsg = NULL;
 
                 for (auto kv : *msgs)
@@ -1567,16 +1674,16 @@ namespace replication
                                 "install it");
                         }
 
-                        log.RemoveAfter(latestMsg->lastop() + 1);
-                        log.Install(latestMsg->entries().begin(),
-                                    latestMsg->entries().end());
+                        // log.RemoveAfter(latestMsg->lastop() + 1);
+                        // log.Install(latestMsg->entries().begin(),
+                                    // latestMsg->entries().end());
                     }
                 }
                 else
                 {
                     RDebug("My log is most current, lastnormalview=" FMT_VIEW
                            " lastop=" FMT_OPNUM,
-                           log.LastViewstamp().view, lastOp);
+                           LastViewstampOfLog().view, lastOp);
                 }
 
                 // How much of the log should we include when we send the
@@ -1621,7 +1728,7 @@ namespace replication
                 sv.set_lastop(lastOp);
                 sv.set_lastcommitted(lastCommitted);
 
-                log.Dump(minCommitted, sv.mutable_entries());
+                // log.Dump(minCommitted, sv.mutable_entries());
 
                 if (!(transport->SendMessageToAll(this, sv)))
                 {
@@ -1639,6 +1746,7 @@ namespace replication
             RDebug("Currently in view " FMT_VIEW " op " FMT_OPNUM
                    " committed " FMT_OPNUM,
                    view, lastOp, lastCommitted);
+            Panic("Shouldn't be calling HandleStartView");
 
             if (msg.view() < view)
             {
@@ -1669,8 +1777,8 @@ namespace replication
                 }
 
                 // Install the new log
-                log.RemoveAfter(msg.lastop() + 1);
-                log.Install(msg.entries().begin(), msg.entries().end());
+                // log.RemoveAfter(msg.lastop() + 1);
+                // log.Install(msg.entries().begin(), msg.entries().end());
             }
 
             EnterView(msg.view());

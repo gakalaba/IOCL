@@ -54,6 +54,7 @@ namespace replication
             IOCL_STATE_ARRIVED,
             IOCL_STATE_PERSISTED,
             IOCL_STATE_READY,
+            IOCL_STATE_PREPARED,
             IOCL_STATE_COMMITTED
         };
 
@@ -67,19 +68,32 @@ namespace replication
             uint64_t finalTs;
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
+            uint64_t intkey;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request, uint64_t shardtag)
+                    const Request &request, uint64_t shardtag, uint64_t inkey)
                 : viewstamp(viewstamp),
                   state(state),
                   request(request),
                   myShardTag(shardtag),
-                  ACKs(0) {}
+                  ACKs(0),
+                  intkey(intkey) {}
             virtual ~IoclEntry() {}
+        };
+        // Comparison operator for ordering IoclEntries
+        struct EntryReadyCompare {
+            bool operator()(const IoclEntry* a, const IoclEntry* b) const {
+                // First by final timestamp
+                if (a->finalTs < b->finalTs) return true;
+                if (a->finalTs > b->finalTs) return false;
+
+                // Then by Tag (unique)
+                return a->myShardTag < b->myShardTag;
+            }
         };
 
         class IOCL_CTReplica : public Replica
@@ -108,16 +122,17 @@ namespace replication
             opnum_t lastBatchEnd;
             opnum_t lastUnorderedBatchEnd;
 
-            Log log;
-            // std::map<uint64_t, IoclEntry*> orderedIndex;
+            std::vector<IoclEntry *> log;
 
             /*******************************/
             /* IOCL_CT specific structures */
             /*******************************/
             ska::flat_hash_map<uint64_t, std::unique_ptr<IoclEntry>> unorderedBag;
             std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
+            ska::flat_hash_map<uint64_t, std::set<IoclEntry*, EntryReadyCompare>> perKeySubqueues;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
+            std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
             ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
 
@@ -161,6 +176,9 @@ namespace replication
             void CloseBatch();
             void CloseUnorderedBatch();
             void ReadyRoutine(IoclEntry *entry);
+            void AppendToLog(IoclEntry *entry);
+            IoclEntry *FindInLog(opnum_t opnum);
+            viewstamp_t LastViewstampOfLog() const;
             uint64_t FoldL(const proto::PredListHolder &pl);
 
             void HandleRequest(const TransportAddress &remote,

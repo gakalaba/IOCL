@@ -304,6 +304,7 @@ namespace strongstore
             Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
             seqno++;
             op_.set_shardtag(myshardtag);
+            op_.set_intkey(std::stoull(key)); // for iocl optimization
 
             // Construct predecessor list
             auto it1 = outstandingOperationList.begin();
