@@ -806,6 +806,7 @@ namespace replication
             perKeySubqueues[entry->intkey].erase(entry);    // Erase by pointer identity            
             /* Assign a final TS */
             entry->finalTs = std::max(entry->arrivalTs, FoldL(entry->predList));
+            lastReadyTS[entry->intkey] = entry->finalTs + 1;
             Debug("Assigned finalTs = %lu (arrivalTs = %lu)", entry->finalTs, entry->arrivalTs);
             /* Reinsert as newly sorted */
             perKeySubqueues[entry->intkey].insert(entry);
@@ -909,7 +910,9 @@ namespace replication
                     entry->state = IOCL_STATE_PERSISTED;
 
                     /* Assign Arrival Timestamp */
-                    entry->arrivalTs = shardTS;
+                    auto ts_it = lastReadyTS.find(entry->intkey);
+                    uint64_t ts = (ts_it == lastReadyTS.end()) ? 0 : ts_it->second;
+                    entry->arrivalTs = std::max(shardTS, ts);
                     entry->finalTs = entry->arrivalTs; // will be updated later
                     shardTS++;
 
