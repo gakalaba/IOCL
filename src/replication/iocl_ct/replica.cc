@@ -829,7 +829,11 @@ namespace replication
                 }
                 Debug("looking at head");
                 IoclEntry* head = *sq.begin();
-                ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
+                if (head->state != IOCL_STATE_PERSISTED && head->state != IOCL_STATE_READY) {
+                    Debug("the head is currently neither PERSISTED nor READY, instead it is in state %d",
+                            head->state);
+                    ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
+                }
                 if (head->state != IOCL_STATE_READY) {
                     Debug("the head is currently NOT_READY");
                     break;
