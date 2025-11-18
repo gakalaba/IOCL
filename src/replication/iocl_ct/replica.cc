@@ -507,10 +507,10 @@ namespace replication
                 }
                 // Add my finalTs at the end
                 ts_chain->add_predlist(entry->finalTs);
-                Debug("The final added ts_chain looks like this:");
-                for (int idx = 0; idx < ts_chain->predlist_size(); idx++) {
-                    Warning("TO DELETE!!!!!!!! ts_chain predlist[%d] = %lu", idx, ts_chain->predlist(idx));
-                }
+                // Debug("The final added ts_chain looks like this:");
+                // for (int idx = 0; idx < ts_chain->predlist_size(); idx++) {
+                //     Warning("TO DELETE!!!!!!!! ts_chain predlist[%d] = %lu", idx, ts_chain->predlist(idx));
+                // }
             }
             lastPrepare = p;
 
@@ -632,6 +632,7 @@ namespace replication
             Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %lu", msg.shardtag(), msg.predlist().size());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
+            Debug("msg intkey is %lu", msg.intkey());
             Debug("is from clientid %lu and clientreqid %lu",
                    msg.req().clientid(), msg.req().clientreqid());
 
@@ -731,11 +732,13 @@ namespace replication
             RDebug("Before swap, local size = %d",
                     entryPtr->predList.predlist_size());
             entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
-            entryPtr->predecessorArrivalTs.reserve(entryPtr->predList.predlist_size());
+            entryPtr->predecessorArrivalTs.resize(entryPtr->predList.predlist_size());
             RDebug("After swap, incoming size = %d",
                     msg.predlist().size());
             RDebug("After swap, local size = %d",
                     entryPtr->predList.predlist_size());
+            RDebug("And the predecessorArrivalTs size is %lu",
+                    entryPtr->predecessorArrivalTs.size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
             Debug("Adding entry to unorderedBag");
@@ -801,7 +804,7 @@ namespace replication
 
         void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry)
         {
-            RDebug("ReadyRoutine called for entry with shardtag %lu", entry->myShardTag);
+            RDebug("ReadyRoutine called for entry with shardtag %lu and intkey %lu", entry->myShardTag, entry->intkey);
             /* Remove from subqueue */
             perKeySubqueues[entry->intkey].erase(entry);    // Erase by pointer identity            
             /* Assign a final TS */
@@ -814,14 +817,20 @@ namespace replication
             entry->state = IOCL_STATE_READY;
             Debug("just trickled down the element and marked it as READY... going to see what we can execute");
 
+            auto &sq = perKeySubqueues[entry->intkey];
             while (true) {
-                auto &sq = perKeySubqueues[entry->intkey];
+                Debug("Okay, inside loop");
                 if (sq.empty()) {
+                    Debug("The subqueue for key %lu is empty", entry->intkey);
                     break;
+                } else {
+                    Debug("the size of the subqeueu is %lu", sq.size());
                 }
+                Debug("looking at head");
                 IoclEntry* head = *sq.begin();
                 ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
-                if (head->state != IOCL_STATE_PERSISTED) {
+                if (head->state != IOCL_STATE_READY) {
+                    Debug("the head is currently NOT_READY");
                     break;
                 }
                 Debug("Popping ready entry with shardtag %lu from subqueue", head->myShardTag);
@@ -918,6 +927,10 @@ namespace replication
 
                     /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
                     perKeySubqueues[entry->intkey].insert(entry);
+                    Debug("just inserted the element with shardtag %lu into perKeySubqueue for key %lu",
+                            entry->myShardTag,  entry->intkey);
+                    Debug("that subqueue now has length %lu",
+                            perKeySubqueues[entry->intkey].size());
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
@@ -1065,10 +1078,10 @@ namespace replication
                 // loop through timestamp_chains and add to predecessorArrivalTs
                 const proto::PredListHolder& ts_chain = msg.timestamp_chains(i);
                 uint64_t N = ts_chain.predlist_size();
-                entry->predecessorArrivalTs.reserve(N);
+                entry->predecessorArrivalTs.resize(N);
                 for (int j = 0; j < (N-1); j++) {
                     uint64_t ts = ts_chain.predlist(j);
-                    entry->predecessorArrivalTs.push_back(ts);
+                    entry->predecessorArrivalTs[j] = ts;
                     Debug("During Prepare, adding predecessorArrivalTs[%d] = %lu", j, ts);
                 }
                 entry->finalTs = ts_chain.predlist(N-1);
@@ -1354,6 +1367,8 @@ namespace replication
             ASSERT(msg.predidx() < entry->predList.predlist_size());
             // ASSERT(entry->predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
             entry->predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
+            Debug("my predecessorARrivalTs has size %lu",
+                  entry->predecessorArrivalTs.size());
             entry->ACKs++;
             // Might remove this for dedup
             ASSERT(entry->state == IOCL_STATE_ARRIVED || entry->state == IOCL_STATE_PERSISTED);
