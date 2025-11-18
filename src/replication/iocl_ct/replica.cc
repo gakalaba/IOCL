@@ -1208,7 +1208,7 @@ namespace replication
 
             /* Send reply now */
             PredecessorReplyMessage preply;
-            preply.set_s(entry->arrivalTs);
+            preply.set_arrivalts(entry->arrivalTs);
             preply.set_s(msg.s());
             preply.set_predidx(msg.predidx());
             Debug("Sending PredecessorReplyMessage with arrivalts = %lu for predidx %d to successor with tag %lu on shard %d",
