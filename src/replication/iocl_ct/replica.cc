@@ -183,20 +183,20 @@ namespace replication
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
 
                 // Store reply in the client table
-                ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                if (cte.lastReqId <= entry->request.clientreqid())
-                {
-                    cte.lastReqId = entry->request.clientreqid();
-                    cte.replied = true;
-                    cte.reply = reply;
-                }
-                else
-                {
-                    // We've subsequently prepared another operation from the
-                    // same client. So this request must have been completed
-                    // at the client, and there's no need to record the
-                    // result.
-                }
+                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
+                // if (cte.lastReqId <= entry->request.clientreqid())
+                // {
+                //     cte.lastReqId = entry->request.clientreqid();
+                //     cte.replied = true;
+                //     cte.reply = reply;
+                // }
+                // else
+                // {
+                //     // We've subsequently prepared another operation from the
+                //     // same client. So this request must have been completed
+                //     // at the client, and there's no need to record the
+                //     // result.
+                // }
 
                 /* Send reply */
                 auto iter = clientAddresses.find(entry->request.clientid());
@@ -339,13 +339,18 @@ namespace replication
 
         void IOCL_CTReplica::UpdateClientTable(const Request &req)
         {
+            Panic("Shouldn't be calling this right now");
             ClientTableEntry &entry = clientTable[req.clientid()];
             Debug("the request has clientid %lu and clientreqid %lu",
                    req.clientid(), req.clientreqid());
             Debug("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
                    entry.lastReqId, req.clientreqid());
 
-            ASSERT(entry.lastReqId <= req.clientreqid());
+            if (entry.lastReqId > req.clientreqid()) {
+
+                Panic("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
+                   entry.lastReqId, req.clientreqid());
+            }
 
             if (entry.lastReqId == req.clientreqid())
             {
@@ -595,6 +600,7 @@ namespace replication
                     std::unique_ptr<TransportAddress>(remote.clone())));
 
             // Check the client table to see if this is a duplicate request
+            /*
             auto kv = clientTable.find(msg.req().clientid());
             if (kv != clientTable.end())
             {
@@ -627,16 +633,15 @@ namespace replication
                         return;
                     }
                 }
-            }
+            }*/
 
             // Update the client table
-            UpdateClientTable(msg.req());
+            //UpdateClientTable(msg.req());
 
             // Leader Upcall
             bool replicate = false;
             string res;
             LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
 
             // Check whether this request should be committed to replicas
             ASSERT(replicate);
@@ -972,7 +977,7 @@ namespace replication
                 // shardTS++;
                 Debug("Added PREPARE for operation " FMT_VIEWSTAMP,
                       msg.view(), op);
-                UpdateClientTable(req);
+                // UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
 

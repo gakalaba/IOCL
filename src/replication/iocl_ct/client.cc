@@ -109,7 +109,8 @@ namespace replication
 
             msg.SerializeToString(&request_str);
 
-            uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
+            // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
+            uint64_t reqId = ++lastReqId;
             Timeout *timer =
                 new Timeout(transport, 500, [this, reqId]()
                             { ResendRequest(reqId); });
@@ -121,8 +122,9 @@ namespace replication
             /*------------------ Send Request ------------------*/
             // req->request is the string type of LinearizeableOperation without IOCL metadata
             reqMsg.mutable_req()->set_op(request_str);
-            uint64_t pid = (reqMsg.shardtag() >> 32) & 0xFFFFFFFF;
-            reqMsg.mutable_req()->set_clientid(pid);
+            // uint64_t pid = (reqMsg.shardtag() >> 32) & 0xFFFFFFFF;
+            // reqMsg.mutable_req()->set_clientid(pid);
+            reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
