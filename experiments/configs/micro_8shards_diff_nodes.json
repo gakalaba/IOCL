@@ -13,7 +13,13 @@
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
-    "us-east-1-2"
+    "us-east-1-2",
+    "eu-west-1-0",
+    "eu-west-1-1",
+    "eu-west-1-2",
+    "us-west-1-0",
+    "us-west-1-1",
+    "us-west-1-2"
   ],
   "consistency": [
     "lin", "lin", "ss"
@@ -33,9 +39,29 @@
       "us-east-1-2"
     ],
     [
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
       "us-east-1-1",
       "us-east-1-2",
       "us-east-1-0"
+    ],
+    [
+      "us-west-1-1",
+      "us-west-1-2",
+      "us-west-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "eu-west-1-2",
+      "eu-west-1-0"
     ],
     [
       "us-east-1-2",
@@ -43,39 +69,19 @@
       "us-east-1-1"
     ],
     [
-      "us-east-1-0",
-      "us-east-1-1",
-      "us-east-1-2"
-    ],
-    [
-      "us-east-1-1",
-      "us-east-1-2",
-      "us-east-1-0"
-    ],
-    [
-      "us-east-1-2",
-      "us-east-1-0",
-      "us-east-1-1"
-    ],
-    [
-      "us-east-1-0",
-      "us-east-1-1",
-      "us-east-1-2"
-    ],
-    [
-      "us-east-1-1",
-      "us-east-1-2",
-      "us-east-1-0"
+      "us-west-1-2",
+      "us-west-1-0",
+      "us-west-1-1"
     ]
   ],
   "client_total": [
-    1,
     2,
     4,
     8,
     16,
     32,
-    64
+    64,
+    128
   ],
   "client_processes_per_client_node": [
     1,
@@ -88,18 +94,26 @@
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0"
+    "client-0-0",
+    "client-1-0"
   ],
   "server_regions": {
     "us-east-1": [
       "us-east-1-0",
+      "us-east-1-1",
+      "us-east-1-2",
       "client-0-0"
     ],
     "eu-west-1": [
-      "us-east-1-1"
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "eu-west-1-2",
+      "client-1-0"
     ],
     "us-west-1": [
-      "us-east-1-2"
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2"
     ]
   },
   "server_port": 7087,
@@ -109,7 +123,7 @@
   "bench_mode": "closed",
   "mpl": 1,
   "client_key_selector": "uniform",
-  "client_fanout": 8,
+  "client_fanout": 1,
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
@@ -128,7 +142,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "mdl",
+  "experiment_name": "icon",
   "codebase_name": "iocl",
   "pin_client_processes": [
     0,
@@ -162,7 +176,7 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 40,
+  "client_experiment_length": 50,
   "client_rand_sleep": 0,
   "client_ramp_down": 10,
   "client_ramp_up": 10,

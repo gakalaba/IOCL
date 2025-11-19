@@ -7,7 +7,7 @@
         exit 1
     fi
 
-    for fanout in 8 4 2 1; do
+    for fanout in 16 8 4 2 1; do
         echo "=== Running experiments for client_fanout = $fanout with config = $CONFIG ==="
 
         # Make sure issue_concurrent is set to true
