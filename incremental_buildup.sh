@@ -7,7 +7,7 @@
         exit 1
     fi
 
-    for fanout in 1 2 4 8; do
+    for fanout in 8 4 2 1; do
         echo "=== Running experiments for client_fanout = $fanout with config = $CONFIG ==="
 
         # Make sure issue_concurrent is set to true
@@ -21,8 +21,9 @@
         # ---- Run Experiment ----
         python3 experiments/run_multiple_experiments.py "$CONFIG"
         wait
-        # rm -rf experiments/printdbg/2*/2*/2*/out/plots
+        # ---- Move Results and Cleanup ----
         outdir="experiments/printdbg/micro_$(basename "$CONFIG" .json)_${fanout}"
         mv experiments/printdbg/2025* "$outdir"
         mv "$outdir/plots/tput-p50.png" "$outdir/tput-p50.png"
+        rm -rf "$outdir/2*/2*/out/plots"
     done
