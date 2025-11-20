@@ -478,6 +478,14 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     struct bufferevent *ev = kv->second;
     ASSERT(ev != NULL);
 
+    // --- Debug before write ---
+    struct evbuffer *outbuf = bufferevent_get_output(ev);
+    size_t outq_before = evbuffer_get_length(outbuf);
+    Debug("TCP OUTQ before write to %s:%d = %zu bytes",
+          inet_ntoa(dst.addr.sin_addr),
+          htons(dst.addr.sin_port),
+          outq_before);
+
     // Serialize message
     string data;
     ASSERT(m.SerializeToString(&data));
@@ -523,6 +531,13 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
         fprintf(stderr, "tcp write failed\n");
         return false;
     }
+    // --- Debug after write ---
+    size_t outq_after = evbuffer_get_length(outbuf);
+    Debug("TCP OUTQ after write to %s:%d = %zu bytes (added %zu)",
+          inet_ntoa(dst.addr.sin_addr),
+          htons(dst.addr.sin_port),
+          outq_after,
+          outq_after - outq_before);
 
     /*Latency_Start(&sockWriteLat);
     if (write(ev->ev_write.ev_fd, buf, totalLen) < 0) {
@@ -989,6 +1004,8 @@ void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,
                 inet_ntoa(addr.addr.sin_addr), htons(addr.addr.sin_port),
                 receiver,
                 err, errstr, evs.c_str(), lifetime_ms);
+        size_t outq = evbuffer_get_length(bufferevent_get_output(bev));
+        Warning("Outgoing TCP event (EOF/ERROR). outq=%zu bytes", outq);
     }
 
     if (what & BEV_EVENT_EOF)
@@ -1000,6 +1017,8 @@ void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,
                 htons(addr.addr.sin_port),
                 receiver,
                 evs.c_str(), lifetime_ms);
+        size_t outq = evbuffer_get_length(bufferevent_get_output(bev));
+        Warning("Outgoing TCP event (EOF/ERROR). outq=%zu bytes", outq);
     }
 
     // Remove from maps BEFORE free()
