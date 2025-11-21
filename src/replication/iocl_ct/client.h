@@ -79,18 +79,16 @@ namespace replication
                 string request;
                 uint64_t clientReqId;
                 continuation_t continuation;
-                Timeout *timer;
                 uint64_t shardtag;
                 uint64_t intkey;
                 inline PendingRequest(string request, uint64_t clientReqId, uint64_t shardtag,
-                                      uint64_t intkey, continuation_t continuation, Timeout *timer)
+                                      uint64_t intkey, continuation_t continuation)
                     : request(request),
                       clientReqId(clientReqId),
                       continuation(continuation),
                       shardtag(shardtag),
-                      intkey(intkey),
-                      timer(timer){};
-                inline ~PendingRequest() { delete timer; }
+                      intkey(intkey){};
+                inline ~PendingRequest() {}
             };
 
             struct PendingUnloggedRequest : public PendingRequest
@@ -98,9 +96,8 @@ namespace replication
                 error_continuation_t error_continuation;
                 inline PendingUnloggedRequest(string request, uint64_t clientReqId,
                                               continuation_t continuation,
-                                              Timeout *timer,
                                               error_continuation_t error_continuation)
-                    : PendingRequest(request, clientReqId, 0, 0, continuation, timer),
+                    : PendingRequest(request, clientReqId, 0, 0, continuation),
                       error_continuation(error_continuation){};
             };
 

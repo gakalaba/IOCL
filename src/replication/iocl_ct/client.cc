@@ -115,11 +115,11 @@ namespace replication
 
             // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
             uint64_t reqId = ++lastReqId;
-            Timeout *timer =
-                new Timeout(transport, 5000, [this, reqId]()
-                            { ResendRequest(reqId); });
+            // Timeout *timer =
+            //     new Timeout(transport, 15000, [this, reqId]()
+            //                 { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation, timer);
+                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
 
             pendingReqs[reqId] = req;
 
@@ -136,7 +136,7 @@ namespace replication
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
-                req->timer->Reset();
+                // req->timer->Reset();
             }
             else
             {
@@ -161,12 +161,12 @@ namespace replication
 
             if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
             {
-                Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                                             { UnloggedRequestTimeoutCallback(reqId); });
+                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
+                //                              { UnloggedRequestTimeoutCallback(reqId); });
                 PendingUnloggedRequest *req = new PendingUnloggedRequest(
-                    request, reqId, continuation, timer, error_continuation);
+                    request, reqId, continuation, error_continuation);
                 pendingReqs[reqId] = req;
-                req->timer->Start();
+                // req->timer->Start();
             }
             else
             {
@@ -198,7 +198,7 @@ namespace replication
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
-                req->timer->Reset();
+                // req->timer->Reset();
             }
             else
             {
@@ -256,7 +256,7 @@ namespace replication
 
             PendingRequest *req = it->second;
             Debug("Client received reply: %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -277,7 +277,7 @@ namespace replication
                 static_cast<PendingUnloggedRequest *>(it->second);
 
             Debug("Client received unloggedReply %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -294,7 +294,7 @@ namespace replication
             Warning("Unlogged request timed out");
             PendingUnloggedRequest *req =
                 static_cast<PendingUnloggedRequest *>(it->second);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             if (req->error_continuation)
             {
