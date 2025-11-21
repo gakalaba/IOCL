@@ -96,10 +96,18 @@ namespace replication
             coordReqMsg.set_shardidx(group); // who pred should return to??
             for (uint32_t i = 0; i < reqMsg.predlist().size(); i++)
             {
+                uint64_t sendTo = msg.shardlist(i);
+                // if (sendTo == group)
+                // {
+                //     Debug("Skipping sending COORD REQUEST to self for predecessor_tag %u",
+                //           reqMsg.predlist(i));
+                //     // Append this index to the same_shards field
+                //     reqMsg.add_same_shards(i);
+                //     continue;
+                // }
                 uint64_t predShardTag = reqMsg.predlist(i);
                 coordReqMsg.set_p(predShardTag);
                 coordReqMsg.set_predidx(i);
-                uint64_t sendTo = msg.shardlist(i);
                 Debug("SENDING %dth COORD REQUEST for predecessor_tag %lu to shard %lu",
                       i, predShardTag, sendTo);
                 // XXX Try sending only to (what we think is) the leader first
