@@ -832,12 +832,14 @@ namespace replication
                     Debug("The subqueue for key %lu is empty", entry->intkey);
                     break;
                 } else {
-                    Debug("the size of the subqeueu is %lu", sq.size());
+                    if (sq.size() > 1) {
+                        Warning("the subqueue has length %lu > 1", sq.size());
+                    }
                 }
                 Debug("looking at head");
                 IoclEntry* head = *sq.begin();
                 if (head->state != IOCL_STATE_PERSISTED && head->state != IOCL_STATE_READY) {
-                    Warning("the head is currently neither PERSISTED nor READY, instead it is in state %d",
+                    Warning("the head (shardtag = %lu) is currently neither PERSISTED nor READY, instead it is in state %d", head->myShardTag,
                             head->state);
                     ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
                 }
@@ -854,13 +856,13 @@ namespace replication
                 ++this->lastOp;
                 v.view = this->view;
                 v.opnum = this->lastOp;
-                entry->viewstamp = v;
+                head->viewstamp = v;
                 RDebug("Persisted REQUEST unordered, gets final ordered viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
                 /* Set it as Prepared (since it isn't quite committed yet ) */
-                entry->state = IOCL_STATE_PREPARED;
+                head->state = IOCL_STATE_PREPARED;
 
                 /* Add the request to my log */
-                AppendToLog(entry);
+                AppendToLog(head);
 
                 if (lastOp - lastBatchEnd + 1 > batchSize)
                 {
