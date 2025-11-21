@@ -3,7 +3,7 @@ set key top left
 set xlabel 'Throughput (txn/s)'
 set ylabel 'p50 Latency'
 set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
-set output '/users/akalaba/IOCL/experiments/printdbg/impl_progressions/2shardsIOCL_v_VR.png'
+set output '/users/akalaba/IOCL/experiments/printdbg/impl_progressions/2shardsIOCL_v_VR_v_1BT.png'
 set style line 1 linetype 1 linewidth 2
 set style line 2 linetype 1 linecolor "green" linewidth 2
 set style line 3 linetype 1 linecolor "blue" linewidth 2
@@ -11,10 +11,14 @@ set style line 4 linetype 4 linewidth 2
 set style line 5 linetype 5 linewidth 2
 set style line 6 linetype 8 linewidth 2
 plot '/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_1/2025-11-18-07-32-20/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 1' ls 1 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_2/2025-11-18-07-52-37/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 2' ls 2 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_4/2025-11-18-08-11-12/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 4' ls 3 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_8/2025-11-18-08-28-07/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 8' ls 4 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f1/2025-11-14-10-19-01/plots/tput-p50.csv' title 'VR fanout 1' ls 5 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f2/2025-11-14-10-37-45/plots/tput-p50.csv' title 'VR fanout 2' ls 6 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f4/2025-11-14-10-58-40/plots/tput-p50.csv' title 'VR fanout 4' ls 7 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f8/2025-11-14-11-14-07/plots/tput-p50.csv' title 'VR fanout 8' ls 8 with linespoint
+'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_2/2025-11-18-07-52-37/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 2' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_4/2025-11-18-08-11-12/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 4' ls 7 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2shards_diff/micro_iocl_2shards_diff_nodes_8/2025-11-18-08-28-07/plots/tput-p50.csv' title '2 shards w leaders on different machines: IOCL\_CT fanout 8' ls 10 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f1/2025-11-14-10-19-01/plots/tput-p50.csv' title 'VR fanout 1' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f2/2025-11-14-10-37-45/plots/tput-p50.csv' title 'VR fanout 2' ls 5 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f4/2025-11-14-10-58-40/plots/tput-p50.csv' title 'VR fanout 4' ls 8 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f8/2025-11-14-11-14-07/plots/tput-p50.csv' title 'VR fanout 8' ls 11 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/1shard_1BT/micro_micro_1bt_quick_1/2025-11-18-13-16-08/plots/tput-p50.csv' title '1BT fanout 1' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/1shard_1BT/micro_micro_1bt_quick_2/2025-11-18-13-08-32/plots/tput-p50.csv' title '1BT fanout 2' ls 6 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/1shard_1BT/micro_micro_1bt_quick_4/2025-11-18-13-00-59/plots/tput-p50.csv' title '1BT fanout 4' ls 9 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/1shard_1BT/micro_micro_1bt_quick_8/2025-11-18-12-53-30/plots/tput-p50.csv' title '1BT fanout 8' ls 12 with linespoint

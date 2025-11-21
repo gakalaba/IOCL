@@ -83,6 +83,8 @@ namespace replication
             proto::RequestMessage reqMsg;
             // We only want to stringify the operation, not the IOCL metadata
             reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
+            uint64_t theshardtag = msg.shardtag();
+            uint64_t theintkey = msg.intkey();
             reqMsg.set_shardtag(msg.shardtag());
             reqMsg.set_intkey(msg.intkey());
             msg.clear_shardtag();
@@ -113,11 +115,11 @@ namespace replication
 
             // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
             uint64_t reqId = ++lastReqId;
-            Timeout *timer =
-                new Timeout(transport, 500, [this, reqId]()
-                            { ResendRequest(reqId); });
+            // Timeout *timer =
+            //     new Timeout(transport, 15000, [this, reqId]()
+            //                 { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request_str, reqId, continuation, timer);
+                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
 
             pendingReqs[reqId] = req;
 
@@ -134,7 +136,7 @@ namespace replication
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
-                req->timer->Reset();
+                // req->timer->Reset();
             }
             else
             {
@@ -159,12 +161,12 @@ namespace replication
 
             if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
             {
-                Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                                             { UnloggedRequestTimeoutCallback(reqId); });
+                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
+                //                              { UnloggedRequestTimeoutCallback(reqId); });
                 PendingUnloggedRequest *req = new PendingUnloggedRequest(
-                    request, reqId, continuation, timer, error_continuation);
+                    request, reqId, continuation, error_continuation);
                 pendingReqs[reqId] = req;
-                req->timer->Start();
+                // req->timer->Start();
             }
             else
             {
@@ -188,13 +190,15 @@ namespace replication
             reqMsg.mutable_req()->set_op(req->request);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            reqMsg.set_shardtag(req->shardtag);
+            reqMsg.set_intkey(req->intkey);
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
-                req->timer->Reset();
+                // req->timer->Reset();
             }
             else
             {
@@ -252,7 +256,7 @@ namespace replication
 
             PendingRequest *req = it->second;
             Debug("Client received reply: %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -273,7 +277,7 @@ namespace replication
                 static_cast<PendingUnloggedRequest *>(it->second);
 
             Debug("Client received unloggedReply %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -290,7 +294,7 @@ namespace replication
             Warning("Unlogged request timed out");
             PendingUnloggedRequest *req =
                 static_cast<PendingUnloggedRequest *>(it->second);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             if (req->error_continuation)
             {
