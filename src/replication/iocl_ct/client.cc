@@ -114,7 +114,7 @@ namespace replication
             // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
             uint64_t reqId = ++lastReqId;
             Timeout *timer =
-                new Timeout(transport, 500, [this, reqId]()
+                new Timeout(transport, 5000, [this, reqId]()
                             { ResendRequest(reqId); });
             PendingRequest *req =
                 new PendingRequest(request_str, reqId, continuation, timer);
