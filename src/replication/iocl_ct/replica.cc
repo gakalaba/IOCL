@@ -728,7 +728,7 @@ namespace replication
             if (!inserted) {
                 RDebug("Duplicate shardtag detected: %lu", shardtag);
                 IoclEntry *existingEntry = it->second.get();
-                Debug("here's everything i know abotu the existing entry: state = %lu, myShardTag = %lu, intkey = %lu, ACKs = %u arrivalTs = %lu finalTs = %lu, num_preds = %lu, clientreqid = %lu",
+                Warning("here's everything i know abotu the existing entry: state = %lu, myShardTag = %lu, intkey = %lu, ACKs = %u arrivalTs = %lu finalTs = %lu, num_preds = %lu, clientreqid = %lu",
                         existingEntry->state, existingEntry->myShardTag, existingEntry->intkey, existingEntry->ACKs, existingEntry->arrivalTs, existingEntry->finalTs, existingEntry->predList.predlist_size(), existingEntry->request.clientreqid());
                 Panic("ok");
             }
@@ -837,7 +837,7 @@ namespace replication
                 Debug("looking at head");
                 IoclEntry* head = *sq.begin();
                 if (head->state != IOCL_STATE_PERSISTED && head->state != IOCL_STATE_READY) {
-                    Debug("the head is currently neither PERSISTED nor READY, instead it is in state %d",
+                    Warning("the head is currently neither PERSISTED nor READY, instead it is in state %d",
                             head->state);
                     ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
                 }
