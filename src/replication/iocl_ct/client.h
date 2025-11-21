@@ -80,11 +80,15 @@ namespace replication
                 uint64_t clientReqId;
                 continuation_t continuation;
                 Timeout *timer;
-                inline PendingRequest(string request, uint64_t clientReqId,
-                                      continuation_t continuation, Timeout *timer)
+                uint64_t shardtag;
+                uint64_t intkey;
+                inline PendingRequest(string request, uint64_t clientReqId, uint64_t shardtag,
+                                      uint64_t intkey, continuation_t continuation, Timeout *timer)
                     : request(request),
                       clientReqId(clientReqId),
                       continuation(continuation),
+                      shardtag(shardtag),
+                      intkey(intkey),
                       timer(timer){};
                 inline ~PendingRequest() { delete timer; }
             };
@@ -96,7 +100,7 @@ namespace replication
                                               continuation_t continuation,
                                               Timeout *timer,
                                               error_continuation_t error_continuation)
-                    : PendingRequest(request, clientReqId, continuation, timer),
+                    : PendingRequest(request, clientReqId, 0, 0, continuation, timer),
                       error_continuation(error_continuation){};
             };
 

@@ -214,6 +214,7 @@ namespace replication
 
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
+                Debug("the request i'm executing has shardtag %lu and predlist size = %d and reqid = %lu", entry->myShardTag, entry->predList.predlist_size(), entry->request.clientreqid());
                 ReplyMessage reply;
                 Execute(lastCommitted, entry->request, reply);
 
@@ -629,7 +630,7 @@ namespace replication
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
-            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %d", msg.shardtag(), msg.predlist().size());
+            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %d and reqid = %lu", msg.shardtag(), msg.predlist().size(), msg.req().clientreqid());
             Debug("msg shardtag is %lu", msg.shardtag());
             Debug("msg predlist size is %d", msg.predlist().size());
             Debug("handle request msg intkey is %lu", msg.intkey());
@@ -724,7 +725,13 @@ namespace replication
             );
             auto it = result.first;
             bool inserted = result.second;
-            ASSERT(inserted);
+            if (!inserted) {
+                RDebug("Duplicate shardtag detected: %lu", shardtag);
+                IoclEntry *existingEntry = it->second.get();
+                Debug("here's everything i know abotu the existing entry: state = %lu, myShardTag = %lu, intkey = %lu, ACKs = %u arrivalTs = %lu finalTs = %lu, num_preds = %lu, clientreqid = %lu",
+                        existingEntry->state, existingEntry->myShardTag, existingEntry->intkey, existingEntry->ACKs, existingEntry->arrivalTs, existingEntry->finalTs, existingEntry->predList.predlist_size(), existingEntry->request.clientreqid());
+                Panic("ok");
+            }
             IoclEntry *entryPtr = it->second.get();
             // Grab the msg.predlist() efficiently and store
             RDebug("Before swap, incoming size = %d",

@@ -83,6 +83,8 @@ namespace replication
             proto::RequestMessage reqMsg;
             // We only want to stringify the operation, not the IOCL metadata
             reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
+            uint64_t theshardtag = msg.shardtag();
+            uint64_t theintkey = msg.intkey();
             reqMsg.set_shardtag(msg.shardtag());
             reqMsg.set_intkey(msg.intkey());
             msg.clear_shardtag();
@@ -117,7 +119,7 @@ namespace replication
                 new Timeout(transport, 5000, [this, reqId]()
                             { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request_str, reqId, continuation, timer);
+                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation, timer);
 
             pendingReqs[reqId] = req;
 
@@ -188,6 +190,8 @@ namespace replication
             reqMsg.mutable_req()->set_op(req->request);
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            reqMsg.set_shardtag(req->shardtag);
+            reqMsg.set_intkey(req->intkey);
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
