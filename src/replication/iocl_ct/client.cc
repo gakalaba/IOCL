@@ -118,6 +118,10 @@ namespace replication
             }
             msg.clear_shardlist();
             Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
+            /* Check if transformed or not */
+            bool hasOpData = msg.has_opdata();
+            bool hasTransformedOpData = msg.has_transformed_opdata();
+            ASSERT(hasOpData || hasTransformedOpData);
 
             msg.SerializeToString(&request_str);
 

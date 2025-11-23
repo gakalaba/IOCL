@@ -138,7 +138,10 @@ namespace strongstore
 
         void SendAsynchOperation(uint64_t req_id, request_utils::Operation optype,
                                 uint64_t key, request_utils::Value oldValue,
-                                request_utils::Value newValue, transformed_callback trcb);
+                                request_utils::Value newValue, transformed_callback trcb,
+                                std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                                std::list<uint16_t> &outstandingOperationRefCount,
+                                bool isIOCL);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,
@@ -190,6 +193,7 @@ namespace strongstore
             request_utils::Value oldVal;
             request_utils::Value newVal;
             transformed_callback trcb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
         };
         struct PendingGet : public PendingRequest
         {

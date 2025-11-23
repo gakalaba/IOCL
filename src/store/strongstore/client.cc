@@ -755,18 +755,56 @@ namespace strongstore
 
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_);
+        ASSERT(i >= 0);
+        bool isIOCL = IsIOCL();
 
         // //std::cout << "[Client::SendAsynchRequest] Shard index: " << i << std::endl;
 
-        auto rcb1 = [trcb, session = std::ref(session)](uint64_t s, request_utils::Value retval, int req_id)
+        auto rcb1 = [this, trcb, isIOCL,
+                    session = std::ref(session)](uint64_t s, request_utils::Value retval,
+                                                int req_id, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             // //std::cout << "[Client::SendAsynchRequest::rcb1] Callback for req_id=" << req_id << std::endl;
             session.get().set_executing();
-            return trcb(s, retval, req_id);
+            if (isIOCL) {
+                auto it1 = p.begin();
+                auto it2 = this->outstandingOperationRefCount_.begin();
+                auto it3 = this->outstandingOperationList_.begin();
+                // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
+                // will never loop if VR, since pred_list is empty
+                while (it1 != p.end()) {
+                    (*it2)--;
+                    if ((*it2) <= 0) {
+                        // remove from both lists
+                        it2 = this->outstandingOperationRefCount_.erase(it2);
+                        it3 = this->outstandingOperationList_.erase(it3);
+                    } else {
+                        ++it2;
+                        ++it3;
+                    }
+                    ++it1;
+                }
+                // afterwards, it2 and it3 should be 
+                // pointing to the entry itself, remove it
+                ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
+                (*it2)--;
+                if ((*it2) <= 0) {
+                    it2 = this->outstandingOperationRefCount_.erase(it2);
+                    it3 = this->outstandingOperationList_.erase(it3);
+                }
+                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount
+                auto itl = this->outstandingOperationList_.begin();
+                auto itr = this->outstandingOperationRefCount_.begin();
+                for (;
+                    itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
+                    ++itl, ++itr) {
+                }
+            }
+            return trcb(s, retval, req_id, p);
         };
 
         // //std::cout << "[Client::SendAsynchRequest] Sending request to shard client..." << std::endl;
-        sclients_[i]->SendAsynchOperation(req_id, optype, key, oldValue, newValue, rcb1);
+        sclients_[i]->SendAsynchOperation(req_id, optype, key, oldValue, newValue, rcb1, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
         // //std::cout << "[Client::SendAsynchRequest] Request sent." << std::endl;
 
         return req_id;

@@ -302,7 +302,7 @@ namespace strongstore
             [](int, string) {}, OPERATION_TIMEOUT);
     }
 
-    void Server::HandleAsynchSendOperation(const TransportAddress &remote, proto::TransformedLinOp &msg)
+    void Server::HandleAsynchSendOperation(const TransportAddress &remote, replication::TransformedLinOp &msg)
     {
         Debug("Calling HandleSendAsynchOperation!");
         uint64_t transaction_id = msg.rid().client_req_id();

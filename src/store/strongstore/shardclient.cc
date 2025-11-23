@@ -349,7 +349,10 @@ namespace strongstore
 
     void ShardClient::SendAsynchOperation(uint64_t transaction_id, request_utils::Operation optype,
                                         uint64_t key, request_utils::Value oldValue,
-                                        request_utils::Value newValue, transformed_callback trcb)
+                                        request_utils::Value newValue, transformed_callback trcb,
+                                        std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                                        std::list<uint16_t> &outstandingOperationRefCount,
+                                        bool isIOCL)
     {
         uint64_t req_id = last_req_id_++;
         // Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
@@ -484,6 +487,41 @@ namespace strongstore
             break;
         default:
             Panic("Not a valid Value type!");
+        }
+
+        // Set the optional fields (myshardtag and pred_list) if IOCL
+        if (isIOCL)
+        {
+            uint64_t myshardtag = CreateTag(client_id_, seqno);
+            seqno++;
+            trop_.set_shardtag(myshardtag);
+            trop_.set_intkey(key); // for iocl optimization
+
+            // Construct predecessor list
+            auto it1 = outstandingOperationList.begin();
+            auto it2 = outstandingOperationRefCount.begin();
+            pendingOp->pred_list.reserve(outstandingOperationList.size());
+            while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
+                // increment refcount entry
+                (*it2)++;
+                // Add this entry to predecessor list and the RPC message
+                trop_.add_predlist((*it1).first);
+                trop_.add_shardlist((*it1).second);
+                pendingOp->pred_list.push_back(*it1);
+                Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
+                ++it1;
+                ++it2;
+            }
+            // Add self to outstanding operations and refcount lists
+            outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
+            outstandingOperationRefCount.push_back(1);
+            // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
+            auto itl = outstandingOperationList.begin();
+            auto itr = outstandingOperationRefCount.begin();
+            for (;
+                 itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
+                 ++itl, ++itr) {
+            }
         }
 
         // //std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;

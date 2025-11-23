@@ -20,11 +20,21 @@ message RequestIDMessage {
 }
 
 message LinearizeableOperation {
+    message OpData {
+        required string op = 1;
+        required string key = 2;
+        required string value = 3;
+    }
+    message TransformedOpData {
+        required AsynchOperation op = 1;
+        required uint64 key = 2;
+        required AsynchValue oldValue = 3;
+        required AsynchValue newValue = 4;
+    }
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
-    required string op = 3;
-    required string key = 4;
-    required string value = 5;
+    optional OpData opd = 2;
+    optional TransformedOpData tropd = 3;
     optional uint64 shardtag = 6;
     optional uint64 intkey = 7;
     repeated uint64 predlist = 8;
