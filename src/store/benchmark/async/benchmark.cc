@@ -52,12 +52,13 @@
 #include "store/strongstore/client.h"
 #include "store/strongstore/networkconfig.h"
 
-enum protomode_t
-{
-    PROTO_UNKNOWN,
-    PROTO_STRONG,
-    PROTO_VR
-};
+// enum protomode_t
+// {
+//     PROTO_UNKNOWN,
+//     PROTO_STRONG,
+//     PROTO_VR,
+//     PROTO_IOCL_CT
+// };
 
 enum benchmode_t
 {
@@ -114,8 +115,11 @@ DEFINE_string(trans_protocol, trans_args[0],
               " passing messages");
 DEFINE_validator(trans_protocol, &ValidateTransMode);
 
-const std::string protocol_args[] = {"span-lock", "vr"};
-const protomode_t protomodes[]{PROTO_STRONG, PROTO_VR};
+const std::string protocol_args[] = {"span-lock", "vr", "iocl_ct"};
+const strongstore::LinearizableProtocol protomodes[]{
+    strongstore::LinearizableProtocol::PROTO_STRONG, 
+    strongstore::LinearizableProtocol::PROTO_VR, 
+    strongstore::LinearizableProtocol::PROTO_IOCL_CT};
 const strongstore::Mode strongmodes[]{strongstore::Mode::MODE_SPAN_LOCK};
 static bool ValidateProtocolMode(const char *flagname,
                                  const std::string &value)
@@ -417,7 +421,7 @@ int main(int argc, char **argv)
     }
 
     // parse protocol and mode
-    protomode_t mode = PROTO_UNKNOWN;
+    strongstore::LinearizableProtocol mode = strongstore::LinearizableProtocol::PROTO_UNKNOWN;
     // strongstore::Mode strongmode = strongstore::Mode::MODE_UNKNOWN;
     int numProtoModes = sizeof(protocol_args);
     for (int i = 0; i < numProtoModes; ++i)
@@ -432,7 +436,7 @@ int main(int argc, char **argv)
     // if (mode == PROTO_UNKNOWN ||
     //     (mode == PROTO_STRONG &&
     //      strongmode == strongstore::Mode::MODE_UNKNOWN))
-    if (mode == PROTO_UNKNOWN)
+    if (mode == strongstore::LinearizableProtocol::PROTO_UNKNOWN)
     {
         std::cerr << "Unknown protocol or unknown strongmode." << std::endl;
         return 1;
@@ -685,7 +689,9 @@ int main(int argc, char **argv)
         }
         replica_configs.emplace_back(replica_config_stream);
 
-        if (mode == PROTO_STRONG || mode == PROTO_VR)
+        if (mode == strongstore::LinearizableProtocol::PROTO_STRONG || 
+            mode == strongstore::LinearizableProtocol::PROTO_VR || 
+            mode == strongstore::LinearizableProtocol::PROTO_IOCL_CT)
         {
             net_config_stream.seekg(0);
             net_configs.emplace_back(replica_configs[i], net_config_stream);
@@ -710,15 +716,16 @@ int main(int argc, char **argv)
         Client *client = nullptr;
         switch (mode)
         {
-        case PROTO_VR:
-        case PROTO_STRONG:
+        case strongstore::LinearizableProtocol::PROTO_VR:
+        case strongstore::LinearizableProtocol::PROTO_IOCL_CT:
+        case strongstore::LinearizableProtocol::PROTO_STRONG:
         {
             auto &shard_config = replica_configs[i];
             auto &net_config = net_configs[i];
             auto &client_region = client_regions[i];
 
             client = new strongstore::Client(
-                consistency, net_config, client_region, shard_config,
+                consistency, mode, net_config, client_region, shard_config,
                 FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
                 tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha);
             break;
@@ -742,6 +749,18 @@ int main(int argc, char **argv)
 
     uint32_t seed = FLAGS_client_id << 4;
     BenchmarkClient *bench;
+    bool to_issue_concurrent = (FLAGS_client_issue_concurrent && (mode != strongstore::LinearizableProtocol::PROTO_VR));
+    if (to_issue_concurrent)
+    {
+        Debug("Clients will issue concurrent requests.");
+    }
+    else
+    {
+        Debug("Clients will issue sequential requests.");
+    }
+    if (mode == strongstore::LinearizableProtocol::PROTO_VR) {
+        ASSERT(to_issue_concurrent == false);
+    }
     switch (benchMode)
     {
     case BENCH_RETWIS:
@@ -756,10 +775,10 @@ int main(int argc, char **argv)
             FLAGS_tput_interval,
             FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
             FLAGS_max_attempts,
-            FLAGS_client_issue_concurrent);
+            to_issue_concurrent);
         break;
     case BENCH_MICRO:
-        Debug("we're starting the microooooo, FLAGS_client_issue_concurrent=%d", FLAGS_client_issue_concurrent);
+        Debug("we're starting the microooooo, issue_concurrent=%d", to_issue_concurrent);
         bench = new micro::MicroClient(
             keySelector, clients, FLAGS_message_timeout, *tport, seed,
             bench_mode,
@@ -771,7 +790,7 @@ int main(int argc, char **argv)
             FLAGS_abort_backoff, FLAGS_retry_aborted, FLAGS_max_backoff,
             FLAGS_max_attempts,
             FLAGS_client_fanout,
-            FLAGS_client_issue_concurrent,
+            to_issue_concurrent,
             FLAGS_client_read_percentage);
         break;
 

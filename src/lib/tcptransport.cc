@@ -276,6 +276,15 @@ void TCPTransport::ConnectTCP(
     info->receiver = dstSrc.second;
     info->replicaIdx = -1;
     info->acceptEvent = NULL;
+    // Extra for IOCL
+    char addrbuf[64];
+    snprintf(addrbuf, sizeof(addrbuf), "%s:%d",
+            inet_ntoa(dstSrc.first.addr.sin_addr),
+            htons(dstSrc.first.addr.sin_port));
+
+    info->conn_role = "outgoing";
+    info->conn_direction = "outgoing";
+    info->peer_addr = addrbuf;
 
     tcpListeners.push_back(info);
 
@@ -288,6 +297,29 @@ void TCPTransport::ConnectTCP(
         std::pair<struct bufferevent *,
                   pair<TCPTransportAddress, TransportReceiver *>>(bev, dstSrc));
     // mtx.unlock();
+
+    // --- Instrumentation start ---
+    uint64_t id = nextConnId++;
+    connId[bev] = id;
+    outgoingCreated++;
+    if (tcpOutgoing.size() > outgoingPeak) {
+        outgoingPeak = tcpOutgoing.size();
+    }
+
+    struct timeval now;
+    evutil_gettimeofday(&now, NULL);
+    connBirth[bev] = now;
+
+    Debug("[TCP OUTGOING %lu] OPEN to %s:%d (receiver=%p). "
+          "outgoingNow=%zu peak=%zu totalCreated=%lu",
+          id,
+          inet_ntoa(dstSrc.first.addr.sin_addr),
+          htons(dstSrc.first.addr.sin_port),
+          dstSrc.second,
+          tcpOutgoing.size(),
+          outgoingPeak,
+          outgoingCreated);
+    // --- Instrumentation end ---
 
     bufferevent_setcb(bev, TCPReadableCallback, NULL,
                       TCPOutgoingEventCallback, info);
@@ -446,6 +478,14 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     struct bufferevent *ev = kv->second;
     ASSERT(ev != NULL);
 
+    // --- Debug before write ---
+    struct evbuffer *outbuf = bufferevent_get_output(ev);
+    size_t outq_before = evbuffer_get_length(outbuf);
+    Debug("TCP OUTQ before write to %s:%d = %zu bytes",
+          inet_ntoa(dst.addr.sin_addr),
+          htons(dst.addr.sin_port),
+          outq_before);
+
     // Serialize message
     string data;
     ASSERT(m.SerializeToString(&data));
@@ -491,6 +531,13 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
         fprintf(stderr, "tcp write failed\n");
         return false;
     }
+    // --- Debug after write ---
+    size_t outq_after = evbuffer_get_length(outbuf);
+    Debug("TCP OUTQ after write to %s:%d = %zu bytes (added %zu)",
+          inet_ntoa(dst.addr.sin_addr),
+          htons(dst.addr.sin_port),
+          outq_after,
+          outq_after - outq_before);
 
     /*Latency_Start(&sockWriteLat);
     if (write(ev->ev_write.ev_fd, buf, totalLen) < 0) {
@@ -550,6 +597,12 @@ void TCPTransport::Stop()
     tcpAddresses.erase(itr->second);
     itr = tcpOutgoing.erase(itr);
   }*/
+  Notice("[TCP SUMMARY] outgoingCreated=%lu outgoingClosed=%lu "
+           "incomingCreated=%lu incomingClosed=%lu "
+           "outgoingPeak=%zu incomingPeak=%zu",
+           outgoingCreated, outgoingClosed,
+           incomingCreated, incomingClosed,
+           outgoingPeak, incomingPeak);
 
     event_base_dump_events(libeventBase, stderr);
     event_base_loopbreak(libeventBase);
@@ -744,6 +797,14 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
             Panic("Failed to enable bufferevent");
         }
         info->connectionEvents.push_back(bev);
+        // Some extra stuff for IOCL
+        char addrbuf[64];
+        snprintf(addrbuf, sizeof(addrbuf), "%s:%d",
+                inet_ntoa(sin.sin_addr), htons(sin.sin_port));
+        info->peer_addr = string(addrbuf);
+        info->conn_role = "replica_or_client";   // you can refine if needed
+        info->conn_direction = "incoming";
+        info->conn_label = "incoming-from-peer";
         TCPTransportAddress client = TCPTransportAddress(sin);
 
         // transport->mtx.lock();
@@ -752,6 +813,29 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         transport->tcpAddresses.insert(pair<struct bufferevent *,
                                             pair<TCPTransportAddress, TransportReceiver *>>(bev, dstSrc));
         // transport->mtx.unlock();
+
+        // --- Instrumentation start ---
+        uint64_t id = transport->nextConnId++;
+        transport->connId[bev] = id;
+        transport->incomingCreated++;
+        if (info->connectionEvents.size() > transport->incomingPeak) {
+            transport->incomingPeak = info->connectionEvents.size();
+        }
+
+        struct timeval now;
+        evutil_gettimeofday(&now, NULL);
+        transport->connBirth[bev] = now;
+
+        Debug("[TCP INCOMING %lu] OPEN from %s:%d (receiver=%p). "
+              "incomingNow=%zu peak=%zu totalCreated=%lu",
+              id,
+              inet_ntoa(sin.sin_addr),
+              htons(sin.sin_port),
+              info->receiver,
+              info->connectionEvents.size(),
+              transport->incomingPeak,
+              transport->incomingCreated);
+        // --- Instrumentation end ---
 
         Debug("Opened incoming TCP connection from %s:%d",
               inet_ntoa(sin.sin_addr), htons(sin.sin_port));
@@ -837,62 +921,140 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
                                             short what, void *arg)
 {
+    TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
+    TCPTransport *transport = info->transport;
+
+    uint64_t id = transport->connId.count(bev) ? transport->connId[bev] : 0;
+
+    // Compute lifetime
+    double lifetime_ms = -1.0;
+    if (transport->connBirth.count(bev)) {
+        struct timeval now;
+        evutil_gettimeofday(&now, NULL);
+        struct timeval birth = transport->connBirth[bev];
+        lifetime_ms = (now.tv_sec - birth.tv_sec) * 1000.0 +
+                      (now.tv_usec - birth.tv_usec) / 1000.0;
+    }
+
+    int err = EVUTIL_SOCKET_ERROR();
+    const char *errstr = evutil_socket_error_to_string(err);
+
     if (what & BEV_EVENT_ERROR)
     {
-        Warning("Error on incoming TCP connection: %s",
-                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        Warn\\\\\\\\\\\ing("[TCP INCOMING %lu] ERROR: errno=%d (%s), lifetime=%.2f ms",
+                id, err, errstr, lifetime_ms);
     }
     else if (what & BEV_EVENT_EOF)
     {
-        Warning("EOF on incoming TCP connection. Client closed the connection.");
-        Warning("Error: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-    } else {
-        Warning("Error on incoming TCP connection, what = %d, error: %s", what, 
-                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        Warning("[TCP INCOMING %lu] EOF, lifetime=%.2f ms",
+                id, lifetime_ms);
     }
+    else {
+        // Unknown event, just bail safely.
+        Warning("[TCP INCOMING %lu] Unexpected event mask %d", id, what);
+    }
+
+    // Clean up maps before freeing
+    transport->connId.erase(bev);
+    transport->connBirth.erase(bev);
+
+    // Remove from tcpOutgoing if present
+    for (auto it = transport->tcpOutgoing.begin();
+         it != transport->tcpOutgoing.end(); ++it)
+    {
+        if (it->second == bev) {
+            transport->tcpOutgoing.erase(it);
+            break;
+        }
+    }
+
     bufferevent_free(bev);
+    transport->incomingClosed++;
 }
+
 
 void TCPTransport::TCPOutgoingEventCallback(struct bufferevent *bev,
                                             short what, void *arg)
 {
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
-    // transport->mtx.lock();
+
     auto it = transport->tcpAddresses.find(bev);
-    // transport->mtx.unlock();
-    ASSERT(it != transport->tcpAddresses.end());
+    if (it == transport->tcpAddresses.end()) {
+        Warning("[TCP OUTGOING] Event for unknown bufferevent");
+        return;
+    }
+
     TCPTransportAddress addr = it->second.first;
+    TransportReceiver *receiver = it->second.second;
+
+    uint64_t id = transport->connId.count(bev) ? transport->connId[bev] : 0;
+
+    // Compute lifetime before possible free()
+    double lifetime_ms = -1.0;
+    if (transport->connBirth.count(bev)) {
+        struct timeval now;
+        evutil_gettimeofday(&now, NULL);
+        struct timeval birth = transport->connBirth[bev];
+        lifetime_ms = (now.tv_sec - birth.tv_sec) * 1000.0 +
+                      (now.tv_usec - birth.tv_usec) / 1000.0;
+    }
+
+    int err = EVUTIL_SOCKET_ERROR();
+    const char *errstr = evutil_socket_error_to_string(err);
+
+    // Decode event mask
+    std::string evs;
+    if (what & BEV_EVENT_CONNECTED) evs += "CONNECTED ";
+    if (what & BEV_EVENT_EOF)       evs += "EOF ";
+    if (what & BEV_EVENT_ERROR)     evs += "ERROR ";
+    if (what & BEV_EVENT_TIMEOUT)   evs += "TIMEOUT ";
 
     if (what & BEV_EVENT_CONNECTED)
     {
-        Debug("Established outgoing TCP connection to server.");
-    }
-    else if (what & BEV_EVENT_ERROR)
-    {
-        Warning("Error on outgoing TCP connection to server: %s",
-                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-        bufferevent_free(bev);
-
-        // transport->mtx.lock();
-        auto it2 = transport->tcpOutgoing.find(std::make_pair(addr, info->receiver));
-        transport->tcpOutgoing.erase(it2);
-        transport->tcpAddresses.erase(bev);
-        // transport->mtx.unlock();
-
+        Debug("[TCP OUTGOING %lu] CONNECTED to %s:%d (receiver=%p)",
+              id,
+              inet_ntoa(addr.addr.sin_addr),
+              htons(addr.addr.sin_port),
+              receiver);
         return;
     }
-    else if (what & BEV_EVENT_EOF)
+
+    if (what & BEV_EVENT_ERROR)
     {
-        Warning("EOF on outgoing TCP connection to server.");
-        bufferevent_free(bev);
-
-        // transport->mtx.lock();
-        auto it2 = transport->tcpOutgoing.find(std::make_pair(addr, info->receiver));
-        transport->tcpOutgoing.erase(it2);
-        transport->tcpAddresses.erase(bev);
-        // transport->mtx.unlock();
-
-        return;
+        Warning("[TCP OUTGOING %lu] ERROR to %s:%d (receiver=%p): "
+                "errno=%d (%s), events={%s}, lifetime=%.2f ms",
+                id,
+                inet_ntoa(addr.addr.sin_addr), htons(addr.addr.sin_port),
+                receiver,
+                err, errstr, evs.c_str(), lifetime_ms);
+        size_t outq = evbuffer_get_length(bufferevent_get_output(bev));
+        Warning("Outgoing TCP event (EOF/ERROR). outq=%zu bytes", outq);
     }
+
+    if (what & BEV_EVENT_EOF)
+    {
+        Warning("[TCP OUTGOING %lu] EOF to %s:%d (receiver=%p): "
+                "events={%s}, lifetime=%.2f ms",
+                id,
+                inet_ntoa(addr.addr.sin_addr),
+                htons(addr.addr.sin_port),
+                receiver,
+                evs.c_str(), lifetime_ms);
+        size_t outq = evbuffer_get_length(bufferevent_get_output(bev));
+        Warning("Outgoing TCP event (EOF/ERROR). outq=%zu bytes", outq);
+    }
+
+    // Remove from maps BEFORE free()
+    transport->connId.erase(bev);
+    transport->connBirth.erase(bev);
+
+    auto it2 = transport->tcpOutgoing.find(std::make_pair(addr, receiver));
+    if (it2 != transport->tcpOutgoing.end()) {
+        transport->tcpOutgoing.erase(it2);
+    }
+
+    transport->tcpAddresses.erase(bev);
+    bufferevent_free(bev);
+    transport->outgoingClosed++;
 }

@@ -123,6 +123,12 @@ private:
         int replicaIdx;
         event *acceptEvent;
         std::list<struct bufferevent *> connectionEvents;
+
+        // NEW FIELDS for debugging
+        std::string conn_role;      // e.g. "client", "replica", "coord", "bench"
+        std::string conn_direction; // "incoming" or "outgoing"
+        std::string conn_label;     // free-form label (e.g., "shard 2 -> shard 0")
+        std::string peer_addr;      // stringified IP:port for logging
     };
     event_base *libeventBase;
     std::vector<event *> listenerEvents;
@@ -134,6 +140,20 @@ private:
     std::list<TCPTransportTCPListener *> tcpListeners;
     std::map<std::pair<TCPTransportAddress, TransportReceiver *>, struct bufferevent *> tcpOutgoing;
     std::map<struct bufferevent *, std::pair<TCPTransportAddress, TransportReceiver *>> tcpAddresses;
+
+    // --- Debug / instrumentation fields ---
+    uint64_t nextConnId = 1;
+    std::unordered_map<struct bufferevent *, uint64_t> connId; // bev -> id
+
+    uint64_t outgoingCreated = 0;
+    uint64_t outgoingClosed = 0;
+    uint64_t incomingCreated = 0;
+    uint64_t incomingClosed = 0;
+
+    size_t outgoingPeak = 0;
+    size_t incomingPeak = 0;
+    std::unordered_map<struct bufferevent *, struct timeval> connBirth;
+    // -- Debug / instrumentation fields end --
     // Latency_t sockWriteLat;
     // ThreadPool tp;
     bool stopped;

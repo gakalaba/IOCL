@@ -1,8 +1,10 @@
+// -*- mode: c++; c-file-style: "k&r"; c-basic-offset: 4 -*-
 /***********************************************************************
  *
- * store/strongstore/common.h:
+ * iocl_utils.h:
+ *   utilities for IOCL metadata handling
  *
- * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
+ * Copyright 2025 Anja Kalaba  <akalaba@princeton.edu>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -25,27 +27,27 @@
  * SOFTWARE.
  *
  **********************************************************************/
-#ifndef _STRONG_COMMON_H_
-#define _STRONG_COMMON_H_
 
-namespace strongstore
+#ifndef _COMMON_IOCL_UTILS_H_
+#define _COMMON_IOCL_UTILS_H_
+
+#include "lib/message.h"
+
+uint64_t TagToPid(uint64_t tag)
 {
+    uint64_t pid = (tag >> 32) & 0xFFFFFFFF;
+    return pid;
+}
 
-    enum Consistency
-    {
-        SS,
-        RSS,
-        LIN
-    };
+uint64_t TagToSeqno(uint64_t tag)
+{
+    uint64_t seqno = (tag & 0xFFFFFFFF);
+    return seqno;
+}
 
-    enum LinearizableProtocol
-    {
-        PROTO_UNKNOWN,
-        PROTO_STRONG,
-        PROTO_VR,
-        PROTO_IOCL_CT
-    };
+uint64_t CreateTag(uint64_t pid, uint64_t seqno)
+{
+    return (pid << 32) | (seqno & 0xFFFFFFFF);
+}
 
-} // namespace strongstore
-
-#endif /* _STRONG_COMMON_H_ */
+#endif /* _COMMON_IOCL_UTILS_H_ */

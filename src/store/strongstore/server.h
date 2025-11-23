@@ -41,6 +41,8 @@
 #include "lib/transport.h"
 #include "replication/vr/client.h"
 #include "replication/vr/replica.h"
+#include "replication/iocl_ct/client.h"
+#include "replication/iocl_ct/replica.h"
 #include "store/common/backend/pingserver.h"
 #include "store/common/backend/versionstore.h"
 #include "store/common/backend/kvstore.h"
@@ -116,6 +118,7 @@ namespace strongstore
         Server(Consistency consistency, const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport,
+               LinearizableProtocol linproto,
                bool debug_stats,
                bool transformed = false);
         ~Server();
@@ -214,7 +217,7 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
-        void HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg);
+        void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
         void HandleAsynchSendOperation(const TransportAddress &remote, proto::TransformedLinOp &msg);
 
@@ -281,8 +284,8 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(opnum_t opnum, strongstore::proto::LinearizeableOperation &op, string &response);
-        void ReplicaUpcallTransformed(opnum_t opnum, strongstore::proto::TransformedLinOp &op, string &response);
+        void ReplicaUpcallAppRequest(opnum_t opnum, replication::LinearizeableOperation &op, string &response);
+        void ReplicaUpcallTransformed(opnum_t opnum, replication::TransformedLinOp &op, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -313,8 +316,8 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
 
         proto::Get get_;
-        proto::LinearizeableOperation op_;
-        proto::TransformedLinOp trop_;
+        replication::LinearizeableOperation op_;
+        replication::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

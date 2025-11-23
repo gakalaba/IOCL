@@ -58,6 +58,7 @@
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/common/frontend/request_utils.h"
+#include "replication/common/request.pb.h"
 
 namespace strongstore
 {
@@ -78,8 +79,8 @@ namespace strongstore
     typedef std::function<void(int, const std::string &, const std::string &)> put_callback;
     typedef std::function<void(int, const std::string &, const std::string &)> put_timeout_callback;
 
-    typedef std::function<void(int, const std::string &)> op_callback;
-    typedef std::function<void(int, const std::string &)> op_timeout_callback;
+    typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_callback;
+    typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_timeout_callback;
     typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
@@ -130,7 +131,10 @@ namespace strongstore
         void SendOperation(uint64_t app_request_id, const std::string op,
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout);
+                         uint32_t timeout,
+                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                         std::list<uint16_t> &outstandingOperationRefCount,
+                         bool isIOCL);
 
         void SendAsynchOperation(uint64_t req_id, request_utils::Operation optype,
                                 uint64_t key, request_utils::Value oldValue,
@@ -240,6 +244,7 @@ namespace strongstore
             std::string val;
             op_callback ocb;
             op_timeout_callback otcb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
         };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
@@ -274,8 +279,8 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
-        proto::LinearizeableOperation op_;
-        proto::TransformedLinOp trop_;
+        replication::LinearizeableOperation op_;
+        replication::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -303,6 +308,9 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+
+        // IOCL Operation Metadata
+        uint64_t seqno;
     };
 
 } // namespace strongstore

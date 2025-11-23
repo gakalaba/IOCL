@@ -43,7 +43,8 @@ enum protocol_t
 {
     PROTO_UNKNOWN,
     PROTO_STRONG,
-    PROTO_VR
+    PROTO_VR,
+    PROTO_IOCL_CT
 };
 
 enum transmode_t
@@ -68,11 +69,12 @@ DEFINE_bool(debug_stats, false, "record stats related to debugging");
 DEFINE_bool(is_transformed, false, "running transformed python app on top of redisstore");
 
 const std::string protocol_args[] = {
-    "strong", "vr",
+    "strong", "vr", "iocl_ct"
 };
 const protocol_t protos[]{
     PROTO_STRONG,
     PROTO_VR,
+    PROTO_IOCL_CT,
 };
 static bool ValidateProtocol(const char *flagname, const std::string &value)
 {
@@ -341,13 +343,25 @@ int main(int argc, char **argv)
                                          tport, tt, FLAGS_debug_stats);
         break;
     }
-    case PROTO_VR:
+    case PROTO_IOCL_CT:
     {
-        Debug("Making application request strongstore server");
+        Debug("Making application request strongstore server using IOCL_CT");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, FLAGS_debug_stats,
+                                         tport, strongstore::LinearizableProtocol::PROTO_IOCL_CT, 
+                                         FLAGS_debug_stats,
+                                         FLAGS_is_transformed);
+        break;
+    }
+    case PROTO_VR:
+    {
+        Debug("Making application request strongstore server using VR");
+        server = new strongstore::Server(consistency, shard_config,
+                                         replica_config, FLAGS_server_id,
+                                         FLAGS_group_idx, FLAGS_replica_idx,
+                                         tport, strongstore::LinearizableProtocol::PROTO_VR,
+                                         FLAGS_debug_stats,
                                          FLAGS_is_transformed);
         break;
     }
@@ -480,6 +494,15 @@ int main(int argc, char **argv)
     {
         Debug("Making linearizable (VR) replica");
         replica = new replication::vr::VRReplica(
+            replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
+            dynamic_cast<replication::AppReplica *>(server),
+            FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_IOCL_CT:
+    {
+        Debug("Making linearizable (IOCL_CT) replica");
+        replica = new replication::iocl_ct::IOCL_CTReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);

@@ -51,8 +51,8 @@ typedef std::function<void(int, const std::string &, const std::string &)>
 typedef std::function<void(int, const std::string &, const std::string &)>
     put_timeout_callback;
 
-typedef std::function<void(int, const std::string &)> op_callback;
-typedef std::function<void(int, const std::string &)> op_timeout_callback;
+typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_callback;
+typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_timeout_callback;
 typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
 
 typedef std::function<void(transaction_status_t)> commit_callback;
@@ -110,6 +110,7 @@ class Client {
     virtual void ForceAbort(const uint64_t transaction_id) = 0;
 
     virtual bool IsLinearizeable() = 0;
+    virtual bool IsIOCL() = 0;
 
     virtual uint64_t SendAsynchOperation(Session &session, request_utils::Operation optype,
                                        uint64_t key, request_utils::Value newValue, request_utils::Value oldValue,

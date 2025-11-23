@@ -35,7 +35,7 @@ namespace strongstore
     using namespace std;
     using namespace proto;
 
-    ReplicaClient::ReplicaClient(const transport::Configuration &config,
+    ReplicaClient::ReplicaClient(LinearizableProtocol linproto, const transport::Configuration &config,
                                  Transport *transport, uint64_t client_id,
                                  int shard)
         : config_{config},
@@ -43,36 +43,62 @@ namespace strongstore
           client_id_(client_id),
           shard_idx_(shard),
           pendingCommits{},
-          lastReqId{0}
+          lastReqId{0},
+          linproto_{linproto}
     {
-        client = new replication::vr::VRClient(config_, transport_, shard_idx_,
-                                               client_id_);
+        Debug("making replica client");
+        switch (linproto) {
+            case LinearizableProtocol::PROTO_VR:
+                client = new replication::vr::VRClient(config_, transport_, shard_idx_,
+                                                    client_id_);
+                break;
+            case LinearizableProtocol::PROTO_IOCL_CT:
+                client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
+                                                            client_id_);
+                break;
+            default:
+                Panic("Invalid linearizable protocol");
+        }
     }
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
     void ReplicaClient::SendOperation(uint64_t request_id,
-                         strongstore::proto::LinearizeableOperation &msg,
+                         replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout)
     {
-        Debug("[shard %i] SendRequest sending msg", shard_idx_);
+        Debug("[shard %i] ReplicaClient SendRequest sending msg", shard_idx_);
+        Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
+              msg.DebugString().c_str());
 
-        // create request
         string request_str;
-
-        msg.SerializeToString(&request_str);
-
         uint64_t reqId = lastReqId++;
         PendingOperation *pendingOperation = new PendingOperation(reqId);
         pendingOperations[reqId] = pendingOperation;
         pendingOperation->ocb = ocb;
         pendingOperation->otcb = otcb;
 
-        client->Invoke(
-            request_str,
-            bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
+        switch (linproto_) {
+            case LinearizableProtocol::PROTO_VR:
+                // create request
+                Debug("Running VR: serializing LinearizeableOperation into string");
+                msg.SerializeToString(&request_str);
+                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
+
+                client->Invoke(
+                    request_str,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
+                break;
+            case LinearizableProtocol::PROTO_IOCL_CT:
+                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
+                client->InvokeIOCL(
+                    msg,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
+                break;
+        }
     }
 
     /* Callback from a shard replica on sendrequest operation completion. */

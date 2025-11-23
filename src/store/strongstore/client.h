@@ -193,7 +193,7 @@ namespace strongstore
     class Client : public ::Client
     {
     public:
-        Client(Consistency consistency, const NetworkConfiguration &net_config,
+        Client(Consistency consistency, LinearizableProtocol replication_proto, const NetworkConfiguration &net_config,
                const std::string &client_region, transport::Configuration &config,
                uint64_t id, int nshards, int closestReplic, Transport *transport,
                Partitioner *part, TrueTime &tt, bool debug_stats,
@@ -255,6 +255,7 @@ namespace strongstore
 
         bool IsLinearizeable() override;
         uint64_t SendAsynchOperation(Session &session, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb) override;
+        bool IsIOCL() override;
 
     private:
         const static std::size_t MAX_SHARDS = 16;
@@ -360,10 +361,17 @@ namespace strongstore
         Latency_t commit_lat_;
 
         Consistency consistency_;
+        LinearizableProtocol replication_proto_;
+
 
         double nb_time_alpha_;
 
         bool debug_stats_;
+
+        // IOCL specific state
+        // (shardtag, shardid) -> refcount
+        std::list<std::pair<uint64_t, uint32_t>> outstandingOperationList_;
+        std::list<uint16_t> outstandingOperationRefCount_;
     };
 
 } // namespace strongstore

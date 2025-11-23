@@ -73,7 +73,7 @@ namespace strongstore
         }
 
         replica_client_ =
-            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+            new ReplicaClient(LinearizableProtocol::PROTO_VR, replica_config_, transport_, server_id_, shard_idx_);
 
         if (debug_stats_)
         {
@@ -84,7 +84,8 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, bool debug_stats, bool transformed)
+                   Transport *transport, LinearizableProtocol linproto,
+                   bool debug_stats, bool transformed)
         : PingServer(transport),
           tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -107,7 +108,7 @@ namespace strongstore
         }*/
 
         replica_client_ =
-            new ReplicaClient(replica_config_, transport_, server_id_, shard_idx_);
+            new ReplicaClient(linproto, replica_config_, transport_, server_id_, shard_idx_);
 
         if (debug_stats_)
         {
@@ -284,7 +285,7 @@ namespace strongstore
         }
     }
 
-    void Server::HandleSendOperation(const TransportAddress &remote, proto::LinearizeableOperation &msg)
+    void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
         Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();

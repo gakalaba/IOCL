@@ -1,0 +1,21 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (txn/s)'
+set ylabel 'p50 Latency'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/impl_progressions/iocl_step1_v_step2.png'
+
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/testing_Step1/f1/2025-11-14-11-49-52/plots/tput-p50.csv' title 'IOCL Step1 fanout 1' ls 1 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step1/f2/2025-11-14-12-02-27/plots/tput-p50.csv' title 'IOCL Step1 fanout 2' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step1/f4/2025-11-14-12-19-34/plots/tput-p50.csv' title 'IOCL Step1 fanout 4' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step1/f8/2025-11-14-12-39-19/plots/tput-p50.csv' title 'IOCL Step1 fanout 8' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f1/2025-11-14-10-26-47/plots/tput-p50.csv' title 'IOCL Step2 fanout 1' ls 5 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f2/2025-11-14-10-45-10/plots/tput-p50.csv' title 'IOCL Step2 fanout 2' ls 6 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f4/2025-11-14-11-05-57/plots/tput-p50.csv' title 'IOCL Step2 fanout 4' ls 7 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/testing_Step2/f8/2025-11-14-11-21-20/plots/tput-p50.csv' title 'IOCL Step2 fanout 8' ls 8 with linespoint
