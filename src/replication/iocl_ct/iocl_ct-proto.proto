@@ -70,7 +70,7 @@ message SuccessorRequestMessage {
 }
 
 message PredecessorReplyMessage {
-    required int64 arrivalTs = 1;
+    required uint64 arrivalTs = 1;
     required uint64 s = 2;
     required uint32 predIdx = 3;
 }

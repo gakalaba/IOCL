@@ -728,7 +728,7 @@ namespace replication
             if (!inserted) {
                 RDebug("Duplicate shardtag detected: %lu", shardtag);
                 IoclEntry *existingEntry = it->second.get();
-                Warning("here's everything i know abotu the existing entry: state = %lu, myShardTag = %lu, intkey = %lu, ACKs = %u arrivalTs = %lu finalTs = %lu, num_preds = %lu, clientreqid = %lu",
+                Warning("here's everything i know abotu the existing entry: state = %d, myShardTag = %lu, intkey = %lu, ACKs = %d arrivalTs = %lu finalTs = %lu, num_preds = %d, clientreqid = %lu",
                         existingEntry->state, existingEntry->myShardTag, existingEntry->intkey, existingEntry->ACKs, existingEntry->arrivalTs, existingEntry->finalTs, existingEntry->predList.predlist_size(), existingEntry->request.clientreqid());
                 Panic("ok");
             }
