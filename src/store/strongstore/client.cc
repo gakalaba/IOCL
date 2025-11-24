@@ -48,7 +48,8 @@ namespace strongstore
                    transport::Configuration &config, uint64_t client_id,
                    int nShards, int closestReplica, Transport *transport,
                    Partitioner *part, TrueTime &tt, bool debug_stats,
-                   double nb_time_alpha)
+                   double nb_time_alpha,
+                   bool emulate_wan)
         : coord_choices_{},
           min_lats_{},
           sessions_{},
@@ -66,7 +67,8 @@ namespace strongstore
           consistency_{consistency},
           replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
-          debug_stats_{debug_stats}
+          debug_stats_{debug_stats},
+          emulate_wan_{emulate_wan}
     {
         Notice("Initializing StrongStore client with id [%lu]", client_id_);
 
@@ -161,6 +163,32 @@ namespace strongstore
 
             uint16_t min_lat = static_cast<uint16_t>(-1);
             int min_coord = -1;
+
+            if (!emulate_wan_)
+            {
+                std::size_t coord_idx = (client_id_ % shards.count()) + 1;
+
+                // Find coord
+                std::size_t n_test = 0;
+                for (std::size_t i = 0; i < MAX_SHARDS; i++)
+                {
+                    if (shards.test(i))
+                    {
+                        n_test++;
+                    }
+
+                    if (n_test == coord_idx)
+                    {
+                        min_coord = i;
+                        break;
+                    }
+                }
+                Debug("(Fast) Choosing random coord: %d", min_coord);
+                coord_choices_.emplace(shards, min_coord);
+                min_lats_.emplace(shards, 0);
+                continue;
+            }
+
             for (std::size_t coord_idx = 1; coord_idx <= shards.count(); coord_idx++)
             {
                 // Find coord

@@ -726,7 +726,7 @@ int main(int argc, char **argv)
             client = new strongstore::Client(
                 consistency, mode, net_config, client_region, shard_config,
                 FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
-                tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha);
+                tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha, FLAGS_ping_replicas);
             break;
         }
         default:
