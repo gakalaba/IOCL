@@ -197,7 +197,8 @@ namespace strongstore
                const std::string &client_region, transport::Configuration &config,
                uint64_t id, int nshards, int closestReplic, Transport *transport,
                Partitioner *part, TrueTime &tt, bool debug_stats,
-               double nb_time_alpha);
+               double nb_time_alpha,
+               bool emulate_wan = false);
         virtual ~Client();
 
         virtual Session &BeginSession() override;
@@ -367,6 +368,8 @@ namespace strongstore
         double nb_time_alpha_;
 
         bool debug_stats_;
+
+        bool emulate_wan_;
 
         // IOCL specific state
         // (shardtag, shardid) -> refcount

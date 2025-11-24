@@ -61,6 +61,7 @@ namespace strongstore
                 }
             }
         }
+        Notice("Not reachable!");
 
         NOT_REACHABLE();
         return INVALID_REGION;
