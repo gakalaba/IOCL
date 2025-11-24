@@ -81,7 +81,7 @@ namespace strongstore
 
     typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_callback;
     typedef std::function<void(int, const std::string &, const std::vector<std::pair<uint64_t, uint32_t>> &)> op_timeout_callback;
-    typedef std::function<void(uint64_t, request_utils::Value, int)> transformed_callback;
+    typedef std::function<void(uint64_t, request_utils::Value, int, const std::vector<std::pair<uint64_t, uint32_t>> &)> transformed_callback;
 
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
@@ -183,18 +183,6 @@ namespace strongstore
             uint64_t transaction_id;
             uint64_t req_id;
         };
-        struct PendingAsynchOperation
-        {
-            PendingAsynchOperation(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}
-            uint64_t transaction_id;
-            uint64_t req_id;
-            request_utils::Operation op;
-            uint64_t key;
-            request_utils::Value oldVal;
-            request_utils::Value newVal;
-            transformed_callback trcb;
-            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
-        };
         struct PendingGet : public PendingRequest
         {
             PendingGet(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -250,6 +238,16 @@ namespace strongstore
             op_timeout_callback otcb;
             std::vector<std::pair<uint64_t, uint32_t>> pred_list;
         };
+        struct PendingAsynchOperation : public PendingRequest
+        {
+            PendingAsynchOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
+            request_utils::Operation op;
+            uint64_t key;
+            request_utils::Value oldVal;
+            request_utils::Value newVal;
+            transformed_callback trcb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
+        };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
 
@@ -259,7 +257,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
-        void HandleAsynchOperationReply(const proto::TransformedLinReply &reply);
+        void HandleAsynchOperationReply(const replication::TransformedLinReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -284,7 +282,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        replication::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -295,7 +292,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::TransformedLinReply trop_reply_;
+        replication::TransformedLinReply trop_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

@@ -297,9 +297,10 @@ namespace strongstore
         op_.mutable_rid()->set_client_id(client_id_);
         op_.mutable_rid()->set_client_req_id(req_id);
         op_.set_transaction_id(app_request_id);
-        op_.set_key(key);
-        op_.set_value(value);
-        op_.set_op(op);
+        // Set non-transformed operation data
+        op_.mutable_opd()->set_key(key);
+        op_.mutable_opd()->set_value(value);
+        op_.mutable_opd()->set_op(op);
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)
@@ -364,125 +365,129 @@ namespace strongstore
         pendingOp->newVal = newValue;
         pendingOp->trcb = trcb;
 
-        trop_.Clear();
-        trop_.mutable_rid()->set_client_id(client_id_);
-        trop_.mutable_rid()->set_client_req_id(req_id);
-        trop_.set_key(key);
+        op_.Clear();
+        op_.mutable_rid()->set_client_id(client_id_);
+        op_.mutable_rid()->set_client_req_id(req_id);
+        op_.set_transaction_id(transaction_id);
+        // set transformed operation data
+        op_.mutable_tropd()->set_key(key);
+
+        // Set the AsynchOperation type
         switch (optype)
         {
         case request_utils::Operation::PUT:
-            trop_.mutable_op()->set_op(AsynchOperation::PUT);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::PUT);
             break;
         case request_utils::Operation::GET:
-            trop_.mutable_op()->set_op(AsynchOperation::GET);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::GET);
             break;
         case request_utils::Operation::SET:
-            trop_.mutable_op()->set_op(AsynchOperation::SET);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::SET);
             break;
         case request_utils::Operation::INCR:
-            trop_.mutable_op()->set_op(AsynchOperation::INCR);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::INCR);
             break;
         case request_utils::Operation::SADD:
-            trop_.mutable_op()->set_op(AsynchOperation::SADD);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::SADD);
             break;
         case request_utils::Operation::EXISTS:
-            trop_.mutable_op()->set_op(AsynchOperation::EXISTS);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::EXISTS);
             break;
         case request_utils::Operation::HMGET:
-            trop_.mutable_op()->set_op(AsynchOperation::HMGET);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::HMGET);
             break;
         case request_utils::Operation::HSET:
-            trop_.mutable_op()->set_op(AsynchOperation::HSET);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::HSET);
             break;
         case request_utils::Operation::HMSET:
-            trop_.mutable_op()->set_op(AsynchOperation::HMSET);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::HMSET);
             break;
         case request_utils::Operation::HGETALL:
-            trop_.mutable_op()->set_op(AsynchOperation::HGETALL);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::HGETALL);
             break;
         case request_utils::Operation::ZADD:
-            trop_.mutable_op()->set_op(AsynchOperation::ZADD);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZADD);
             break;
         case request_utils::Operation::ZINCRBY:
-            trop_.mutable_op()->set_op(AsynchOperation::ZINCRBY);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZINCRBY);
             break;
         case request_utils::Operation::ZSCORE:
-            trop_.mutable_op()->set_op(AsynchOperation::ZSCORE);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZSCORE);
             break;
         case request_utils::Operation::ZRANGE:
-            trop_.mutable_op()->set_op(AsynchOperation::ZRANGE);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZRANGE);
             break;
         case request_utils::Operation::ZREVRANGE:
-            trop_.mutable_op()->set_op(AsynchOperation::ZREVRANGE);
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZREVRANGE);
             break;
         default:
             Panic("Not implemented ops yet");
         }
 
-        // Setting the old value
+        // Setting the old value (AsynchValue)
         switch (oldValue.type)
         {
         case request_utils::ValueType::STRING:
-            trop_.mutable_oldvalue()->set_type(AsynchValue::STRING);
-            trop_.mutable_oldvalue()->set_str(oldValue.str);
+            op_.mutable_tropd()->mutable_oldvalue()->set_type(replication::AsynchValue::STRING);
+            op_.mutable_tropd()->mutable_oldvalue()->set_str(oldValue.str);
             break;
         case request_utils::ValueType::LIST:
-            trop_.mutable_oldvalue()->set_type(AsynchValue::LIST);
+            op_.mutable_tropd()->mutable_oldvalue()->set_type(replication::AsynchValue::LIST);
             for (string s : oldValue.list)
             {
-                trop_.mutable_oldvalue()->add_list(s);
+                op_.mutable_tropd()->mutable_oldvalue()->add_list(s);
             }
             break;
         case request_utils::ValueType::SET:
-            trop_.mutable_oldvalue()->set_type(AsynchValue::SET);
+            op_.mutable_tropd()->mutable_oldvalue()->set_type(replication::AsynchValue::SET);
             for (string s : oldValue.set)
             {
-                trop_.mutable_oldvalue()->add_set(s);
+                op_.mutable_tropd()->mutable_oldvalue()->add_set(s);
             }
             break;
         case request_utils::ValueType::HASH:
-            trop_.mutable_oldvalue()->set_type(AsynchValue::HASH);
+            op_.mutable_tropd()->mutable_oldvalue()->set_type(replication::AsynchValue::HASH);
             for (const auto &entry : oldValue.hash)
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
 
-                (*trop_.mutable_oldvalue()->mutable_hash())[k] = v;
+                (*(op_.mutable_tropd())->mutable_oldvalue()->mutable_hash())[k] = v;
             }
             break;
         default:
             Panic("Not a valid Value type!");
         }
 
-        // Setting the new value
+        // Setting the new value (AsynchValue)
         switch (newValue.type)
         {
         case request_utils::ValueType::STRING:
-            trop_.mutable_newvalue()->set_type(AsynchValue::STRING);
-            trop_.mutable_newvalue()->set_str(newValue.str);
+            op_.mutable_tropd()->mutable_newvalue()->set_type(replication::AsynchValue::STRING);
+            op_.mutable_tropd()->mutable_newvalue()->set_str(newValue.str);
             break;
         case request_utils::ValueType::LIST:
-            trop_.mutable_newvalue()->set_type(AsynchValue::LIST);
+            op_.mutable_tropd()->mutable_newvalue()->set_type(replication::AsynchValue::LIST);
             for (string s : newValue.list)
             {
-                trop_.mutable_newvalue()->add_list(s);
+                op_.mutable_tropd()->mutable_newvalue()->add_list(s);
             }
             break;
         case request_utils::ValueType::SET:
-            trop_.mutable_newvalue()->set_type(AsynchValue::SET);
+            op_.mutable_tropd()->mutable_newvalue()->set_type(replication::AsynchValue::SET);
             for (string s : newValue.set)
             {
-                trop_.mutable_newvalue()->add_set(s);
+                op_.mutable_tropd()->mutable_newvalue()->add_set(s);
             }
             break;
         case request_utils::ValueType::HASH:
-            trop_.mutable_newvalue()->set_type(AsynchValue::HASH);
+            op_.mutable_tropd()->mutable_newvalue()->set_type(replication::AsynchValue::HASH);
             for (const auto &entry : newValue.hash)
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
 
-                (*trop_.mutable_newvalue()->mutable_hash())[k] = v;
+                (*(op_.mutable_tropd())->mutable_newvalue()->mutable_hash())[k] = v;
             }
             break;
         default:
@@ -494,8 +499,8 @@ namespace strongstore
         {
             uint64_t myshardtag = CreateTag(client_id_, seqno);
             seqno++;
-            trop_.set_shardtag(myshardtag);
-            trop_.set_intkey(key); // for iocl optimization
+            op_.set_shardtag(myshardtag);
+            op_.set_intkey(key); // for iocl optimization
 
             // Construct predecessor list
             auto it1 = outstandingOperationList.begin();
@@ -505,8 +510,8 @@ namespace strongstore
                 // increment refcount entry
                 (*it2)++;
                 // Add this entry to predecessor list and the RPC message
-                trop_.add_predlist((*it1).first);
-                trop_.add_shardlist((*it1).second);
+                op_.add_predlist((*it1).first);
+                op_.add_shardlist((*it1).second);
                 pendingOp->pred_list.push_back(*it1);
                 Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
                 ++it1;
@@ -525,7 +530,7 @@ namespace strongstore
         }
 
         // //std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, trop_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
     // IOCL receive the response
@@ -561,7 +566,7 @@ namespace strongstore
         ocb(status, retval, pred_list);
     }
 
-    void ShardClient::HandleAsynchOperationReply(const proto::TransformedLinReply &reply)
+    void ShardClient::HandleAsynchOperationReply(const replication::TransformedLinReply &reply)
     {
         Debug("shard client got TRANSFORMED LinReply!");
         uint64_t req_id = reply.rid().client_req_id();
@@ -573,12 +578,12 @@ namespace strongstore
         // Setting the command oldValue
         switch (reply.return_value().type())
         {
-        case AsynchValue::STRING:
+        case replication::AsynchValue::STRING:
             retval.type = request_utils::ValueType::STRING;
             retval.str = reply.return_value().str();
             Debug("retval has type STRING and value %s", retval.str.c_str());
             break;
-        case AsynchValue::LIST:
+        case replication::AsynchValue::LIST:
             retval.type = request_utils::ValueType::LIST;
             Debug("retval has type LIST");
             for (int i = 0; i < reply.return_value().list_size(); ++i)
@@ -587,7 +592,7 @@ namespace strongstore
                 retval.list.push_back(reply.return_value().list(i));
             }
             break;
-        case AsynchValue::SET:
+        case replication::AsynchValue::SET:
             Debug("retval has type SET");
             retval.type = request_utils::ValueType::SET;
             for (int i = 0; i < reply.return_value().set_size(); ++i)
@@ -596,7 +601,7 @@ namespace strongstore
                 retval.set.insert(reply.return_value().set(i));
             }
             break;
-        case AsynchValue::HASH:
+        case replication::AsynchValue::HASH:
             Debug("retval has type HASH");
             retval.type = request_utils::ValueType::HASH;
             for (const auto &entry : reply.return_value().hash())
@@ -622,16 +627,24 @@ namespace strongstore
             return; // stale request
         }
 
+        // Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
+        //       shard_idx_, app_request_id, status, retval.c_str());
+
+        // // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
+
+        // ocb(status, retval, pred_list);
+
         PendingAsynchOperation *op = itr->second;
         uint64_t transaction_id = op->transaction_id;
-        transformed_callback trcb = op->trcb;
+        transformed_callback trcb = std::move(op->trcb);
+        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
         pendingAsynchOperations.erase(itr);
         delete op;
 
         Debug("[%lu] [shard %i] Received SendRequest reply with status %d",
               transaction_id, shard_idx_, status);
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-        trcb(status, retval, transaction_id);
+        trcb(status, retval, transaction_id, pred_list);
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

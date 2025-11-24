@@ -219,7 +219,7 @@ namespace strongstore
 
         void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
-        void HandleAsynchSendOperation(const TransportAddress &remote, proto::TransformedLinOp &msg);
+        void HandleAsynchSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -285,7 +285,7 @@ namespace strongstore
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
         void ReplicaUpcallAppRequest(opnum_t opnum, replication::LinearizeableOperation &op, string &response);
-        void ReplicaUpcallTransformed(opnum_t opnum, replication::TransformedLinOp &op, string &response);
+        void ReplicaUpcallTransformed(opnum_t opnum, replication::LinearizeableOperation &op, string &response);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -317,7 +317,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        replication::TransformedLinOp trop_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -327,7 +326,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::TransformedLinReply trop_reply_;
+        replication::TransformedLinReply trop_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

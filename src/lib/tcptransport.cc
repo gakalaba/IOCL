@@ -941,7 +941,7 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
 
     if (what & BEV_EVENT_ERROR)
     {
-        Warn\\\\\\\\\\\ing("[TCP INCOMING %lu] ERROR: errno=%d (%s), lifetime=%.2f ms",
+        Warning("[TCP INCOMING %lu] ERROR: errno=%d (%s), lifetime=%.2f ms",
                 id, err, errstr, lifetime_ms);
     }
     else if (what & BEV_EVENT_EOF)

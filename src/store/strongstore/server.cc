@@ -148,15 +148,15 @@ namespace strongstore
             get_.ParseFromString(data);
             HandleGet(remote, get_);
         }
-        else if (type == op_.GetTypeName())
+        else if (type == op_.GetTypeName() && (!transformed_))
         {
             op_.ParseFromString(data);
             HandleSendOperation(remote, op_);
         }
-        else if (type == trop_.GetTypeName())
+        else if (type == op_.GetTypeName() && (transformed_))
         {
-            trop_.ParseFromString(data);
-            HandleAsynchSendOperation(remote, trop_);
+            op_.ParseFromString(data);
+            HandleAsynchSendOperation(remote, op_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
@@ -287,12 +287,12 @@ namespace strongstore
 
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
-        Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
+        Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.opd().op().c_str(), msg.opd().key().c_str(), msg.opd().value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
         auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
-        reply->key = msg.key();
-        reply->value = msg.value();
+        reply->key = msg.opd().key();
+        reply->value = msg.opd().value();
 
         replica_client_->SendOperation(
             transaction_id, msg,
@@ -302,7 +302,7 @@ namespace strongstore
             [](int, string) {}, OPERATION_TIMEOUT);
     }
 
-    void Server::HandleAsynchSendOperation(const TransportAddress &remote, replication::TransformedLinOp &msg)
+    void Server::HandleAsynchSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
         Debug("Calling HandleSendAsynchOperation!");
         uint64_t transaction_id = msg.rid().client_req_id();
@@ -1697,7 +1697,6 @@ namespace strongstore
 
         Request request;
         LinearizeableOperation linreq;
-        TransformedLinOp translinreq;
         if (consistency_ != LIN)
         {
             request.ParseFromString(op);
@@ -1713,17 +1712,10 @@ namespace strongstore
                 Panic("Unrecognized operation.");
             }
         } else {
-            if (!transformed_) {
-                linreq.ParseFromString(op);
-                replicate = true;
-                response = op;
-                Debug("was able to parse LinearizeableOperation!");
-            } else {
-                translinreq.ParseFromString(op);
-                replicate = true;
-                response = op;
-                Debug("was able to parse TransformedLinOp!");
-            }
+            linreq.ParseFromString(op);
+            replicate = true;
+            response = op;
+            Debug("was able to parse LinearizeableOperation!");
         }
     }
 
@@ -1737,15 +1729,13 @@ namespace strongstore
     {
         Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
-        TransformedLinOp translinreq;
         if (consistency_ == LIN)
         {
+            linreq.ParseFromString(op);
             if (!transformed_) {
-                linreq.ParseFromString(op);
                 ReplicaUpcallAppRequest(opnum, linreq, response);
             } else {
-                translinreq.ParseFromString(op);
-                ReplicaUpcallTransformed(opnum, translinreq, response);
+                ReplicaUpcallTransformed(opnum, linreq, response);
             }
             return;
         }
@@ -1879,24 +1869,24 @@ namespace strongstore
     // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
     {
-        Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
+        Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.opd().op().c_str(), req.opd().key().c_str(), req.opd().value().c_str());
         LinearizeableReply reply;
 
         string retval;
         int status = REPLY_OK;
-        if (req.op() == "get")
+        if (req.opd().op() == "get")
         {
             Debug("the request is get");
             // TODO ANJA look up how to mutate variables
-            if (!linearizeable_kv_store_.get(req.key(), retval))
+            if (!linearizeable_kv_store_.get(req.opd().key(), retval))
             {
                 status = REPLY_FAIL;
             };
         }
-        else if (req.op() == "put")
+        else if (req.opd().op() == "put")
         {
             Debug("the request is put");
-            if (!linearizeable_kv_store_.put(req.key(), req.value()))
+            if (!linearizeable_kv_store_.put(req.opd().key(), req.opd().value()))
             {
                 status = REPLY_FAIL;
             };
@@ -1913,16 +1903,16 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
-    void Server::ReplicaUpcallTransformed(opnum_t opnum, TransformedLinOp &op, string &response)
+    void Server::ReplicaUpcallTransformed(opnum_t opnum, replication::LinearizeableOperation &op, string &response)
     {
         Debug("Inside new ReplicaUpcall for ASYNCHRequests");
         redis::Command c;
 
         // Setting the command key
-        c.key = std::to_string(op.key());
+        c.key = std::to_string(op.tropd().key());
 
         // Setting the command op
-        switch (op.mutable_op()->op())
+        switch (op.tropd().op().op())
         {
         case AsynchOperation::PUT:
             c.op = Operation::PUT;
@@ -1974,29 +1964,29 @@ namespace strongstore
         }
 
         // Setting the command oldValue
-        switch (op.mutable_oldvalue()->type())
+        switch (op.tropd().oldvalue().type())
         {
         case AsynchValue::STRING:
             c.oldValue.type = ValueType::STRING;
-            c.oldValue.str = op.mutable_oldvalue()->str();
+            c.oldValue.str = op.tropd().oldvalue().str();
             break;
         case AsynchValue::LIST:
             c.oldValue.type = ValueType::LIST;
-            for (int i = 0; i < op.mutable_oldvalue()->list_size(); ++i)
+            for (int i = 0; i < op.tropd().oldvalue().list_size(); ++i)
             {
-                c.oldValue.list.push_back(op.mutable_oldvalue()->list(i));
+                c.oldValue.list.push_back(op.tropd().oldvalue().list(i));
             }
             break;
         case AsynchValue::SET:
             c.oldValue.type = ValueType::SET;
-            for (int i = 0; i < op.mutable_oldvalue()->set_size(); ++i)
+            for (int i = 0; i < op.tropd().oldvalue().set_size(); ++i)
             {
-                c.oldValue.set.insert(op.mutable_oldvalue()->set(i));
+                c.oldValue.set.insert(op.tropd().oldvalue().set(i));
             }
             break;
         case AsynchValue::HASH:
             c.oldValue.type = ValueType::HASH;
-            for (const auto &entry : op.mutable_oldvalue()->hash())
+            for (const auto &entry : op.tropd().oldvalue().hash())
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;
@@ -2011,29 +2001,29 @@ namespace strongstore
         }
 
         // Setting the command value
-        switch (op.mutable_newvalue()->type())
+        switch (op.tropd().newvalue().type())
         {
         case AsynchValue::STRING:
             c.value.type = ValueType::STRING;
-            c.value.str = op.mutable_newvalue()->str();
+            c.value.str = op.tropd().newvalue().str();
             break;
         case AsynchValue::LIST:
             c.value.type = ValueType::LIST;
-            for (int i = 0; i < op.mutable_newvalue()->list_size(); ++i)
+            for (int i = 0; i < op.tropd().newvalue().list_size(); ++i)
             {
-                c.value.list.push_back(op.mutable_newvalue()->list(i));
+                c.value.list.push_back(op.tropd().newvalue().list(i));
             }
             break;
         case AsynchValue::SET:
             c.value.type = ValueType::SET;
-            for (int i = 0; i < op.mutable_newvalue()->set_size(); ++i)
+            for (int i = 0; i < op.tropd().newvalue().set_size(); ++i)
             {
-                c.value.set.insert(op.mutable_newvalue()->set(i));
+                c.value.set.insert(op.tropd().newvalue().set(i));
             }
             break;
         case AsynchValue::HASH:
             c.value.type = ValueType::HASH;
-            for (const auto &entry : op.mutable_newvalue()->hash())
+            for (const auto &entry : op.tropd().newvalue().hash())
             {
                 const std::string &k = entry.first;
                 const std::string &v = entry.second;

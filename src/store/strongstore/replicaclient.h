@@ -75,7 +75,7 @@ namespace strongstore
                          uint32_t timeout);
 
         void SendAsynchOperation(uint64_t request_id,
-                               strongstore::proto::TransformedLinOp &msg,
+                               replication::LinearizeableOperation &msg,
                                transformed_callback trcb);
 
         void Prepare(uint64_t transaction_id,

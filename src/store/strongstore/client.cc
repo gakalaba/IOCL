@@ -661,7 +661,7 @@ namespace strongstore
                     }
                     ++it1;
                 }
-                // afterwards, it2 and it3 should be 
+                // afterwards, it2 and it3 should be
                 // pointing to the entry itself, remove it
                 Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
                 ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
@@ -707,7 +707,7 @@ namespace strongstore
                     }
                     ++it1;
                 }
-                // afterwards, it2 and it3 should be 
+                // afterwards, it2 and it3 should be
                 // pointing to the entry itself, remove it
                 Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
                 ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
@@ -784,7 +784,7 @@ namespace strongstore
                     }
                     ++it1;
                 }
-                // afterwards, it2 and it3 should be 
+                // afterwards, it2 and it3 should be
                 // pointing to the entry itself, remove it
                 ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
                 (*it2)--;

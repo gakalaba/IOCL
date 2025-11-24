@@ -123,7 +123,7 @@ namespace strongstore
     }
 
     void ReplicaClient::SendAsynchOperation(uint64_t request_id,
-                                          TransformedLinOp &msg,
+                                          replication::LinearizeableOperation &msg,
                                           transformed_callback trcb)
     {
         Debug("[shard %i] SendAsynchOperation sending Transformed LinOp", shard_idx_);
@@ -138,15 +138,16 @@ namespace strongstore
             case LinearizableProtocol::PROTO_VR:
                 // create request
                 msg.SerializeToString(&asynch_op_str);
+                ASSERT(!msg.has_tropd());
 
                 client->Invoke(
-                    request_str,
+                    asynch_op_str,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
                 Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-                client->InvokeTransformed(
+                client->InvokeIOCL(
                     msg,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));

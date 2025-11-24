@@ -491,9 +491,8 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                         auto &shard_config = replica_configs[i];
                         auto &net_config = net_configs[i];
                         auto &region = client_regions[i];
-                        
                         Client *c = new strongstore::Client(
-                            consistency, net_config, region, shard_config,
+                            consistency, strongstore::LinearizableProtocol::PROTO_VR, net_config, region, shard_config,
                             GetEnvU64("IOCL_CLIENT_ID", "0"), static_cast<int>(num_shards), closest_replica,
                             s_transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
                         

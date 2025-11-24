@@ -19,6 +19,41 @@ message RequestIDMessage {
     required uint64 client_req_id = 2;
 }
 
+message AsynchValue {
+    enum ValueType {
+        STRING = 1;
+        LIST = 2;
+        SET = 3;
+        HASH = 4;
+    }
+    required ValueType type = 1;
+    optional string str = 2;
+    repeated string list = 3;
+    repeated string set = 4;
+    map<string, string> hash = 5;
+}
+
+message AsynchOperation {
+    enum OperationType {
+        PUT = 1;
+        GET = 2;
+        INCR = 3;
+        SET = 4;
+        SADD = 5;
+        EXISTS = 6;
+        HMGET = 7;
+        HSET = 8;
+        HMSET = 9;
+        HGETALL = 10;
+        ZADD = 11;
+        ZINCRBY = 12;
+        ZSCORE = 13;
+        ZRANGE = 14;
+        ZREVRANGE = 15;
+     }
+     required OperationType op = 1;
+}
+
 message LinearizeableOperation {
     message OpData {
         required string op = 1;
@@ -33,10 +68,16 @@ message LinearizeableOperation {
     }
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
-    optional OpData opd = 2;
-    optional TransformedOpData tropd = 3;
-    optional uint64 shardtag = 6;
-    optional uint64 intkey = 7;
-    repeated uint64 predlist = 8;
-    repeated uint32 shardlist = 9;
+    optional OpData opd = 3;
+    optional TransformedOpData tropd = 4;
+    optional uint64 shardtag = 5;
+    optional uint64 intkey = 6;
+    repeated uint64 predlist = 7;
+    repeated uint32 shardlist = 8;
+}
+
+message TransformedLinReply {
+    required RequestIDMessage rid = 1;
+    required AsynchValue return_value = 2;
+    required uint64 status = 3;
 }
