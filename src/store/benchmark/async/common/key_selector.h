@@ -31,6 +31,8 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <unordered_set>
+#include <iostream>
 
 class KeySelector
 {
@@ -39,6 +41,7 @@ public:
   virtual ~KeySelector();
 
   virtual int GetKey(std::mt19937 &rand) = 0;
+  virtual int GetKeyWOReplacement(std::mt19937 &rand, const std::unordered_set<int> &seenKeys) = 0;
 
   inline const std::string &GetKey(int idx) const { return keys[idx]; }
   inline size_t GetNumKeys() const { return keys.size(); }

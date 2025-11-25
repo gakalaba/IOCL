@@ -53,6 +53,7 @@ class ZipfKeySelector : public KeySelector {
     ZipfKeySelector(const std::vector<std::string> &keys, double exponent);
 
     int GetKey(std::mt19937 &rand) override;
+    int GetKeyWOReplacement(std::mt19937 &rand, const std::unordered_set<int> &seenKeys) override;
 
    private:
     /** Threshold below which Taylor series will be used. */

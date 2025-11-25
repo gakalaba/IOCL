@@ -39,7 +39,7 @@ namespace micro
     class BasicBigTransaction : public AsyncTransaction
     {
     public:
-        BasicBigTransaction(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage);
+        BasicBigTransaction(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage, bool wo_replacement);
         virtual ~BasicBigTransaction();
 
     protected:
@@ -62,6 +62,8 @@ namespace micro
         std::string ttype_;
         int fanout_;
         uint32_t read_percentage_;
+        std::unordered_set<int> seenKeys_;
+        bool wo_replacement_;
     };
 
 } // namespace micro

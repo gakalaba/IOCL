@@ -39,7 +39,7 @@ namespace micro
     class BasicAppRequest : public AsyncAppRequest
     {
     public:
-        BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage);
+        BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage, bool WOReplacement);
         virtual ~BasicAppRequest();
 
     protected:
@@ -62,6 +62,8 @@ namespace micro
         std::string ttype_;
         int fanout_;
         uint32_t read_percentage_;
+        std::unordered_set<int> seenKeys_;
+        bool WOReplacement_;
     };
 
 } // namespace micro

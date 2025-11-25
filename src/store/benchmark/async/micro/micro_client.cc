@@ -45,6 +45,7 @@ namespace micro
                              int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
                              bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, uint64_t fanout, bool issueConcurrent,
                              uint32_t read_percentage,
+                             bool wo_replacement,
                              const std::string &latencyFilename)
         : BenchmarkClient(clients, timeout, transport, id,
                           mode,
@@ -54,7 +55,8 @@ namespace micro
                           expDuration, warmupSec, cooldownSec, abortBackoff,
                           retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, latencyFilename),
           keySelector(keySelector),
-          read_percentage_{read_percentage}
+          read_percentage_{read_percentage},
+          wo_replacement_{wo_replacement}
     {
         ASSERT(fanout > 0);
     }
@@ -65,12 +67,12 @@ namespace micro
 
     AsyncTransaction *MicroClient::GetNextTransaction()
     {
-        return new BasicBigTransaction(keySelector, GetFanout(), GetRand(), read_percentage_);
+        return new BasicBigTransaction(keySelector, GetFanout(), GetRand(), read_percentage_, wo_replacement_);
     }
 
     AsyncAppRequest *MicroClient::GetNextAppRequest()
     {
-        return new BasicAppRequest(keySelector, GetFanout(), GetRand(), read_percentage_);
+        return new BasicAppRequest(keySelector, GetFanout(), GetRand(), read_percentage_, wo_replacement_);
     }
 
 

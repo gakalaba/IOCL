@@ -37,6 +37,7 @@ public:
   virtual ~UniformKeySelector();
 
   virtual int GetKey(std::mt19937 &rand) override;
+  virtual int GetKeyWOReplacement(std::mt19937 &rand, const std::unordered_set<int> &seenKeys) override;
 };
 
 #endif /* UNIFORM_KEY_SELECTOR_H */

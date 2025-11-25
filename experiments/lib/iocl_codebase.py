@@ -98,6 +98,8 @@ class IOCLCodebase:
             client_command += ' --client_issue_concurrent=%s' % (str(config['client_issue_concurrent']).lower())
         if 'client_read_percentage' in config:
             client_command += ' --client_read_percentage %d' % config['client_read_percentage']
+        if 'client_wo_replacement' in config and config['client_wo_replacement']:
+            client_command += ' --wo_replacement'
 
         if 'client_switch_probability' in config:
             client_command += ' --client_switch_probability %f' % config['client_switch_probability']

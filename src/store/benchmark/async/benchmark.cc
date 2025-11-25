@@ -90,6 +90,7 @@ DEFINE_string(replica_config_paths, "", "paths to replication configuration file
 DEFINE_uint64(num_shards, 1, "number of shards in the system");
 DEFINE_bool(ping_replicas, false, "determine latency to replicas via pings");
 DEFINE_string(net_config_path, "", "path to network configuration file");
+DEFINE_bool(wo_replacement, false, "without replacement on key per transaction");
 
 DEFINE_bool(debug_stats, false, "record stats related to debugging");
 
@@ -790,7 +791,8 @@ int main(int argc, char **argv)
             FLAGS_max_attempts,
             FLAGS_client_fanout,
             to_issue_concurrent,
-            FLAGS_client_read_percentage);
+            FLAGS_client_read_percentage,
+            FLAGS_wo_replacement);
         break;
 
     default:

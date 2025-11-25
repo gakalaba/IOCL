@@ -33,16 +33,27 @@ namespace micro
 {
 
     BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector, int fanout, std::mt19937 &rand,
-    uint32_t read_percentage)
+    uint32_t read_percentage,
+    bool wo_replacement)
         : AsyncTransaction(),
           keySelector(keySelector),
           ttype_{"basic_1BT"},
           fanout_{fanout},
-          read_percentage_{read_percentage}
+          read_percentage_{read_percentage},
+          wo_replacement_{wo_replacement}
     {
-        for (int i = 0; i < fanout; ++i)
-        {
-            keyIdxs.push_back(keySelector->GetKey(rand));
+        if (!wo_replacement_) {
+            for (int i = 0; i < fanout; ++i)
+            {
+                keyIdxs.push_back(keySelector->GetKey(rand));
+            }
+        } else {
+            for (int i = 0; i < fanout; ++i)
+            {
+                int ki = keySelector->GetKeyWOReplacement(rand, seenKeys_);
+                seenKeys_.insert(ki);
+                keyIdxs.push_back(ki);
+            }
         }
     }
 

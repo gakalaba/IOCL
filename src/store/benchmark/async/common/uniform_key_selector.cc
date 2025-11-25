@@ -42,3 +42,13 @@ int UniformKeySelector::GetKey(std::mt19937 &rand)
 {
   return rand() % GetNumKeys();
 }
+
+int UniformKeySelector::GetKeyWOReplacement(std::mt19937 &rand, const std::unordered_set<int> &seenKeys)
+{
+  while (true) {
+    int k = rand() % GetNumKeys();
+    if (seenKeys.find(k) == seenKeys.end()) {
+      return k;
+    }
+  }
+}

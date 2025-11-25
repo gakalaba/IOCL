@@ -60,6 +60,7 @@ namespace micro
                     uint64_t fanout,
                     bool issueConcurrent,
                     uint32_t read_percentage,
+                    bool wo_replacement,
                     const std::string &latencyFilename = "latency");
 
         virtual ~MicroClient();
@@ -72,6 +73,7 @@ namespace micro
         KeySelector *keySelector;
         std::string lastOp;
         uint32_t read_percentage_;
+        bool wo_replacement_;
     };
 
 } // namespace micro

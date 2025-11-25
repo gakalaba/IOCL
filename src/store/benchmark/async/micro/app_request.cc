@@ -33,16 +33,26 @@ namespace micro
 {
 
     BasicAppRequest::BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand,
-    uint32_t read_percentage)
+    uint32_t read_percentage, bool WOReplacement)
         : AsyncAppRequest(),
           keySelector(keySelector),
           ttype_{"basic_appreq"},
           fanout_{fanout},
-          read_percentage_{read_percentage}
+          read_percentage_{read_percentage},
+          WOReplacement_{WOReplacement}
     {
-        for (int i = 0; i < fanout; ++i)
-        {
-            keyIdxs.push_back(keySelector->GetKey(rand));
+        if (!WOReplacement_) {
+            for (int i = 0; i < fanout; ++i)
+            {
+                keyIdxs.push_back(keySelector->GetKey(rand));
+            }
+        } else {
+            for (int i = 0; i < fanout; ++i)
+            {
+                int ki = keySelector->GetKeyWOReplacement(rand, seenKeys_);
+                seenKeys_.insert(ki);
+                keyIdxs.push_back(ki);
+            }
         }
     }
 
