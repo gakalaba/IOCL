@@ -5,7 +5,20 @@ import shutil
 from lib.experiment_codebase import *
 from utils.experiment_util import *
 from utils.remote_util import *
+MACHINE_CORE_COUNTER = {}
 
+def next_core_for_machine(machine, core_list):
+    """
+    Returns the next core for this machine using an in-memory counter.
+    No files, no locks: since this Python script runs sequentially.
+    """
+    if machine not in MACHINE_CORE_COUNTER:
+        MACHINE_CORE_COUNTER[machine] = 0
+
+    counter = MACHINE_CORE_COUNTER[machine]
+    MACHINE_CORE_COUNTER[machine] += 1
+
+    return core_list[counter % len(core_list)]
 
 class IOCLCodebase:
 
@@ -356,8 +369,13 @@ class IOCLCodebase:
             replica_command = config['server_wrap_command'] % replica_command
 
         if 'pin_server_processes' in config and isinstance(config['pin_server_processes'], list) and len(config['pin_server_processes']) > 0:
-            core = config['pin_server_processes'][server_id %
-                                                  len(config['pin_server_processes'])]
+            # if (config["client_protocol_mode"] == "span-lock"):
+            #     core = config['pin_server_processes'][server_id %
+            #                                       len(config['pin_server_processes'])]
+            # else:
+            machine = config["shards"][shard_idx][replica_idx]
+            all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
+            core = next_core_for_machine(machine, all_cores)
             replica_command = 'taskset 0x%x %s' % (1 << core, replica_command)
 
         # Wrapping additional information around command
