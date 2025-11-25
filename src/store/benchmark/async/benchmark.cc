@@ -227,8 +227,8 @@ DEFINE_bool(client_issue_concurrent, false, "whether a client issues concurrent 
 DEFINE_uint32(client_read_percentage, 500, "percentage of reads in the workload");
 
 const std::string partitioner_args[] = {"default", "warehouse_dist_items",
-                                        "warehouse"};
-const partitioner_t parts[]{DEFAULT, WAREHOUSE_DIST_ITEMS, WAREHOUSE};
+                                        "warehouse", "load_balanced"};
+const partitioner_t parts[]{DEFAULT, WAREHOUSE_DIST_ITEMS, WAREHOUSE, LOAD_BALANCED};
 static bool ValidatePartitioner(const char *flagname,
                                 const std::string &value)
 {
@@ -488,18 +488,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // parse partitioner
-    partitioner_t partType = DEFAULT;
-    int numParts = sizeof(partitioner_args);
-    for (int i = 0; i < numParts; ++i)
-    {
-        if (FLAGS_partitioner == partitioner_args[i])
-        {
-            partType = parts[i];
-            break;
-        }
-    }
-
     // parse key selector
     keysmode_t keySelectionMode = KEYS_UNKNOWN;
     int numKeySelectionModes = sizeof(keys_args);
@@ -515,6 +503,22 @@ int main(int argc, char **argv)
     {
         std::cerr << "Unknown key selector." << std::endl;
         return 1;
+    }
+
+    // parse partitioner
+    partitioner_t partType = DEFAULT;
+    int numParts = sizeof(partitioner_args);
+    for (int i = 0; i < numParts; ++i)
+    {
+        if (FLAGS_partitioner == partitioner_args[i])
+        {
+            partType = parts[i];
+            break;
+        }
+    }
+    if ((partType == LOAD_BALANCED) && (keySelectionMode == KEYS_UNIFORM))
+    {
+        partType = DEFAULT;
     }
 
     // parse closest replicas
@@ -614,6 +618,10 @@ int main(int argc, char **argv)
     {
     case DEFAULT:
         part = new DefaultPartitioner();
+        break;
+    case LOAD_BALANCED:
+        part = new LoadBalancedPartitioner(FLAGS_zipf_coefficient, FLAGS_num_shards);
+        Debug("Creating a load balanced paritioner!");
         break;
     case WAREHOUSE_DIST_ITEMS:
         part = new WarehouseDistItemsPartitioner(FLAGS_tpcc_num_warehouses);

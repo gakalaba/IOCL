@@ -148,6 +148,7 @@ class IOCLCodebase:
             if 'client_key_selector' in config:
                 client_command += ' --key_selector %s' % config['client_key_selector']
             if config['client_key_selector'] == 'zipf':
+                assert('client_zipf_coefficient' in config)
                 client_command += ' --zipf_coefficient %f' % config['client_zipf_coefficient']
 
         if 'client_wrap_command' in config and len(config['client_wrap_command']) > 0:
@@ -261,6 +262,11 @@ class IOCLCodebase:
             if 'unreplicated' in config['replication_protocol_settings']:
                 replica_command += ' --strong_unreplicated=%s' % str(
                     config['replication_protocol_settings']['unreplicated']).lower()
+        if 'client_key_selector' in config:
+            replica_command += ' --key_selector %s' % config['client_key_selector']
+            if config['client_key_selector'] == 'zipf':
+                    assert('client_zipf_coefficient' in config)
+                    replica_command += ' --zipf_coefficient %f' % config['client_zipf_coefficient']
 
         if config['replication_protocol'] == 'tapir':
             if 'strictly_serializable' in config['replication_protocol_settings']:

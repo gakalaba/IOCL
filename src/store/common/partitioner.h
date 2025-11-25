@@ -33,12 +33,14 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 enum partitioner_t
 {
     DEFAULT = 0,
     WAREHOUSE_DIST_ITEMS,
     WAREHOUSE,
+    LOAD_BALANCED,
 };
 
 class Partitioner
@@ -60,6 +62,57 @@ public:
 
     virtual uint64_t operator()(const std::string &key, uint64_t numShards,
                                 int group, const std::vector<int> &txnGroups);
+};
+
+class LoadBalancedPartitioner : public Partitioner
+{
+public:
+    LoadBalancedPartitioner(double zipf_coef, int num_shards) :
+        M(3000),
+        num_shards_(num_shards)
+    {
+        // compute weights for top M keys
+        std::vector<double> weights;
+        weights.reserve(M);
+        for (int k = 1; k <= M; k++) {
+            double w = 1.0 / std::pow(static_cast<double>(k), zipf_coef);
+            weights.push_back(w);
+        }
+        double total = std::accumulate(weights.begin(), weights.end(), 0.0);
+
+        std::vector<double> freqs_;
+        freqs_.reserve(M);
+        int i = 0;
+        for (double w : weights) {
+            freqs_.push_back(w / total);
+            i++;
+        }
+
+        // Calculate map of key to shard_idx,
+        // balancing the load given the key frequencies
+        std::vector<double> shard_load(num_shards, 0.0);
+        for (int k = 0; k < M; k++) {
+            double best_load = std::numeric_limits<double>::max();
+            int best_shard = 0;
+            for (int s = 0; s < num_shards; s++) {
+                if (shard_load[s] < best_load) {
+                    best_load = shard_load[s];
+                    best_shard = s;
+                }
+            }
+            key_to_shard_[k] = best_shard;
+            shard_load[best_shard] += freqs_[k];
+        }
+    }
+    virtual ~LoadBalancedPartitioner() {}
+
+    virtual uint64_t operator()(const std::string &key, uint64_t numShards,
+                                int group, const std::vector<int> &txnGroups);
+private:
+    // store some state
+    int M; // cutoff point
+    int num_shards_;
+    std::unordered_map<int, int> key_to_shard_;
 };
 
 class WarehouseDistItemsPartitioner : public Partitioner

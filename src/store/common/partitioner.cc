@@ -46,6 +46,17 @@ uint64_t DefaultPartitioner::operator()(const std::string &key, uint64_t nshards
     return (hash % nshards);
 };
 
+uint64_t LoadBalancedPartitioner::operator()(const std::string &key, uint64_t nshards,
+                                        int group, const std::vector<int> &txnGroups)
+{
+    int k = std::stoi(key);
+    if (k >= key_to_shard_.size()) {
+        return key_to_shard_[(k - M) % nshards];
+    } else {
+        return key_to_shard_[k];
+    }
+}
+
 /*partitioner warehouse_partitioner = [](const std::string &key, uint64_t nshards,
     int group, const std::vector<int> &txnGroups) {
   // keys format is defined in tpcc_utils.cc

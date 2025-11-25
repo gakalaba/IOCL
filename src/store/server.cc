@@ -66,6 +66,10 @@ DEFINE_uint64(replica_idx, 0,
 DEFINE_uint64(group_idx, 0, "index of the shard to which this replica belongs");
 DEFINE_uint64(num_shards, 1, "number of shards in the system");
 DEFINE_bool(debug_stats, false, "record stats related to debugging");
+DEFINE_string(key_selector, "uniform",
+              "the distribution from which to "
+              "select keys.");
+DEFINE_double(zipf_coefficient, 0.5, "the coefficient of the zipf distribution for key selection.");
 
 const std::string protocol_args[] = {
     "strong", "vr", "iocl_ct"
@@ -117,8 +121,8 @@ DEFINE_string(trans_protocol, trans_args[0],
 DEFINE_validator(trans_protocol, &ValidateTransMode);
 
 const std::string partitioner_args[] = {"default", "warehouse_dist_items",
-                                        "warehouse"};
-const partitioner_t parts[]{DEFAULT, WAREHOUSE_DIST_ITEMS, WAREHOUSE};
+                                        "warehouse", "load_balanced"};
+const partitioner_t parts[]{DEFAULT, WAREHOUSE_DIST_ITEMS, WAREHOUSE, LOAD_BALANCED};
 static bool ValidatePartitioner(const char *flagname,
                                 const std::string &value)
 {
@@ -314,12 +318,20 @@ int main(int argc, char **argv)
             break;
         }
     }
+    if ((partType == LOAD_BALANCED) && (FLAGS_key_selector == "uniform"))
+    {
+        partType = DEFAULT;
+    }
 
     std::mt19937 unused;
     switch (partType)
     {
     case DEFAULT:
         part = new DefaultPartitioner();
+        break;
+    case LOAD_BALANCED:
+        part = new LoadBalancedPartitioner(FLAGS_zipf_coefficient, FLAGS_num_shards);
+        Debug("Creating a load balanced paritioner!");
         break;
     case WAREHOUSE_DIST_ITEMS:
         part = new WarehouseDistItemsPartitioner(FLAGS_tpcc_num_warehouses);
