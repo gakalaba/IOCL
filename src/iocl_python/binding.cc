@@ -421,9 +421,9 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     if (consistency_s == "ss")  consistency = strongstore::Consistency::SS;
 
     std::string protocol_mode_s = GetEnvOr("IOCL_PROTOCOL_MODE", "vr");
-    strongstore::LinearizableProtocol protocol_mode = strongstore::LinearizableProtocol::VR;
+    strongstore::LinearizableProtocol protocol_mode = strongstore::LinearizableProtocol::PROTO_VR;
     if (protocol_mode_s == "iocl_ct") protocol_mode = strongstore::LinearizableProtocol::PROTO_IOCL_CT;
-    if (protocol_mode_s == "vr") protocol_mode = strongstore::LinearizableProtocol::VR;
+    if (protocol_mode_s == "vr") protocol_mode = strongstore::LinearizableProtocol::PROTO_VR;
     if (protocol_mode_s == "span-lock") protocol_mode = strongstore::LinearizableProtocol::PROTO_STRONG;
 
     // std::cout << "[CreateBenchmarkClient] Config: replicas='" << replica_paths
