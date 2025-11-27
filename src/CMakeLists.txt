@@ -32,6 +32,9 @@ link_libraries(gflags::gflags)
 # add third-party JSON library
 include_directories(${CMAKE_SOURCE_DIR}/third_party/json/single_include)
 
+# add the GSL library
+include_directories(${CMAKE_SOURCE_DIR}/third_party/GSL/include)
+
 # add the common library
 add_subdirectory(lib)
 

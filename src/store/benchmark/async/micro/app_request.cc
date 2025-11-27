@@ -32,28 +32,17 @@
 namespace micro
 {
 
-    BasicAppRequest::BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand,
-    uint32_t read_percentage, bool WOReplacement)
+    BasicAppRequest::BasicAppRequest(KeySelector *keySelector,
+    uint64_t fanout,
+    uint32_t read_percentage,
+    gsl::span<int> s)
         : AsyncAppRequest(),
           keySelector(keySelector),
           ttype_{"basic_appreq"},
           fanout_{fanout},
           read_percentage_{read_percentage},
-          WOReplacement_{WOReplacement}
+          keyIdxs{s}
     {
-        if (!WOReplacement_) {
-            for (int i = 0; i < fanout; ++i)
-            {
-                keyIdxs.push_back(keySelector->GetKey(rand));
-            }
-        } else {
-            for (int i = 0; i < fanout; ++i)
-            {
-                int ki = keySelector->GetKeyWOReplacement(rand, seenKeys_);
-                seenKeys_.insert(ki);
-                keyIdxs.push_back(ki);
-            }
-        }
     }
 
     BasicAppRequest::~BasicAppRequest()
@@ -62,10 +51,9 @@ namespace micro
 
     Operation BasicAppRequest::GetNextOperation(std::size_t op_index)
     {
-        size_t fanout = GetNumKeys();
-        Debug("BASIC_APP_REQUEST with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout, op_index, read_percentage_);
+        Debug("BASIC_APP_REQUEST with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout_, op_index, read_percentage_);
 
-        if (0 <= op_index && op_index < fanout) {
+        if (0 <= op_index && op_index < fanout_) {
             srand(time(0));
             if ((rand() % 100) < read_percentage_)
             {
@@ -76,7 +64,7 @@ namespace micro
             {
                 Debug("Sending Put on key = %s", GetKey(op_index).c_str());
                 return Put(GetKey(op_index), GetKey(op_index));
-            }   
+            }
         }
         else {
             PPanic("Not good!!! Sending operation out of bounds of app request!");

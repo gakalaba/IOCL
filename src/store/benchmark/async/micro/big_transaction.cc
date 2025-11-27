@@ -32,29 +32,17 @@
 namespace micro
 {
 
-    BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector, int fanout, std::mt19937 &rand,
+    BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector,
+    uint64_t fanout,
     uint32_t read_percentage,
-    bool wo_replacement)
+    gsl::span<int> s)
         : AsyncTransaction(),
           keySelector(keySelector),
           ttype_{"basic_1BT"},
           fanout_{fanout},
           read_percentage_{read_percentage},
-          wo_replacement_{wo_replacement}
+          keyIdxs{s}
     {
-        if (!wo_replacement_) {
-            for (int i = 0; i < fanout; ++i)
-            {
-                keyIdxs.push_back(keySelector->GetKey(rand));
-            }
-        } else {
-            for (int i = 0; i < fanout; ++i)
-            {
-                int ki = keySelector->GetKeyWOReplacement(rand, seenKeys_);
-                seenKeys_.insert(ki);
-                keyIdxs.push_back(ki);
-            }
-        }
     }
 
     BasicBigTransaction::~BasicBigTransaction()
@@ -63,13 +51,12 @@ namespace micro
 
     Operation BasicBigTransaction::GetNextOperation(std::size_t op_index)
     {
-        size_t fanout = GetNumKeys();
-        Debug("BASIC_1_BIG_TRANSACTION with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout, op_index, read_percentage_);
+        Debug("BASIC_1_BIG_TRANSACTION with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout_, op_index, read_percentage_);
         if (op_index == 0)
         {
             return BeginRW();
         }
-        else if (0 < op_index && op_index <= fanout)
+        else if (0 < op_index && op_index <= fanout_)
         {
             srand(time(0));
             if ((rand() % 100) < read_percentage_)
@@ -83,7 +70,7 @@ namespace micro
                 return Put(GetKey(op_index - 1), GetKey(op_index - 1));   
             }
         }
-        else if (op_index == fanout + 1)
+        else if (op_index == fanout_ + 1)
         {
             Debug("Sending Commit");
             return Commit();

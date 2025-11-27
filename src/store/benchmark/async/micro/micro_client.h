@@ -72,8 +72,12 @@ namespace micro
     private:
         KeySelector *keySelector;
         std::string lastOp;
+        uint64_t fanout_;
         uint32_t read_percentage_;
         bool wo_replacement_;
+        int txn_idx_;
+        std::vector<int> allKeyIdxs;
+        int max_txns_per_client_;
     };
 
 } // namespace micro

@@ -55,10 +55,33 @@ namespace micro
                           expDuration, warmupSec, cooldownSec, abortBackoff,
                           retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, latencyFilename),
           keySelector(keySelector),
+          fanout_{fanout},
           read_percentage_{read_percentage},
-          wo_replacement_{wo_replacement}
+          wo_replacement_{wo_replacement},
+          txn_idx_{0},
+          max_txns_per_client_{100000}
     {
         ASSERT(fanout > 0);
+        allKeyIdxs.reserve(fanout * max_txns_per_client_);
+        std::unordered_set<int> seenKeys_;
+        std::mt19937 &rand = GetRand();
+        for (int i = 0; i < max_txns_per_client_; i++) {
+            rand = GetRand();
+            seenKeys_.clear();
+            if (!wo_replacement_) {
+                for (int i = 0; i < fanout; ++i)
+                {
+                    allKeyIdxs.push_back(keySelector->GetKey(rand));
+                }
+            } else {
+                for (int i = 0; i < fanout; ++i)
+                {
+                    int ki = keySelector->GetKeyWOReplacement(rand, seenKeys_);
+                    seenKeys_.insert(ki);
+                    allKeyIdxs.push_back(ki);
+                }
+            }
+        }
     }
 
     MicroClient::~MicroClient()
@@ -67,12 +90,16 @@ namespace micro
 
     AsyncTransaction *MicroClient::GetNextTransaction()
     {
-        return new BasicBigTransaction(keySelector, GetFanout(), GetRand(), read_percentage_, wo_replacement_);
+        int this_txn_id = txn_idx_;
+        txn_idx_++;
+        return new BasicBigTransaction(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id, fanout_));
     }
 
     AsyncAppRequest *MicroClient::GetNextAppRequest()
     {
-        return new BasicAppRequest(keySelector, GetFanout(), GetRand(), read_percentage_, wo_replacement_);
+        int this_txn_id = txn_idx_;
+        txn_idx_++;
+        return new BasicAppRequest(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id, fanout_));
     }
 
 

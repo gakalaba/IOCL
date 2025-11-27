@@ -88,7 +88,8 @@ namespace retwis
 
     AsyncAppRequest *RetwisClient::GetNextAppRequest()
     {
-        return new micro::BasicAppRequest(keySelector, 0, GetRand(), 0, false);
+        gsl::span<int> s;
+        return new micro::BasicAppRequest(keySelector, 0, 0, s);
     }
 
 } // namespace retwis

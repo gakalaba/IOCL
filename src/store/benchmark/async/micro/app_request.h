@@ -33,13 +33,15 @@
 #include "store/common/frontend/async_apprequest.h"
 #include "store/benchmark/async/common/key_selector.h"
 
+#include <gsl/span>
+
 namespace micro
 {
 
     class BasicAppRequest : public AsyncAppRequest
     {
     public:
-        BasicAppRequest(KeySelector *keySelector, int fanout, std::mt19937 &rand, uint32_t read_percentage, bool WOReplacement);
+        BasicAppRequest(KeySelector *keySelector, uint64_t fanout, uint32_t read_percentage, gsl::span<int> s);
         virtual ~BasicAppRequest();
 
     protected:
@@ -58,12 +60,10 @@ namespace micro
         KeySelector *keySelector;
 
     private:
-        std::vector<int> keyIdxs;
+        gsl::span<int> keyIdxs;
         std::string ttype_;
-        int fanout_;
+        uint64_t fanout_;
         uint32_t read_percentage_;
-        std::unordered_set<int> seenKeys_;
-        bool WOReplacement_;
     };
 
 } // namespace micro
