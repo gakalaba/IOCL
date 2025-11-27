@@ -420,6 +420,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     if (consistency_s == "rss") consistency = strongstore::Consistency::RSS;
     if (consistency_s == "ss")  consistency = strongstore::Consistency::SS;
 
+    std::string protocol_mode_s = GetEnvOr("IOCL_PROTOCOL_MODE", "vr");
+    strongstore::LinearizableProtocol protocol_mode = strongstore::LinearizableProtocol::VR;
+    if (protocol_mode_s == "iocl_ct") protocol_mode = strongstore::LinearizableProtocol::PROTO_IOCL_CT;
+    if (protocol_mode_s == "vr") protocol_mode = strongstore::LinearizableProtocol::VR;
+    if (protocol_mode_s == "span-lock") protocol_mode = strongstore::LinearizableProtocol::PROTO_STRONG;
+
     // std::cout << "[CreateBenchmarkClient] Config: replicas='" << replica_paths
     //           << "' net='" << net_config_path
     //           << "' host='" << client_host
@@ -492,7 +498,7 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                         auto &net_config = net_configs[i];
                         auto &region = client_regions[i];
                         Client *c = new strongstore::Client(
-                            consistency, strongstore::LinearizableProtocol::PROTO_VR, net_config, region, shard_config,
+                            consistency, protocol_mode, net_config, region, shard_config,
                             GetEnvU64("IOCL_CLIENT_ID", "0"), static_cast<int>(num_shards), closest_replica,
                             s_transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
                         
