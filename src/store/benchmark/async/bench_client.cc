@@ -58,7 +58,6 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       clients_{clients},
       client_id_{id},
       timeout_{timeout},
-      rand_{id},
       next_arrival_dist_{arrival_rate * 1e-6},
       think_time_dist_{1 / think_time * 1e-6},
       stay_dist_{stay_probability},
@@ -84,6 +83,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
     {
         Panic("Arrival rate must be (strictly) positive!");
     }
+    srand(time(0));
+    rand_ = (std::mt19937)(id * rand());
 
     _Latency_Init(&latency, "txn");
 }
