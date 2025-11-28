@@ -829,12 +829,7 @@ namespace replication
             while (true) {
                 Debug("Okay, inside loop");
                 if (sq.empty()) {
-                    Debug("The subqueue for key %lu is empty", entry->intkey);
                     break;
-                } else {
-                    if (sq.size() > 1) {
-                        Warning("the subqueue has length %lu > 1", sq.size());
-                    }
                 }
                 Debug("looking at head");
                 IoclEntry* head = *sq.begin();
