@@ -618,15 +618,18 @@ int main(int argc, char **argv)
     {
     case DEFAULT:
         part = new DefaultPartitioner();
+        Notice("Creating a default paritioner!");
         break;
     case LOAD_BALANCED:
         part = new LoadBalancedPartitioner(FLAGS_zipf_coefficient, FLAGS_num_shards);
-        Debug("Creating a load balanced paritioner!");
+        Notice("Creating a load balanced paritioner!");
         break;
     case WAREHOUSE_DIST_ITEMS:
+        Notice("Creating a warehouse dist items paritioner!");
         part = new WarehouseDistItemsPartitioner(FLAGS_tpcc_num_warehouses);
         break;
     case WAREHOUSE:
+        Notice("Creating a warehouse paritioner!");
         part = new WarehousePartitioner(FLAGS_tpcc_num_warehouses, rand);
         break;
     default:
