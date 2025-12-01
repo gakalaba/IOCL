@@ -76,6 +76,10 @@ namespace strongstore
         {
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
+
+        // Debug event loop delay
+        // expected_fire_us = 0;
+        // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
     }
 
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
@@ -109,6 +113,9 @@ namespace strongstore
         {
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
+        // Debug event loop delay
+        // expected_fire_us = 0;
+        // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
     }
 
     Server::~Server()
@@ -132,6 +139,23 @@ namespace strongstore
         Stats &s = transactions_.GetStats();
         stats_.Merge(s);
         return stats_;
+    }
+
+    void Server::DelayOnEventLoop()
+    {
+        uint64_t now = now_us();
+        if (expected_fire_us != 0) {
+            int64_t delay = (int64_t)now - (int64_t)expected_fire_us;
+            if (delay > 0) {
+                Notice("Server %d/%d event loop delay detected! HEARTBEAT delay_us=%ld", shard_idx_, replica_idx_, delay);
+                //print int64_t
+
+            } else {
+                Notice("Negative delay?? Server %d/%d event loop ahead by %ld us", shard_idx_, replica_idx_, -delay);
+            }
+        }
+        expected_fire_us = now + 1000;
+        transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
     }
 
     void Server::ReceiveMessage(const TransportAddress &remote,

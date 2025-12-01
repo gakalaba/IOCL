@@ -55,6 +55,7 @@
 #include "store/strongstore/shardclient.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/strongstore/transactionstore.h"
+#include "store/common/backend/timingdebug.h"
 
 namespace strongstore
 {
@@ -211,6 +212,7 @@ namespace strongstore
                 return t1.timestamp < t2.timestamp;
             };
         };
+        void DelayOnEventLoop();
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
@@ -337,6 +339,8 @@ namespace strongstore
         int replica_idx_;
         Consistency consistency_;
         bool debug_stats_;
+
+        uint64_t expected_fire_us;
     };
 
 } // namespace strongstore
