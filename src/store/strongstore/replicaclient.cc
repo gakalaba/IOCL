@@ -117,7 +117,7 @@ namespace strongstore
         op_callback ocb = pendingOperation->ocb;
         this->pendingOperations.erase(itr);
         delete pendingOperation;
-        ocb(reply.status(), reply.return_value());
+        ocb(reply.status());
 
         return true;
     }

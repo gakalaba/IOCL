@@ -148,8 +148,6 @@ namespace strongstore
             int64_t delay = (int64_t)now - (int64_t)expected_fire_us;
             if (delay > 0) {
                 Notice("Server %d/%d event loop delay detected! HEARTBEAT delay_us=%ld", shard_idx_, replica_idx_, delay);
-                //print int64_t
-
             } else {
                 Notice("Negative delay?? Server %d/%d event loop ahead by %ld us", shard_idx_, replica_idx_, -delay);
             }
@@ -287,7 +285,11 @@ namespace strongstore
             auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
             reply->key = key;
 
-            pending_get_replies_[msg.transaction_id()] = reply;
+            auto inserted = pending_get_replies_.insert({transaction_id, reply});
+            if (!inserted.second) {
+                Panic("Duplicate GET request for transaction_id = %lu", transaction_id);
+            }
+            // pending_get_replies_[msg.transaction_id()] = reply;
 
             transactions_.PauseGet(transaction_id, key);
 
@@ -307,13 +309,17 @@ namespace strongstore
         auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
         reply->key = msg.key();
         reply->value = msg.value();
+        auto inserted = pending_operation_replies_.insert({transaction_id, reply});
+        if (!inserted.second) {
+            Panic("Duplicate operation request for transaction_id = %lu", transaction_id);
+        }
 
         replica_client_->SendOperation(
             transaction_id, msg,
-            std::bind(&Server::SendOperationCallback, this, reply, transaction_id,
-                      std::placeholders::_1, std::placeholders::_2),
+            std::bind(&Server::SendOperationCallback, this,
+                              transaction_id, std::placeholders::_1),
             // this thing is the ptcb
-            [](int, string) {}, OPERATION_TIMEOUT);
+            [](int) {}, OPERATION_TIMEOUT);
     }
 
     void Server::ContinueGet(uint64_t transaction_id)
@@ -513,7 +519,11 @@ namespace strongstore
             // Debug("[%lu] Waiting for prepared transactions", transaction_id);
             auto reply = new PendingROCommitReply(client_id, client_req_id, remote.clone());
             reply->n_slow_path_replies = transactions_.GetRONumberSkipped(transaction_id);
-            pending_ro_commit_replies_[transaction_id] = reply;
+            auto inserted = pending_ro_commit_replies_.insert({transaction_id, reply});
+            if (!inserted.second) {
+                Panic("Duplicate ROCommit request for transaction_id = %lu", transaction_id);
+            }
+            // pending_ro_commit_replies_[transaction_id] = reply;
 
             if (debug_stats_)
             {
@@ -546,7 +556,11 @@ namespace strongstore
             // Add for slow replies
             auto reply = new PendingROCommitReply(client_id, client_req_id, remote.clone());
             reply->n_slow_path_replies = skipped_prepares.size();
-            pending_ro_commit_replies_[transaction_id] = reply;
+            auto inserted = pending_ro_commit_replies_.insert({transaction_id, reply});
+            if (!inserted.second) {
+                Panic("Duplicate ROCommit request for transaction_id = %lu", transaction_id);
+            }
+            // pending_ro_commit_replies_[transaction_id] = reply;
 
             for (auto &pt : skipped_prepares)
             {
@@ -663,7 +677,11 @@ namespace strongstore
                 const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
                 auto *reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-                pending_rw_commit_c_replies_[transaction_id] = reply;
+                auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+                if (!inserted.second) {
+                    Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+                }
+                // pending_rw_commit_c_replies_[transaction_id] = reply;
 
                 // TODO: Handle timeout
                 replica_client_->CoordinatorCommit(
@@ -690,7 +708,11 @@ namespace strongstore
                 Debug("[%lu] Waiting", transaction_id);
 
                 auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-                pending_rw_commit_c_replies_[transaction_id] = reply;
+                auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+                if (!inserted.second) {
+                    Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+                }
+                // pending_rw_commit_c_replies_[transaction_id] = reply;
 
                 transactions_.PausePrepare(transaction_id);
 
@@ -714,7 +736,11 @@ namespace strongstore
             // Debug("[%lu] Waiting for other participants", transaction_id);
 
             auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-            pending_rw_commit_c_replies_[transaction_id] = reply;
+            auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+            if (!inserted.second) {
+                Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+            }
+            // pending_rw_commit_c_replies_[transaction_id] = reply;
         }
         else
         {
@@ -982,7 +1008,11 @@ namespace strongstore
                 transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
 
                 auto reply = new PendingRWCommitParticipantReply(client_id, client_req_id, remote.clone());
-                pending_rw_commit_p_replies_[transaction_id] = reply;
+                auto inserted = pending_rw_commit_p_replies_.insert({transaction_id, reply});
+                if (!inserted.second) {
+                    Panic("Duplicate RWCommitParticipant request for transaction_id = %lu", transaction_id);
+                }
+                // pending_rw_commit_p_replies_[transaction_id] = reply;
 
                 // TODO: Handle timeout
                 replica_client_->Prepare(
@@ -1017,7 +1047,11 @@ namespace strongstore
                 Debug("[%lu] Waiting", transaction_id);
 
                 auto reply = new PendingRWCommitParticipantReply(client_id, client_req_id, remote.clone());
-                pending_rw_commit_p_replies_[transaction_id] = reply;
+                auto inserted = pending_rw_commit_p_replies_.insert({transaction_id, reply});
+                if (!inserted.second) {
+                    Panic("Duplicate RWCommitParticipant request for transaction_id = %lu", transaction_id);
+                }
+                // pending_rw_commit_p_replies_[transaction_id] = reply;
 
                 transactions_.PausePrepare(transaction_id);
 
@@ -1159,31 +1193,10 @@ namespace strongstore
         }
     }
 
-    void Server::SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
-                                     string retval)
+    void Server::SendOperationCallback(uint64_t transaction_id, int status)
     {
-        Debug("got this status %d and this retval %s", status, retval.c_str());
-
-        uint64_t client_id = reply->rid.client_id();
-        uint64_t client_req_id = reply->rid.client_req_id();
-        const TransportAddress *remote = reply->rid.addr();
-
-        const std::string &key = reply->key;
-        const std::string &val = reply->value;
-
-        Debug("[%lu] SendOperationCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
-
-        op_reply_.Clear();
-        op_reply_.mutable_rid()->set_client_id(client_id);
-        op_reply_.mutable_rid()->set_client_req_id(client_req_id);
-        op_reply_.set_status(status);
-        op_reply_.set_return_value(retval);
-        op_reply_.set_transaction_id(transaction_id);
-
-        transport_->SendMessage(this, *remote, op_reply_);
-
-        delete remote;
-        delete reply;
+        ASSERT(status == REPLY_OK);
+        // Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
@@ -1264,7 +1277,7 @@ namespace strongstore
         const Timestamp prepare_ts{msg.prepare_timestamp()};
         const Timestamp nonblock_ts{msg.nonblock_timestamp()};
 
-        // Debug("[%lu] Received Prepare OK", transaction_id);
+        // Debug("[%lu] Received Prepare OK from participant shard %d", transaction_id, participant_shard);
 
         PendingPrepareOKReply *reply = nullptr;
         auto search = pending_prepare_ok_replies_.find(transaction_id);
@@ -1599,6 +1612,33 @@ namespace strongstore
         }
     }
 
+    void Server::RespondToClientOperation(PendingOperationReply *reply,
+                            uint64_t transaction_id, int status, string retval)
+    {
+        Debug("got this status %d and this retval %s", status, retval.c_str());
+
+        uint64_t client_id = reply->rid.client_id();
+        uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->rid.addr();
+
+        const std::string &key = reply->key;
+        const std::string &val = reply->value;
+
+        Debug("[%lu] SendOperationCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
+
+        op_reply_.Clear();
+        op_reply_.mutable_rid()->set_client_id(client_id);
+        op_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        op_reply_.set_status(status);
+        op_reply_.set_return_value(retval);
+        op_reply_.set_transaction_id(transaction_id);
+
+        transport_->SendMessage(this, *remote, op_reply_);
+
+        delete remote;
+        delete reply;
+    }
+
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
         // Debug("[%lu] Commiting", transaction_id);
@@ -1637,7 +1677,7 @@ namespace strongstore
 
     void Server::ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
-        // Debug("[%lu] Commiting", transaction_id);
+        // Debug("[%lu] Participant Commiting", transaction_id);
 
         // Commit writes
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
@@ -1798,6 +1838,12 @@ namespace strongstore
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
                 Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                 transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
+                // if (commit_wait_us > 0) {
+                //     Notice("[%lu] delaying commit by %lu us!!!!", transaction_id, commit_wait_us);
+                //     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
+                // } else {
+                //     CoordinatorCommitTransaction(transaction_id, commit_ts);
+                // }
             }
             else
             { // Participant commit
@@ -1866,10 +1912,23 @@ namespace strongstore
         }
         reply.set_status(status);
         reply.set_return_value(retval);
-        reply.set_transaction_id(req.transaction_id());
+        uint64_t transaction_id = req.transaction_id();
+        reply.set_transaction_id(transaction_id);
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         reply.SerializeToString(&response);
+
+        auto search = pending_operation_replies_.find(transaction_id);
+        if (search == pending_operation_replies_.end())
+        {
+            // Must be we're not a leader, so we don't want to send duplicate responses to clients
+            ASSERT(replica_idx_ != 0);
+            return;
+        }
+
+        PendingOperationReply *pending_reply = search->second;
+        pending_operation_replies_.erase(search);
+        transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

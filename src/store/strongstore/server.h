@@ -256,8 +256,7 @@ namespace strongstore
 
         void PrepareCallback(uint64_t transaction_id, int status,
                              Timestamp timestamp);
-        void SendOperationCallback(PendingOperationReply *reply, uint64_t transaction_id, int status,
-                                 string retval);
+        void SendOperationCallback(uint64_t transaction_id, int status);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -286,6 +285,7 @@ namespace strongstore
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
+        void RespondToClientOperation(PendingOperationReply *reply, uint64_t transaction_id, int status, string retval);
 
         const TrueTime &tt_;
         TransactionStore transactions_;
@@ -308,6 +308,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
         std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
+        std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
 
         proto::Get get_;
         replication::LinearizeableOperation op_;

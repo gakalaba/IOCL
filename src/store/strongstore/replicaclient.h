@@ -59,8 +59,8 @@ namespace strongstore
         typedef std::function<void()> abort_timeout_callback;
 
         // IOCL Project
-        typedef std::function<void(int, string)> op_callback;
-        typedef std::function<void(int, string)> op_timeout_callback;
+        typedef std::function<void(int)> op_callback;
+        typedef std::function<void(int)> op_timeout_callback;
 
     public:
         /* Constructor needs path to shard config. */
