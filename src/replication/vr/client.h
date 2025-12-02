@@ -77,12 +77,11 @@ namespace replication
                 continuation_t continuation;
                 Timeout *timer;
                 inline PendingRequest(string request, uint64_t clientReqId,
-                                      continuation_t continuation, Timeout *timer)
+                                      continuation_t continuation)
                     : request(request),
                       clientReqId(clientReqId),
-                      continuation(continuation),
-                      timer(timer){};
-                inline ~PendingRequest() { delete timer; }
+                      continuation(continuation){};
+                inline ~PendingRequest() {}
             };
 
             struct PendingUnloggedRequest : public PendingRequest
@@ -90,9 +89,8 @@ namespace replication
                 error_continuation_t error_continuation;
                 inline PendingUnloggedRequest(string request, uint64_t clientReqId,
                                               continuation_t continuation,
-                                              Timeout *timer,
                                               error_continuation_t error_continuation)
-                    : PendingRequest(request, clientReqId, continuation, timer),
+                    : PendingRequest(request, clientReqId, continuation),
                       error_continuation(error_continuation){};
             };
 

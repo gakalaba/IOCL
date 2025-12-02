@@ -218,6 +218,7 @@ namespace replication
 
         void IOCL_CTClient::ResendRequest(const uint64_t reqId)
         {
+            Panic("Shouldn't be resending");
             if (pendingReqs.find(reqId) == pendingReqs.end())
             {
                 Debug("Received resend request when no request was pending");
