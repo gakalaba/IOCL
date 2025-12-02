@@ -352,7 +352,7 @@ namespace strongstore
         TrueTime &tt_;
 
         uint64_t next_transaction_id_;
-        uint64_t next_apprequest_id;
+        uint64_t next_apprequest_id_;
 
         uint64_t last_req_id_;
         std::unordered_map<uint64_t, PendingRequest *> pending_reqs_;

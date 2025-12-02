@@ -64,6 +64,7 @@ namespace strongstore
           part_(part),
           tt_{tt},
           next_transaction_id_{client_id_ << 26},
+          next_apprequest_id_{client_id_ << 32},
           consistency_{consistency},
           replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
@@ -468,7 +469,7 @@ namespace strongstore
             sessions_by_apprequest_id_.erase(session.apprequest_id());
         }
 
-        auto arid = next_apprequest_id++;
+        auto arid = next_apprequest_id_++;
 
         Debug("[%lu] BeginAppRequest", arid);
 
@@ -567,8 +568,6 @@ namespace strongstore
 
         auto tid = session.transaction_id();
 
-        Debug("GET FOR UPDATE [%lu : %s]", tid, key.c_str());
-
         if (session.needs_aborts())
         {
             Debug("[%lu] Need to abort", tid);
@@ -581,6 +580,7 @@ namespace strongstore
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
+        Notice("GET FOR UPDATE [%lu : %s] going to shard %d", tid, key.c_str(), i);
 
         session.set_getting(i);
 
