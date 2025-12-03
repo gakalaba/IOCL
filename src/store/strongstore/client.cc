@@ -469,7 +469,7 @@ namespace strongstore
             sessions_by_apprequest_id_.erase(session.apprequest_id());
         }
 
-        auto arid = next_apprequest_id_++;
+        auto arid = next_apprequest_id_;
 
         Debug("[%lu] BeginAppRequest", arid);
 
@@ -580,7 +580,7 @@ namespace strongstore
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
-        Notice("GET FOR UPDATE [%lu : %s] going to shard %d", tid, key.c_str(), i);
+        Debug("GET FOR UPDATE [%lu : %s] going to shard %d", tid, key.c_str(), i);
 
         session.set_getting(i);
 
@@ -653,7 +653,7 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto arid = session.apprequest_id();
+        auto arid = next_apprequest_id_++;
 
         Debug("SendOperation on AppRequest[%lu]: %s(%s, %s)", arid, op.c_str(), key.c_str(), value.c_str());
 
