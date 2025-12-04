@@ -414,6 +414,7 @@ namespace strongstore
         }
 
         // Wound holders
+
         if (!read_waiting || state_ == LOCKED_FOR_READ)
         {
             for (auto w : holders_)
@@ -565,7 +566,7 @@ namespace strongstore
     {
         Lock &l = locks_[lock];
 
-        Debug("[%lu] Lock for Write: %s", requester, lock.c_str());
+        Debug("[%lu] Lock for Write on key: %s", requester, lock.c_str());
 
         int ret = l.TryAcquireWriteLock(requester, ts, wound);
 

@@ -59,7 +59,9 @@ namespace strongstore
         COMMITTING,
         COMMITTED,
         ABORTED,
-        SLOW_PATH
+        SLOW_PATH,
+        DONE_READS,
+        PARALLEL_READING
     };
 
     struct TransactionFinishResult
@@ -76,6 +78,7 @@ namespace strongstore
 
         TransactionState GetRWTransactionState(uint64_t transaction_id);
         TransactionState GetROTransactionState(uint64_t transaction_id);
+        void ShowAllTxns();
 
         const Transaction &GetTransaction(uint64_t transaction_id);
         const Timestamp &GetPrepareTimestamp(uint64_t transaction_id);
@@ -137,7 +140,7 @@ namespace strongstore
         class PendingRWTransaction
         {
         public:
-            PendingRWTransaction() : client_addr_{nullptr}, coordinator_{-1}, state_{READING}, wait_start_{0} {}
+            PendingRWTransaction() : client_addr_{nullptr}, coordinator_{-1}, state_{PARALLEL_READING}, wait_start_{0} {}
             ~PendingRWTransaction() {}
 
             TransactionState state() const { return state_; }
@@ -188,6 +191,18 @@ namespace strongstore
                                          const Timestamp &nonblock_ts);
             void SetParticipantPrepareTimestamp(const Timestamp &prepare_ts);
             void FinishParticipantPrepare();
+            void AddNewParallelGetKey(const std::string key)
+            {
+                parallel_gets_.emplace_back(key, READING);
+            }
+            int ParallelGetCount() const
+            {
+                return parallel_gets_.size();
+            }
+            std::vector<std::pair<const std::string, TransactionState>> &ParallelGets()
+            {
+                return parallel_gets_;
+            }
 
         private:
             Transaction transaction_;
@@ -195,6 +210,7 @@ namespace strongstore
             std::unordered_set<int> ok_participants_;
             std::unordered_set<uint64_t> waiting_ros_;
             std::unordered_set<uint64_t> slow_path_ros_;
+            std::vector<std::pair<const std::string, TransactionState>> parallel_gets_;
             Timestamp start_ts_;
             Timestamp nonblock_ts_;
             Timestamp prepare_ts_;
@@ -241,6 +257,7 @@ namespace strongstore
         void NotifyROs(std::unordered_set<uint64_t> &ros);
 
         std::unordered_map<uint64_t, PendingRWTransaction> pending_rw_;
+        // std::unordered_map<uint64_t, std::vector<PendingRWTransaction>> pending_rw_;
         std::unordered_map<uint64_t, PendingROTransaction> pending_ro_;
         std::unordered_set<uint64_t> committed_;
         std::unordered_set<uint64_t> aborted_;

@@ -139,6 +139,7 @@ namespace strongstore
                   const Timestamp timestamp) override;
 
         Stats &GetStats() override;
+        void SeeAllTxns() override;
 
     private:
         class PendingRWCommitCoordinatorReply
@@ -269,8 +270,10 @@ namespace strongstore
 
         void WoundPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
 
+        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
         void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
-        void ContinueGet(uint64_t transaction_id);
+        void ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
+        void ContinueGetAbort(uint64_t transaction_id);
         void ContinueCoordinatorPrepare(uint64_t transaction_id);
         void ContinueParticipantPrepare(uint64_t transaction_id);
 
@@ -308,7 +311,8 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingRWCommitParticipantReply *> pending_rw_commit_p_replies_;
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
-        std::unordered_map<uint64_t, PendingGetReply *> pending_get_replies_;
+        // pending_get_replies maps to a vector of PendingGetReply*
+        std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
         std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
 
         proto::Get get_;

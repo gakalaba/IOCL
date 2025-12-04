@@ -591,7 +591,7 @@ void BenchmarkClient::CommitTimeout()
 
 void BenchmarkClient::AbortCallback(const uint64_t session_id, transaction_status_t status)
 {
-    Debug("[%lu] Abort callback.", session_id);
+    Debug("[%lu] Abort callback. with status %lu", session_id, status);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 

@@ -42,6 +42,7 @@ public:
                     const Timestamp timestamp) = 0;
 
   virtual Stats &GetStats() = 0;
+  virtual void SeeAllTxns() = 0;
 };
 
 #endif /* STORE_SERVER_H */

@@ -69,7 +69,8 @@ namespace strongstore
           replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
           debug_stats_{debug_stats},
-          emulate_wan_{emulate_wan}
+          emulate_wan_{emulate_wan},
+          last_req_id_{0}
     {
         Notice("Initializing StrongStore client with id [%lu]", client_id_);
 
@@ -344,8 +345,11 @@ namespace strongstore
             session.set_needs_abort();
             break;
         case StrongSession::GETTING:
-            p = session.current_participant();
-            sclients_[p]->AbortGet(transaction_id);
+            // Send abort to all participants because there could be multiple gets in flight
+            for (int participant : session.parallel_gets_participants())
+            {
+                sclients_[participant]->AbortGet(transaction_id);
+            }
             break;
         case StrongSession::PUTTING:
             p = session.current_participant();
@@ -357,7 +361,7 @@ namespace strongstore
             sclients_[coordinator]->Wound(transaction_id);
             break;
         case StrongSession::ABORTING:
-            Debug("[%lu] Already aborted", transaction_id);
+            Debug("[%lu] Already in process of aborting", transaction_id);
             break;
         default:
             Panic("Unexpected state: %d", session.state());
@@ -535,6 +539,7 @@ namespace strongstore
 
         // ASSERT(session.executing());
         ASSERT(session.executing() || session.getting());
+        session.add_parallel_get(key);
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
@@ -577,6 +582,7 @@ namespace strongstore
 
         // ASSERT(session.executing());
         ASSERT(session.executing() || session.getting());
+        session.add_parallel_get(key);
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
@@ -586,16 +592,33 @@ namespace strongstore
 
         // Add this shard to set of participants
         session.add_participant(i);
+        session.add_get_participant(i);
 
         auto gcb1 = [gcb, session = std::ref(session)](int s, const std::string &k, const std::string &v, Timestamp ts)
         {
-            session.get().set_executing();
+            // check how many outstanding gets!
+            // session.get().set_executing();
+            session.get().remove_parallel_get(k);
+            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+                session.get().set_executing();
+            }
+            if (session.get().state() == StrongSession::ABORTING) {
+                s = REPLY_FAIL;
+            }
             gcb(s, k, v, ts);
         };
 
         auto gtcb1 = [gtcb, session = std::ref(session)](int s, const std::string &k)
         {
-            session.get().set_executing();
+            // check how many outstanding gets!
+            // session.get().set_executing();
+            session.get().remove_parallel_get(k);
+            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+                session.get().set_executing();
+            }
+            if (session.get().state() == StrongSession::ABORTING) {
+                s = REPLY_FAIL;
+            }
             gtcb(s, k);
         };
 
@@ -881,7 +904,13 @@ namespace strongstore
         auto tid = session.transaction_id();
         Debug("[%lu] ABORT", tid);
 
-        ASSERT(session.needs_aborts() || session.executing());
+        if (session.state() == StrongSession::ABORTING) {
+            // Debug("Already in process of Aborting!");
+            return;
+        }
+
+        // State could be getting if we have outstanding gets still
+        ASSERT(session.needs_aborts() || session.executing() || session.getting());
         session.set_aborting();
 
         auto &participants = session.participants();
@@ -905,7 +934,7 @@ namespace strongstore
     void Client::AbortCallback(StrongSession &session, uint64_t req_id)
     {
         auto tid = session.transaction_id();
-        Debug("[%lu] Abort callback", tid);
+        Debug("[%lu] Abort callback, with req_id = %lu", tid, req_id);
 
         auto search = pending_reqs_.find(req_id);
         if (search == pending_reqs_.end())

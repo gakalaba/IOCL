@@ -71,9 +71,17 @@ namespace strongstore
         void advance_min_read_ts(const Timestamp &ts) { min_read_ts_ = std::max(min_read_ts_, ts); }
 
         const std::set<int> &participants() const { return participants_; }
+        const std::unordered_set<int> &parallel_gets_participants() const { return parallel_gets_participants_; }
         const std::unordered_map<uint64_t, PreparedTransaction> prepares() const { return prepares_; }
 
         const Timestamp &snapshot_ts() const { return snapshot_ts_; }
+        int num_parallel_gets() {return parallel_gets.size();}
+        void add_parallel_get(const std::string &key) {
+            parallel_gets.insert(key);
+        }
+        void remove_parallel_get(const std::string &key) {
+            parallel_gets.erase(key);
+        }
 
     protected:
         friend class Client;
@@ -83,6 +91,7 @@ namespace strongstore
             transaction_id_ = transaction_id;
             start_ts_ = start_ts;
             participants_.clear();
+            parallel_gets_participants_.clear();
             prepares_.clear();
             values_.clear();
             snapshot_ts_ = Timestamp();
@@ -94,6 +103,7 @@ namespace strongstore
         {
             transaction_id_ = transaction_id;
             participants_.clear();
+            parallel_gets_participants_.clear();
             prepares_.clear();
             values_.clear();
             snapshot_ts_ = Timestamp();
@@ -134,6 +144,7 @@ namespace strongstore
         void set_getting(int p)
         {
             current_participant_ = p;
+            add_get_participant(p);
             state_ = GETTING;
         }
 
@@ -149,7 +160,8 @@ namespace strongstore
 
         std::set<int> &mutable_participants() { return participants_; }
         void add_participant(int p) { participants_.insert(p); }
-        void clear_participants() { participants_.clear(); }
+        void add_get_participant(int p) { parallel_gets_participants_.insert(p); }
+        void clear_participants() { participants_.clear(); parallel_gets_participants_.clear(); }
 
         std::unordered_map<uint64_t, PreparedTransaction> &mutable_prepares() { return prepares_; }
         std::unordered_map<std::string, std::list<Value>> &mutable_values() { return values_; }
@@ -162,11 +174,13 @@ namespace strongstore
         Timestamp start_ts_;
         Timestamp min_read_ts_;
         std::set<int> participants_;
+        std::unordered_set<int> parallel_gets_participants_;
         std::unordered_map<uint64_t, PreparedTransaction> prepares_;
         std::unordered_map<std::string, std::list<Value>> values_;
         Timestamp snapshot_ts_;
         int current_participant_;
         State state_;
+        std::unordered_set<std::string> parallel_gets;
     };
 
     class CommittedTransaction

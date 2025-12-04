@@ -177,23 +177,29 @@ namespace strongstore
     void TransactionStore::StartGet(uint64_t transaction_id, const TransportAddress &remote, const std::string &key, bool for_update)
     {
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        if (pt.state() != READING && pt.state() != READ_WAIT) {
-            Debug("pt.state() is %d", pt.state());
-            Panic("Invalid state for StartGet: %d", pt.state());
-        }
+        pt.AddNewParallelGetKey(key);
+        // the parallel get is initialized as READING, the transaction overall is initialized as PARALLEL_READING
+
+        ASSERT(pt.state() == PARALLEL_READING);
 
         pt.StartGet(remote, key, for_update);
     }
 
     void TransactionStore::FinishGet(uint64_t transaction_id, const std::string &key)
     {
-        (void)key;
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING || pt.state() == READ_WAIT);
+        ASSERT(pt.state() == PARALLEL_READING);
+        for (auto &p : pt.ParallelGets()) {
+            if (p.first == key) {
+                ASSERT(p.second == READING);
+                return;
+            }
+        }
     }
 
     void TransactionStore::AbortGet(uint64_t transaction_id, const std::string &key)
     {
+        Panic("Don't think we should be able to enter this case without WaitDie implemented??");
         (void)key;
         PendingRWTransaction &pt = pending_rw_[transaction_id];
         ASSERT(pt.state() == READING ||
@@ -203,29 +209,62 @@ namespace strongstore
         aborted_.insert(transaction_id);
     }
 
+    void TransactionStore::ShowAllTxns()
+    {
+        Notice("---- Showing all transactions in TransactionStore ----");
+        for (auto &p : pending_rw_)
+        {
+            Notice("RW Transaction %lu: state %d", p.first, p.second.state());
+            for (auto &q : p.second.ParallelGets()) {
+                Notice("    Key %s: state %d", q.first.c_str(), q.second);
+            }
+        }
+        for (auto &p : pending_ro_)
+        {
+            Notice("RO Transaction %lu: state %d", p.first, p.second.state());
+        }
+        Notice("Committed transactions:");
+        for (auto &t : committed_)
+        {
+            Notice("%lu", t);
+        }
+        Notice("Aborted transactions:");
+        for (auto &t : aborted_)
+        {
+            Notice("%lu", t);
+        }
+        Notice("-----------------------------------------------------");
+    }
+
     void TransactionStore::PauseGet(uint64_t transaction_id, const std::string &key)
     {
-        (void)key;
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING || pt.state() == READ_WAIT);
-
-        pt.set_state(READ_WAIT);
+        ASSERT(pt.state() == PARALLEL_READING);
+        // loop through key, state pairs in parallel_gets_
+        for (auto &p : pt.ParallelGets()) {
+            if (p.first == key) {
+                ASSERT(p.second == READING);
+                p.second = READ_WAIT;
+                return;
+            }
+        }
     }
 
     TransactionState TransactionStore::ContinueGet(uint64_t transaction_id, const std::string &key)
     {
-        (void)key;
         if (aborted_.count(transaction_id) > 0)
         {
             return ABORTED;
         }
-
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READ_WAIT);
-
-        pt.set_state(READING);
-
-        return pt.state();
+        ASSERT(pt.state() == PARALLEL_READING);
+        for (auto &p : pt.ParallelGets()) {
+            if (p.first == key) {
+                ASSERT(p.second == READ_WAIT);
+                p.second = READING;
+                return p.second;
+            }
+        }
     }
 
     TransactionState TransactionStore::StartCoordinatorPrepare(uint64_t transaction_id, const Timestamp &start_ts,
@@ -239,7 +278,11 @@ namespace strongstore
         }
 
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING || pt.state() == WAIT_PARTICIPANTS);
+        ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
+        // Also want to make sure all the reads are done
+        for (auto &p : pt.ParallelGets()) {
+            ASSERT(p.second == READING);
+        }
 
         Debug("[%lu] Coordinator: StartTransaction %lu.%lu", transaction_id, start_ts.getTimestamp(), start_ts.getID());
 
@@ -264,7 +307,11 @@ namespace strongstore
         }
 
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING);
+        ASSERT(pt.state() == PARALLEL_READING);
+         // Also want to make sure all the reads are done
+        for (auto &p : pt.ParallelGets()) {
+            ASSERT(p.second == READING);
+        }
 
         Debug("[%lu] Participant prepare", transaction_id);
 
@@ -461,7 +508,11 @@ namespace strongstore
         }
 
         PendingRWTransaction &pt = pending_rw_[transaction_id];
-        ASSERT(pt.state() == READING || pt.state() == WAIT_PARTICIPANTS);
+        ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
+         // Also want to make sure all the reads are done
+        for (auto &p : pt.ParallelGets()) {
+            ASSERT(p.second == READING);
+        }
         pt.ReceivePrepareOK(this_shard_, participant, prepare_ts, nonblock_ts);
 
         return pt.state();
@@ -532,7 +583,7 @@ namespace strongstore
 
         r.notify_slow_path_ros = std::move(pt.slow_path_ros());
 
-        pending_rw_.erase(transaction_id);
+        pending_rw_.erase(transaction_id); // delete the underlying transaction object
         aborted_.insert(transaction_id);
 
         return r;

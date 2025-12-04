@@ -630,7 +630,9 @@ int TCPTransport::TimerInternal(struct timeval &tv, timer_callback_t cb)
 
     timers[info->id] = info;
 
-    event_add(info->ev, &tv);
+    if (event_add(info->ev, &tv) < 0) {
+        Warning("WHAHAHAHHAHT");
+    }
 
     return info->id;
 }

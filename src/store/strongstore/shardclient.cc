@@ -226,7 +226,7 @@ namespace strongstore
         auto itr = pendingGets.find(req_id);
         if (itr == pendingGets.end())
         {
-            Debug("[%d][%lu] GetReply for stale request.", shard_idx_, req_id);
+            Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
 
@@ -721,7 +721,7 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Aborting GET", transaction_id, shard_idx_);
 
-        for (auto it = pendingGets.begin(); it != pendingGets.end(); ++it)
+        for (auto it = pendingGets.begin(); it != pendingGets.end(); )
         {
             if (it->second->transaction_id == transaction_id)
             {
@@ -730,11 +730,12 @@ namespace strongstore
                 get_callback gcb = req->gcb;
                 std::string key = req->key;
 
-                pendingGets.erase(it);
+                it = pendingGets.erase(it);
                 delete req;
 
                 gcb(REPLY_FAIL, key, "", {});
-                break;
+            } else {
+                ++it;
             }
         }
     }
@@ -748,13 +749,13 @@ namespace strongstore
 
     void ShardClient::HandleAbortReply(const proto::AbortReply &reply)
     {
-        Debug("[shard %i] Received HandleAbortReply", shard_idx_);
+        Debug("[shard %i] Received HandleAbortReply for req_id %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
         auto itr = pendingAborts.find(req_id);
         if (itr == pendingAborts.end())
         {
-            Debug("[%d][%lu] PrepareAbortReply for stale request.", shard_idx_,
+            Debug("[%d][%lu] HandleAbortReply for stale request.", shard_idx_,
                   req_id);
             return; // stale request
         }
