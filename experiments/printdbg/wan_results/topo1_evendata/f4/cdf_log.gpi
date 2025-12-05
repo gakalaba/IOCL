@@ -1,0 +1,17 @@
+set datafile separator ','
+set title "\nclient\\\_total=320\n topo1 fanout=4 (log)"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/wan_results/topo1_evendata/f4/cdf_log.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/topo1_f4_evendata/2025-12-04-18-54-28/2025-12-04-18-54-31/out/plots/aggregate-basic-appreq-log.csv' using 1:(-log10(1-$2)):yticlabels(3) title "IOCL" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/topo1_f4_evendata/2025-12-04-18-58-39/2025-12-04-18-58-41/out/plots/aggregate-basic-appreq-log.csv' using 1:(-log10(1-$2)) title "VR" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/topo1_f4_evendata/2025-12-04-19-02-30/2025-12-04-19-02-31/out/plots/aggregate-basic-1BT-log.csv' using 1:(-log10(1-$2)):yticlabels(3) title "Spanner" ls 3 with lines
+
