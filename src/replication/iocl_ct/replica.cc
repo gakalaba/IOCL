@@ -213,8 +213,6 @@ namespace replication
                 const Request request = entry->request;
 
                 /* Execute it */
-                RDebug("Executing request " FMT_OPNUM, lastCommitted);
-                Debug("the request i'm executing has shardtag %lu and predlist size = %d and reqid = %lu", entry->myShardTag, entry->predList.predlist_size(), entry->request.clientreqid());
                 ReplyMessage reply;
                 Execute(lastCommitted, entry->request, reply);
 
@@ -448,7 +446,6 @@ namespace replication
             up.set_view(view);
             up.set_opnum(lastUnorderedOp);
             up.set_batchstart(unorderedBatchStart);
-            Debug("setting the opnum to %lu", lastUnorderedOp);
 
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
@@ -457,13 +454,10 @@ namespace replication
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
                 up.add_shardtags(entry.myShardTag);
-                Debug("adding pred list of size %d to UnorderedPrepareMessage", entry.predList.predlist_size());
                 PredListHolder* pl = up.add_predlists();
                 pl->CopyFrom(entry.predList);
             }
             lastUnorderedPrepare = up;
-
-            RDebug("Sending UNORDERED_PREPARE for batch of size %lu and with opnum = %lu", (lastUnorderedOp-unorderedBatchStart+1), up.opnum());
 
             if (!(transport->SendMessageToAll(this, up)))
             {
@@ -499,7 +493,6 @@ namespace replication
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
-                Debug("adding timestamp chain of size %lu to PrepareMessage", entry->predecessorArrivalTs.size());
                 p.add_shardtags(entry->myShardTag);
                 PredListHolder* ts_chain = p.add_timestamp_chains();
                 // loop through predecessorArrivalTs and add to timestamp chain
@@ -630,12 +623,6 @@ namespace replication
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
-            Debug("Inside HandleRequest, request has shardTag %lu and predlist size = %d and reqid = %lu", msg.shardtag(), msg.predlist().size(), msg.req().clientreqid());
-            Debug("msg shardtag is %lu", msg.shardtag());
-            Debug("msg predlist size is %d", msg.predlist().size());
-            Debug("handle request msg intkey is %lu", msg.intkey());
-            Debug("is from clientid %lu and clientreqid %lu",
-                   msg.req().clientid(), msg.req().clientreqid());
 
             if (status != STATUS_NORMAL)
             {
@@ -726,7 +713,6 @@ namespace replication
             auto it = result.first;
             bool inserted = result.second;
             if (!inserted) {
-                RDebug("Duplicate shardtag detected: %lu", shardtag);
                 IoclEntry *existingEntry = it->second.get();
                 Warning("here's everything i know abotu the existing entry: state = %d, myShardTag = %lu, intkey = %lu, ACKs = %d arrivalTs = %lu finalTs = %lu, num_preds = %d, clientreqid = %lu",
                         existingEntry->state, existingEntry->myShardTag, existingEntry->intkey, existingEntry->ACKs, existingEntry->arrivalTs, existingEntry->finalTs, existingEntry->predList.predlist_size(), existingEntry->request.clientreqid());
@@ -734,52 +720,32 @@ namespace replication
             }
             IoclEntry *entryPtr = it->second.get();
             // Grab the msg.predlist() efficiently and store
-            RDebug("Before swap, incoming size = %d",
-                    msg.predlist().size());
-            RDebug("Before swap, local size = %d",
-                    entryPtr->predList.predlist_size());
             entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
             entryPtr->predecessorArrivalTs.resize(entryPtr->predList.predlist_size());
-            RDebug("After swap, incoming size = %d",
-                    msg.predlist().size());
-            RDebug("After swap, local size = %d",
-                    entryPtr->predList.predlist_size());
-            RDebug("And the predecessorArrivalTs size is %lu",
-                    entryPtr->predecessorArrivalTs.size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
-            Debug("Adding entry to unorderedBag");
             unorderedBagByOpnum.emplace(v.opnum, entryPtr);
-            Debug("The entry's inteky is %lu", entryPtr->intkey);
 
             /* Go through any outstanding predecessor replies and add them in */
-            Debug("Checking if any predecessor replies are already present");
             auto pit = outstandingCoordinationResps.find(shardtag);
             if (pit != outstandingCoordinationResps.end()) {
                 auto &predAcks = pit->second;
                 for (const auto& resp : predAcks) {
-                    Debug("Reply from predIdx=%u arrivalTs=%lu",
-                        resp.predidx(), resp.arrivalts());
                     ASSERT(resp.predidx() < entryPtr->predList.predlist_size());
                     // ASSERT(entryPtr->predecessorArrivalTs[resp.predidx()] == 0);
                     entryPtr->predecessorArrivalTs[resp.predidx()] = resp.arrivalts();
                     entryPtr->ACKs++;
                 }
                 outstandingCoordinationResps.erase(pit);
-            } else {
-                Debug("Had no pending predecessor replies");
             }
 
 
-            RDebug("Received Unordered REQUEST, assigning unordered " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-            RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);
             if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
             {
                 CloseUnorderedBatch();
             }
             else
             {
-                RDebug("Keeping in unordered batch");
                 if (!closeUnorderedBatchTimeout->Active())
                 {
                     closeUnorderedBatchTimeout->Start();
@@ -812,26 +778,21 @@ namespace replication
 
         void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry)
         {
-            RDebug("ReadyRoutine called for entry with shardtag %lu and intkey %lu", entry->myShardTag, entry->intkey);
             /* Remove from subqueue */
             perKeySubqueues[entry->intkey].erase(entry);    // Erase by pointer identity            
             /* Assign a final TS */
             entry->finalTs = std::max(entry->arrivalTs, FoldL(entry->predList));
             lastReadyTS[entry->intkey] = entry->finalTs + 1;
-            Debug("Assigned finalTs = %lu (arrivalTs = %lu)", entry->finalTs, entry->arrivalTs);
             /* Reinsert as newly sorted */
             perKeySubqueues[entry->intkey].insert(entry);
             /* Assign it ready state */
             entry->state = IOCL_STATE_READY;
-            Debug("just trickled down the element and marked it as READY... going to see what we can execute");
 
             auto &sq = perKeySubqueues[entry->intkey];
             while (true) {
-                Debug("Okay, inside loop");
                 if (sq.empty()) {
                     break;
                 }
-                Debug("looking at head");
                 IoclEntry* head = *sq.begin();
                 if (head->state != IOCL_STATE_PERSISTED && head->state != IOCL_STATE_READY) {
                     Warning("the head (shardtag = %lu) is currently neither PERSISTED nor READY, instead it is in state %d", head->myShardTag,
@@ -839,10 +800,8 @@ namespace replication
                     ASSERT(head->state == IOCL_STATE_PERSISTED || head->state == IOCL_STATE_READY);
                 }
                 if (head->state != IOCL_STATE_READY) {
-                    Debug("the head is currently NOT_READY");
                     break;
                 }
-                Debug("Popping ready entry with shardtag %lu from subqueue", head->myShardTag);
                 /* Progress to REQUEST ordered */
                 sq.erase(sq.begin());
 
@@ -852,7 +811,6 @@ namespace replication
                 v.view = this->view;
                 v.opnum = this->lastOp;
                 head->viewstamp = v;
-                RDebug("Persisted REQUEST unordered, gets final ordered viewstamp " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
                 /* Set it as Prepared (since it isn't quite committed yet ) */
                 head->state = IOCL_STATE_PREPARED;
 
@@ -866,7 +824,6 @@ namespace replication
                 else
                 {
                     Panic("should always be batching with IOCL protocol");
-                    RDebug("Keeping in batch");
                     if (!closeBatchTimeout->Active())
                     {
                         closeBatchTimeout->Start();
@@ -911,7 +868,6 @@ namespace replication
             if (auto msgs =
                     (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
             {
-                Debug("the count of msgs/quorum is %lu/%d (return is msgs>quorum)", msgs->size(), configuration.QuorumSize());
                 if (msgs->size() >= (unsigned int)configuration.QuorumSize())
                 {
                     return;
@@ -936,10 +892,6 @@ namespace replication
 
                     /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
                     perKeySubqueues[entry->intkey].insert(entry);
-                    Debug("just inserted the element with shardtag %lu into perKeySubqueue for key %lu",
-                            entry->myShardTag,  entry->intkey);
-                    Debug("that subqueue now has length %lu",
-                            perKeySubqueues[entry->intkey].size());
                     /* Code Instrumentation ! */
                     perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
 
@@ -952,8 +904,6 @@ namespace replication
                         for (const auto& succ : it->second) {
                             preply.set_s(succ.s());
                             preply.set_predidx(succ.predidx());
-                            Debug("Sending PredecessorReplyMessage with arrivalts = %lu for predidx %d to successor with tag %lu on shard %d",
-                                   entry->arrivalTs, succ.predidx(), succ.s(), succ.shardidx());
                             if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, preply)))
                             {
                                 RWarning("Failed to send SuccessorReply message to client");
@@ -964,12 +914,8 @@ namespace replication
                     /* If it has been persisted, it doesn't need to be retried, 
                     remove from unorderedBagByOpnum tracker */
                     unorderedBagByOpnum.erase(entry->viewstamp.opnum);
-                    Debug("size of unordered Bag and unorderedBagByOpnum are %lu and %lu respectively",
-                            unorderedBag.size(), unorderedBagByOpnum.size());
                     if (entry->state == IOCL_STATE_PERSISTED &&
                             entry->ACKs == entry->predList.predlist_size()) {
-                        Debug("All predecessor replies received for shardtag %lu",
-                            entry->myShardTag);
                         /* Now can progress to READY state */
                         ReadyRoutine(entry);
                     }
@@ -1093,16 +1039,13 @@ namespace replication
                 for (int j = 0; j < (N-1); j++) {
                     uint64_t ts = ts_chain.predlist(j);
                     entry->predecessorArrivalTs[j] = ts;
-                    Debug("During Prepare, adding predecessorArrivalTs[%d] = %lu", j, ts);
                 }
                 entry->finalTs = ts_chain.predlist(N-1);
                 /* Add the request to my log */
                 AppendToLog(entry);
                 /* Remove from the batched unorderdBagByOpnum */
                 unorderedBagByOpnum.erase(entry->viewstamp.opnum);
-                
-                Debug("Added PREPARE for operation " FMT_VIEWSTAMP,
-                      msg.view(), op);
+
                 // UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
@@ -1177,7 +1120,6 @@ namespace replication
 
             // Add operations to the unordered bag
             int i = 0;
-            Debug("About to add batch to unordered bag from opnum %lu to %lu", msg.batchstart(), msg.opnum());
             opnum_t op = msg.batchstart() - 1;
             for (const auto &req : msg.request())
             {
@@ -1188,7 +1130,6 @@ namespace replication
                 }
                 this->lastUnorderedOp++;
                 /* Add the request to the unordered bag */
-                Debug("replica is adding req with shardtag %lu to unordered bag", msg.shardtags(i));
                 uint64_t shardtag = msg.shardtags(i);
 
                 /* For now we don't replicate the intkey at replicas
@@ -1206,15 +1147,7 @@ namespace replication
                 IoclEntry *entryPtr = it->second.get();
 
                 // Grab the msg.predlist() efficiently and store
-                RDebug("Before swap, incoming size = %d",
-                       msg.predlists(i).predlist_size());
-                RDebug("Before swap, local size = %d",
-                       entryPtr->predList.predlist_size());
                 entryPtr->predList.Swap(msg.mutable_predlists(i));
-                RDebug("After swap, incoming size = %d",
-                       msg.predlists(i).predlist_size());
-                RDebug("After swap, local size = %d",
-                       entryPtr->predList.predlist_size());
                 unorderedBagByOpnum.emplace(op, entryPtr);
                 i++;
             }
@@ -1305,26 +1238,15 @@ namespace replication
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
                                                 const proto::SuccessorRequestMessage &msg)
         {
-            Debug("Received COORDINATION request asking for predecessor %lu from successor %lu for invocation order %u going back to shard index %d",
-                  msg.p(),
-                  msg.s(),
-                  msg.predidx(),
-                  msg.shardidx());
             auto it = unorderedBag.find(msg.p());
             if (it == unorderedBag.end()) {
-                Debug("Can't find predecessor with shardtag %lu, storing request for later",
-                      msg.p());
                 auto &vec = outstandingCoordinationReqs[msg.p()];
                 vec.emplace_back(std::move(msg));
                 return;
             }
             IoclEntry *entry = it->second.get();
-            Debug("Found predecessor with shardtag %lu, state = %d",
-                  msg.p(), entry->state);
             /* If not yet persisted, can't respond yet */
             if (entry->state == IOCL_STATE_ARRIVED) {
-                Debug("Predecessor with shardtag %lu not yet persisted, storing request for later",
-                      msg.p());
                 auto &vec = outstandingCoordinationReqs[msg.p()];
                 vec.emplace_back(std::move(msg));
                 return;
@@ -1340,8 +1262,6 @@ namespace replication
             preply.set_arrivalts(entry->arrivalTs);
             preply.set_s(msg.s());
             preply.set_predidx(msg.predidx());
-            Debug("Sending PredecessorReplyMessage with arrivalts = %lu for predidx %d to successor with tag %lu on shard %d",
-                                   entry->arrivalTs, msg.predidx(), msg.s(), msg.shardidx());
             if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, preply)))
             {
                 RWarning("Failed to send SuccessorReply message to client");
@@ -1354,22 +1274,14 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationReply(const TransportAddress &remote,
                                                 const proto::PredecessorReplyMessage &msg)
         {
-            Debug("Received COORDINATION_REPLY request responding to successor %lu for with arrival ts %lu at invocation order index %u",
-                  msg.s(),
-                  msg.arrivalts(),
-                  msg.predidx());
             // NOTE the shardidx is int32
             auto it = unorderedBag.find(msg.s());
             if (it == unorderedBag.end()) {
-                Debug("Can't find successor with shardtag %lu, storing response for later",
-                      msg.s());
                 auto &vec = outstandingCoordinationResps[msg.s()];
                 vec.emplace_back(std::move(msg));
                 return;
             }
             IoclEntry *entry = it->second.get();
-            Debug("A predecessor resplied to us with shardtag arrival_ts = %lu at indx = %u",
-                  msg.arrivalts(), msg.predidx());
             /* assert that there are no outstanding
                responses for this successor in the
                outstandingCoordinationResps -- should
@@ -1378,15 +1290,11 @@ namespace replication
             ASSERT(msg.predidx() < entry->predList.predlist_size());
             // ASSERT(entry->predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
             entry->predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
-            Debug("my predecessorARrivalTs has size %lu",
-                  entry->predecessorArrivalTs.size());
             entry->ACKs++;
             // Might remove this for dedup
             ASSERT(entry->state == IOCL_STATE_ARRIVED || entry->state == IOCL_STATE_PERSISTED);
             if (entry->state == IOCL_STATE_PERSISTED &&
                      entry->ACKs == entry->predList.predlist_size()) {
-                Debug("All predecessor replies received for shardtag %lu",
-                      entry->myShardTag);
                 /* Now can progress to READY state */
                 ReadyRoutine(entry);
             }
