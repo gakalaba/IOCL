@@ -33,10 +33,11 @@ for zipf in 0.8 0.99 1.2; do
         wait
 
         # ---- Move Results and Cleanup ----
-        outdir="experiments/printdbg/$(basename "$CONFIG" .json)_zipf${zipf}_fanout${fanout}"
-        mv experiments/printdbg/2025* "$outdir"
-        mv "$outdir/plots/tput-p50.png" "$outdir/tput-p50.png"
-        rm -rf "$outdir"/2*/2*/out/plots
+        # outdir="experiments/printdbg/$(basename "$CONFIG" .json)_zipf${zipf}_fanout${fanout}"
+        outdir="$(basename "$CONFIG" .json)_zipf"
+        mv experiments/printdbg/2025* "/proj/praxis-PG0/exp/icon/KEEP_DATA/wan/$outdir"
+        # mv "$outdir/plots/tput-p50.png" "$outdir/tput-p50.png"
+        # rm -rf "$outdir"/2*/2*/out/plots
     done
 
 done
