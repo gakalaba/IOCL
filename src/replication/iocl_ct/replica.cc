@@ -826,9 +826,6 @@ namespace replication
             Debug("just trickled down the element and marked it as READY... going to see what we can execute");
 
             auto &sq = perKeySubqueues[entry->intkey];
-            /* Code Instrumentation ! */
-            size_t len = sq.size();
-            perKeyQueueLengths[entry->intkey].push_back(len);
             while (true) {
                 Debug("Okay, inside loop");
                 if (sq.empty()) {
@@ -943,6 +940,8 @@ namespace replication
                             entry->myShardTag,  entry->intkey);
                     Debug("that subqueue now has length %lu",
                             perKeySubqueues[entry->intkey].size());
+                    /* Code Instrumentation ! */
+                    perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
