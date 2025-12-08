@@ -97,6 +97,7 @@ class Replica : public TransportReceiver {
     Transport *transport;
     AppReplica *app;
     ReplicaStatus status;
+
 };
 
 #include "replica-inl.h"

@@ -1177,5 +1177,9 @@ namespace replication
             SendPrepareOKs(oldLastOp);
         }
 
+        void VRReplica::Close()
+        {
+        }
+
     } // namespace vr
 } // namespace replication

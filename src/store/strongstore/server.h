@@ -124,6 +124,7 @@ namespace strongstore
         // Override TransportReceiver
         void ReceiveMessage(const TransportAddress &remote, const std::string &type,
                             const std::string &data, void *meta_data) override;
+        void Close() override;
 
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,

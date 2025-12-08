@@ -55,6 +55,7 @@ namespace replication
                       Transport *transport, unsigned int batchSize, AppReplica *app,
                       bool debug_stats);
             ~VRReplica();
+            void Close();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);

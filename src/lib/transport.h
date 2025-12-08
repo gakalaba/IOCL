@@ -61,6 +61,7 @@ public:
                                 const string &type,
                                 const string &data,
                                 void *meta_data) = 0;
+    virtual void Close() = 0;
 
 protected:
     const TransportAddress *myAddress;

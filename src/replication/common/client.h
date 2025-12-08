@@ -86,7 +86,7 @@ class Client : public TransportReceiver {
     virtual void ReceiveMessage(const TransportAddress &remote,
                                 const string &type, const string &data,
                                 void *meta_data) override;
-
+    virtual void Close() override;
    protected:
     transport::Configuration config;
     Transport *transport;

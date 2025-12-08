@@ -68,7 +68,6 @@ namespace replication
             virtual void ReceiveMessage(const TransportAddress &remote,
                                         const string &type, const string &data,
                                         void *meta_data);
-
         protected:
             int view;
             int opnumber;

@@ -54,6 +54,9 @@ namespace strongstore
     }
 
     ShardClient::~ShardClient() {}
+    void ShardClient::Close()
+    {
+    }
 
     void ShardClient::ReceiveMessage(const TransportAddress &remote,
                                      const std::string &type,

@@ -103,6 +103,7 @@ namespace replication
                       Transport *transport, unsigned int batchSize, AppReplica *app,
                       bool debug_stats);
             ~IOCL_CTReplica();
+            void Close();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
@@ -135,6 +136,7 @@ namespace replication
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
             ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
+            std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
 
             struct ClientTableEntry
             {

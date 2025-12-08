@@ -552,6 +552,7 @@ void Cleanup(int signal)
         Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
         server->GetStats().ExportJSON(FLAGS_stats_file);
     }
+    replica->Close();
     delete replica;
     delete server;
     exit(0);

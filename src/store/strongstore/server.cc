@@ -156,6 +156,10 @@ namespace strongstore
         transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
     }
 
+    void Server::Close()
+    {
+    }
+
     void Server::ReceiveMessage(const TransportAddress &remote,
                                 const std::string &type, const std::string &data,
                                 void *meta_data)

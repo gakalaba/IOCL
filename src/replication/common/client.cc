@@ -82,6 +82,9 @@ Client::ReceiveMessage(const TransportAddress &remote,
           type.c_str());
 }
 
+void Client::Close()
+{}
+
 void
 Client::InvokeIOCL(LinearizeableOperation &msg,
                                     continuation_t continuation,

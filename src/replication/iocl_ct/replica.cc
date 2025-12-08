@@ -826,6 +826,9 @@ namespace replication
             Debug("just trickled down the element and marked it as READY... going to see what we can execute");
 
             auto &sq = perKeySubqueues[entry->intkey];
+            /* Code Instrumentation ! */
+            size_t len = sq.size();
+            perKeyQueueLengths[entry->intkey].push_back(len);
             while (true) {
                 Debug("Okay, inside loop");
                 if (sq.empty()) {
@@ -1816,6 +1819,29 @@ namespace replication
 
             CommitUpTo(msg.lastcommitted());
             SendPrepareOKs(oldLastOp);
+        }
+
+        void IOCL_CTReplica::Close()
+        {
+            Debug("IOCL_CTReplica::Close called, closing batch if any");
+            std::cerr << "==== IOCL Per-Key Queue Length Dump ====\n";
+
+            for (const auto &kv : perKeyQueueLengths) {
+                uint64_t key = kv.first;
+                const std::vector<size_t> &lens = kv.second;
+
+                std::cerr << "key=" << key << ": [";
+
+                for (size_t i = 0; i < lens.size(); ++i) {
+                    std::cerr << lens[i];
+                    if (i + 1 < lens.size()) {
+                        std::cerr << ",";
+                    }
+                }
+                std::cerr << "]\n";
+            }
+
+            std::cerr << "==== End of Dump ====\n";
         }
 
     } // namespace iocl_ct
