@@ -75,18 +75,60 @@ def copy_path_to_remote_host(local_path, remote_user,
             args.append(exclude_paths[i])
     subprocess.call(args)
 
+def copy_remote_directory_to_local(local_directory, remote_user, remote_host,
+                                   remote_directory, tar_queues, tar_file='logs.tar',
+                                   file_filter='.'):
+    if (not tar_queues):
+        os.makedirs(local_directory, exist_ok=True)
+        tar_file_path = os.path.join(remote_directory, tar_file)
+        run_remote_command_sync('cd %s && tar -czf %s %s' % (remote_directory, tar_file_path, file_filter),
+                                remote_user, remote_host)
 
-def copy_remote_directory_to_local(local_directory, remote_user, remote_host, remote_directory, tar_file='logs.tar', file_filter='.'):
+        subprocess.call(["scp", "-r", "-p", '%s@%s:%s' %
+                         (remote_user, remote_host, tar_file_path), local_directory])
+        subprocess.call(['tar', '-xzf', os.path.join(local_directory, tar_file),
+                         '-C', local_directory])
+        subprocess.call(['rm', '-rf', os.path.join(local_directory, tar_file)])
+        return
+
     os.makedirs(local_directory, exist_ok=True)
     tar_file_path = os.path.join(remote_directory, tar_file)
-    run_remote_command_sync('cd %s && tar -czf %s %s' % (remote_directory, tar_file_path, file_filter),
-                            remote_user, remote_host)
-    subprocess.call(["scp", "-r", "-p", '%s@%s:%s' %
-                     (remote_user, remote_host, tar_file_path), local_directory])
-    subprocess.call(['tar', '-xzf', os.path.join(local_directory, tar_file),
-                     '-C', local_directory])
-    subprocess.call(['rm', '-rf', os.path.join(local_directory, tar_file)])
 
+    # Determine if this file_filter corresponds to replica 0
+    # Example file_filter: "out/server-0-3-0-*.*"
+    # We extract the middle `server-0-3-0-`
+    include_dump = ""
+    try:
+        base = os.path.basename(file_filter)        # server-0-3-0-*.*
+        parts = base.split('-')                    # ["server","0","3","0","*.*"]
+        replica_idx = int(parts[3])                # "0" => good
+        if replica_idx == 0:
+            include_dump = "../queue_dump*.log"
+    except:
+        pass  # if parsing fails, do not include dump
+
+    # Build tar command
+    # If include_dump is empty, tar only uses file_filter
+    tar_cmd = (
+        f"cd {remote_directory} && "
+        f"tar -czf {tar_file} {file_filter} {include_dump} || true"
+    )
+
+    run_remote_command_sync(tar_cmd, remote_user, remote_host)
+
+    subprocess.call([
+        "scp", "-r", "-p",
+        f"{remote_user}@{remote_host}:{tar_file_path}",
+        local_directory
+    ])
+
+    subprocess.call([
+        "tar", "-xzf",
+        os.path.join(local_directory, tar_file),
+        "-C", local_directory
+    ])
+
+    subprocess.call(['rm', '-rf', os.path.join(local_directory, tar_file)])
 
 def tcsh_redirect_output_to_files(command, stdout_file, stderr_file):
     return '(%s > %s) >& %s' % (command, stdout_file, stderr_file)

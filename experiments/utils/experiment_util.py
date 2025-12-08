@@ -16,13 +16,14 @@ def is_using_master(config):
 
 
 def collect_exp_data(config, remote_exp_directory, local_directory_base, executor):
+    tar_queues = ('server_instrument' in config and config['server_instrument'])
     download_futures = []
     remote_directory = os.path.join(
         remote_exp_directory, config['out_directory_name'])
     if is_using_master(config):
         master_host = get_master_host(config)
         copy_remote_directory_to_local(os.path.join(
-            local_directory_base, 'master'), config['emulab_user'], master_host, remote_directory)
+            local_directory_base, 'master'), config['emulab_user'], master_host, remote_directory, False)
 
     for instance_idx in range(config["num_instances"]):
         for shard_idx in range(len(config["shards"])):
@@ -31,14 +32,14 @@ def collect_exp_data(config, remote_exp_directory, local_directory_base, executo
                 replica = shard[replica_idx]
                 server_host = get_server_host(config, replica)
                 download_futures.append(executor.submit(copy_remote_directory_to_local, os.path.join(
-                    local_directory_base, 'server-%d-%d' % (instance_idx, shard_idx)), config['emulab_user'], server_host, remote_directory,
+                    local_directory_base, 'server-%d-%d' % (instance_idx, shard_idx)), config['emulab_user'], server_host, remote_directory, tar_queues,
                     tar_file="server-{}-{}-{}.tar".format(instance_idx, shard_idx, replica_idx),
                     file_filter="server-{}-{}-{}-*.*".format(instance_idx, shard_idx, replica_idx)))
 
     for client in config['clients']:
         client_host = get_client_host(config, client)
         download_futures.append(executor.submit(copy_remote_directory_to_local, os.path.join(
-            local_directory_base, client), config['emulab_user'], client_host, remote_directory))
+            local_directory_base, client), config['emulab_user'], client_host, remote_directory, False))
     return download_futures
 
 

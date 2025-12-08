@@ -353,6 +353,8 @@ class IOCLCodebase:
 
         if 'server_debug_stats' in config and config['server_debug_stats']:
             replica_command += ' --debug_stats'
+        if 'server_instrument' in config and config['server_instrument']:
+            replica_command += ' --instrument'
 
         if config['benchmark_name'] == 'retwis' or config['benchmark_name'] == 'micro':
             replica_command += ' --num_keys %d' % config['client_num_keys']

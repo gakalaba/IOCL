@@ -69,6 +69,7 @@ DEFINE_bool(debug_stats, false, "record stats related to debugging");
 DEFINE_string(key_selector, "uniform",
               "the distribution from which to "
               "select keys.");
+DEFINE_bool(instrument_code, false, "whether to instrument code");
 DEFINE_double(zipf_coefficient, 0.5, "the coefficient of the zipf distribution for key selection.");
 
 const std::string protocol_args[] = {
@@ -515,7 +516,7 @@ int main(int argc, char **argv)
         replica = new replication::iocl_ct::IOCL_CTReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
-            FLAGS_debug_stats);
+            FLAGS_debug_stats, FLAGS_instrument_code);
         break;
     }
     default:
@@ -552,7 +553,10 @@ void Cleanup(int signal)
         Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
         server->GetStats().ExportJSON(FLAGS_stats_file);
     }
-    replica->Close();
+    if (FLAGS_instrument_code)
+    {
+        replica->Close();
+    }
     delete replica;
     delete server;
     exit(0);

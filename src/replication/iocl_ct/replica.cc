@@ -56,7 +56,7 @@ namespace replication
 
         IOCL_CTReplica::IOCL_CTReplica(transport::Configuration config, int groupIdx, int myIdx,
                              Transport *transport, unsigned int batchSize,
-                             AppReplica *app, bool debug_stats)
+                             AppReplica *app, bool debug_stats, bool instrument_code)
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
@@ -64,7 +64,8 @@ namespace replication
               prepareOKQuorum(config.QuorumSize() - 1),
               startViewChangeQuorum(config.QuorumSize() - 1),
               doViewChangeQuorum(config.QuorumSize() - 1),
-              debug_stats_{debug_stats}
+              debug_stats_{debug_stats},
+              instrument_code_{instrument_code}
         {
             this->status = STATUS_NORMAL;
             this->view = 0;
@@ -75,6 +76,9 @@ namespace replication
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
             lastUnorderedBatchEnd = 0;
+            if (instrument_code_ && myIdx == 0) {
+                queueDumpFile.open("queue_dump_" + std::to_string(groupIdx) + "_" + std::to_string(myIdx) + ".log", std::ios::out | std::ios::trunc);
+            }
 
             if (batchSize > 1)
             {
@@ -135,6 +139,9 @@ namespace replication
             delete stateTransferTimeout;
             delete resendPrepareTimeout;
             delete closeBatchTimeout;
+            if (queueDumpFile.is_open()) {
+                queueDumpFile.close();
+            }
 
             if (debug_stats_)
             {
@@ -893,7 +900,9 @@ namespace replication
                     /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
                     perKeySubqueues[entry->intkey].insert(entry);
                     /* Code Instrumentation ! */
-                    perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
+                    if (instrument_code_) {
+                        perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
+                    }
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
@@ -1730,26 +1739,56 @@ namespace replication
 
         void IOCL_CTReplica::Close()
         {
-            Debug("IOCL_CTReplica::Close called, closing batch if any");
-            std::cerr << "==== IOCL Per-Key Queue Length Dump ====\n";
-
-            for (const auto &kv : perKeyQueueLengths) {
-                uint64_t key = kv.first;
-                const std::vector<size_t> &lens = kv.second;
-
-                std::cerr << "key=" << key << ": [";
-
-                for (size_t i = 0; i < lens.size(); ++i) {
-                    std::cerr << lens[i];
-                    if (i + 1 < lens.size()) {
-                        std::cerr << ",";
-                    }
-                }
-                std::cerr << "]\n";
+            if (!queueDumpFile.is_open()) {
+                return;
+            }
+            if (myIdx != 0) {
+                return;
+            }
+            if (!instrument_code_) {
+                return;
             }
 
-            std::cerr << "==== End of Dump ====\n";
+            // Convert map → vector so we can sort
+            std::vector<std::pair<uint64_t, std::vector<size_t>>> vec;
+
+            vec.reserve(perKeyQueueLengths.size());
+            for (auto &kv : perKeyQueueLengths) {
+                vec.emplace_back(kv.first, kv.second);
+            }
+
+            // Sort keys by length of queue-history (descending)
+            std::sort(vec.begin(), vec.end(),
+                    [](const auto &a, const auto &b) {
+                        return a.second.size() > b.second.size();
+                    });
+
+            // Compute how many keys to dump
+            int num_keys_to_dump = 50;
+            size_t dumpCount = std::min<size_t>(num_keys_to_dump, vec.size());
+
+            queueDumpFile << "==== IOCL Top-50 Longest Queue Histories ====\n";
+
+            for (size_t i = 0; i < dumpCount; ++i) {
+                uint64_t key = vec[i].first;
+                const std::vector<size_t> &lens = vec[i].second;
+
+                queueDumpFile << "key=" << key << ": [";
+
+                for (size_t j = 0; j < lens.size(); ++j) {
+                    queueDumpFile << lens[j];
+                    if (j + 1 < lens.size()) {
+                        queueDumpFile << ",";
+                    }
+                }
+                queueDumpFile << "]\n";
+            }
+
+            queueDumpFile << "==== End of Dump ====\n";
+            queueDumpFile.flush();
         }
+
+
 
     } // namespace iocl_ct
 } // namespace replication

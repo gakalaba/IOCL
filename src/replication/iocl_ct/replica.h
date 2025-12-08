@@ -101,7 +101,7 @@ namespace replication
         public:
             IOCL_CTReplica(transport::Configuration config, int groupIdx, int myIdx,
                       Transport *transport, unsigned int batchSize, AppReplica *app,
-                      bool debug_stats);
+                      bool debug_stats, bool instrument_code);
             ~IOCL_CTReplica();
             void Close();
 
@@ -137,6 +137,7 @@ namespace replication
             ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
             std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
+            std::ofstream queueDumpFile;
 
             struct ClientTableEntry
             {
@@ -164,6 +165,7 @@ namespace replication
             Latency_t exec_to_sent_lat_;
 
             bool debug_stats_;
+            bool instrument_code_;
 
             bool AmLeader() const;
             void CommitUpTo(opnum_t upto);
