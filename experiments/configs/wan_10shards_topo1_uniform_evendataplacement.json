@@ -1,15 +1,25 @@
 {
   "experiment_independent_vars": [
     [
-      "consistency", "replication_protocol", "client_protocol_mode"
+      "consistency",
+      "replication_protocol",
+      "client_protocol_mode",
+      "client_total",
+      "client_processes_per_client_node"
     ],
     [
       "client_total",
       "client_processes_per_client_node"
     ]
   ],
-  "replication_protocol": ["iocl_ct", "vr", "strong"],
-  "client_protocol_mode": ["iocl_ct", "vr", "span-lock"],
+  "replication_protocol": [
+    "iocl_ct",
+    "vr"
+  ],
+  "client_protocol_mode": [
+    "iocl_ct",
+    "vr"
+  ],
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
@@ -23,7 +33,8 @@
     "mex-cent-1-0"
   ],
   "consistency": [
-    "lin", "lin", "ss"
+    "lin",
+    "lin"
   ],
   "num_instances": 1,
   "shard_config": "shard.config",
@@ -34,22 +45,92 @@
   "fault_tolerance": 2,
   "num_shards": 10,
   "shards": [
-    ["us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-0", "eu-west-1-2"],
-    ["us-east-1-1", "us-west-1-0", "us-west-1-2", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-east-1-2", "us-east-1-0", "us-west-1-1", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-west-1-0", "us-east-1-1", "us-west-1-2", "eu-west-1-0", "eu-west-1-2"],
-    ["us-west-1-1", "us-east-1-0", "us-west-1-0", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-west-1-2", "us-east-1-1", "us-east-1-2", "eu-west-1-0", "eu-west-1-2"],
-    ["eu-west-1-0", "us-west-1-0", "us-west-1-2", "eu-west-1-1", "mex-cent-1-0"],
-    ["eu-west-1-1", "us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-2"],
-    ["eu-west-1-2", "us-east-1-1", "us-west-1-0", "us-west-1-2", "eu-west-1-0"],
-    ["mex-cent-1-0", "us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-1"]
+    [
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-east-1-2",
+      "us-east-1-0",
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-2",
+      "us-east-1-1",
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-2",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-1"
+    ]
   ],
   "client_total": [
-    320
+    [
+      20
+    ],
+    [
+      320
+    ]
   ],
   "client_processes_per_client_node": [
-    64
+    [
+      4
+    ],
+    [
+      64
+    ]
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -92,11 +173,10 @@
   "benchmark_name": "micro",
   "bench_mode": "closed",
   "mpl": 1,
-  "client_key_selector": "uniform",
+  "client_key_selector": "zipf",
   "client_wo_replacement": true,
-  "client_fanout": 4,
+  "client_fanout": 16,
   "client_issue_concurrent": true,
-  "client_zipf_coefficient": 1.4,
   "rw_num_ops_txn": 1,
   "server_load_time": 20,
   "server_preload_keys": true,
@@ -113,7 +193,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "debugskew",
+  "experiment_name": "runskew",
   "codebase_name": "iocl",
   "pin_client_processes": [
     0,
@@ -146,7 +226,7 @@
     9,
     10,
     11,
-    12, 
+    12,
     13,
     14,
     15
@@ -304,5 +384,7 @@
   "server_rpc_port": 8087,
   "client_gc_debug_trace": false,
   "client_cpuprofile": false,
-  "server_gc_debug_trace": false
+  "server_gc_debug_trace": false,
+  "partitioner": "load_balanced",
+  "client_zipf_coefficient": 1.2
 }
