@@ -68,11 +68,11 @@ namespace replication
             (void)error_continuation;
 
             uint64_t reqId = ++lastReqId;
-            Timeout *timer =
-                new Timeout(transport, 500, [this, reqId]()
-                            { ResendRequest(reqId); });
+            // Timeout *timer =
+            //     new Timeout(transport, 500, [this, reqId]()
+            //                 { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request, reqId, continuation, timer);
+                new PendingRequest(request, reqId, continuation);
 
             pendingReqs[reqId] = req;
             SendRequest(req);
@@ -91,12 +91,12 @@ namespace replication
 
             if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
             {
-                Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                                             { UnloggedRequestTimeoutCallback(reqId); });
+                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
+                //                              { UnloggedRequestTimeoutCallback(reqId); });
                 PendingUnloggedRequest *req = new PendingUnloggedRequest(
-                    request, reqId, continuation, timer, error_continuation);
+                    request, reqId, continuation, error_continuation);
                 pendingReqs[reqId] = req;
-                req->timer->Start();
+                // req->timer->Start();
             }
             else
             {
@@ -125,7 +125,7 @@ namespace replication
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
             // if (transport->SendMessageToGroup(this, group, reqMsg))
             {
-                req->timer->Reset();
+                // req->timer->Reset();
             }
             else
             {
@@ -137,6 +137,7 @@ namespace replication
 
         void VRClient::ResendRequest(const uint64_t reqId)
         {
+            Panic("Shouldn't be resending");
             if (pendingReqs.find(reqId) == pendingReqs.end())
             {
                 Debug("Received resend request when no request was pending");
@@ -183,7 +184,7 @@ namespace replication
 
             PendingRequest *req = it->second;
             Debug("Client received reply: %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -204,7 +205,7 @@ namespace replication
                 static_cast<PendingUnloggedRequest *>(it->second);
 
             Debug("Client received unloggedReply %lu", reqId);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -221,7 +222,7 @@ namespace replication
             Warning("Unlogged request timed out");
             PendingUnloggedRequest *req =
                 static_cast<PendingUnloggedRequest *>(it->second);
-            req->timer->Stop();
+            // req->timer->Stop();
             pendingReqs.erase(it);
             if (req->error_continuation)
             {
