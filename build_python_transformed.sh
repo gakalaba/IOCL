@@ -1,51 +1,64 @@
 #!/bin/bash
 
-# Build and run script for IOCL project
-# Exit on error
+# Exit on error and print each command
 set -e
 set -x
 
-echo "Starting IOCL build and run process..."
+echo "=== Starting IOCL build and run process ==="
 
-# Navigate to redis-chat-transformed directory
-sudo -s
-cd /users/akalaba/IOCL/redis-chat-transformed
+# ---- CONFIGURATION ----
+PROJECT_ROOT="/users/akalaba/IOCL"
+TRANSFORMED_DIR="$PROJECT_ROOT/redis-chat-transformed"
+VENV_DIR="$TRANSFORMED_DIR/redis-chat"
+BUILD_DIR="$PROJECT_ROOT/src/build"
+PYTHON_EXEC="$VENV_DIR/bin/python"
+PYBIND_DIR="$VENV_DIR/lib/python3.6/site-packages/pybind11/share/cmake/pybind11"
+OUTPUT_SO="$PROJECT_ROOT/src/build/iocl_python/redisstorepython.cpython-36m-x86_64-linux-gnu.so"
+DESTINATION="$PROJECT_ROOT/src/iocl_python/redisstore"
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source redis-chat/bin/activate
 
-# Navigate to build directory and clean it
-echo "Cleaning build directory..."
-cd /users/akalaba/IOCL/src/build && rm -rf *
+# ---- CHECKS ----
+if [ ! -d "$PROJECT_ROOT" ]; then
+    echo "ERROR: PROJECT_ROOT does not exist: $PROJECT_ROOT"
+    exit 1
+fi
 
-# Configure with CMake
+# ---- Activate virtual environment ----
+echo "Activating Python virtual environment..."
+source "$VENV_DIR/bin/activate"
+
+# ---- Ensure build directory exists ----
+echo "Ensuring build directory exists..."
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# ---- Clean folder ----
+echo "Cleaning previous build artifacts..."
+rm -rf ./*
+
+# ---- Configure CMake ----
 echo "Configuring with CMake..."
-cmake .. -DPYTHON_EXECUTABLE=/users/akalaba/IOCL/redis-chat-transformed/redis-chat/bin/python \
--DPYBIND11_PYTHON_VERSION=3.6 \
--Dpybind11_DIR=/users/akalaba/IOCL/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11/share/cmake/pybind11
+cmake .. -DPYTHON_EXECUTABLE="$PYTHON_EXEC" \
+         -DPYBIND11_PYTHON_VERSION=3.6 \
+         -Dpybind11_DIR="$PYBIND_DIR"
 
-# Clean and build
+# ---- Build ----
 echo "Building project..."
 make clean
-make -j
+make -j$(nproc)
 
-# Set library path
-echo "Setting LD_LIBRARY_PATH..."
-export LD_LIBRARY_PATH=/users/akalaba/IOCL/src/build/store/benchmark/async:/users/akalaba/IOCL/src/build/lib:/users/akalaba/IOCL/src/build/rss:$LD_LIBRARY_PATH
+# ---- Export library path ----
+echo "Updating LD_LIBRARY_PATH..."
+export LD_LIBRARY_PATH="$BUILD_DIR/store/benchmark/async:$BUILD_DIR/lib:$BUILD_DIR/rss:$LD_LIBRARY_PATH"
 
-# Copy the built library
-echo "Copying built library..."
-cp -f /users/akalaba/IOCL/src/build/iocl_python/redisstorepython.cpython-36m-x86_64-linux-gnu.so /users/akalaba/IOCL/src/iocl_python/redisstore
+# ---- Copy built library ----
+echo "Copying built redisstore Python shared object..."
+mkdir -p "$DESTINATION"
+cp -f "$OUTPUT_SO" "$DESTINATION"
 
-# Install iocl_python package
-echo "Installing iocl_python package..."
-cd ../iocl_python
+# ---- Install Python package ----
+echo "Installing Python package iocl_python..."
+cd "$PROJECT_ROOT/src/iocl_python"
 pip install -e .
 
-# Run experiments
-# echo "Running experiments..."
-# cd ../../
-# python3 ./experiments/run_multiple_experiments.py experiments/configs/1shard_transformed_test_multiple_.json
-
-echo "Process complete!"
+echo "=== Build & setup complete! ==="
