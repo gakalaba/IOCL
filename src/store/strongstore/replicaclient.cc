@@ -133,31 +133,26 @@ namespace strongstore
         PendingOperation *pendingOperation = new PendingOperation(reqId);
         pendingOperations[reqId] = pendingOperation;
         pendingOperation->trcb = trcb;
+        ASSERT(msg.has_tropd());
 
         switch (linproto_) {
             case LinearizableProtocol::PROTO_VR:
                 // create request
                 msg.SerializeToString(&asynch_op_str);
-                ASSERT(!msg.has_tropd());
 
                 client->Invoke(
                     asynch_op_str,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                    bind(&ReplicaClient::AsynchOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
                 Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
                 client->InvokeIOCL(
                     msg,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                    bind(&ReplicaClient::AsynchOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
         }
-
-        client->Invoke(
-            asynch_op_str,
-            bind(&ReplicaClient::AsynchOperationCallback, this, pendingOperation->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
     }
 
     /* Callback from a shard replica on sendoperation completion. */
