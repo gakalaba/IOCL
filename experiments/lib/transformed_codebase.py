@@ -64,6 +64,12 @@ class TransformedCodebase:
         python_dir = config["base_python_directory"]
         python_cmd = config["python_app_name"]
 
+        # Determine config file path for Python app
+        if "run_locally" in config and config["run_locally"]:
+            config_file_path = os.path.join(local_exp_directory, config.get('_config_file_basename', ''))
+        else:
+            config_file_path = os.path.join(remote_exp_directory, config.get('_config_file_basename', ''))
+
         # Build the client command ONCE with all required parameters
         client_command = "".join(
             [
@@ -75,6 +81,8 @@ class TransformedCodebase:
                     config["python_venv"],
                     "; python ",
                     python_cmd,
+                    " --config=",
+                    config_file_path,
                     " --clientid=",
                     client_id,
                     " --explen=",
@@ -610,10 +618,13 @@ class TransformedCodebase:
     def prepare_local_exp_directory(self, config, config_file):
         local_exp_directory = get_timestamped_exp_dir(config)
         os.makedirs(local_exp_directory)
+        config_basename = os.path.basename(config_file)
         shutil.copy(
             config_file,
-            os.path.join(local_exp_directory, os.path.basename(config_file)),
+            os.path.join(local_exp_directory, config_basename),
         )
+        # Store config filename for use in get_client_cmd
+        config['_config_file_basename'] = config_basename
 
         server_names = config["server_names"]
         num_instances = config["num_instances"]

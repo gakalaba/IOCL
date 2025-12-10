@@ -18,7 +18,7 @@ include_directories(${Python_INCLUDE_DIRS} /usr/include/python3.6m)
 link_libraries(${PYTHON_LIBRARIES})
 
 # pybind11
-set(PYBIND11_DIR "/users/akalaba/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11")
+set(PYBIND11_DIR "/users/akalaba/IOCL/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11")
 find_package(pybind11 REQUIRED PATHS ${PYBIND11_DIR}/share/cmake/pybind11)
 include_directories(${PYBIND11_DIR}/include)
 

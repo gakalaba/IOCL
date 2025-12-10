@@ -4,6 +4,7 @@
       "consistency",
       "replication_protocol",
       "client_protocol_mode",
+      "base_python_directory",
       "client_total",
       "client_processes_per_client_node"
     ],
@@ -35,6 +36,12 @@
     "lin",
     "lin"
   ],
+  "base_python_directory": [
+    "/users/akalaba/IOCL/redis-chat-transformed/async",
+    "/users/akalaba/IOCL/redis-chat-transformed/sync"
+  ],
+  "python_venv": "/users/akalaba/IOCL/redis-chat-transformed/redis-chat/bin/activate",
+  "python_app_name": "main.py",
   "num_instances": 1,
   "shard_config": "shard.config",
   "replica_config": "replica.config",
@@ -125,7 +132,7 @@
     "commit_branch"
   ],
   "experiment_name": "icon",
-  "codebase_name": "iocl",
+  "codebase_name": "transformed",
   "pin_client_processes": [
     0,
     1,
@@ -166,7 +173,7 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 80,
+  "client_experiment_length": 30,
   "client_rand_sleep": 0,
   "client_ramp_down": 15,
   "client_ramp_up": 15,

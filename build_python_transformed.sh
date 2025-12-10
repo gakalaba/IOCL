@@ -3,12 +3,13 @@
 # Build and run script for IOCL project
 # Exit on error
 set -e
+set -x
 
 echo "Starting IOCL build and run process..."
 
 # Navigate to redis-chat-transformed directory
 sudo -s
-cd /users/akalaba/redis-chat-transformed
+cd /users/akalaba/IOCL/redis-chat-transformed
 
 # Activate virtual environment
 echo "Activating virtual environment..."
@@ -20,9 +21,9 @@ cd /users/akalaba/IOCL/src/build && rm -rf *
 
 # Configure with CMake
 echo "Configuring with CMake..."
-cmake .. -DPYTHON_EXECUTABLE=/users/akalaba/redis-chat-transformed/redis-chat/bin/python \
+cmake .. -DPYTHON_EXECUTABLE=/users/akalaba/IOCL/redis-chat-transformed/redis-chat/bin/python \
 -DPYBIND11_PYTHON_VERSION=3.6 \
--Dpybind11_DIR=/users/akalaba/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11/share/cmake/pybind11
+-Dpybind11_DIR=/users/akalaba/IOCL/redis-chat-transformed/redis-chat/lib/python3.6/site-packages/pybind11/share/cmake/pybind11
 
 # Clean and build
 echo "Building project..."
