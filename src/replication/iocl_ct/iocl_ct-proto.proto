@@ -75,6 +75,11 @@ message PredecessorReplyMessage {
     required uint32 predIdx = 3;
 }
 
+message PredecessorFinalMessage {
+    required uint64 s = 1;
+    required uint64 p = 2;
+}
+
 message CommitMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;    

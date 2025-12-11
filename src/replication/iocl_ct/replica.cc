@@ -212,39 +212,30 @@ namespace replication
 
                 const Request request = entry->request;
 
-                /* Execute it */
-                ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
-
                 /* Mark it as committed */
                 entry->state = IOCL_STATE_COMMITTED;
 
-                // Store reply in the client table
-                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                // if (cte.lastReqId <= entry->request.clientreqid())
-                // {
-                //     cte.lastReqId = entry->request.clientreqid();
-                //     cte.replied = true;
-                //     cte.reply = reply;
-                // }
-                // else
-                // {
-                //     // We've subsequently prepared another operation from the
-                //     // same client. So this request must have been completed
-                //     // at the client, and there's no need to record the
-                //     // result.
-                // }
-
-                /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
+                /* If there are other ops that haven't received their 
+                   N final ACKs, then this op must block behind them.
+                   Similarly, if there is no sublog, but this op hasn't
+                   received all N final ACKs, insert it to the log and
+                   do NOT execute it (for now replicas do, since we don't
+                   track acks there, and i don't want to implement the final
+                   ACK probably via piggybacking mechanism)*/ 
+                if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) || 
+                    (AmLeader() && (entry->finalAcks.size() != entry->predList.predlist_size()))) {
+                    Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
+                            lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
+                    // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
+                    auto &vec = perKeySubLogs[entry->intkey];
+                    vec.push_back(lastCommitted);
+                    return;
                 }
+                ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
+                ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
+
+                /* Execute it */
+                ReadyFinalRoutine(entry);
             }
         }
 
@@ -536,6 +527,8 @@ namespace replication
             StartViewMessage startView;
             SuccessorRequestMessage coordReq;
             PredecessorReplyMessage coordResp;
+            PredecessorFinalMessage coordFinal;
+
 
             if (type == request.GetTypeName())
             {
@@ -554,6 +547,12 @@ namespace replication
                 // Predecessor reply arrived
                 coordResp.ParseFromString(data);
                 HandleCoordinationReply(remote, coordResp);
+            }
+            else if (type == coordFinal.GetTypeName())
+            {
+                // Predecessor final ACK arrived
+                coordFinal.ParseFromString(data);
+                HandleCoordinationFinal(remote, coordFinal);
             }
             else if (type == unorderedPrepare.GetTypeName())
             {
@@ -738,6 +737,20 @@ namespace replication
                 }
                 outstandingCoordinationResps.erase(pit);
             }
+            /* Also go through any outstanding predecessor final ACKs and add them in */
+            auto fit = outstandingCoordinationFinals.find(shardtag);
+            if (fit != outstandingCoordinationFinals.end()) {
+                auto &predFinals = fit->second;
+                for (const auto& finalAck : predFinals) {
+                    if (entryPtr->finalAcks.find(finalAck.p()) != entryPtr->finalAcks.end()) {
+                        Warning("Duplicate final ACK received from predecessor with shardtag %lu for my shardtag %lu",
+                            finalAck.p(), entryPtr->myShardTag);
+                    }
+                    /* ASSERT THIS IS A LEGAL PREDECESSOR */
+                    entryPtr->finalAcks.insert(finalAck.p());
+                }
+                outstandingCoordinationFinals.erase(fit);
+            }
 
 
             if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
@@ -776,6 +789,65 @@ namespace replication
             return v;
         }
 
+        void IOCL_CTReplica::ReadyFinalRoutine(IoclEntry *entry)
+        {
+            if (perKeySubLogs.find(entry->intkey) == perKeySubLogs.end()) {
+                /* We can immediately execute this entry */
+                auto &vec = perKeySubLogs[entry->intkey];
+                vec.push_back(entry->intkey);
+            }
+
+            /* Execute as many head entries from the sublog as are ready */
+            auto &vec = perKeySubLogs[entry->intkey];
+            while (true) {
+                if (vec.empty()) {
+                    /* Delete it and return */
+                    perKeySubLogs.erase(entry->intkey);
+                    ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
+                    break;
+                }
+                opnum_t headOpnum = vec.front();
+                const IoclEntry *entry = FindInLog(headOpnum);
+                ASSERT(entry->state == IOCL_STATE_COMMITTED);
+                if (entry->finalAcks.size() != entry->predList.predlist_size()) {
+                    /* Still waiting on final ACKs, done with loop */
+                    break;
+                }
+                /* Remove from sublog */
+                vec.erase(vec.begin());
+                /* Execute it */
+                ReplyMessage reply;
+                Execute(entry->viewstamp.opnum, entry->request, reply);
+
+                reply.set_view(entry->viewstamp.view);
+                reply.set_opnum(entry->viewstamp.opnum);
+                reply.set_clientreqid(entry->request.clientreqid());
+
+                // Store reply in the client table
+                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
+                // if (cte.lastReqId <= entry->request.clientreqid())
+                // {
+                //     cte.lastReqId = entry->request.clientreqid();
+                //     cte.replied = true;
+                //     cte.reply = reply;
+                // }
+                // else
+                // {
+                //     // We've subsequently prepared another operation from the
+                //     // same client. So this request must have been completed
+                //     // at the client, and there's no need to record the
+                //     // result.
+                // }
+
+                /* Send reply */
+                auto iter = clientAddresses.find(entry->request.clientid());
+                if (iter != clientAddresses.end())
+                {
+                    transport->SendMessage(this, *iter->second, reply);
+                }
+            }
+        }
+
         void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry)
         {
             /* Remove from subqueue */
@@ -804,6 +876,16 @@ namespace replication
                 }
                 /* Progress to REQUEST ordered */
                 sq.erase(sq.begin());
+                /* Send out the Final ACK to all successors */
+                PredecessorFinalMessage predFinal;
+                predFinal.set_p(head->myShardTag);
+                for (const auto& succ : head->successors) {
+                    predFinal.set_s(succ.first);
+                    if (!(transport->SendMessageToReplica(this, succ.second, 0, predFinal)))
+                    {
+                        RWarning("Failed to send SuccessorRequest message to client");
+                    }
+                }
 
                 /* Assign it a real opnum for this view in the ordered log */
                 viewstamp_t v;
@@ -907,6 +989,13 @@ namespace replication
                             if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, preply)))
                             {
                                 RWarning("Failed to send SuccessorReply message to client");
+                            }
+                            /* And save the successor ! */
+                            if (entry->successors.find(succ.s()) == entry->successors.end()) {
+                                entry->successors[succ.s()] = succ.shardidx();
+                            } else {
+                                ASSERT(entry->successors[succ.s()] == succ.shardidx());
+                                Notice("Duplicate successor request received for successor on shard %lu", succ.s(), succ.shardidx());
                             }
                         }
                         outstandingCoordinationReqs.erase(it);
@@ -1235,6 +1324,39 @@ namespace replication
             }
         }
 
+        void IOCL_CTReplica::HandleCoordinationFinal(const TransportAddress &remote,
+                                                const proto::PredecessorFinalMessage &msg)
+        {
+            auto it = unorderedBag.find(msg.s());
+            if (it == unorderedBag.end()) {
+
+                auto &vec = outstandingCoordinationFinals[msg.s()];
+                vec.emplace_back(std::move(msg));
+                return;
+            }
+            IoclEntry *entry = it->second.get();
+
+            /* assert that there are no outstanding
+               responses for this successor in the
+               outstandingCoordinationFinals -- should
+               have been drained when upon arrival */
+            ASSERT(outstandingCoordinationFinals.find(entry->myShardTag) == outstandingCoordinationFinals.end());
+            /* Mark that this predecessor has finalized */
+            if (entry->finalAcks.find(msg.p()) != entry->finalAcks.end()) {
+                Warning("Duplicate final ACK received from predecessor with shardtag %lu for my shardtag %lu",
+                        msg.p(), entry->myShardTag);
+                return;
+            }
+            /* ASSERT THIS IS A LEGAL PREDECESSOR */
+            entry->finalAcks.insert(msg.p());
+            /* Now it is safe to Execute this operation! */
+            /* Check if it is waiting to be executed */
+            if ((entry->state == IOCL_STATE_COMMITTED) && (entry->finalAcks.size() == entry->predList.predlist_size())) {
+                ASSERT(perKeySubLogs.find(entry->intkey) != perKeySubLogs.end());
+                ReadyFinalRoutine(entry);
+            }
+        }
+
         void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
                                                 const proto::SuccessorRequestMessage &msg)
         {
@@ -1267,6 +1389,24 @@ namespace replication
                 RWarning("Failed to send SuccessorReply message to client");
             }
             // NOTE the shardidx is int32
+            /* Store the successor for the final TS */
+            if (entry->successors.find(msg.s()) == entry->successors.end()) {
+                entry->successors[msg.s()] = msg.shardidx();
+            } else {
+                ASSERT(entry->successors[msg.s()] == msg.shardidx());
+                Notice("Duplicate successor request received for successor on shard %lu", msg.s(), msg.shardidx());
+            }
+            /* Reply to the successor if we've already been added to the ordered log */
+            if (entry->state == IOCL_STATE_READY || entry->state == IOCL_STATE_PREPARED || entry->state == IOCL_STATE_COMMITTED) {
+                /* Send out the Final ACK to all successors */
+                PredecessorFinalMessage predFinal;
+                predFinal.set_p(entry->myShardTag);
+                predFinal.set_s(msg.s());
+                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, predFinal)))
+                {
+                    RWarning("Failed to send SuccessorRequest message to client");
+                }
+            }
 
             return;
         }

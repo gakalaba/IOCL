@@ -69,6 +69,8 @@ namespace replication
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
             const uint64_t intkey;
+            std::unordered_set<uint64_t> finalAcks; // tracking all unique final ACKs from predecessors
+            std::unordered_map<uint64_t, int32_t> successors; // keep track of all your successors to send the final ACK!
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
@@ -124,6 +126,7 @@ namespace replication
             opnum_t lastUnorderedBatchEnd;
 
             std::vector<IoclEntry *> log;
+            ska::flat_hash_map<uint64_t, std::vector<opnum_t>> perKeySubLogs;
 
             /*******************************/
             /* IOCL_CT specific structures */
@@ -136,6 +139,7 @@ namespace replication
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
             ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
+            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorFinalMessage>> outstandingCoordinationFinals;
             std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
 
             struct ClientTableEntry
@@ -178,6 +182,7 @@ namespace replication
             void CloseBatch();
             void CloseUnorderedBatch();
             void ReadyRoutine(IoclEntry *entry);
+            void ReadyFinalRoutine(IoclEntry *entry);
             void AppendToLog(IoclEntry *entry);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
@@ -200,6 +205,8 @@ namespace replication
                                  const proto::SuccessorRequestMessage &msg);
             void HandleCoordinationReply(const TransportAddress &remote,
                                 const proto::PredecessorReplyMessage &msg);
+            void HandleCoordinationFinal(const TransportAddress &remote,
+                                const proto::PredecessorFinalMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleRequestStateTransfer(
