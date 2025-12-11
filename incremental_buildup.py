@@ -62,10 +62,10 @@ def save_config(cfg):
 # -------------------------------
 
 SKEWS = [
-    {"type": "uniform"},           # uniform mode — no partitioner, uniform keys
     {"type": "zipf", "zipf": 0.8},
     {"type": "zipf", "zipf": 0.99},
     {"type": "zipf", "zipf": 1.2},
+    {"type": "uniform"}           # uniform mode — no partitioner, uniform keys
 ]
 
 FANOUT_VALUES = [1, 2, 4, 8, 16]
@@ -108,9 +108,23 @@ for skew in SKEWS:
 
         # -------- Move results --------
         outdir = f"{CONFIG_PATH.stem}_{zipf_label}_fanout{fanout}"
-        dest_dir = Path(f"/proj/praxis-PG0/exp/icon/KEEP_DATA/wan/{outdir}")
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_root = Path("/proj/praxis-PG0/exp/icon/KEEP_DATA/wan")
 
         for path in glob.glob("experiments/printdbg/2025*"):
-            print(f"Moving {path} → {dest_dir}")
-            shutil.move(path, dest_dir)
+            src = Path(path)
+
+            # Step A: rename the directory in place to experiments/printdbg/<outdir>
+            renamed = src.with_name(outdir)
+            print(f"Renaming {src} → {renamed}")
+            src.rename(renamed)
+
+            # Step B: move renamed directory AS-IS into /proj/.../wan/
+            final_dst = dest_root / outdir
+            print(f"Moving {renamed} → {final_dst}")
+
+            # final destination must NOT exist, to avoid shutil merging semantics
+            if final_dst.exists():
+                print(f"[WARN] {final_dst} already exists — deleting it first")
+                shutil.rmtree(final_dst)
+
+            shutil.move(str(renamed), str(final_dst))
