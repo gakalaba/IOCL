@@ -548,16 +548,33 @@ namespace strongstore
 
         // Add this shard to set of participants
         session.add_participant(i);
+        session.add_get_participant(i);
 
         auto gcb1 = [gcb, session = std::ref(session)](int s, const std::string &k, const std::string &v, Timestamp ts)
         {
-            session.get().set_executing();
+            // check how many outstanding gets!
+            // session.get().set_executing();
+            session.get().remove_parallel_get(k);
+            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+                session.get().set_executing();
+            }
+            if (session.get().state() == StrongSession::ABORTING) {
+                s = REPLY_FAIL;
+            }
             gcb(s, k, v, ts);
         };
 
         auto gtcb1 = [gtcb, session = std::ref(session)](int s, const std::string &k)
         {
-            session.get().set_executing();
+            // check how many outstanding gets!
+            // session.get().set_executing();
+            session.get().remove_parallel_get(k);
+            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+                session.get().set_executing();
+            }
+            if (session.get().state() == StrongSession::ABORTING) {
+                s = REPLY_FAIL;
+            }
             gtcb(s, k);
         };
 

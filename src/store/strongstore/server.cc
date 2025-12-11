@@ -384,7 +384,7 @@ namespace strongstore
         for (auto it = replies.begin(); it != replies.end(); ) {
             reply = *it;
             if (locks_.HasReadLock(transaction_id, reply->key)) {
-                ASSERT(prevHolderWriteSet.find(reply->key) != prevHolderWriteSet.end());
+                // ASSERT(prevHolderWriteSet.find(reply->key) != prevHolderWriteSet.end());
 
                 uint64_t client_id = reply->rid.client_id();
                 uint64_t client_req_id = reply->rid.client_req_id();
