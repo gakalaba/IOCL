@@ -62,12 +62,12 @@ namespace micro
             if ((rand() % 100) < read_percentage_)
             {
                 Debug("sending Get on key = %s", GetKey(op_index - 1).c_str());
-                return GetForUpdate(GetKey(op_index - 1));
+                return Get(GetKey(op_index - 1));
             }
             else
             {
                 Debug("Sending Put on key = %s", GetKey(op_index - 1).c_str());
-                return Put(GetKey(op_index - 1), GetKey(op_index - 1));   
+                return GetForUpdate(GetKey(op_index - 1));
             }
         }
         else if (op_index == fanout_ + 1)
