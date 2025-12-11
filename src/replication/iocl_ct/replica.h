@@ -59,6 +59,15 @@ namespace replication
         };
 
         struct IoclEntry {
+            struct PairHash {
+                std::size_t operator()(const std::pair<uint64_t, int32_t>& p) const noexcept {
+                    uint64_t h1 = std::hash<uint64_t>()(p.first);
+                    uint64_t h2 = std::hash<int32_t>()(p.second);
+
+                    // Very good hash mixing (from boost::hash_combine)
+                    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+                }
+            };
             viewstamp_t viewstamp;
             IoclEntryState state;
             Request request;
@@ -69,8 +78,8 @@ namespace replication
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
             const uint64_t intkey;
-            std::unordered_set<uint64_t> finalAcks; // tracking all unique final ACKs from predecessors
-            std::unordered_map<uint64_t, int32_t> successors; // keep track of all your successors to send the final ACK!
+            std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> finalAcks; // tracking all unique final ACKs from predecessors
+            std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> successors; // keep track of all your successors to send the final ACK! (shardtag -> shardidx)
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;

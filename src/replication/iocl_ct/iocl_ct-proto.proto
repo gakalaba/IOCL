@@ -78,6 +78,7 @@ message PredecessorReplyMessage {
 message PredecessorFinalMessage {
     required uint64 s = 1;
     required uint64 p = 2;
+    required int32 shardIdx = 3;
 }
 
 message CommitMessage {

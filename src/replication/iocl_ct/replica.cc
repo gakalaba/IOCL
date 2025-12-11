@@ -99,7 +99,7 @@ namespace replication
                 new Timeout(transport, 300, [this]()
                             { CloseBatch(); });
             this->resendUnorderedPrepareTimeout =
-                new Timeout(transport, 500, [this]()
+                new Timeout(transport, 30000, [this]()
                             { ResendUnorderedPrepare(); });
             this->closeUnorderedBatchTimeout =
                 new Timeout(transport, 300, [this]()
@@ -224,18 +224,56 @@ namespace replication
                    ACK probably via piggybacking mechanism)*/ 
                 if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) || 
                     (AmLeader() && (entry->finalAcks.size() != entry->predList.predlist_size()))) {
-                    Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
-                            lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
+                    // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
+                    //         lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
+                    if (entry->finalAcks.size() > entry->predList.predlist_size()) {
+                        Panic("Should not be getting more final ACKs than predecessors?");
+                    }
                     // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
                     auto &vec = perKeySubLogs[entry->intkey];
                     vec.push_back(lastCommitted);
                     return;
                 }
-                ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
-                ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
+                if (AmLeader()) {
+                    ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
+                    ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
 
+                    /* Execute it */
+                    ReadyFinalRoutine(entry);
+                    return;
+                }
+
+                /* Replica path: */
                 /* Execute it */
-                ReadyFinalRoutine(entry);
+                ReplyMessage reply;
+                Execute(entry->viewstamp.opnum, entry->request, reply);
+
+                reply.set_view(entry->viewstamp.view);
+                reply.set_opnum(entry->viewstamp.opnum);
+                reply.set_clientreqid(entry->request.clientreqid());
+
+                // Store reply in the client table
+                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
+                // if (cte.lastReqId <= entry->request.clientreqid())
+                // {
+                //     cte.lastReqId = entry->request.clientreqid();
+                //     cte.replied = true;
+                //     cte.reply = reply;
+                // }
+                // else
+                // {
+                //     // We've subsequently prepared another operation from the
+                //     // same client. So this request must have been completed
+                //     // at the client, and there's no need to record the
+                //     // result.
+                // }
+
+                // /* Send reply */
+                // auto iter = clientAddresses.find(entry->request.clientid());
+                // if (iter != clientAddresses.end())
+                // {
+                //     transport->SendMessage(this, *iter->second, reply);
+                // }
             }
         }
 
@@ -742,12 +780,14 @@ namespace replication
             if (fit != outstandingCoordinationFinals.end()) {
                 auto &predFinals = fit->second;
                 for (const auto& finalAck : predFinals) {
-                    if (entryPtr->finalAcks.find(finalAck.p()) != entryPtr->finalAcks.end()) {
-                        Warning("Duplicate final ACK received from predecessor with shardtag %lu for my shardtag %lu",
-                            finalAck.p(), entryPtr->myShardTag);
+                    auto facks_it = entryPtr->finalAcks.find({finalAck.p(), finalAck.shardidx()});
+                    if (facks_it != entryPtr->finalAcks.end()) {
+                        Warning("Duplicate final ACK received from predecessor with shardtag %lu and shardidx %lu for my shardtag %lu",
+                            finalAck.p(), finalAck.shardidx(), entryPtr->myShardTag);
+                    } else {
+                        /* ASSERT THIS IS A LEGAL PREDECESSOR */
+                        entryPtr->finalAcks.emplace(finalAck.p(), finalAck.shardidx());
                     }
-                    /* ASSERT THIS IS A LEGAL PREDECESSOR */
-                    entryPtr->finalAcks.insert(finalAck.p());
                 }
                 outstandingCoordinationFinals.erase(fit);
             }
@@ -794,7 +834,7 @@ namespace replication
             if (perKeySubLogs.find(entry->intkey) == perKeySubLogs.end()) {
                 /* We can immediately execute this entry */
                 auto &vec = perKeySubLogs[entry->intkey];
-                vec.push_back(entry->intkey);
+                vec.push_back(entry->viewstamp.opnum);
             }
 
             /* Execute as many head entries from the sublog as are ready */
@@ -811,6 +851,9 @@ namespace replication
                 ASSERT(entry->state == IOCL_STATE_COMMITTED);
                 if (entry->finalAcks.size() != entry->predList.predlist_size()) {
                     /* Still waiting on final ACKs, done with loop */
+                    if (entry->finalAcks.size() > entry->predList.predlist_size()) {
+                        Panic("Should not be getting more final ACKs than predecessors?");
+                    }
                     break;
                 }
                 /* Remove from sublog */
@@ -879,6 +922,7 @@ namespace replication
                 /* Send out the Final ACK to all successors */
                 PredecessorFinalMessage predFinal;
                 predFinal.set_p(head->myShardTag);
+                predFinal.set_shardidx(groupIdx);
                 for (const auto& succ : head->successors) {
                     predFinal.set_s(succ.first);
                     if (!(transport->SendMessageToReplica(this, succ.second, 0, predFinal)))
@@ -991,11 +1035,12 @@ namespace replication
                                 RWarning("Failed to send SuccessorReply message to client");
                             }
                             /* And save the successor ! */
-                            if (entry->successors.find(succ.s()) == entry->successors.end()) {
-                                entry->successors[succ.s()] = succ.shardidx();
+                            auto succ_it = entry->successors.find({succ.s(), succ.shardidx()});
+                            if (succ_it == entry->successors.end()) {
+                                // Map the successor shardtag to its shardidx
+                                entry->successors.emplace(succ.s(), succ.shardidx());
                             } else {
-                                ASSERT(entry->successors[succ.s()] == succ.shardidx());
-                                Notice("Duplicate successor request received for successor on shard %lu", succ.s(), succ.shardidx());
+                                Warning("Duplicate successor request received for successor %lu on shard %lu", succ.s(), succ.shardidx());
                             }
                         }
                         outstandingCoordinationReqs.erase(it);
@@ -1342,13 +1387,14 @@ namespace replication
                have been drained when upon arrival */
             ASSERT(outstandingCoordinationFinals.find(entry->myShardTag) == outstandingCoordinationFinals.end());
             /* Mark that this predecessor has finalized */
-            if (entry->finalAcks.find(msg.p()) != entry->finalAcks.end()) {
-                Warning("Duplicate final ACK received from predecessor with shardtag %lu for my shardtag %lu",
-                        msg.p(), entry->myShardTag);
+            auto facks_it = entry->finalAcks.find({msg.p(), msg.shardidx()});
+            if (facks_it != entry->finalAcks.end()) {
+                Warning("Duplicate final ACK received from predecessor with shardtag %lu on shard %lu for my shardtag %lu",
+                        msg.p(), msg.shardidx(), entry->myShardTag);
                 return;
             }
             /* ASSERT THIS IS A LEGAL PREDECESSOR */
-            entry->finalAcks.insert(msg.p());
+            entry->finalAcks.emplace(msg.p(), msg.shardidx());
             /* Now it is safe to Execute this operation! */
             /* Check if it is waiting to be executed */
             if ((entry->state == IOCL_STATE_COMMITTED) && (entry->finalAcks.size() == entry->predList.predlist_size())) {
@@ -1390,11 +1436,12 @@ namespace replication
             }
             // NOTE the shardidx is int32
             /* Store the successor for the final TS */
-            if (entry->successors.find(msg.s()) == entry->successors.end()) {
-                entry->successors[msg.s()] = msg.shardidx();
+
+            auto succ_it = entry->successors.find({msg.s(), msg.shardidx()});
+            if (succ_it == entry->successors.end()) {
+                entry->successors.emplace(msg.s(), msg.shardidx());
             } else {
-                ASSERT(entry->successors[msg.s()] == msg.shardidx());
-                Notice("Duplicate successor request received for successor on shard %lu", msg.s(), msg.shardidx());
+                Warning("Duplicate successor request received for successor %lu on shard %lu", msg.s(), msg.shardidx());
             }
             /* Reply to the successor if we've already been added to the ordered log */
             if (entry->state == IOCL_STATE_READY || entry->state == IOCL_STATE_PREPARED || entry->state == IOCL_STATE_COMMITTED) {
@@ -1402,6 +1449,7 @@ namespace replication
                 PredecessorFinalMessage predFinal;
                 predFinal.set_p(entry->myShardTag);
                 predFinal.set_s(msg.s());
+                predFinal.set_shardidx(groupIdx);
                 if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, predFinal)))
                 {
                     RWarning("Failed to send SuccessorRequest message to client");
