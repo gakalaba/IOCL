@@ -968,6 +968,10 @@ void TCPTransport::TCPIncomingEventCallback(struct bufferevent *bev,
         }
     }
 
+    // CRITICAL FIX: Remove from tcpAddresses to prevent stale entries
+    // when bufferevent memory is reused for new connections
+    transport->tcpAddresses.erase(bev);
+
     bufferevent_free(bev);
     transport->incomingClosed++;
 }

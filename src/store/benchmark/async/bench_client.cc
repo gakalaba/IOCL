@@ -120,6 +120,7 @@ uint64_t BenchmarkClient::CustomInit()
 {
 
     Debug("[%d] Starting Transformed App Client", n_sessions_started_);
+    // std::cout << "Starting transformed app client" << std::endl;
     n_sessions_started_++;
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -129,16 +130,25 @@ uint64_t BenchmarkClient::CustomInit()
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
+    // std::cout << "session id created" << std::endl;
+    // std::cout.flush();
+    // std::cerr << "session id created (stderr)" << std::endl;
+    // std::cerr.flush();
     // //std::cout << "[CustomInit] created session" << std::endl;
 
-    // don't need these two -> dummy values to call for emplace 
+    // don't need these two -> dummy values to call for emplace
     auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    // std::cout << "About to call GetNextAppRequest()" << std::endl;
+    // std::cout.flush();
     auto appreq = GetNextAppRequest();
+    // std::cout << "GetNextAppRequest() completed" << std::endl;
+    // std::cout.flush();
     // don't need
     // stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
-    // move to sendAsync function, GetFanout() --> 0 
+    // move to sendAsync function, GetFanout() --> 0
     session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
-    // //std::cout << "[CustomInit] emplace called" << std::endl;
+    // std::cout << "[CustomInit] emplace called" << std::endl;
+    // std::cout.flush();
 
     // auto &ss = session_states_.find(sid)->second;
     // don't need
@@ -151,8 +161,15 @@ uint64_t BenchmarkClient::CustomInit()
     // Debug("ANJAAAAAA we should be starting the event loop....");
     // Start event loop in a background thread
     // std::thread(transport_.RunTransformed).detach();
+    // std::cout << "About to start event loop thread..." << std::endl;
+    // std::cout.flush();
+    // std::cerr << "About to start event loop thread (stderr)..." << std::endl;
+    // std::cerr.flush();
     std::thread(std::bind(&BenchmarkClient::StartTransformedEventLoop, this)).detach();
-    // //std::cout << "do we print after run transformed?" << std::endl;
+    // std::cout << "Event loop thread started, about to return sid=" << sid << std::endl;
+    // std::cout.flush();
+    // std::cerr << "Event loop thread started (stderr), sid=" << sid << std::endl;
+    // std::cerr.flush();
     return sid;
 }
 
@@ -996,7 +1013,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
     Debug("SendAsynchOperation");
     auto search = session_states_.find(session_id);
     if (search == session_states_.end()) {
-        std::cout << "[SendAsynchOperation] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+        std::cout << "@!@!@!@!@!!@!@!@!@!@!@!@[SendAsynchOperation] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
     }
     ASSERT(search != session_states_.end());
 
@@ -1076,17 +1093,25 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
         //std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
         Panic("NOT YET SUPPORTEDunsupported operation type");
     }
-    Debug("here?:");
     auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb);
-    // //std::cout << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
+    std::cerr << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }
 
 void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
 {
-    // std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
+    std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
+    if (replies_map_.find(commandId) != replies_map_.end())
+    {
+        std::cerr << "[AsynchRequestCallback] WARNING: Duplicate response for commandId=" << commandId << std::endl;
+    }
     replies_map_[commandId] = retval;
-    
+    Debug("And the replies map size is %lu", replies_map_.size());
+    Debug("It looks like ");
+    for (auto const& pair : replies_map_) {
+        Debug("commandId %d is in the replies map", pair.first);
+    }
+
     auto efd_it = efd_map_.find(commandId);
     if (efd_it != efd_map_.end()) {
         int efd = efd_it->second;
@@ -1095,7 +1120,7 @@ void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int sta
         // Verify the efd is still valid
         int flags = fcntl(efd, F_GETFD);
         if (flags == -1) {
-            // std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
+            std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
             efd_map_.erase(efd_it);
             return;
         }
@@ -1105,7 +1130,7 @@ void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int sta
         uint64_t val = 1;
         ssize_t written = write(efd, &val, sizeof(val));
     } else {
-        // std::cerr << "[AsynchRequestCallback] No efd found for commandId=" << commandId << std::endl;
+        std::cerr << "[AsynchRequestCallback] No efd found for commandId=, but we have added the reply to the replies map!!" << commandId << std::endl;
     }
 }
 
@@ -1113,24 +1138,24 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
 {
     // Debug("Called AwaitAsynchResponse!");
 
-    // //std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
+    // std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
     //           << ", commandId=" << commandId << std::endl;
 
     // TODO need to increment the request id!!
     if (replies_map_.find(commandId) != replies_map_.end())
     {
         Debug("Got a response!");
-        // //std::cout << "[AwaitAsynchResponse] Got a response for commandId=" << commandId << std::endl;
+        // std::cout << "[AwaitAsynchResponse] Got a response for commandId=" << commandId << std::endl;
 
         auto search = session_states_.find(session_id);
         if (search == session_states_.end()) {
-            //std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
+            std::cout << "[AwaitAsynchResponse] ERROR: session_id " << session_id << " not found in session_states_!" << std::endl;
         }
         ASSERT(search != session_states_.end());
 
         auto &ss = search->second;
         // TODO ANJA somehwere in here we need to increment the transaction id!!
-        // //std::cout << "[AwaitAsynchResponse] Returning value for commandId=" << commandId << std::endl;
+        // std::cout << "[AwaitAsynchResponse] Returning value for commandId=" << commandId << std::endl;
 
         // right now we don't delete the value... for the purposes of double await? TODO ANJA see with austin
         return std::make_tuple(replies_map_[commandId], -1);
@@ -1141,19 +1166,24 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     // Create the event file descriptor
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd == -1) {
-        // //std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
+        std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
         Panic("eventfd creation failed");
     }
     // Debug("making an efd! it has value %d", efd);
 
     // Log the created efd and the commandId it maps to
-    // //std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
+    // std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
 
     // Map the efd to the commandId
     efd_map_[commandId] = efd;
-    // Debug("making an efd! it has value %d and is mapped to commandId %d", efd, commandId);
-    // Debug("the side of the efd_map_ is %lu", efd_map_.size());
-    // // //std::cout << "[AwaitAsynchResponse] Mapped efd=" << efd << " to commandId=" << commandId << std::endl;
+    Debug("making an efd! it has value %d and is mapped to commandId %d", efd, commandId);
+    Debug("the side of the efd_map_ is %lu", efd_map_.size());
+    // std::cout << "[AwaitAsynchResponse] Mapped efd=" << efd << " to commandId=" << commandId << std::endl;
+    Debug("And the replies map size is %lu", replies_map_.size());
+    Debug("It looks like ");
+    for (auto const& pair : replies_map_) {
+        Debug("commandId %d is in the replies map", pair.first);
+    }
 
     // Return the Value object and the efd
     return std::make_tuple(Value{}, efd);

@@ -356,7 +356,7 @@ namespace strongstore
                                         bool isIOCL)
     {
         uint64_t req_id = last_req_id_++;
-        // Debug("Storing the request in pendingReqs with transactionid = %d and its reqid = %d", transaction_id, req_id);
+        Debug("Storing the request in pendingReqs with tid = %d and its reqid = %d", transaction_id, req_id);
         PendingAsynchOperation *pendingOp = new PendingAsynchOperation(transaction_id, req_id);
         pendingAsynchOperations[req_id] = pendingOp;
         pendingOp->op = optype;
@@ -364,6 +364,10 @@ namespace strongstore
         pendingOp->oldVal = oldValue;
         pendingOp->newVal = newValue;
         pendingOp->trcb = trcb;
+        Debug("PendingAsynchOperations looks like:");
+        for (auto const& pair : pendingAsynchOperations) {
+            Debug("  req_id: %lu, tid: %lu", pair.first, pair.second->transaction_id);
+        }
 
         op_.Clear();
         op_.mutable_rid()->set_client_id(client_id_);
@@ -500,6 +504,7 @@ namespace strongstore
             uint64_t myshardtag = CreateTag(client_id_, seqno);
             seqno++;
             op_.set_shardtag(myshardtag);
+            Debug("MY shard tag = %lu", myshardtag);
             op_.set_intkey(key); // for iocl optimization
 
             // Construct predecessor list
@@ -570,7 +575,7 @@ namespace strongstore
     {
         Debug("shard client got TRANSFORMED LinReply!");
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the transaction_id = %lu", req_id);
+        Debug("the req_id = %lu", req_id);
         int status = reply.status();
 
         request_utils::Value retval;
@@ -619,6 +624,10 @@ namespace strongstore
             break;
         }
 
+        Debug("PendingAsynchOperations looks like:");
+        for (auto const& pair : pendingAsynchOperations) {
+            Debug("  req_id: %lu, tid: %lu", pair.first, pair.second->transaction_id);
+        }
         auto itr = pendingAsynchOperations.find(req_id);
         if (itr == pendingAsynchOperations.end())
         {
@@ -636,6 +645,7 @@ namespace strongstore
 
         PendingAsynchOperation *op = itr->second;
         uint64_t transaction_id = op->transaction_id;
+        Debug("when i found the pending asynch op, its tid = %lu", transaction_id);
         transformed_callback trcb = std::move(op->trcb);
         std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
         pendingAsynchOperations.erase(itr);

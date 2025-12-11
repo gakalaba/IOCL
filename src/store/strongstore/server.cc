@@ -35,6 +35,8 @@
 #include <functional>
 #include <memory>
 #include <unordered_set>
+#include <arpa/inet.h>
+#include "lib/tcptransport.h"
 
 using redis::Operation;
 using redis::ValueType;
@@ -304,8 +306,10 @@ namespace strongstore
 
     void Server::HandleAsynchSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
-        Debug("Calling HandleSendAsynchOperation!");
         uint64_t transaction_id = msg.rid().client_req_id();
+        Debug("Calling HandleSendAsynchOperation! it has transaction_id (msg.req_id) = %lu and client_id = %lu", transaction_id, msg.rid().client_id());
+        const TCPTransportAddress &dst = static_cast<const TCPTransportAddress &>(remote);
+        Debug("The remote address is: %s:%d", inet_ntoa(dst.addr.sin_addr), htons(dst.addr.sin_port));
 
         auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
 
@@ -1193,10 +1197,14 @@ namespace strongstore
 
         tr_reply.ParseFromString(reply_str);
         Debug("Transformed Lin REPLY");
+        Debug("This is what the reply looks like:");
+        Debug("%s", tr_reply.DebugString().c_str());
 
         uint64_t client_id = reply->rid.client_id();
         uint64_t client_req_id = reply->rid.client_req_id();
         const TransportAddress *remote = reply->rid.addr();
+        const TCPTransportAddress &dst = static_cast<const TCPTransportAddress &>(*remote);
+        Debug("The remote address is: %s:%d", inet_ntoa(dst.addr.sin_addr), htons(dst.addr.sin_port));
 
         Debug("[%lu] AsynchOperationCallback", transaction_id);
 
@@ -2045,6 +2053,7 @@ namespace strongstore
         reply.set_status(status);
         reply.mutable_rid()->set_client_id(op.rid().client_id());
         reply.mutable_rid()->set_client_req_id(op.rid().client_req_id());
+        Debug("In reply, we're setting the client_id = %lu and the req_id = %lu", op.rid().client_id(), op.rid().client_req_id());
         // Setting the return value!
         switch (retval.type)
         {
@@ -2080,7 +2089,6 @@ namespace strongstore
             Panic("Not a valid Value type!");
         }
         reply.SerializeToString(&response);
-        Debug("the response was %s", response.c_str());
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

@@ -95,6 +95,11 @@ public:
 
     inline uint64_t GetFanout() { return fanout; };
 
+    // Take ownership of the transport to ensure it outlives the client
+    void SetTransport(std::unique_ptr<Transport> transport) {
+        owned_transport_ = std::move(transport);
+    }
+
 protected:
     virtual AsyncTransaction *GetNextTransaction() = 0;
     virtual AsyncAppRequest *GetNextAppRequest() = 0;
@@ -266,6 +271,10 @@ private:
     bool isTransformed;
     std::unordered_map<uint64_t, request_utils::Value> replies_map_;
     std::unordered_map<uint64_t, int> efd_map_;
+
+    // Own the transport to ensure it outlives the client
+    // The transport_ reference above points to this owned object
+    std::unique_ptr<Transport> owned_transport_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

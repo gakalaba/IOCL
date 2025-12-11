@@ -326,10 +326,10 @@ request_utils::Value python_to_value(const py::object& obj) {
 }
 
 // Keep storage so references remain valid
-static std::unique_ptr<TCPTransport> s_transport;
 static std::unique_ptr<KeySelector> s_keySelector;
 static std::vector<Client *> s_clients;
 static std::unique_ptr<Partitioner> s_partitioner;
+static std::vector<std::string> s_keys;  // CRITICAL: Must be static so KeySelector's reference remains valid
 
 // Helper functions for environment variables
 static std::string GetEnvOr(const char *name, const char *def) {
@@ -355,27 +355,33 @@ static bool GetEnvBool(const char *name, const char *def) {
 }
 
 std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
+    // std::cout << "[CreateBenchmarkClient] Called from PID: " << getpid() << std::endl;
+    // std::cout << "[CreateBenchmarkClient] s_clients.size() before clear: " << s_clients.size() << std::endl;
+
     // 1) Transport
-    if (!s_transport) {
-        s_transport.reset(new TCPTransport(0.0, 0.0, 0, false));
-        // std::cerr << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
-    } else {
-        // std::cerr << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
-    }
+    // 1) Transport - create a NEW transport for each client to avoid connection sharing
+    std::unique_ptr<TCPTransport> transport(new TCPTransport(0.0, 0.0, 0, false));
+    // std::cout << "[CreateBenchmarkClient] Transport created (TCP) at " << transport.get() << std::endl;
+    // if (!s_transport) {
+    //     s_transport.reset(new TCPTransport(0.0, 0.0, 0, false));
+    //     // std::cerr << "[CreateBenchmarkClient] Transport created (TCP) at " << s_transport.get() << std::endl;
+    // } else {
+    //     // std::cerr << "[CreateBenchmarkClient] Reusing existing transport at " << s_transport.get() << std::endl;
+    // }
 
     // 2) Keys + selector
     if (!s_keySelector) {
-        std::vector<std::string> keys;
+        s_keys.clear();  // Use static vector to ensure it persists
         uint64_t num_keys = GetEnvU64("IOCL_CLIENT_NUM_KEYS", "1");
         if (num_keys == 0) {
             num_keys = 1;
         }
         std::string key = "0000000000";
         for (uint64_t i = 0; i < num_keys; ++i) {
-            keys.emplace_back(key);
+            s_keys.emplace_back(key);
         }
-        s_keySelector.reset(new UniformKeySelector(keys));
-        // std::cout << "[CreateBenchmarkClient] KeySelector created (uniform) with " << keys.size() << " keys at " << s_keySelector.get() << std::endl;
+        s_keySelector.reset(new UniformKeySelector(s_keys));  // Pass static vector by reference
+        // std::cout << "[CreateBenchmarkClient] KeySelector created (uniform) with " << s_keys.size() << " keys at " << s_keySelector.get() << std::endl;
     } 
 
     // 3) Clients vector (empty or placeholder)
@@ -388,7 +394,10 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
     BenchmarkClientMode bench_mode = (GetEnvOr("IOCL_BENCH_MODE", "closed") == "open") ? OPEN : CLOSED;
 
     uint32_t timeout_ms = static_cast<uint32_t>(GetEnvU64("IOCL_MESSAGE_TIMEOUT", "60000"));
-    uint64_t id = GetEnvU64("IOCL_CLIENT_ID", "0") << 4;
+    uint64_t raw_client_id = GetEnvU64("IOCL_CLIENT_ID", "0");
+    uint64_t id = raw_client_id << 4;
+
+    // std::cout << "[CreateBenchmarkClient] IOCL_CLIENT_ID from env: " << raw_client_id << ", shifted id: " << id << std::endl;
 
     double switch_probability = GetEnvDouble("IOCL_CLIENT_SWITCH_PROBABILITY", "0.0");
     double arrival_rate = GetEnvDouble("IOCL_CLIENT_ARRIVAL_RATE", "1.0");
@@ -497,12 +506,17 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
                         auto &shard_config = replica_configs[i];
                         auto &net_config = net_configs[i];
                         auto &region = client_regions[i];
+                        uint64_t client_id_for_store = GetEnvU64("IOCL_CLIENT_ID", "0");
+                        // std::cout << "[CreateBenchmarkClient] Creating strongstore::Client #" << i
+                        //           << " with client_id=" << client_id_for_store << std::endl;
+
                         Client *c = new strongstore::Client(
                             consistency, protocol_mode, net_config, region, shard_config,
-                            GetEnvU64("IOCL_CLIENT_ID", "0"), static_cast<int>(num_shards), closest_replica,
-                            s_transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
-                        
+                            client_id_for_store, static_cast<int>(num_shards), closest_replica,
+                            transport.get(), s_partitioner.get(), tt, debug_stats, nb_time_alpha);
+
                         s_clients.push_back(c);
+                        // std::cout << "[CreateBenchmarkClient] strongstore::Client #" << i << " created successfully" << std::endl;
                     } catch (const std::exception& e) {
                         std::cout << "[CreateBenchmarkClient] EXCEPTION creating client #" << i << ": " << e.what() << std::endl;
                     } catch (...) {
@@ -531,7 +545,7 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         s_keySelector.get(),
         s_clients,
         timeout_ms,
-        *s_transport,
+        *transport,
         id,
         bench_mode,
         switch_probability,
@@ -544,41 +558,12 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
         0
     );
 
+    // Transfer ownership of transport to bench client
+    // The transport must outlive the bench client
+    bench->SetTransport(std::move(transport));
+
     return std::unique_ptr<BenchmarkClient>(bench);
 }
-
-
-// SendRequest - Synchronous version that chains request and response
-// std::pair<bool, request_utils::Value> SendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
-//     std::cout << "[SendRequest] Called with session_id=" << session_id 
-//               << ", op=" << static_cast<int>(op) 
-//               << ", key=" << key << std::endl;
-
-//     if (!benchmarkClient) {
-//         std::cout << "[SendRequest] Creating new benchmark client" << std::endl;
-//         benchmarkClient = CreateBenchmarkClient();
-//     }
-    
-//     // Call SendAsynchRequest from BenchmarkClient and get the command ID
-//     std::cout << "[SendRequest] Calling SendAsynchRequest..." << std::endl;
-//     std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchRequest(session_id, op, key, newVal, oldVal);
-    
-//     // Extract the command ID from the result (assuming it's the second element)
-//     uint64_t commandId = std::get<1>(result).type == request_utils::ValueType::STRING ? 
-//                         std::stoull(std::get<1>(result).str) : 0;
-    
-//     std::cout << "[SendRequest] Got command ID: " << commandId << ", awaiting response..." << std::endl;
-
-//     // Immediately await the response using the command ID
-//     std::tuple<request_utils::Value, uint64_t> response = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
-
-//     // bool success = std::get<1>(response) == 0;
-//     int efd = std::get<1>(response);
-//     std::cout << "[SendRequest] Response received, efd=" << efd << std::endl;
-    
-//     // Return the response value and success status
-//     return {efd, std::get<0>(response)};
-// }
 
 // AsyncSendRequest - Asynchronous version of SendRequest
 std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
@@ -619,19 +604,26 @@ std::pair<bool, request_utils::Value> AsyncGetResponse(uint64_t session_id, uint
         // std::cout << "[AsyncGetResponse] Response is ready, returning value." << std::endl;
         return {true, value};
     } else {
+        // Response is not ready, return false and the efd as a string
+        // Python waits on this efd
+        // std::cout << "[AsyncGetResponse] Response wasn't ready, returning efd=" << efd << std::endl;
+        return {false, request_utils::Value::NewString(std::to_string(efd))};
         // Response is not ready, return false and a Value containing the efd as a string
         // Wait for the eventfd to be signaled, then close it
-        uint64_t val = 0;
-        ssize_t read_bytes = read(efd, &val, sizeof(val));
-        if (read_bytes != sizeof(val)) {
-            std::cout << "[AsyncGetResponse] ERROR: Failed to read from efd " << efd << ", errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
-        }
-        close(efd); // Release the fd so the OS can assign a new one next time
-        // After waiting, try again to get the response
-        std::tuple<request_utils::Value, uint64_t> retry_result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
-        request_utils::Value retry_value = std::get<0>(retry_result);
-        // Should now be ready
-        return {true, retry_value};
+        // uint64_t val = 0;
+        // ssize_t read_bytes = read(efd, &val, sizeof(val));
+        // std::cout << "[AsyncGetResponse] Response wasn't ready, got back edf." << std::endl;
+        // if (read_bytes != sizeof(val)) {
+        //     std::cout << "[AsyncGetResponse] ERROR: Failed to read from efd " << efd << ", errno=" << errno << " (" << strerror(errno) << ")" << std::endl;
+        // }
+        // close(efd); // Release the fd so the OS can assign a new one next time
+        // // After waiting, try again to get the response
+        // std::cout << "[AsyncGetResponse] Awaiting Asynch Response" << std::endl;
+        // std::tuple<request_utils::Value, uint64_t> retry_result = benchmarkClient->AwaitAsynchResponse(session_id, commandId);
+        // request_utils::Value retry_value = std::get<0>(retry_result);
+        // std::cout << "[AsyncGetResponse] Returning back efd" << std::endl;
+        // // Should now be ready
+        // return {true, retry_value};
     }
 }
 
@@ -666,7 +658,7 @@ py::object value_to_python(const request_utils::Value& val) {
 // Cleanup function to properly manage global resources
 void CleanupGlobalResources() {
     // std::cout << "[CleanupGlobalResources] Starting cleanup..." << std::endl;
-    
+
     // Clean up static resources
     for (auto client : s_clients) {
         if (client) {
@@ -675,39 +667,29 @@ void CleanupGlobalResources() {
         }
     }
     s_clients.clear();
-    
+
     // Clear static pointers (they will be automatically deleted)
     s_keySelector.reset();
     s_partitioner.reset();
-    s_transport.reset();
-    
+    // Note: s_transport no longer exists - each BenchmarkClient owns its own transport
+
+    // Clear static keys vector
+    s_keys.clear();
+
     // Clear the global benchmark client pointer
     benchmarkClient.reset();
-    
+
     std::cout << "[CleanupGlobalResources] Cleanup completed" << std::endl;
 }
 
 // Function to start the transport (needed for clients to function)
+// Note: Since each BenchmarkClient now owns its own transport,
+// this function is no longer needed. The transport is started
+// automatically when StartTransformedEventLoop() is called.
 bool StartTransport() {
-    if (!s_transport) {
-        std::cout << "[StartTransport] No transport available" << std::endl;
-        return false;
-    }
-    
-    std::cout << "[StartTransport] Starting transport..." << std::endl;
-    try {
-        // Start transport in a separate thread to avoid blocking
-        std::thread transport_thread([]() {
-            s_transport->Run();
-        });
-        transport_thread.detach();
-        
-        std::cout << "[StartTransport] Transport started successfully" << std::endl;
-        return true;
-    } catch (const std::exception& e) {
-        std::cout << "[StartTransport] Exception starting transport: " << e.what() << std::endl;
-        return false;
-    }
+    std::cout << "[StartTransport] WARNING: This function is deprecated. "
+              << "Each BenchmarkClient now owns its own transport." << std::endl;
+    return true;  // Return true for backward compatibility
 }
 
 // // Set string flags
@@ -740,7 +722,7 @@ uint64_t CustomInitSession() {
         // std::cout << "[CustomInitSession] Creating new benchmark client" << std::endl;
         benchmarkClient = CreateBenchmarkClient();
         if (!benchmarkClient) {
-            // std::cout << "[CustomInitSession] Failed to create benchmark client, returning 0" << std::endl;
+            std::cout << "[CustomInitSession] Failed to create benchmark client, returning 0" << std::endl;
             return 0; // Return invalid session ID
         }
         // std::cout << "[CustomInitSession] Benchmark client created successfully" << std::endl;

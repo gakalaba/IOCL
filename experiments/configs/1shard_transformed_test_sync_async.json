@@ -2,26 +2,24 @@
   "experiment_independent_vars": [
     [
       "consistency",
-      "base_python_directory"
+      "replication_protocol",
+      "client_protocol_mode"
     ],
     [
       "client_total",
       "client_processes_per_client_node"
     ]
   ],
-  "replication_protocol": "vr",
-  "client_protocol_mode": "span-lock",
+  "replication_protocol": ["vr"],
+  "client_protocol_mode": ["vr"],
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
     "us-east-1-2"
   ],
-  "consistency": [
-    "lin", "lin"
-  ],
+  "consistency": ["lin"],
   "base_python_directory": [
-    "/users/akalaba/IOCL/redis-chat-transformed/sync",
-    "/users/akalaba/IOCL/redis-chat-transformed/async"
+    "/users/akalaba/IOCL/redis-chat-transformed/sync"
   ],
   "num_instances": 1,
   "shard_config": "shard.config",
@@ -74,7 +72,7 @@
   "benchmark_name": "micro",
   "bench_mode": "closed",
   "mpl": 1,
-  "client_key_selector": "zipf",
+  "client_key_selector": "uniform",
   "client_fanout": 1,
   "client_issue_concurrent": false,
   "client_zipf_coefficient": 0.1,
@@ -94,7 +92,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "mdl",
+  "experiment_name": "icon",
   "codebase_name": "transformed",
   "pin_client_processes": [
     0,

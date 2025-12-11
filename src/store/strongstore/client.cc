@@ -769,15 +769,15 @@ namespace strongstore
             sessions_by_transaction_id_.erase(session.transaction_id());
         }
 
-        auto req_id = next_transaction_id_++;
+        auto tid = next_transaction_id_++;
         // austin: we're replacing this with next_transaction_id_++?
-        // auto req_id = session.transaction_id();
+        // auto tid = session.transaction_id();
 
-        // //std::cout << "[Client::SendAsynchRequest] Called with req_id=" << req_id
+        // std::cout << "[Client::SendAsynchRequest] Called with tid=" << tid
         //         << ", optype=" << static_cast<int>(optype)
         //         << ", key=" << key << std::endl;
 
-        // Debug("SendAsynchRequest request_id = [%lu]", req_id);
+        Debug("SendAsynchRequest request_id = [%lu]", tid);
 
         ASSERT(session.executing());
 
@@ -790,9 +790,9 @@ namespace strongstore
 
         auto rcb1 = [this, trcb, isIOCL,
                     session = std::ref(session)](uint64_t s, request_utils::Value retval,
-                                                int req_id, const std::vector<std::pair<uint64_t, uint32_t>> &p)
+                                                int tid, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
-            // //std::cout << "[Client::SendAsynchRequest::rcb1] Callback for req_id=" << req_id << std::endl;
+            std::cerr << "[Client::SendAsynchRequest::rcb1] Callback for tid=" << tid << std::endl;
             session.get().set_executing();
             if (isIOCL) {
                 auto it1 = p.begin();
@@ -828,14 +828,14 @@ namespace strongstore
                     ++itl, ++itr) {
                 }
             }
-            return trcb(s, retval, req_id, p);
+            return trcb(s, retval, tid, p);
         };
 
         // //std::cout << "[Client::SendAsynchRequest] Sending request to shard client..." << std::endl;
-        sclients_[i]->SendAsynchOperation(req_id, optype, key, oldValue, newValue, rcb1, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
+        sclients_[i]->SendAsynchOperation(tid, optype, key, oldValue, newValue, rcb1, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
         // //std::cout << "[Client::SendAsynchRequest] Request sent." << std::endl;
 
-        return req_id;
+        return tid;
     }
 
     /* Attempts to commit the ongoing transaction. */

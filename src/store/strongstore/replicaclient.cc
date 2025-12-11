@@ -126,13 +126,18 @@ namespace strongstore
                                           replication::LinearizeableOperation &msg,
                                           transformed_callback trcb)
     {
-        Debug("[shard %i] SendAsynchOperation sending Transformed LinOp", shard_idx_);
+        Debug("[shard %i] SendAsynchOperation sending Transformed LinOp, it has ", shard_idx_);
 
         string asynch_op_str;
         uint64_t reqId = lastReqId++;
+        Debug("It has reqId = %lu", reqId);
         PendingOperation *pendingOperation = new PendingOperation(reqId);
         pendingOperations[reqId] = pendingOperation;
         pendingOperation->trcb = trcb;
+        Debug("The pendingOperations list looks like this:");
+        for (auto const& pair : pendingOperations) {
+            Debug("reqId %lu is in the pendingOperations map", pair.first);
+        }
         ASSERT(msg.has_tropd());
 
         switch (linproto_) {
@@ -159,7 +164,7 @@ namespace strongstore
     bool ReplicaClient::AsynchOperationCallback(uint64_t opId, const string &request_str,
                                               const string &reply_str)
     {
-        Debug("[shard %i] Received SENDOPERATION callback", shard_idx_);
+        Debug("[shard %i] Received SENDOPERATION callback with opId = %lu", shard_idx_, opId);
         auto itr = this->pendingOperations.find(opId);
         ASSERT(itr != this->pendingOperations.end());
         PendingOperation *pendingOperation = itr->second;
