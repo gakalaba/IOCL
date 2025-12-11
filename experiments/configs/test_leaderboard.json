@@ -1,0 +1,303 @@
+{
+    "experiment_independent_vars": [
+      [
+        "consistency",
+        "replication_protocol",
+        "client_protocol_mode",
+        "base_python_directory",
+        "client_total",
+        "client_processes_per_client_node"
+      ],
+      [
+        "client_total",
+        "client_processes_per_client_node"
+      ]
+    ],
+    "replication_protocol": [
+      "iocl_ct",
+      "vr"
+    ],
+    "client_protocol_mode": [
+      "iocl_ct",
+      "vr"
+    ],
+    "server_names": [
+      "us-east-1-0",
+      "us-east-1-1",
+      "us-east-1-2",
+      "us-west-1-0",
+      "us-west-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "eu-west-1-2"
+    ],
+    "consistency": [
+      "lin",
+      "lin"
+    ],
+    "base_python_directory": [
+      "/users/akalaba/IOCL/basic-redis-leaderboard-demo-python-transformed/async",
+      "/users/akalaba/IOCL/basic-redis-leaderboard-demo-python-transformed/sync"
+    ],
+    "python_venv": "/users/akalaba/IOCL/basic-redis-leaderboard-demo-python-transformed/redis-chat/bin/activate",
+    "python_app_name": "main.py",
+    "num_instances": 1,
+    "shard_config": "shard.config",
+    "replica_config": "replica.config",
+    "network_config": "network.json",
+    "replica_config_format_str": "replica-%d.config",
+    "shard_config_format_str": "shard-%d.config",
+    "fault_tolerance": 1,
+    "num_shards": 9,
+    "shards": [
+      ["us-east-1-0", "us-west-1-0", "eu-west-1-0"],
+      ["us-east-1-1", "us-west-1-1", "eu-west-1-1"],
+      ["us-east-1-2", "us-west-1-2", "eu-west-1-2"],
+
+      ["us-west-1-0", "us-east-1-1", "eu-west-1-2"],
+      ["us-west-1-1", "us-east-1-2", "eu-west-1-0"],
+      ["us-west-1-2", "us-east-1-0", "eu-west-1-1"],
+
+      ["eu-west-1-0", "us-west-1-2", "us-east-1-0"],
+      ["eu-west-1-1", "us-west-1-0", "us-east-1-2"],
+      ["eu-west-1-2", "us-west-1-1", "us-east-1-1"]
+    ],
+    "client_total": [
+      [
+        16
+      ],
+      [
+        16
+      ]
+    ],
+    "client_processes_per_client_node": [
+      [
+        16
+      ],
+      [
+        16
+      ]
+    ],
+    "client_threads_per_process": 1,
+    "clients": [
+      "client-0-0"
+    ],
+    "server_regions": {
+      "ca": [
+        "us-east-1-0",
+        "us-east-1-1",
+        "us-east-1-2",
+        "client-0-0"
+      ],
+      "ir": [
+        "us-west-1-0",
+        "us-west-1-1",
+        "us-west-1-2"
+      ],
+      "jp": [
+        "eu-west-1-0",
+        "eu-west-1-1",
+        "eu-west-1-2"
+      ]
+    },
+    "server_port": 7087,
+    "truetime_error": 0,
+    "client_num_keys": 100,
+    "benchmark_name": "micro",
+    "bench_mode": "closed",
+    "mpl": 1,
+    "client_key_selector": "uniform",
+    "COMMENT<client_wo_replacement>": true,
+    "client_fanout": 16,
+    "client_issue_concurrent": true,
+    "rw_num_ops_txn": 1,
+    "server_load_time": 20,
+    "server_preload_keys": true,
+    "client_abort_backoff": 1,
+    "client_retry_aborted": true,
+    "client_max_attempts": -1,
+    "client_max_backoff": 2500,
+    "client_message_timeout": 60000,
+    "run_locally": false,
+    "replication_protocol_settings": {
+      "message_transport_type": "tcp"
+    },
+    "stats_merge_lists": [
+      "txn_groups",
+      "commit_branch"
+    ],
+    "experiment_name": "icon",
+    "codebase_name": "transformed",
+    "pin_client_processes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "pin_server_processes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "client_debug_output": true,
+    "server_debug_output": true,
+    "client_debug_stats": true,
+    "server_debug_stats": false,
+    "client_experiment_length": 20,
+    "client_rand_sleep": 0,
+    "client_ramp_down": 2,
+    "client_ramp_up": 2,
+    "default_remote_shell": "bash",
+    "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+    "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+    "project_name": "praxis-pg0",
+    "region_rtt_latencies": {
+      "ca": {
+        "ca": 0,
+        "ir": 151,
+        "jp": 113
+      },
+      "ir": {
+        "ca": 151,
+        "ir": 0,
+        "jp": 220
+      },
+      "jp": {
+        "ca": 113,
+        "ir": 220,
+        "jp": 0
+      }
+    },
+    "server_emulate_wan": false,
+    "plots": [
+      {
+        "name": "tput-p50",
+        "font": "DejaVu Sans,12",
+        "height": 600,
+        "width": 800,
+        "series_indep_vars_idx": 0,
+        "series_titles": [
+          "IOCL_CT",
+          "View-Stamped Replication"
+        ],
+        "x_var_is_config": false,
+        "y_var": [
+          "run_stats",
+          "combined",
+          "p50",
+          "p50"
+        ],
+        "y_label": "p50 Latency",
+        "x_label": "Throughput (txn/s)",
+        "x_indep_vars_idx": 1,
+        "x_var": [
+          "run_stats",
+          "combined",
+          "tput",
+          "p50"
+        ]
+      }
+    ],
+    "cdf_plots": {
+      "font": "DejaVu Sans,12",
+      "height": 600,
+      "width": 800,
+      "x_label": "Latency (ms)",
+      "y_label": "Cumulative ratio of operations"
+    },
+    "plot_cdf_png_font": "DejaVu Sans,12",
+    "plot_cdf_png_height": 600,
+    "plot_cdf_png_width": 800,
+    "plot_cdf_series_title": "Protocol",
+    "plot_cdf_x_label": "Latency (ms)",
+    "plot_cdf_y_label": "Cumulative ratio of operations",
+    "plot_directory_name": "plots",
+    "plot_tput_lat_png_font": "DejaVu Sans,12",
+    "plot_tput_lat_png_height": 600,
+    "plot_tput_lat_png_width": 800,
+    "plot_tput_lat_series_title": "Charizard",
+    "plot_tput_lat_x_label": "Throughput (ops/sec)",
+    "plot_tput_lat_y_label": "Latency (ms)",
+    "input_latency_scale": 1000000000,
+    "output_latency_scale": 1000,
+    "src_commit_hash": "new_transform",
+    "stats_file_name": "stats.json",
+    "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
+    "base_mounted_fs_path": "/mnt/extra",
+    "base_remote_bin_directory_nfs": "/users/akalaba/IOCL",
+    "base_remote_exp_directory": "/mnt/extra/experiments",
+    "bin_directory_name": "bin",
+    "client_bin_name": "benchmark",
+    "client_name_format_str": "%s",
+    "emulab_user": "root",
+    "max_bandwidth": "10gibps",
+    "max_file_descriptors": 1000000,
+    "max_retries": 1,
+    "num_experiment_runs": 1,
+    "out_directory_name": "out",
+    "server_bin_name": "server",
+    "src_directory": "/users/akalaba/IOCL/src",
+    "make_collect_bins": [
+      "store/benchmark/async/benchmark",
+      "store/server"
+    ],
+    "make_clean": false,
+    "remote_bin_directory_nfs_enabled": false,
+    "client_combine_ro_ops": [
+      "get_timeline"
+    ],
+    "client_combine_stats_blacklist": [],
+    "client_stats_blacklist": [],
+    "client_cdf_plot_blacklist": [],
+    "make_env": {},
+    "server_rdma_port": 9087,
+    "rxe_cfg_path": "",
+    "client_read_percentage": 1000,
+    "client_write_percentage": 0,
+    "client_conflict_percentage": 2,
+    "client_max_processors": 2,
+    "client_random_coordinator": false,
+    "client_rmw_percentage": 0,
+    "client_zipfian_s": 2,
+    "client_zipfian_v": 1,
+    "use_master": false,
+    "master_bin_name": "master",
+    "master_port": 7077,
+    "master_server_name": "california",
+    "client_disable_gc": true,
+    "server_disable_gc": true,
+    "server_cpuprofile": false,
+    "server_durable": false,
+    "server_rpc_port": 8087,
+    "client_gc_debug_trace": false,
+    "client_cpuprofile": false,
+    "server_gc_debug_trace": false,
+    "COMMENT<partitioner>": "load_balanced",
+    "client_zipf_coefficient": 1.2
+}
