@@ -1101,36 +1101,47 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
 void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, uint64_t commandId)
 {
     std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
-    if (replies_map_.find(commandId) != replies_map_.end())
-    {
-        std::cerr << "[AsynchRequestCallback] WARNING: Duplicate response for commandId=" << commandId << std::endl;
-    }
-    replies_map_[commandId] = retval;
-    Debug("And the replies map size is %lu", replies_map_.size());
-    Debug("It looks like ");
-    for (auto const& pair : replies_map_) {
-        Debug("commandId %d is in the replies map", pair.first);
-    }
 
-    auto efd_it = efd_map_.find(commandId);
-    if (efd_it != efd_map_.end()) {
-        int efd = efd_it->second;
-        // std::cerr << "[AsynchRequestCallback] Found efd=" << efd << " for commandId=" << commandId << std::endl;
-        
-        // Verify the efd is still valid
-        int flags = fcntl(efd, F_GETFD);
-        if (flags == -1) {
-            std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd << " is no longer valid!" << std::endl;
+    int efd_to_signal = -1;
+
+    {
+        std::lock_guard<std::mutex> lock(replies_mutex_);
+
+        if (replies_map_.find(commandId) != replies_map_.end())
+        {
+            std::cerr << "[AsynchRequestCallback] WARNING: Duplicate response for commandId=" << commandId << std::endl;
+        }
+        replies_map_[commandId] = retval;
+        Debug("And the replies map size is %lu", replies_map_.size());
+        Debug("It looks like ");
+        for (auto const& pair : replies_map_) {
+            Debug("commandId %d is in the replies map", pair.first);
+        }
+
+        auto efd_it = efd_map_.find(commandId);
+        if (efd_it != efd_map_.end()) {
+            efd_to_signal = efd_it->second;
+            // std::cerr << "[AsynchRequestCallback] Found efd=" << efd_to_signal << " for commandId=" << commandId << std::endl;
             efd_map_.erase(efd_it);
+        } else {
+            std::cerr << "[AsynchRequestCallback] No efd found for commandId=, but we have added the reply to the replies map!!" << commandId << std::endl;
+        }
+    }  // Lock released here
+
+    // Signal the efd outside the lock to avoid holding lock during I/O
+    if (efd_to_signal != -1) {
+        // Verify the efd is still valid
+        int flags = fcntl(efd_to_signal, F_GETFD);
+        if (flags == -1) {
+            std::cerr << "[AsynchRequestCallback] WARNING: efd " << efd_to_signal << " is no longer valid!" << std::endl;
             return;
         }
-        
-        efd_map_.erase(efd_it);
-        
+
         uint64_t val = 1;
-        ssize_t written = write(efd, &val, sizeof(val));
-    } else {
-        std::cerr << "[AsynchRequestCallback] No efd found for commandId=, but we have added the reply to the replies map!!" << commandId << std::endl;
+        ssize_t written = write(efd_to_signal, &val, sizeof(val));
+        if (written != sizeof(val)) {
+            std::cerr << "[AsynchRequestCallback] WARNING: Failed to write to efd " << efd_to_signal << std::endl;
+        }
     }
 }
 
@@ -1140,6 +1151,8 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
 
     // std::cout << "[AwaitAsynchResponse] Called with session_id=" << session_id
     //           << ", commandId=" << commandId << std::endl;
+
+    std::lock_guard<std::mutex> lock(replies_mutex_);
 
     // TODO need to increment the request id!!
     if (replies_map_.find(commandId) != replies_map_.end())
@@ -1162,8 +1175,9 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     }
     // Debug("response not available!");
     // //std::cout << "[AwaitAsynchResponse] No response yet for commandId=" << commandId << ", creating efd..." << std::endl;
-    
-    // Create the event file descriptor
+
+    // Create the event file descriptor WHILE HOLDING THE LOCK
+    // This prevents the callback from running between the check above and efd creation
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd == -1) {
         std::cout << "[AwaitAsynchResponse] Event EFD creation failed" << std::endl;
@@ -1174,7 +1188,7 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     // Log the created efd and the commandId it maps to
     // std::cout << "[AwaitAsynchResponse] Created efd=" << efd << " for commandId=" << commandId << std::endl;
 
-    // Map the efd to the commandId
+    // Map the efd to the commandId WHILE HOLDING THE LOCK
     efd_map_[commandId] = efd;
     Debug("making an efd! it has value %d and is mapped to commandId %d", efd, commandId);
     Debug("the side of the efd_map_ is %lu", efd_map_.size());
@@ -1186,5 +1200,6 @@ std::tuple<Value, uint64_t> BenchmarkClient::AwaitAsynchResponse(const uint64_t 
     }
 
     // Return the Value object and the efd
+    // Lock is released here - now callback can safely find and signal the efd
     return std::make_tuple(Value{}, efd);
 }

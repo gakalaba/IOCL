@@ -30,6 +30,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <random>
 #include <unordered_map>
 #include <vector>
@@ -271,6 +272,7 @@ private:
     bool isTransformed;
     std::unordered_map<uint64_t, request_utils::Value> replies_map_;
     std::unordered_map<uint64_t, int> efd_map_;
+    std::mutex replies_mutex_;  // Protects replies_map_ and efd_map_
 
     // Own the transport to ensure it outlives the client
     // The transport_ reference above points to this owned object
