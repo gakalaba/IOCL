@@ -1094,13 +1094,13 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
         Panic("NOT YET SUPPORTEDunsupported operation type");
     }
     auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb);
-    std::cerr << "[SendAsynchRequest] Sent request, commandId=" << commandId << std::endl;
+    
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }
 
 void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, uint64_t commandId)
 {
-    std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
+   // std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
 
     int efd_to_signal = -1;
 
@@ -1124,7 +1124,7 @@ void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int sta
             // std::cerr << "[AsynchRequestCallback] Found efd=" << efd_to_signal << " for commandId=" << commandId << std::endl;
             efd_map_.erase(efd_it);
         } else {
-            std::cerr << "[AsynchRequestCallback] No efd found for commandId=, but we have added the reply to the replies map!!" << commandId << std::endl;
+           // std::cerr << "[AsynchRequestCallback] No efd found for commandId=, but we have added the reply to the replies map!!" << commandId << std::endl;
         }
     }  // Lock released here
 
