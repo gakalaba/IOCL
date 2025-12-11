@@ -212,7 +212,7 @@ private:
                             int status, const std::string &retval);
     void AsynchOperationCallback(const uint64_t session_id,
                                int status, const request_utils::Value retval,
-                               int commandId);
+                               uint64_t commandId);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
     void EndAppRequestCallback(const uint64_t session_id);

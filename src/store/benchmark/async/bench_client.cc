@@ -1098,7 +1098,7 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }
 
-void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, int commandId)
+void BenchmarkClient::AsynchOperationCallback(const uint64_t session_id, int status, const request_utils::Value retval, uint64_t commandId)
 {
     std::cerr << "[AsynchRequestCallback] Called with commandId=" << commandId << std::endl;
     if (replies_map_.find(commandId) != replies_map_.end())

@@ -790,7 +790,7 @@ namespace strongstore
 
         auto rcb1 = [this, trcb, isIOCL,
                     session = std::ref(session)](uint64_t s, request_utils::Value retval,
-                                                int tid, const std::vector<std::pair<uint64_t, uint32_t>> &p)
+                                                uint64_t tid, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             std::cerr << "[Client::SendAsynchRequest::rcb1] Callback for tid=" << tid << std::endl;
             session.get().set_executing();
