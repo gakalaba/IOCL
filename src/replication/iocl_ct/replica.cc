@@ -1018,8 +1018,8 @@ namespace replication
 
                     /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
                     perKeySubqueues[entry->intkey].insert(entry);
-                    /* Code Instrumentation ! */
-                    perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
+                    // /* Code Instrumentation ! */
+                    // perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
