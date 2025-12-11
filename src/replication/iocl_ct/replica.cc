@@ -923,12 +923,17 @@ namespace replication
                 PredecessorFinalMessage predFinal;
                 predFinal.set_p(head->myShardTag);
                 predFinal.set_shardidx(groupIdx);
-                for (const auto& succ : head->successors) {
-                    predFinal.set_s(succ.first);
-                    if (!(transport->SendMessageToReplica(this, succ.second, 0, predFinal)))
+                for (const auto& kv : head->successors) {
+                    if (kv.second > 0) {
+                        continue;
+                    }
+                    predFinal.set_s(kv.first.first);
+                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, predFinal)))
                     {
                         RWarning("Failed to send SuccessorRequest message to client");
                     }
+                    // Mark that we've sent to this successor
+                    head->successors[kv.first] = 1;
                 }
 
                 /* Assign it a real opnum for this view in the ordered log */
@@ -1038,7 +1043,7 @@ namespace replication
                             auto succ_it = entry->successors.find({succ.s(), succ.shardidx()});
                             if (succ_it == entry->successors.end()) {
                                 // Map the successor shardtag to its shardidx
-                                entry->successors.emplace(succ.s(), succ.shardidx());
+                                entry->successors.emplace(std::make_pair(succ.s(), succ.shardidx()), 0);
                             } else {
                                 Warning("Duplicate successor request received for successor %lu on shard %lu", succ.s(), succ.shardidx());
                             }
@@ -1439,7 +1444,7 @@ namespace replication
 
             auto succ_it = entry->successors.find({msg.s(), msg.shardidx()});
             if (succ_it == entry->successors.end()) {
-                entry->successors.emplace(msg.s(), msg.shardidx());
+                entry->successors.emplace(std::make_pair(msg.s(), msg.shardidx()), 0);
             } else {
                 Warning("Duplicate successor request received for successor %lu on shard %lu", msg.s(), msg.shardidx());
             }
@@ -1450,6 +1455,7 @@ namespace replication
                 predFinal.set_p(entry->myShardTag);
                 predFinal.set_s(msg.s());
                 predFinal.set_shardidx(groupIdx);
+                entry->successors[{msg.s(), msg.shardidx()}] = 1; // Mark that we've sent final ACK to this successor
                 if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, predFinal)))
                 {
                     RWarning("Failed to send SuccessorRequest message to client");
