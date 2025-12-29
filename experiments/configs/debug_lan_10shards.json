@@ -1,15 +1,27 @@
 {
   "experiment_independent_vars": [
     [
-      "consistency", "replication_protocol", "client_protocol_mode"
+      "consistency",
+      "replication_protocol",
+      "client_protocol_mode",
+      "client_total",
+      "client_processes_per_client_node"
     ],
     [
       "client_total",
       "client_processes_per_client_node"
     ]
   ],
-  "replication_protocol": ["iocl_ct", "vr", "strong"],
-  "client_protocol_mode": ["iocl_ct", "vr", "span-lock"],
+  "replication_protocol": [
+    "iocl_ct",
+    "vr",
+    "strong"
+  ],
+  "client_protocol_mode": [
+    "iocl_ct",
+    "vr",
+    "span-lock"
+  ],
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
@@ -19,10 +31,13 @@
     "us-west-1-2",
     "eu-west-1-0",
     "eu-west-1-1",
-    "eu-west-1-2"
+    "eu-west-1-2",
+    "mex-cent-1-0"
   ],
   "consistency": [
-    "lin", "lin", "ss"
+    "lin",
+    "lin",
+    "ss"
   ],
   "num_instances": 1,
   "shard_config": "shard.config",
@@ -30,81 +45,131 @@
   "network_config": "network.json",
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
-  "fault_tolerance": 1,
-  "num_shards": 9,
+  "fault_tolerance": 2,
+  "num_shards": 10,
   "shards": [
     [
       "us-east-1-0",
-      "us-east-1-1",
-      "us-east-1-2"
-    ],
-    [
-      "us-west-1-0",
+      "us-east-1-2",
       "us-west-1-1",
-      "us-west-1-2"
-    ],
-    [
       "eu-west-1-0",
-      "eu-west-1-1",
       "eu-west-1-2"
     ],
     [
       "us-east-1-1",
-      "us-east-1-2",
-      "us-east-1-0"
-    ],
-    [
-      "us-west-1-1",
+      "us-west-1-0",
       "us-west-1-2",
-      "us-west-1-0"
-    ],
-    [
       "eu-west-1-1",
-      "eu-west-1-2",
-      "eu-west-1-0"
+      "mex-cent-1-0"
     ],
     [
       "us-east-1-2",
       "us-east-1-0",
-      "us-east-1-1"
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
     ],
     [
       "us-west-1-2",
+      "us-east-1-1",
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
       "us-west-1-0",
-      "us-west-1-1"
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
     ],
     [
       "eu-west-1-2",
-      "eu-west-1-0",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
       "eu-west-1-1"
     ]
   ],
   "client_total": [
-    1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ],
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ],
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ]
   ],
   "client_processes_per_client_node": [
-    1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ],
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ],
+    [
+      1, 2, 3, 4, 8, 12, 16, 20, 24, 32, 64, 128
+    ]
   ],
   "client_threads_per_process": 1,
   "clients": [
     "client-0-0"
   ],
   "server_regions": {
-    "us-east-1": [
+    "ca": [
       "us-east-1-0",
-      "us-west-1-0",
-      "eu-west-1-0",
+      "us-east-1-1",
       "client-0-0"
     ],
-    "eu-west-1": [
-      "us-east-1-1",
-      "us-west-1-1",
-      "eu-west-1-1"
-    ],
-    "us-west-1": [
+    "va": [
       "us-east-1-2",
+      "us-west-1-0",
+      "client-1-0"
+    ],
+    "ir": [
+      "us-west-1-1",
       "us-west-1-2",
-      "eu-west-1-2"
+      "client-2-0"
+    ],
+    "or": [
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "client-3-0"
+    ],
+    "jp": [
+      "eu-west-1-2",
+      "mex-cent-1-0",
+      "client-4-0"
     ]
   },
   "server_port": 7087,
@@ -117,7 +182,6 @@
   "client_wo_replacement": true,
   "client_fanout": 1,
   "client_issue_concurrent": true,
-  "client_zipf_coefficient": 1.4,
   "rw_num_ops_txn": 1,
   "server_load_time": 20,
   "server_preload_keys": true,
@@ -167,7 +231,7 @@
     9,
     10,
     11,
-    12, 
+    12,
     13,
     14,
     15
@@ -176,62 +240,49 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 30,
+  "client_experiment_length": 14,
   "client_rand_sleep": 0,
-  "client_ramp_down": 8,
-  "client_ramp_up": 7,
+  "client_ramp_down": 4,
+  "client_ramp_up": 4,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "project_name": "praxis-pg0",
   "region_rtt_latencies": {
-    "us-east-1": {
-      "us-east-1": 0,
-      "eu-west-1": 73,
-      "ap-northeast-1": 160,
-      "us-west-1": 63,
-      "eu-central-1": 87,
-      "ap-southeast-2": 199
+    "ca": {
+      "ca": 0,
+      "va": 72,
+      "ir": 151,
+      "or": 59,
+      "jp": 113
     },
-    "eu-west-1": {
-      "us-east-1": 73,
-      "eu-west-1": 0,
-      "ap-northeast-1": 220,
-      "us-west-1": 145,
-      "eu-central-1": 26,
-      "ap-southeast-2": 255
+    "va": {
+      "ca": 72,
+      "va": 0,
+      "ir": 88,
+      "or": 93,
+      "jp": 162
     },
-    "ap-northeast-1": {
-      "us-east-1": 160,
-      "eu-west-1": 220,
-      "ap-northeast-1": 0,
-      "us-west-1": 115,
-      "eu-central-1": 243,
-      "ap-southeast-2": 106
+    "ir": {
+      "ca": 151,
+      "va": 88,
+      "ir": 0,
+      "or": 145,
+      "jp": 220
     },
-    "us-west-1": {
-      "us-east-1": 63,
-      "eu-west-1": 145,
-      "ap-northeast-1": 115,
-      "us-west-1": 0,
-      "eu-central-1": 148,
-      "ap-southeast-2": 139
+    "or": {
+      "ca": 59,
+      "va": 93,
+      "ir": 145,
+      "or": 0,
+      "jp": 121
     },
-    "eu-central-1": {
-      "us-east-1": 87,
-      "eu-west-1": 26,
-      "ap-northeast-1": 243,
-      "us-west-1": 148,
-      "eu-central-1": 0,
-      "ap-southeast-2": 177
-    },
-    "ap-southeast-2": {
-      "us-east-1": 199,
-      "eu-west-1": 255,
-      "ap-northeast-1": 106,
-      "us-west-1": 139,
-      "eu-central-1": 177,
-      "ap-southeast-2": 0
+    "jp": {
+      "ca": 113,
+      "va": 162,
+      "ir": 220,
+      "or": 121,
+      "jp": 0
     }
   },
   "server_emulate_wan": false,
@@ -336,7 +387,9 @@
   "server_cpuprofile": false,
   "server_durable": false,
   "server_rpc_port": 8087,
-  "client_gc_debug_trace": false,
+  "client_gc_debug_trace": false, 
   "client_cpuprofile": false,
-  "server_gc_debug_trace": false
+  "server_gc_debug_trace": false,
+  "COMMENTpartitioner": "load_balanced",
+  "client_zipf_coefficient": 1.2
 }
