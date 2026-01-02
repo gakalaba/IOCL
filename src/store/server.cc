@@ -44,7 +44,8 @@ enum protocol_t
     PROTO_UNKNOWN,
     PROTO_STRONG,
     PROTO_VR,
-    PROTO_IOCL_CT
+    PROTO_IOCL_CT,
+    PROTO_CRAQ
 };
 
 enum transmode_t
@@ -72,12 +73,13 @@ DEFINE_string(key_selector, "uniform",
 DEFINE_double(zipf_coefficient, 0.5, "the coefficient of the zipf distribution for key selection.");
 
 const std::string protocol_args[] = {
-    "strong", "vr", "iocl_ct"
+    "strong", "vr", "iocl_ct", "craq"
 };
 const protocol_t protos[]{
     PROTO_STRONG,
     PROTO_VR,
     PROTO_IOCL_CT,
+    PROTO_CRAQ,
 };
 static bool ValidateProtocol(const char *flagname, const std::string &value)
 {
@@ -375,6 +377,15 @@ int main(int argc, char **argv)
                                          tport, strongstore::LinearizableProtocol::PROTO_VR, FLAGS_debug_stats);
         break;
     }
+    case PROTO_CRAQ:
+    {
+        Debug("Making application request strongstore server using CRAQ --> FIXME but for now just creating VR server");
+        server = new strongstore::Server(consistency, shard_config,
+                                         replica_config, FLAGS_server_id,
+                                         FLAGS_group_idx, FLAGS_replica_idx,
+                                         tport, strongstore::LinearizableProtocol::PROTO_VR, FLAGS_debug_stats);
+        break;
+    }
     default:
     {
         NOT_REACHABLE();
@@ -513,6 +524,15 @@ int main(int argc, char **argv)
     {
         Debug("Making linearizable (IOCL_CT) replica");
         replica = new replication::iocl_ct::IOCL_CTReplica(
+            replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
+            dynamic_cast<replication::AppReplica *>(server),
+            FLAGS_debug_stats);
+        break;
+    }
+    case PROTO_CRAQ:
+    {
+        Debug("Making linearizable (CRAQ) replica --> FIXME for now just making VR replica");
+        replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
