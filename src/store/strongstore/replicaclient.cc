@@ -56,6 +56,10 @@ namespace strongstore
                 client = new replication::iocl_ct::IOCL_CTClient(config_, transport_, shard_idx_,
                                                             client_id_);
                 break;
+            case LinearizableProtocol::PROTO_CRAQ:
+                client = new replication::craq::CRAQClient(config_, transport_, shard_idx_,
+                                                    client_id_);
+                break;
             default:
                 Panic("Invalid linearizable protocol");
         }

@@ -383,7 +383,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, strongstore::LinearizableProtocol::PROTO_VR, FLAGS_debug_stats);
+                                         tport, strongstore::LinearizableProtocol::PROTO_CRAQ, FLAGS_debug_stats);
         break;
     }
     default:
@@ -532,7 +532,7 @@ int main(int argc, char **argv)
     case PROTO_CRAQ:
     {
         Debug("Making linearizable (CRAQ) replica --> FIXME for now just making VR replica");
-        replica = new replication::vr::VRReplica(
+        replica = new replication::craq::CRAQReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
