@@ -78,6 +78,7 @@ namespace replication
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
             const uint64_t intkey;
+            bool replicate;
             std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> finalAcks; // tracking all unique final ACKs from predecessors
             std::unordered_map<std::pair<uint64_t,int32_t>, int, PairHash> successors; // keep track of all your successors to send the final ACK! (shardtag -> shardidx)
             // string hash;

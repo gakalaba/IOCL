@@ -535,6 +535,7 @@ namespace replication
                 //     Warning("TO DELETE!!!!!!!! ts_chain predlist[%d] = %lu", idx, ts_chain->predlist(idx));
                 // }
             }
+
             lastPrepare = p;
 
             if (!(transport->SendMessageToAll(this, p)))
@@ -724,8 +725,6 @@ namespace replication
             string res;
             LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
 
-            // Check whether this request should be committed to replicas
-            ASSERT(replicate);
             Request request;
             request.set_op(res);
             request.set_clientid(msg.req().clientid());
@@ -756,12 +755,13 @@ namespace replication
                 Panic("ok");
             }
             IoclEntry *entryPtr = it->second.get();
+
             // Grab the msg.predlist() efficiently and store
             entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
             entryPtr->predecessorArrivalTs.resize(entryPtr->predList.predlist_size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
-            unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            if (replicate) unorderedBagByOpnum.emplace(v.opnum, entryPtr);
 
             /* Go through any outstanding predecessor replies and add them in */
             auto pit = outstandingCoordinationResps.find(shardtag);
@@ -792,6 +792,59 @@ namespace replication
                 outstandingCoordinationFinals.erase(fit);
             }
 
+            // Check whether this request should be committed to replicas
+            if (!replicate)
+            {
+                entryPtr->replicate = false;
+                RDebug("Not replicating to replicas");
+
+
+                /* Progress state to Persisted */
+                entryPtr->state = IOCL_STATE_PERSISTED;
+
+                /* Assign Arrival Timestamp */
+                auto ts_it = lastReadyTS.find(entryPtr->intkey);
+                uint64_t ts = (ts_it == lastReadyTS.end()) ? 0 : ts_it->second;
+                entryPtr->arrivalTs = std::max(shardTS, ts);
+                entryPtr->finalTs = entryPtr->arrivalTs; // will be updated later
+                shardTS++;
+
+                /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                perKeySubqueues[entryPtr->intkey].insert(entryPtr);
+
+                auto it = outstandingCoordinationReqs.find(entryPtr->myShardTag);
+                if (it != outstandingCoordinationReqs.end()) {
+                    PredecessorReplyMessage preply;
+                    preply.set_arrivalts(entryPtr->arrivalTs);
+                    for (const auto& succ : it->second) {
+                        preply.set_s(succ.s());
+                        preply.set_predidx(succ.predidx());
+                        if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, preply)))
+                        {
+                            RWarning("Failed to send SuccessorReply message to client");
+                        }
+                        /* And save the successor ! */
+                        auto succ_it = entryPtr->successors.find({succ.s(), succ.shardidx()});
+                        if (succ_it == entryPtr->successors.end()) {
+                            // Map the successor shardtag to its shardidx
+                            entryPtr->successors.emplace(std::make_pair(succ.s(), succ.shardidx()), 0);
+                        } else {
+                            Warning("Duplicate successor request received for successor %lu on shard %lu", succ.s(), succ.shardidx());
+                        }
+                    }
+                    outstandingCoordinationReqs.erase(it);
+                }
+                
+                if (entryPtr->state == IOCL_STATE_PERSISTED &&
+                        entryPtr->ACKs == entryPtr->predList.predlist_size()) {
+                    /* Now can progress to READY state */
+                    ReadyRoutine(entryPtr);
+                }
+                return;
+            } else {
+                entryPtr->replicate = true;
+                RDebug("Replicating to replicas");
+            }
 
             if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
             {
@@ -947,6 +1000,39 @@ namespace replication
 
                 /* Add the request to my log */
                 AppendToLog(head);
+                if (!(head->replicate))
+                {
+                    const Request request = head->request;
+
+                    /* Mark it as committed */
+                    head->state = IOCL_STATE_COMMITTED;
+
+                    /* If there are other ops that haven't received their 
+                    N final ACKs, then this op must block behind them.
+                    Similarly, if there is no sublog, but this op hasn't
+                    received all N final ACKs, insert it to the sublog and
+                    do NOT execute it (for now replicas do, since we don't
+                    track acks there, and i don't want to implement the final
+                    ACK probably via piggybacking mechanism)*/ 
+                    if ((perKeySubLogs.find(head->intkey) != perKeySubLogs.end()) || 
+                        (AmLeader() && (head->finalAcks.size() != head->predList.predlist_size()))) {
+                        // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
+                        //         lastCommitted, head->finalAcks.size(), head->predList.predlist_size());
+                        if (head->finalAcks.size() > head->predList.predlist_size()) {
+                            Panic("Should not be getting more final ACKs than predecessors?");
+                        }
+                        // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
+                        auto &vec = perKeySubLogs[head->intkey];
+                        vec.push_back(lastCommitted);
+                        return;
+                    }
+                    ASSERT(head->finalAcks.size() == head->predList.predlist_size());
+                    ASSERT(perKeySubLogs.find(head->intkey) == perKeySubLogs.end());
+
+                    /* Execute it */
+                    ReadyFinalRoutine(head);
+                    return;
+                }
 
                 if (lastOp - lastBatchEnd + 1 > batchSize)
                 {

@@ -48,7 +48,7 @@ namespace strongstore
                    const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, const TrueTime &tt, bool debug_stats)
+                   Transport *transport, const TrueTime &tt, bool replicate, bool debug_stats)
         : PingServer(transport),
           tt_{tt},
           transactions_{shard_idx, consistency, tt_},
@@ -60,6 +60,7 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           consistency_{consistency},
+          do_replication{replicate},
           debug_stats_{debug_stats}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
@@ -85,7 +86,7 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, LinearizableProtocol linproto, bool debug_stats)
+                   Transport *transport, LinearizableProtocol linproto, bool replicate, bool debug_stats)
         : PingServer(transport),
           tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -97,7 +98,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency}
+          consistency_{consistency},
+          do_replication{replicate}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -1810,7 +1812,8 @@ namespace strongstore
             case strongstore::proto::Request::PREPARE:
             case strongstore::proto::Request::COMMIT:
             case strongstore::proto::Request::ABORT:
-                replicate = true;
+                replicate = do_replication;
+                Notice("DELETEME replicate = %d", replicate);
                 response = op;
                 break;
             default:
@@ -1818,7 +1821,8 @@ namespace strongstore
             }
         } else {
             linreq.ParseFromString(op);
-            replicate = true;
+            replicate = do_replication;
+            Notice("DELETEME replicate = %d", replicate);
             response = op;
             Debug("was able to parse LinearizeableOperation!");
         }

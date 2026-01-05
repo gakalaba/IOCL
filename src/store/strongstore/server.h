@@ -114,11 +114,11 @@ namespace strongstore
                const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport, const TrueTime &tt,
-               bool debug_stats);
+               bool replicate, bool debug_stats);
         Server(Consistency consistency, const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,
                int groupIdx, int idx, Transport *transport, LinearizableProtocol linproto,
-               bool debug_stats);
+               bool replicate, bool debug_stats);
         ~Server();
 
         // Override TransportReceiver
@@ -347,6 +347,8 @@ namespace strongstore
         bool debug_stats_;
 
         uint64_t expected_fire_us;
+
+        bool do_replication;
     };
 
 } // namespace strongstore
