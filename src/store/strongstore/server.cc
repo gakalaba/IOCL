@@ -1813,7 +1813,6 @@ namespace strongstore
             case strongstore::proto::Request::COMMIT:
             case strongstore::proto::Request::ABORT:
                 replicate = do_replication;
-                Notice("DELETEME replicate = %d", replicate);
                 response = op;
                 break;
             default:
@@ -1822,7 +1821,6 @@ namespace strongstore
         } else {
             linreq.ParseFromString(op);
             replicate = do_replication;
-            Notice("DELETEME replicate = %d", replicate);
             response = op;
             Debug("was able to parse LinearizeableOperation!");
         }

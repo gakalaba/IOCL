@@ -529,14 +529,24 @@ namespace replication
             LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
             ClientTableEntry &cte = clientTable[msg.req().clientid()];
 
+            Request request;
+            request.set_op(res);
+            request.set_clientid(msg.req().clientid());
+            request.set_clientreqid(msg.req().clientreqid());
+
+            /* Assign it an opnum */
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+
             // Check whether this request should be committed to replicas
             if (!replicate)
             {
                 RDebug("Not replicating to replicas");
                 ReplyMessage reply;
-                reply.set_reply(res);
-                reply.set_view(0);
-                reply.set_opnum(0);
+                Execute(v.opnum, request, reply);
+                reply.set_view(v.view);
+                reply.set_opnum(v.opnum);
                 reply.set_clientreqid(msg.req().clientreqid());
                 cte.replied = true;
                 cte.reply = reply;
@@ -544,15 +554,6 @@ namespace replication
             }
             else
             {
-                Request request;
-                request.set_op(res);
-                request.set_clientid(msg.req().clientid());
-                request.set_clientreqid(msg.req().clientreqid());
-
-                /* Assign it an opnum */
-                ++this->lastOp;
-                v.view = this->view;
-                v.opnum = this->lastOp;
 
                 RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
