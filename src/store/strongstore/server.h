@@ -39,6 +39,8 @@
 
 #include "lib/latency.h"
 #include "lib/transport.h"
+#include "replication/craq/client.h"
+#include "replication/craq/replica.h"
 #include "replication/vr/client.h"
 #include "replication/vr/replica.h"
 #include "replication/iocl_ct/client.h"
