@@ -86,11 +86,11 @@ namespace replication
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
             QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
 
-            Timeout *viewChangeTimeout;
-            Timeout *nullCommitTimeout;
-            Timeout *stateTransferTimeout;
-            Timeout *resendPrepareTimeout;
-            Timeout *closeBatchTimeout;
+            // Timeout *viewChangeTimeout;
+            // Timeout *nullCommitTimeout;
+            // Timeout *stateTransferTimeout;
+            // Timeout *resendPrepareTimeout;
+            // Timeout *closeBatchTimeout;
 
             Latency_t rec_to_upcall_lat_;
             Latency_t upcall_to_exec_lat_;

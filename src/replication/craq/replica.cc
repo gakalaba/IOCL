@@ -77,32 +77,32 @@ namespace replication
                 Notice("Batching enabled; batch size %d", batchSize);
             }
 
-            this->viewChangeTimeout =
-                new Timeout(transport, 5000, [this]()
-                            { StartViewChange(view + 1); });
-            this->nullCommitTimeout =
-                new Timeout(transport, 1000, [this]()
-                            { SendNullCommit(); });
-            this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
-                                                     {
-        this->lastRequestStateTransferView = 0;
-        this->lastRequestStateTransferOpnum = 0; });
-            this->stateTransferTimeout->Start();
-            this->resendPrepareTimeout =
-                new Timeout(transport, 500, [this]()
-                            { ResendPrepare(); });
-            this->closeBatchTimeout =
-                new Timeout(transport, 300, [this]()
-                            { CloseBatch(); });
+        //     this->viewChangeTimeout =
+        //         new Timeout(transport, 5000, [this]()
+        //                     { StartViewChange(view + 1); });
+        //     this->nullCommitTimeout =
+        //         new Timeout(transport, 1000, [this]()
+        //                     { SendNullCommit(); });
+        //     this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
+        //                                              {
+        // this->lastRequestStateTransferView = 0;
+        // this->lastRequestStateTransferOpnum = 0; });
+        //     this->stateTransferTimeout->Start();
+        //     this->resendPrepareTimeout =
+        //         new Timeout(transport, 500, [this]()
+        //                     { ResendPrepare(); });
+        //     this->closeBatchTimeout =
+        //         new Timeout(transport, 300, [this]()
+        //                     { CloseBatch(); });
 
-            if (AmLeader())
-            {
-                nullCommitTimeout->Start();
-            }
-            else
-            {
-                viewChangeTimeout->Start();
-            }
+            // if (AmLeader())
+            // {
+            //     nullCommitTimeout->Start();
+            // }
+            // else
+            // {
+            //     viewChangeTimeout->Start();
+            // }
 
             if (debug_stats_)
             {
@@ -114,11 +114,11 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            delete viewChangeTimeout;
-            delete nullCommitTimeout;
-            delete stateTransferTimeout;
-            delete resendPrepareTimeout;
-            delete closeBatchTimeout;
+            // delete viewChangeTimeout;
+            // delete nullCommitTimeout;
+            // delete stateTransferTimeout;
+            // delete resendPrepareTimeout;
+            // delete closeBatchTimeout;
 
             if (debug_stats_)
             {
@@ -262,18 +262,18 @@ namespace replication
             status = STATUS_NORMAL;
             lastBatchEnd = lastOp;
 
-            if (AmLeader())
-            {
-                viewChangeTimeout->Stop();
-                nullCommitTimeout->Start();
-            }
-            else
-            {
-                viewChangeTimeout->Start();
-                nullCommitTimeout->Stop();
-                resendPrepareTimeout->Stop();
-                closeBatchTimeout->Stop();
-            }
+            // if (AmLeader())
+            // {
+            //     viewChangeTimeout->Stop();
+            //     nullCommitTimeout->Start();
+            // }
+            // else
+            // {
+            //     viewChangeTimeout->Start();
+            //     nullCommitTimeout->Stop();
+            //     resendPrepareTimeout->Stop();
+            //     closeBatchTimeout->Stop();
+            // }
 
             prepareOKQuorum.Clear();
             startViewChangeQuorum.Clear();
@@ -287,10 +287,10 @@ namespace replication
             view = newview;
             status = STATUS_VIEW_CHANGE;
 
-            viewChangeTimeout->Reset();
-            nullCommitTimeout->Stop();
-            resendPrepareTimeout->Stop();
-            closeBatchTimeout->Stop();
+            // viewChangeTimeout->Reset();
+            // nullCommitTimeout->Stop();
+            // resendPrepareTimeout->Stop();
+            // closeBatchTimeout->Stop();
 
             StartViewChangeMessage m;
             m.set_view(newview);
@@ -317,7 +317,7 @@ namespace replication
                 RWarning("Failed to send null COMMIT message to all replicas");
             }
 
-            nullCommitTimeout->Reset();
+            // nullCommitTimeout->Reset();
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -349,7 +349,7 @@ namespace replication
                 RWarning("Failed to ressend prepare message to all replicas");
             }
             // Keep retrying
-            resendPrepareTimeout->Reset();
+            // resendPrepareTimeout->Reset();
         }
 
         void CRAQReplica::CloseBatch()
@@ -384,8 +384,8 @@ namespace replication
             }
             lastBatchEnd = lastOp;
 
-            resendPrepareTimeout->Reset();
-            closeBatchTimeout->Stop();
+            // resendPrepareTimeout->Reset();
+            // closeBatchTimeout->Stop();
         }
 
         void CRAQReplica::ReceiveMessage(const TransportAddress &remote,
@@ -566,13 +566,13 @@ namespace replication
                 else
                 {
                     RDebug("Keeping in batch");
-                    if (!closeBatchTimeout->Active())
-                    {
-                        closeBatchTimeout->Start();
-                    }
+                    // if (!closeBatchTimeout->Active())
+                    // {
+                    //     closeBatchTimeout->Start();
+                    // }
                 }
 
-                nullCommitTimeout->Reset();
+                // nullCommitTimeout->Reset();
             }
         }
 
@@ -633,7 +633,7 @@ namespace replication
             ASSERT((msg.opnum() - msg.batchstart() + 1) ==
                    (unsigned int)msg.request_size());
 
-            viewChangeTimeout->Reset();
+            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -752,7 +752,7 @@ namespace replication
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
 
-                nullCommitTimeout->Reset();
+                // nullCommitTimeout->Reset();
             }
         }
 
@@ -784,7 +784,7 @@ namespace replication
                 RPanic("Unexpected COMMIT: I'm the leader of this view");
             }
 
-            viewChangeTimeout->Reset();
+            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastCommitted)
             {
