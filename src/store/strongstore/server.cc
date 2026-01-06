@@ -103,10 +103,10 @@ namespace strongstore
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
-        /*for (int i = 0; i < shard_config_.g; i++)
+        for (int i = 0; i < shard_config_.g; i++)
         {
             shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i));
-        }*/
+        }
 
         replica_client_ =
             new ReplicaClient(linproto, replica_config_, transport_, server_id_, shard_idx_);
@@ -315,6 +315,7 @@ namespace strongstore
 
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
+        Notice("        (C) Received op on server side %lu", now_us());
         Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
@@ -1725,6 +1726,7 @@ namespace strongstore
         op_reply_.set_return_value(retval);
         op_reply_.set_transaction_id(transaction_id);
 
+        Notice("        (G) Sending REPLY on Wire %lu", now_us());
         transport_->SendMessage(this, *remote, op_reply_);
 
         delete remote;
@@ -2032,7 +2034,10 @@ namespace strongstore
 
         PendingOperationReply *pending_reply = search->second;
         pending_operation_replies_.erase(search);
-        transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
+        Notice("            (F) Adding response routine to event queue now %lu", now_us());
+        // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
+
+        RespondToClientOperation(pending_reply, transaction_id, status, retval);
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

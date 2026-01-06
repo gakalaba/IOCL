@@ -40,6 +40,8 @@
 #include "lib/transport.h"
 #include "store/strongstore/client.h"
 
+#include "store/common/backend/timingdebug.h"
+
 DEFINE_LATENCY(op);
 
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
@@ -176,6 +178,7 @@ void BenchmarkClient::SendNext()
 void BenchmarkClient::SendNextAppRequest()
 {
     n_sessions_started_++;
+    Notice("(A) Start of AppReq %lu", now_us());
     Debug("[%d] SendNextAppRequest", n_sessions_started_);
 
     std::size_t client_index = n_sessions_started_ % clients_.size();
@@ -256,6 +259,7 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
 
 void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
 {
+    Notice("(A) Start of AppReq %lu", now_us());
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
     auto &ss = search->second;
@@ -526,6 +530,8 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
     ss.incr_responses();
     Debug("current number of responses recieved = %lu, looking for %lu", ss.responses(), ss.fanout());
 
+    // END OF APPREQUEST
+    Notice("(I) End of AppReq %lu", now_us());
     if (status == REPLY_OK)
     {
         if (ss.responses() == ss.fanout())
@@ -849,7 +855,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
         BenchState state = GetBenchState(diff);
         if ((state == COOL_DOWN || state == DONE) && !cooldownStarted)
         {
-            Debug("Starting cooldown after %ld seconds.", diff.tv_sec);
+            Notice("Starting cooldown after %ld seconds.", diff.tv_sec);
             Finish();
         }
         else

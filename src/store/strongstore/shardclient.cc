@@ -27,6 +27,7 @@
  **********************************************************************/
 #include "store/strongstore/shardclient.h"
 #include "store/common/iocl_utils.h"
+#include "store/common/backend/timingdebug.h"
 
 #include "lib/configuration.h"
 
@@ -342,12 +343,14 @@ namespace strongstore
         }
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
+        Notice("    (B) Sending on wire %lu", now_us());
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
     // IOCL receive the response
     void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
+        Notice("    (H) Got the reply NOW %lu", now_us());
         Debug("shard client got LinearizeableReply!");
         uint64_t req_id = reply.rid().client_req_id();
         Debug("the app_request_id = %lu", req_id);

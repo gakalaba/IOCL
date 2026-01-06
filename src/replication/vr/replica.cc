@@ -40,6 +40,7 @@
 #include "lib/transport.h"
 #include "replication/vr/replica.h"
 #include "replication/vr/vr-proto.pb.h"
+#include "store/common/backend/timingdebug.h"
 
 #define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
@@ -406,6 +407,7 @@ namespace replication
             if (type == request.GetTypeName())
             {
                 request.ParseFromString(data);
+                Notice("                (E) Received Op On Leader Replica %lu", now_us());
                 HandleRequest(remote, request);
             }
             else if (type == unloggedRequest.GetTypeName())

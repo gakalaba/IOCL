@@ -41,6 +41,7 @@
 #include "lib/transport.h"
 #include "replication/iocl_ct/replica.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
+#include "store/common/backend/timingdebug.h"
 
 #define RDebug(fmt, ...) Debug("[%d] " fmt, myIdx, ##__VA_ARGS__)
 #define RNotice(fmt, ...) Notice("[%d] " fmt, myIdx, ##__VA_ARGS__)
@@ -573,6 +574,7 @@ namespace replication
             {
                 // Request arrived -- issue unordered prepare
                 request.ParseFromString(data);
+                Notice("                (E) Received Op on Leader Replica %lu", now_us());
                 HandleRequest(remote, request);
             }
             else if (type == coordReq.GetTypeName())

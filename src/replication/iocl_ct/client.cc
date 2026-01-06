@@ -40,6 +40,7 @@
 #include "replication/common/request.pb.h"
 #include "replication/iocl_ct/client.h"
 #include "replication/iocl_ct/iocl_ct-proto.pb.h"
+#include "store/common/backend/timingdebug.h"
 
 namespace replication
 {
@@ -75,6 +76,7 @@ namespace replication
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
+            Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
 
             Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
                   msg.shardtag(), msg.predlist().size());
