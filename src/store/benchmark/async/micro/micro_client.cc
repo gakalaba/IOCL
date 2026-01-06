@@ -59,7 +59,7 @@ namespace micro
           read_percentage_{read_percentage},
           wo_replacement_{wo_replacement},
           txn_idx_{0},
-          max_txns_per_client_{100000}
+          max_txns_per_client_{150000}
     {
         ASSERT(fanout > 0);
         allKeyIdxs.reserve(fanout * max_txns_per_client_);
