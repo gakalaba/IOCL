@@ -38,6 +38,7 @@
 #include "lib/configuration.h"
 #include "lib/transport.h"
 #include "replication/common/request.pb.h"
+#include "replication/common/replica.h"
 
 namespace replication {
 
@@ -71,9 +72,10 @@ class Client : public TransportReceiver {
 
     virtual void Invoke(const string &request, continuation_t continuation,
                         error_continuation_t error_continuation = nullptr) = 0;
-    virtual void InvokeIOCL(LinearizeableOperation &msg,
+    virtual void InvokeLinOp(LinearizeableOperation &msg,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation = nullptr);
+    virtual void SetReplica(Replica *replica) = 0;
     virtual void InvokeUnlogged(
         int replicaIdx, const string &request, continuation_t continuation,
         error_continuation_t error_continuation = nullptr,

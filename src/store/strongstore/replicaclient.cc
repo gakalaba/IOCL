@@ -63,6 +63,11 @@ namespace strongstore
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
+    void ReplicaClient::SetReplica(replication::Replica *replica)
+    {
+        client->SetReplica(replica);
+    }
+
     void ReplicaClient::SendOperation(uint64_t request_id,
                          replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
@@ -72,33 +77,15 @@ namespace strongstore
         Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
               msg.DebugString().c_str());
 
-        string request_str;
         uint64_t reqId = lastReqId++;
         PendingOperation *pendingOperation = new PendingOperation(reqId);
         pendingOperations[reqId] = pendingOperation;
         pendingOperation->ocb = ocb;
         pendingOperation->otcb = otcb;
-
-        switch (linproto_) {
-            case LinearizableProtocol::PROTO_VR:
-                // create request
-                Debug("Running VR: serializing LinearizeableOperation into string");
-                msg.SerializeToString(&request_str);
-                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
-
-                client->Invoke(
-                    request_str,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                        std::placeholders::_1, std::placeholders::_2));
-                break;
-            case LinearizableProtocol::PROTO_IOCL_CT:
-                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-                client->InvokeIOCL(
+        client->InvokeLinOp(
                     msg,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
-                break;
-        }
     }
 
     /* Callback from a shard replica on sendrequest operation completion. */

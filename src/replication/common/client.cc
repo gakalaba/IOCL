@@ -86,7 +86,7 @@ void Client::Close()
 {}
 
 void
-Client::InvokeIOCL(LinearizeableOperation &msg,
+Client::InvokeLinOp(LinearizeableOperation &msg,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation)
 {

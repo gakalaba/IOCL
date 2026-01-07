@@ -56,7 +56,7 @@ namespace replication
 
         VRReplica::VRReplica(transport::Configuration config, int groupIdx, int myIdx,
                              Transport *transport, unsigned int batchSize,
-                             AppReplica *app, bool debug_stats)
+                             AppReplica *app, bool do_replication, bool debug_stats)
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
@@ -71,6 +71,7 @@ namespace replication
             this->lastCommitted = 0;
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
+            this->replicate_ = do_replication;
             lastBatchEnd = 0;
 
             if (batchSize > 1)
@@ -160,35 +161,35 @@ namespace replication
                 ReplyMessage reply;
                 Execute(lastCommitted, entry->request, reply);
 
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
-
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
 
-                // Store reply in the client table
-                ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                if (cte.lastReqId <= entry->request.clientreqid())
-                {
-                    cte.lastReqId = entry->request.clientreqid();
-                    cte.replied = true;
-                    cte.reply = reply;
-                }
-                else
-                {
-                    // We've subsequently prepared another operation from the
-                    // same client. So this request must have been completed
-                    // at the client, and there's no need to record the
-                    // result.
-                }
+                // reply.set_view(entry->viewstamp.view);
+                // reply.set_opnum(entry->viewstamp.opnum);
+                // reply.set_clientreqid(entry->request.clientreqid());
+
+                // // Store reply in the client table
+                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
+                // if (cte.lastReqId <= entry->request.clientreqid())
+                // {
+                //     cte.lastReqId = entry->request.clientreqid();
+                //     cte.replied = true;
+                //     cte.reply = reply;
+                // }
+                // else
+                // {
+                //     // We've subsequently prepared another operation from the
+                //     // same client. So this request must have been completed
+                //     // at the client, and there's no need to record the
+                //     // result.
+                // }
 
                 /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
-                }
+                // auto iter = clientAddresses.find(entry->request.clientid());
+                // if (iter != clientAddresses.end())
+                // {
+                //     transport->SendMessage(this, *iter->second, reply);
+                // }
             }
         }
 
@@ -393,7 +394,6 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            RequestMessage request;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
@@ -404,13 +404,7 @@ namespace replication
             DoViewChangeMessage doViewChange;
             StartViewMessage startView;
 
-            if (type == request.GetTypeName())
-            {
-                request.ParseFromString(data);
-                Notice("                (E) Received Op On Leader Replica %lu", now_us());
-                HandleRequest(remote, request);
-            }
-            else if (type == unloggedRequest.GetTypeName())
+            if (type == unloggedRequest.GetTypeName())
             {
                 unloggedRequest.ParseFromString(data);
                 HandleUnloggedRequest(remote, unloggedRequest);
@@ -462,8 +456,7 @@ namespace replication
             }
         }
 
-        void VRReplica::HandleRequest(const TransportAddress &remote,
-                                      const RequestMessage &msg)
+        void VRReplica::HandleRequest(const string &msg, uint64_t clientid, uint64_t clientreqid)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
@@ -481,14 +474,114 @@ namespace replication
             }
 
             // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
+            // clientAddresses.erase(msg.clientid());
+            // clientAddresses.insert(
+            //     std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
+            //         msg.clientid(),
+            //         std::unique_ptr<TransportAddress>(remote.clone())));
 
             // Check the client table to see if this is a duplicate request
-            auto kv = clientTable.find(msg.req().clientid());
+            // auto kv = clientTable.find(msg.clientid());
+            // if (kv != clientTable.end())
+            // {
+            //     const ClientTableEntry &entry = kv->second;
+            //     if (msg.clientreqid() < entry.lastReqId)
+            //     {
+            //         RNotice("Ignoring stale request");
+            //         return;
+            //     }
+            //     if (msg.clientreqid() == entry.lastReqId)
+            //     {
+            //         // This is a duplicate request. Resend the reply if we
+            //         // have one. We might not have a reply to resend if we're
+            //         // waiting for the other replicas; in that case, just
+            //         // discard the request.
+            //         if (entry.replied)
+            //         {
+            //             RNotice("Received duplicate request; resending reply");
+            //             if (!(transport->SendMessage(this, remote, entry.reply)))
+            //             {
+            //                 RWarning("Failed to resend reply to client");
+            //             }
+            //             return;
+            //         }
+            //         else
+            //         {
+            //             RNotice(
+            //                 "Received duplicate request but no reply available; "
+            //                 "ignoring");
+            //             return;
+            //         }
+            //     }
+            // }
+
+            // Update the client table
+            // UpdateClientTable(msg.req());
+
+            Request request;
+            request.set_op(msg);
+            request.set_clientid(clientid);
+            request.set_clientreqid(clientreqid);
+
+            /* Assign it an opnum */
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+
+            // UpdateClientTable(msg);
+
+            // Check whether this request should be committed to replicas
+            if (!replicate_)
+            {
+                RDebug("Not replicating to replicas");
+                ReplyMessage reply;
+                Execute(v.opnum, request, reply);
+            }
+            else
+            {
+
+                RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+
+                /* Add the request to my log */
+                log.Append(v, request, LOG_STATE_PREPARED);
+
+                if (lastOp - lastBatchEnd + 1 > batchSize)
+                {
+                    CloseBatch();
+                }
+                else
+                {
+                    RDebug("Keeping in batch");
+                    if (!closeBatchTimeout->Active())
+                    {
+                        closeBatchTimeout->Start();
+                    }
+                }
+
+                nullCommitTimeout->Reset();
+            }
+        }
+
+        void VRReplica::HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid)
+        {
+            // Latency_Start(&rec_to_upcall_lat_);
+            viewstamp_t v;
+
+            if (status != STATUS_NORMAL)
+            {
+                RNotice("Ignoring request due to abnormal status");
+                return;
+            }
+
+            if (!AmLeader())
+            {
+                RDebug("Ignoring request because I'm not the leader");
+                return;
+            }
+
+
+            // Check the client table to see if this is a duplicate request
+            /*auto kv = clientTable.find(msg.req().clientid());
             if (kv != clientTable.end())
             {
                 const ClientTableEntry &entry = kv->second;
@@ -520,21 +613,17 @@ namespace replication
                         return;
                     }
                 }
-            }
+            }*/
 
             // Update the client table
-            UpdateClientTable(msg.req());
-
-            // Leader Upcall
-            bool replicate = false;
-            string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
+            // UpdateClientTable(msg.req());
 
             Request request;
+            string res;
+            msg.SerializeToString(&res);
             request.set_op(res);
-            request.set_clientid(msg.req().clientid());
-            request.set_clientreqid(msg.req().clientreqid());
+            request.set_clientid(clientid);
+            request.set_clientreqid(clientreqid);
 
             /* Assign it an opnum */
             ++this->lastOp;
@@ -542,17 +631,17 @@ namespace replication
             v.opnum = this->lastOp;
 
             // Check whether this request should be committed to replicas
-            if (!replicate)
+            if (!replicate_)
             {
                 RDebug("Not replicating to replicas");
                 ReplyMessage reply;
                 Execute(v.opnum, request, reply);
-                reply.set_view(v.view);
-                reply.set_opnum(v.opnum);
-                reply.set_clientreqid(msg.req().clientreqid());
-                cte.replied = true;
-                cte.reply = reply;
-                transport->SendMessage(this, remote, reply);
+                // reply.set_view(v.view);
+                // reply.set_opnum(v.opnum);
+                // reply.set_clientreqid(msg.req().clientreqid());
+                // cte.replied = true;
+                // cte.reply = reply;
+                // transport->SendMessage(this, remote, reply);
             }
             else
             {

@@ -4,10 +4,6 @@ import "request.proto";
 
 package replication.vr.proto;
 
-message RequestMessage {
-    required replication.Request req = 1;
-}
-
 message ReplyMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;

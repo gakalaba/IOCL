@@ -77,6 +77,8 @@ class Replica : public TransportReceiver {
     Replica(const transport::Configuration &config, int groupIdx, int myIdx,
             Transport *transport, AppReplica *app);
     virtual ~Replica();
+    virtual void HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid) = 0;
+    virtual void HandleRequest(const string &reqMsg, uint64_t clientid, uint64_t clientreqid) = 0;
 
    protected:
     void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,

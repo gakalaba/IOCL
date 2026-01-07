@@ -78,6 +78,10 @@ void IRClient::InvokeInconsistent(const string &request,
     SendInconsistent(req);
 }
 
+void IRClient::SetReplica(Replica *replica) {
+    Panic("Should never call this");
+}
+
 void IRClient::SendInconsistent(const PendingInconsistentRequest *req) {
     Debug("%lu:%lu Sending inconsistent op.", clientid, req->clientReqId);
     proto::ProposeInconsistentMessage reqMsg;

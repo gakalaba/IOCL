@@ -57,7 +57,7 @@ namespace replication
 
         IOCL_CTReplica::IOCL_CTReplica(transport::Configuration config, int groupIdx, int myIdx,
                              Transport *transport, unsigned int batchSize,
-                             AppReplica *app, bool debug_stats)
+                             AppReplica *app, bool do_replication, bool debug_stats)
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
@@ -74,6 +74,7 @@ namespace replication
             this->lastCommitted = 0;
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
+            this->replicate_ = do_replication;
             lastBatchEnd = 0;
             lastUnorderedBatchEnd = 0;
 
@@ -249,9 +250,9 @@ namespace replication
                 ReplyMessage reply;
                 Execute(entry->viewstamp.opnum, entry->request, reply);
 
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
+                // reply.set_view(entry->viewstamp.view);
+                // reply.set_opnum(entry->viewstamp.opnum);
+                // reply.set_clientreqid(entry->request.clientreqid());
 
                 // Store reply in the client table
                 // ClientTableEntry &cte = clientTable[entry->request.clientid()];
@@ -553,7 +554,6 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            RequestMessage request;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
@@ -569,15 +569,7 @@ namespace replication
             PredecessorReplyMessage coordResp;
             PredecessorFinalMessage coordFinal;
 
-
-            if (type == request.GetTypeName())
-            {
-                // Request arrived -- issue unordered prepare
-                request.ParseFromString(data);
-                Notice("                (E) Received Op on Leader Replica %lu", now_us());
-                HandleRequest(remote, request);
-            }
-            else if (type == coordReq.GetTypeName())
+            if (type == coordReq.GetTypeName())
             {
                 // Successor request arrived
                 coordReq.ParseFromString(data);
@@ -658,30 +650,25 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::HandleRequest(const TransportAddress &remote,
-                                      RequestMessage &msg)
+        void IOCL_CTReplica::HandleRequest(const string &reqMsg, uint64_t clientid, uint64_t clientreqid)
+        {
+            Panic("Shouldn't be calling handle request for IOCL_CTReplica");
+        }
+
+        void IOCL_CTReplica::HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
-
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring request due to abnormal status");
                 return;
             }
-
             if (!AmLeader())
             {
                 RDebug("Ignoring request because I'm not the leader");
                 return;
             }
-
-            // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
 
             // Check the client table to see if this is a duplicate request
             /*
@@ -718,19 +705,15 @@ namespace replication
                     }
                 }
             }*/
-
             // Update the client table
             //UpdateClientTable(msg.req());
 
-            // Leader Upcall
-            bool replicate = false;
-            string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-
             Request request;
+            string res;
+            msg.SerializeToString(&res);
             request.set_op(res);
-            request.set_clientid(msg.req().clientid());
-            request.set_clientreqid(msg.req().clientreqid());
+            request.set_clientid(clientid);
+            request.set_clientreqid(clientreqid);
 
             /* Assign it an opnum within this view --> this is 
                 strictly to compy with quorum checking which 
@@ -763,7 +746,7 @@ namespace replication
             entryPtr->predecessorArrivalTs.resize(entryPtr->predList.predlist_size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
-            if (replicate) unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            if (replicate_) unorderedBagByOpnum.emplace(v.opnum, entryPtr);
 
             /* Go through any outstanding predecessor replies and add them in */
             auto pit = outstandingCoordinationResps.find(shardtag);
@@ -795,11 +778,9 @@ namespace replication
             }
 
             // Check whether this request should be committed to replicas
-            if (!replicate)
+            if (!replicate_)
             {
-                entryPtr->replicate = false;
                 RDebug("Not replicating to replicas");
-
 
                 /* Progress state to Persisted */
                 entryPtr->state = IOCL_STATE_PERSISTED;
@@ -843,9 +824,6 @@ namespace replication
                     ReadyRoutine(entryPtr);
                 }
                 return;
-            } else {
-                entryPtr->replicate = true;
-                RDebug("Replicating to replicas");
             }
 
             if (lastUnorderedOp - lastUnorderedBatchEnd + 1 > batchSize)
@@ -917,9 +895,9 @@ namespace replication
                 ReplyMessage reply;
                 Execute(entry->viewstamp.opnum, entry->request, reply);
 
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
+                // reply.set_view(entry->viewstamp.view);
+                // reply.set_opnum(entry->viewstamp.opnum);
+                // reply.set_clientreqid(entry->request.clientreqid());
 
                 // Store reply in the client table
                 // ClientTableEntry &cte = clientTable[entry->request.clientid()];
@@ -938,11 +916,11 @@ namespace replication
                 // }
 
                 /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
-                }
+                // auto iter = clientAddresses.find(entry->request.clientid());
+                // if (iter != clientAddresses.end())
+                // {
+                //     transport->SendMessage(this, *iter->second, reply);
+                // }
             }
         }
 
@@ -1002,7 +980,7 @@ namespace replication
 
                 /* Add the request to my log */
                 AppendToLog(head);
-                if (!(head->replicate))
+                if (!replicate_)
                 {
                     const Request request = head->request;
 

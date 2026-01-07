@@ -78,7 +78,6 @@ namespace replication
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
             const uint64_t intkey;
-            bool replicate;
             std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> finalAcks; // tracking all unique final ACKs from predecessors
             std::unordered_map<std::pair<uint64_t,int32_t>, int, PairHash> successors; // keep track of all your successors to send the final ACK! (shardtag -> shardidx)
             // string hash;
@@ -113,13 +112,14 @@ namespace replication
         public:
             IOCL_CTReplica(transport::Configuration config, int groupIdx, int myIdx,
                       Transport *transport, unsigned int batchSize, AppReplica *app,
-                      bool debug_stats);
+                      bool do_replication, bool debug_stats);
             ~IOCL_CTReplica();
             void Close();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
-
+            void HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid) override;
+            void HandleRequest(const string &reqMsg, uint64_t clientid, uint64_t clientreqid) override;
         private:
             view_t view;
             opnum_t lastCommitted;
@@ -179,6 +179,8 @@ namespace replication
 
             bool debug_stats_;
 
+            bool replicate_;
+
             bool AmLeader() const;
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
@@ -198,8 +200,6 @@ namespace replication
             viewstamp_t LastViewstampOfLog() const;
             uint64_t FoldL(const proto::PredListHolder &pl);
 
-            void HandleRequest(const TransportAddress &remote,
-                               proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 

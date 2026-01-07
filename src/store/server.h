@@ -30,6 +30,7 @@
 
 #include "store/common/stats.h"
 #include "store/common/timestamp.h"
+#include "replication/common/replica.h"
 
 #include <string>
 
@@ -43,6 +44,7 @@ public:
 
   virtual Stats &GetStats() = 0;
   virtual void SeeAllTxns() = 0;
+  virtual void SetReplica(class replication::Replica *replica) = 0;
 };
 
 #endif /* STORE_SERVER_H */

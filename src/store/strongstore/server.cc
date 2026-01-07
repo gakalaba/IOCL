@@ -48,7 +48,7 @@ namespace strongstore
                    const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, const TrueTime &tt, bool replicate, bool debug_stats)
+                   Transport *transport, const TrueTime &tt, bool debug_stats)
         : PingServer(transport),
           tt_{tt},
           transactions_{shard_idx, consistency, tt_},
@@ -60,7 +60,6 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           consistency_{consistency},
-          do_replication{replicate},
           debug_stats_{debug_stats}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
@@ -86,7 +85,7 @@ namespace strongstore
     Server::Server(Consistency consistency, const transport::Configuration &shard_config,
                    const transport::Configuration &replica_config,
                    uint64_t server_id, int shard_idx, int replica_idx,
-                   Transport *transport, LinearizableProtocol linproto, bool replicate, bool debug_stats)
+                   Transport *transport, LinearizableProtocol linproto, bool debug_stats)
         : PingServer(transport),
           tt_{dummyTT},                 // filler, will not use
           transactions_{0, SS, tt_}, // filler, will not use
@@ -98,8 +97,7 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency},
-          do_replication{replicate}
+          consistency_{consistency}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -165,6 +163,11 @@ namespace strongstore
 
     void Server::Close()
     {
+    }
+
+    void Server::SetReplica(replication::Replica *replica)
+    {
+        replica_client_->SetReplica(replica);
     }
 
     void Server::ReceiveMessage(const TransportAddress &remote,
@@ -1247,31 +1250,32 @@ namespace strongstore
 
     void Server::PrepareCallback(uint64_t transaction_id, int status, Timestamp timestamp)
     {
-        TransactionState s = transactions_.FinishParticipantPrepare(transaction_id);
-        if (s == PREPARED)
-        {
-            int coordinator = transactions_.GetCoordinator(transaction_id);
-            const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
-            const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
-            // TODO: Handle timeout
-            shard_clients_[coordinator]->PrepareOK(
-                transaction_id, shard_idx_, prepare_ts, nonblock_ts,
-                std::bind(&Server::PrepareOKCallback, this, transaction_id,
-                          placeholders::_1, placeholders::_2),
-                [](int, Timestamp) {}, PREPARE_TIMEOUT);
+        // ASSERT(status == REPLY_OK)
+        // TransactionState s = transactions_.FinishParticipantPrepare(transaction_id);
+        // if (s == PREPARED)
+        // {
+        //     int coordinator = transactions_.GetCoordinator(transaction_id);
+        //     const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
+        //     const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        //     // TODO: Handle timeout
+        //     shard_clients_[coordinator]->PrepareOK(
+        //         transaction_id, shard_idx_, prepare_ts, nonblock_ts,
+        //         std::bind(&Server::PrepareOKCallback, this, transaction_id,
+        //                   placeholders::_1, placeholders::_2),
+        //         [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
-            // Reply to client
-            SendRWCommmitParticipantReplyOK(transaction_id);
-        }
-        else if (s == ABORTED)
-        { // Already aborted
+        //     // Reply to client
+        //     SendRWCommmitParticipantReplyOK(transaction_id);
+        // }
+        // else if (s == ABORTED)
+        // { // Already aborted
 
-            SendRWCommmitParticipantReplyFail(transaction_id);
-        }
-        else
-        {
-            NOT_REACHABLE();
-        }
+        //     SendRWCommmitParticipantReplyFail(transaction_id);
+        // }
+        // else
+        // {
+        //     NOT_REACHABLE();
+        // }
     }
 
     void Server::SendOperationCallback(uint64_t transaction_id, int status)
@@ -1799,35 +1803,6 @@ namespace strongstore
         NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
 
-    void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
-                              string &response)
-    {
-        Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
-
-        Request request;
-        LinearizeableOperation linreq;
-        if (consistency_ != LIN)
-        {
-            request.ParseFromString(op);
-            switch (request.op())
-            {
-            case strongstore::proto::Request::PREPARE:
-            case strongstore::proto::Request::COMMIT:
-            case strongstore::proto::Request::ABORT:
-                replicate = do_replication;
-                response = op;
-                break;
-            default:
-                Panic("Unrecognized operation.");
-            }
-        } else {
-            linreq.ParseFromString(op);
-            replicate = do_replication;
-            response = op;
-            Debug("was able to parse LinearizeableOperation!");
-        }
-    }
-
     /* Gets called when a command is issued using client.Invoke(...) to this
      * replica group.
      * opnum is the operation number.
@@ -1887,6 +1862,32 @@ namespace strongstore
             else if (s == PREPARING || s == PREPARED)
             {
                 // Debug("[%lu] Already prepared", transaction_id);
+            }
+            else
+            {
+                NOT_REACHABLE();
+            }
+
+            s = transactions_.FinishParticipantPrepare(transaction_id);
+            if (s == PREPARED)
+            {
+                int coordinator = transactions_.GetCoordinator(transaction_id);
+                const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
+                const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+                // TODO: Handle timeout
+                shard_clients_[coordinator]->PrepareOK(
+                    transaction_id, shard_idx_, prepare_ts, nonblock_ts,
+                    std::bind(&Server::PrepareOKCallback, this, transaction_id,
+                            placeholders::_1, placeholders::_2),
+                    [](int, Timestamp) {}, PREPARE_TIMEOUT);
+
+                // Reply to client
+                SendRWCommmitParticipantReplyOK(transaction_id);
+            }
+            else if (s == ABORTED)
+            { // Already aborted
+
+                SendRWCommmitParticipantReplyFail(transaction_id);
             }
             else
             {

@@ -97,6 +97,7 @@ namespace strongstore
 
         void Abort(uint64_t transaction_id, abort_callback acb,
                    abort_timeout_callback atcb, uint32_t timeout);
+        void SetReplica(replication::Replica *replica);
 
     private:
         struct PendingRequest

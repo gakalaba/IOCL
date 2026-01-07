@@ -69,7 +69,7 @@ namespace replication
             Panic("Should never call this");
         }
 
-        void IOCL_CTClient::InvokeIOCL(LinearizeableOperation &msg,
+        void IOCL_CTClient::InvokeLinOp(LinearizeableOperation &msg,
                                 continuation_t continuation,
                                 error_continuation_t error_continuation)
         {
@@ -82,32 +82,23 @@ namespace replication
                   msg.shardtag(), msg.predlist().size());
             Debug("size of the message before: %lu", msg.ByteSizeLong());
             string request_str;
-            proto::RequestMessage reqMsg;
-            // We only want to stringify the operation, not the IOCL metadata
-            reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
-            uint64_t theshardtag = msg.shardtag();
-            uint64_t theintkey = msg.intkey();
-            reqMsg.set_shardtag(msg.shardtag());
-            reqMsg.set_intkey(msg.intkey());
-            msg.clear_shardtag();
-            msg.clear_predlist();
-            msg.clear_intkey();
+
             // Issue coordination requests
             proto::SuccessorRequestMessage coordReqMsg;
-            coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
+            coordReqMsg.set_s(msg.shardtag()); // my shard tag
             coordReqMsg.set_shardidx(group); // who pred should return to??
-            for (uint32_t i = 0; i < reqMsg.predlist().size(); i++)
+            for (uint32_t i = 0; i < msg.predlist().size(); i++)
             {
                 uint64_t sendTo = msg.shardlist(i);
                 // if (sendTo == group)
                 // {
                 //     Debug("Skipping sending COORD REQUEST to self for predecessor_tag %u",
-                //           reqMsg.predlist(i));
+                //           msg.predlist(i));
                 //     // Append this index to the same_shards field
-                //     reqMsg.add_same_shards(i);
+                //     msg.add_same_shards(i);
                 //     continue;
                 // }
-                uint64_t predShardTag = reqMsg.predlist(i);
+                uint64_t predShardTag = msg.predlist(i);
                 coordReqMsg.set_p(predShardTag);
                 coordReqMsg.set_predidx(i);
                 Debug("SENDING %dth COORD REQUEST for predecessor_tag %lu to shard %lu",
@@ -121,42 +112,19 @@ namespace replication
             msg.clear_shardlist();
             Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
 
-            msg.SerializeToString(&request_str);
-
-            // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
             uint64_t reqId = ++lastReqId;
             // Timeout *timer =
             //     new Timeout(transport, 15000, [this, reqId]()
             //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
 
-            pendingReqs[reqId] = req;
-
-            /*------------------ Send Request ------------------*/
-            // req->request is the string type of LinearizeableOperation without IOCL metadata
-            reqMsg.mutable_req()->set_op(request_str);
-            // uint64_t pid = (reqMsg.shardtag() >> 32) & 0xFFFFFFFF;
-            // reqMsg.mutable_req()->set_clientid(pid);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
-            {
-                // req->timer->Reset();
-            }
-            else
-            {
-                Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
-            }
+            /* Call the HandleRequest function on the leader */
+            replica_->HandleOperation(msg, clientid, reqId);
         }
 
-
+        void IOCL_CTClient::SetReplica(Replica *replica)
+        {
+            this->replica_ = replica;
+        }
 
         void IOCL_CTClient::InvokeUnlogged(int replicaIdx, const string &request,
                                       continuation_t continuation,

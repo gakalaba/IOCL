@@ -355,7 +355,7 @@ int main(int argc, char **argv)
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
-                                         tport, tt, FLAGS_replicate, FLAGS_debug_stats);
+                                         tport, tt, FLAGS_debug_stats);
         break;
     }
     case PROTO_IOCL_CT:
@@ -365,7 +365,7 @@ int main(int argc, char **argv)
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
                                          tport, strongstore::LinearizableProtocol::PROTO_IOCL_CT,
-                                         FLAGS_replicate, FLAGS_debug_stats);
+                                         FLAGS_debug_stats);
         break;
     }
     case PROTO_VR:
@@ -375,7 +375,7 @@ int main(int argc, char **argv)
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
                                          tport, strongstore::LinearizableProtocol::PROTO_VR,
-                                         FLAGS_replicate, FLAGS_debug_stats);
+                                         FLAGS_debug_stats);
         break;
     }
     default:
@@ -499,8 +499,9 @@ int main(int argc, char **argv)
         Debug("Making transactional strongstore replica");
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server), FLAGS_replicate,
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_VR:
@@ -508,8 +509,9 @@ int main(int argc, char **argv)
         Debug("Making linearizable (VR) replica");
         replica = new replication::vr::VRReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server), FLAGS_replicate,
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_IOCL_CT:
@@ -517,8 +519,9 @@ int main(int argc, char **argv)
         Debug("Making linearizable (IOCL_CT) replica");
         replica = new replication::iocl_ct::IOCL_CTReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
-            dynamic_cast<replication::AppReplica *>(server),
+            dynamic_cast<replication::AppReplica *>(server), FLAGS_replicate,
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::iocl_ct::IOCL_CTReplica *>(replica));
         break;
     }
     default:

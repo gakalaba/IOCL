@@ -52,6 +52,9 @@ namespace replication
             virtual ~VRClient();
             virtual void Invoke(const string &request, continuation_t continuation,
                                 error_continuation_t error_continuation = nullptr);
+            virtual void InvokeLinOp(LinearizeableOperation &msg,
+                                    continuation_t continuation,
+                                    error_continuation_t error_continuation = nullptr);
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -64,11 +67,13 @@ namespace replication
             virtual void ReceiveMessage(const TransportAddress &remote,
                                         const string &type, const string &data,
                                         void *meta_data);
+            void SetReplica(Replica *replica) override;
 
         protected:
             int view;
             int opnumber;
             uint64_t lastReqId;
+            Replica *replica_;
 
             struct PendingRequest
             {

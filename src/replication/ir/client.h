@@ -76,6 +76,7 @@ class IRClient : public Client {
     virtual void InvokeConsensus(
         const string &request, decide_t decide, continuation_t continuation,
         error_continuation_t error_continuation = nullptr);
+    void SetReplica(Replica *replica) override;
 
    protected:
     struct PendingRequest {

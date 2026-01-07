@@ -53,12 +53,14 @@ namespace replication
         public:
             VRReplica(transport::Configuration config, int groupIdx, int myIdx,
                       Transport *transport, unsigned int batchSize, AppReplica *app,
-                      bool debug_stats);
+                      bool do_replication, bool debug_stats);
             ~VRReplica();
             void Close();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            void HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid) override;
+            void HandleRequest(const string &reqMsg, uint64_t clientid, uint64_t clientreqid) override;
 
         private:
             view_t view;
@@ -98,6 +100,8 @@ namespace replication
 
             bool debug_stats_;
 
+            bool replicate_;
+
             bool AmLeader() const;
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
@@ -109,8 +113,6 @@ namespace replication
             void ResendPrepare();
             void CloseBatch();
 
-            void HandleRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 

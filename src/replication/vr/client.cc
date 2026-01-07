@@ -80,6 +80,28 @@ namespace replication
             SendRequest(req);
         }
 
+        void VRClient::InvokeLinOp(LinearizeableOperation &msg, continuation_t continuation,
+                              error_continuation_t error_continuation)
+        {
+            // TODO: Currently, invocations never timeout and error_continuation is
+            // never called. It may make sense to set a timeout on the invocation.
+            (void)error_continuation;
+            Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
+
+            uint64_t reqId = ++lastReqId;
+            // Timeout *timer =
+            //     new Timeout(transport, 500, [this, reqId]()
+            //                 { ResendRequest(reqId); });
+
+            /* Call the HandleRequest function on the leader */
+            replica_->HandleOperation(msg, clientid, reqId);
+        }
+
+        void VRClient::SetReplica(Replica *replica)
+        {
+            this->replica_ = replica;
+        }
+
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
                                       continuation_t continuation,
                                       error_continuation_t error_continuation,
@@ -117,24 +139,7 @@ namespace replication
 
         void VRClient::SendRequest(const PendingRequest *req)
         {
-            proto::RequestMessage reqMsg;
-            reqMsg.mutable_req()->set_op(req->request);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
-            {
-                // req->timer->Reset();
-            }
-            else
-            {
-                Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
-            }
+            replica_->HandleRequest(req->request, clientid, req->clientReqId);
         }
 
         void VRClient::ResendRequest(const uint64_t reqId)
