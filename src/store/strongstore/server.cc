@@ -318,7 +318,7 @@ namespace strongstore
 
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
-        Notice("        (C) Received op on server side %lu", now_us());
+        // Notice("        (C) Received op on server side %lu", now_us());
         Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
@@ -726,7 +726,7 @@ namespace strongstore
 
     void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::RWCommitCoordinator &msg)
     {
-        Notice("        (C) Received op on server side %lu", now_us());
+        // Notice("        (C) Received op on server side %lu", now_us());
         uint64_t client_id = msg.rid().client_id();
         uint64_t client_req_id = msg.rid().client_req_id();
 
@@ -1731,7 +1731,7 @@ namespace strongstore
         op_reply_.set_return_value(retval);
         op_reply_.set_transaction_id(transaction_id);
 
-        Notice("        (G) Sending REPLY on Wire %lu", now_us());
+        // Notice("        (G) Sending REPLY on Wire %lu", now_us());
         transport_->SendMessage(this, *remote, op_reply_);
 
         delete remote;
@@ -1740,7 +1740,7 @@ namespace strongstore
 
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
-        Notice("        (G) Sending REPLY on Wire %lu", now_us());
+        // Notice("        (G) Sending REPLY on Wire %lu", now_us());
         // Debug("[%lu] Commiting", transaction_id);
 
         const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
@@ -1945,7 +1945,7 @@ namespace strongstore
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
                 // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                 // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-                Notice("            (F) Adding response routine to event queue now %lu", now_us());
+                // Notice("            (F) Adding response routine to event queue now %lu", now_us());
                 if (commit_wait_us > 0) {
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
@@ -2038,7 +2038,7 @@ namespace strongstore
 
         PendingOperationReply *pending_reply = search->second;
         pending_operation_replies_.erase(search);
-        Notice("            (F) Adding response routine to event queue now %lu", now_us());
+        // Notice("            (F) Adding response routine to event queue now %lu", now_us());
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
 
         RespondToClientOperation(pending_reply, transaction_id, status, retval);

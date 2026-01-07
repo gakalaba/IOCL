@@ -343,14 +343,14 @@ namespace strongstore
         }
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
-        Notice("    (B) Sending on wire %lu", now_us());
+        // Notice("    (B) Sending on wire %lu", now_us());
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
     // IOCL receive the response
     void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
-        Notice("    (H) Got the reply NOW %lu", now_us());
+        // Notice("    (H) Got the reply NOW %lu", now_us());
         Debug("shard client got LinearizeableReply!");
         uint64_t req_id = reply.rid().client_req_id();
         Debug("the app_request_id = %lu", req_id);
@@ -517,13 +517,13 @@ namespace strongstore
             rw_commit_c_.add_participants(p);
         }
 
-        Notice("    (B) Sending on wire %lu", now_us());
+        // Notice("    (B) Sending on wire %lu", now_us());
         transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
     }
 
     void ShardClient::HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply)
     {
-        Notice("    (H) Got the reply NOW %lu", now_us());
+        // Notice("    (H) Got the reply NOW %lu", now_us());
         uint64_t req_id = reply.rid().client_req_id();
 
         auto itr = pendingRWCoordCommits.find(req_id);

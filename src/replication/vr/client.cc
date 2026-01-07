@@ -67,7 +67,7 @@ namespace replication
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
-            Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
+            // Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
 
             uint64_t reqId = ++lastReqId;
             // Timeout *timer =
@@ -84,7 +84,7 @@ namespace replication
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
-            Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
+            // Notice("                (D) Received Op on Replica CLIENT side %lu", now_us());
 
             uint64_t reqId = ++lastReqId;
             // Timeout *timer =
