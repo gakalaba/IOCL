@@ -73,11 +73,9 @@ namespace replication
             // Timeout *timer =
             //     new Timeout(transport, 500, [this, reqId]()
             //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request, reqId, continuation);
 
-            pendingReqs[reqId] = req;
-            SendRequest(req);
+            /* Call the HandleRequest function on the leader */
+            replica_->HandleRequest(request, clientid, reqId);
         }
 
         void VRClient::InvokeLinOp(LinearizeableOperation &msg, continuation_t continuation,
