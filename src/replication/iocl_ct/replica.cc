@@ -657,6 +657,7 @@ namespace replication
 
         void IOCL_CTReplica::HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid)
         {
+            Notice("                (E) Received Op on Leader Replica %lu", now_us());
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
             if (status != STATUS_NORMAL)

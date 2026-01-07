@@ -458,6 +458,7 @@ namespace replication
 
         void VRReplica::HandleRequest(const string &msg, uint64_t clientid, uint64_t clientreqid)
         {
+            Notice("                (E) Received Op on Leader Replica %lu", now_us());
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -564,6 +565,7 @@ namespace replication
 
         void VRReplica::HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid)
         {
+            Notice("                (E) Received Op on Leader Replica %lu", now_us());
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 

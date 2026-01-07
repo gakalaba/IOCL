@@ -113,6 +113,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
 void BenchmarkClient::SendNext()
 {
+    Notice("(A) Start of Txn %lu", now_us());
     n_sessions_started_++;
     Debug("[%d] SendNext", n_sessions_started_);
 
@@ -206,6 +207,7 @@ void BenchmarkClient::SendNextAppRequest()
 
 void BenchmarkClient::SendNextInSession(const uint64_t session_id)
 {
+    Notice("(A) Start of Txn %lu", now_us());
     Debug("[%lu] SendNextInSession", session_id);
 
     auto search = session_states_.find(session_id);
@@ -623,6 +625,7 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
     auto transaction = ss.transaction();
     auto &ttype = transaction->GetTransactionType();
     auto n_attempts = ss.n_attempts();
+    Notice("(I) End of Txn %lu", now_us());
 
     if (result == COMMITTED || result == ABORTED_USER ||
         (maxAttempts != -1 && n_attempts >= static_cast<uint64_t>(maxAttempts)) ||
