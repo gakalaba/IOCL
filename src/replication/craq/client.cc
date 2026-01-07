@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * craq/client.cc:
- *   Viewstamped Replication clinet
+ *   CRAQ client
  *
  * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
  * Copyright 2013 Dan R. K. Ports  <drkp@cs.washington.edu>
@@ -46,7 +46,7 @@ namespace replication
     {
 
         CRAQClient::CRAQClient(const transport::Configuration &config, Transport *transport,
-                           int group, uint64_t clientid)
+                               int group, uint64_t clientid)
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
@@ -61,7 +61,7 @@ namespace replication
         }
 
         void CRAQClient::Invoke(const string &request, continuation_t continuation,
-                              error_continuation_t error_continuation)
+                                error_continuation_t error_continuation)
         {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
@@ -79,9 +79,9 @@ namespace replication
         }
 
         void CRAQClient::InvokeUnlogged(int replicaIdx, const string &request,
-                                      continuation_t continuation,
-                                      error_continuation_t error_continuation,
-                                      uint32_t timeout)
+                                        continuation_t continuation,
+                                        error_continuation_t error_continuation,
+                                        uint32_t timeout)
         {
             uint64_t reqId = ++lastReqId;
             proto::UnloggedRequestMessage reqMsg;
@@ -105,9 +105,9 @@ namespace replication
         }
 
         void CRAQClient::InvokeUnloggedAll(const string &request,
-                                         continuation_t continuation,
-                                         error_continuation_t error_continuation,
-                                         uint32_t timeout)
+                                           continuation_t continuation,
+                                           error_continuation_t error_continuation,
+                                           uint32_t timeout)
         {
             Panic("Unimplemented.");
             return;
@@ -149,8 +149,8 @@ namespace replication
         }
 
         void CRAQClient::ReceiveMessage(const TransportAddress &remote,
-                                      const string &type, const string &data,
-                                      void *meta_data)
+                                        const string &type, const string &data,
+                                        void *meta_data)
         {
             proto::ReplyMessage reply;
             proto::UnloggedReplyMessage unloggedReply;
@@ -191,7 +191,7 @@ namespace replication
         }
 
         void CRAQClient::HandleUnloggedReply(const TransportAddress &remote,
-                                           const proto::UnloggedReplyMessage &msg)
+                                             const proto::UnloggedReplyMessage &msg)
         {
             uint64_t reqId = msg.clientreqid();
             auto it = pendingReqs.find(reqId);

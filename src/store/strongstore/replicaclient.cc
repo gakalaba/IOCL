@@ -102,6 +102,18 @@ namespace strongstore
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
+
+            case LinearizableProtocol::PROTO_CRAQ:
+                // create request
+                Debug("Running CRAQ: serializing LinearizeableOperation into string");
+                msg.SerializeToString(&request_str);
+                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
+
+                client->Invoke(
+                    request_str,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
+                break;
         }
     }
 

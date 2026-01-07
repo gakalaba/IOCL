@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * craq-test.cc:
- *   test cases for Viewstamped Replication protocol
+ *   test cases for CRAQ protocol
  *
  * Copyright 2013 Dan R. K. Ports  <drkp@cs.washington.edu>
  *

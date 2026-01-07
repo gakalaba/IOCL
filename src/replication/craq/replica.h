@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * craq/replica.h:
- *   Viewstamped Replication protocol
+ *   CRAQ protocol
  *
  * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
  * Copyright 2013 Dan R. K. Ports  <drkp@cs.washington.edu>
@@ -52,8 +52,8 @@ namespace replication
         {
         public:
             CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
-                      Transport *transport, unsigned int batchSize, AppReplica *app,
-                      bool debug_stats);
+                        Transport *transport, unsigned int batchSize, AppReplica *app,
+                        bool debug_stats);
             ~CRAQReplica();
             void Close();
 
@@ -86,11 +86,11 @@ namespace replication
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
             QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
 
-            // Timeout *viewChangeTimeout;
-            // Timeout *nullCommitTimeout;
-            // Timeout *stateTransferTimeout;
-            // Timeout *resendPrepareTimeout;
-            // Timeout *closeBatchTimeout;
+            Timeout *viewChangeTimeout;
+            Timeout *nullCommitTimeout;
+            Timeout *stateTransferTimeout;
+            Timeout *resendPrepareTimeout;
+            Timeout *closeBatchTimeout;
 
             Latency_t rec_to_upcall_lat_;
             Latency_t upcall_to_exec_lat_;

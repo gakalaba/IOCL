@@ -2,7 +2,7 @@
 /***********************************************************************
  *
  * craq/replica.cc:
- *   Viewstamped Replication protocol
+ *   CRAQ protocol
  *
  * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
  * Copyright 2013 Dan R. K. Ports  <drkp@cs.washington.edu>
@@ -54,8 +54,8 @@ namespace replication
         using namespace proto;
 
         CRAQReplica::CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
-                             Transport *transport, unsigned int batchSize,
-                             AppReplica *app, bool debug_stats)
+                                 Transport *transport, unsigned int batchSize,
+                                 AppReplica *app, bool debug_stats)
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
@@ -77,32 +77,32 @@ namespace replication
                 Notice("Batching enabled; batch size %d", batchSize);
             }
 
-        //     this->viewChangeTimeout =
-        //         new Timeout(transport, 5000, [this]()
-        //                     { StartViewChange(view + 1); });
-        //     this->nullCommitTimeout =
-        //         new Timeout(transport, 1000, [this]()
-        //                     { SendNullCommit(); });
-        //     this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
-        //                                              {
-        // this->lastRequestStateTransferView = 0;
-        // this->lastRequestStateTransferOpnum = 0; });
-        //     this->stateTransferTimeout->Start();
-        //     this->resendPrepareTimeout =
-        //         new Timeout(transport, 500, [this]()
-        //                     { ResendPrepare(); });
-        //     this->closeBatchTimeout =
-        //         new Timeout(transport, 300, [this]()
-        //                     { CloseBatch(); });
+            this->viewChangeTimeout =
+                new Timeout(transport, 5000, [this]()
+                            { StartViewChange(view + 1); });
+            this->nullCommitTimeout =
+                new Timeout(transport, 1000, [this]()
+                            { SendNullCommit(); });
+            this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
+                                                     {
+        this->lastRequestStateTransferView = 0;
+        this->lastRequestStateTransferOpnum = 0; });
+            this->stateTransferTimeout->Start();
+            this->resendPrepareTimeout =
+                new Timeout(transport, 500, [this]()
+                            { ResendPrepare(); });
+            this->closeBatchTimeout =
+                new Timeout(transport, 300, [this]()
+                            { CloseBatch(); });
 
-            // if (AmLeader())
-            // {
-            //     nullCommitTimeout->Start();
-            // }
-            // else
-            // {
-            //     viewChangeTimeout->Start();
-            // }
+            if (AmLeader())
+            {
+                nullCommitTimeout->Start();
+            }
+            else
+            {
+                viewChangeTimeout->Start();
+            }
 
             if (debug_stats_)
             {
@@ -114,11 +114,11 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            // delete viewChangeTimeout;
-            // delete nullCommitTimeout;
-            // delete stateTransferTimeout;
-            // delete resendPrepareTimeout;
-            // delete closeBatchTimeout;
+            delete viewChangeTimeout;
+            delete nullCommitTimeout;
+            delete stateTransferTimeout;
+            delete resendPrepareTimeout;
+            delete closeBatchTimeout;
 
             if (debug_stats_)
             {
@@ -262,18 +262,18 @@ namespace replication
             status = STATUS_NORMAL;
             lastBatchEnd = lastOp;
 
-            // if (AmLeader())
-            // {
-            //     viewChangeTimeout->Stop();
-            //     nullCommitTimeout->Start();
-            // }
-            // else
-            // {
-            //     viewChangeTimeout->Start();
-            //     nullCommitTimeout->Stop();
-            //     resendPrepareTimeout->Stop();
-            //     closeBatchTimeout->Stop();
-            // }
+            if (AmLeader())
+            {
+                viewChangeTimeout->Stop();
+                nullCommitTimeout->Start();
+            }
+            else
+            {
+                viewChangeTimeout->Start();
+                nullCommitTimeout->Stop();
+                resendPrepareTimeout->Stop();
+                closeBatchTimeout->Stop();
+            }
 
             prepareOKQuorum.Clear();
             startViewChangeQuorum.Clear();
@@ -287,10 +287,10 @@ namespace replication
             view = newview;
             status = STATUS_VIEW_CHANGE;
 
-            // viewChangeTimeout->Reset();
-            // nullCommitTimeout->Stop();
-            // resendPrepareTimeout->Stop();
-            // closeBatchTimeout->Stop();
+            viewChangeTimeout->Reset();
+            nullCommitTimeout->Stop();
+            resendPrepareTimeout->Stop();
+            closeBatchTimeout->Stop();
 
             StartViewChangeMessage m;
             m.set_view(newview);
@@ -317,7 +317,7 @@ namespace replication
                 RWarning("Failed to send null COMMIT message to all replicas");
             }
 
-            // nullCommitTimeout->Reset();
+            nullCommitTimeout->Reset();
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -349,7 +349,7 @@ namespace replication
                 RWarning("Failed to ressend prepare message to all replicas");
             }
             // Keep retrying
-            // resendPrepareTimeout->Reset();
+            resendPrepareTimeout->Reset();
         }
 
         void CRAQReplica::CloseBatch()
@@ -384,13 +384,13 @@ namespace replication
             }
             lastBatchEnd = lastOp;
 
-            // resendPrepareTimeout->Reset();
-            // closeBatchTimeout->Stop();
+            resendPrepareTimeout->Reset();
+            closeBatchTimeout->Stop();
         }
 
         void CRAQReplica::ReceiveMessage(const TransportAddress &remote,
-                                       const string &type, const string &data,
-                                       void *meta_data)
+                                         const string &type, const string &data,
+                                         void *meta_data)
         {
             RequestMessage request;
             UnloggedRequestMessage unloggedRequest;
@@ -461,7 +461,7 @@ namespace replication
         }
 
         void CRAQReplica::HandleRequest(const TransportAddress &remote,
-                                      const RequestMessage &msg)
+                                        const RequestMessage &msg)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
@@ -566,18 +566,18 @@ namespace replication
                 else
                 {
                     RDebug("Keeping in batch");
-                    // if (!closeBatchTimeout->Active())
-                    // {
-                    //     closeBatchTimeout->Start();
-                    // }
+                    if (!closeBatchTimeout->Active())
+                    {
+                        closeBatchTimeout->Start();
+                    }
                 }
 
-                // nullCommitTimeout->Reset();
+                nullCommitTimeout->Reset();
             }
         }
 
         void CRAQReplica::HandleUnloggedRequest(const TransportAddress &remote,
-                                              const UnloggedRequestMessage &msg)
+                                                const UnloggedRequestMessage &msg)
         {
             if (status != STATUS_NORMAL)
             {
@@ -599,7 +599,7 @@ namespace replication
         }
 
         void CRAQReplica::HandlePrepare(const TransportAddress &remote,
-                                      const PrepareMessage &msg)
+                                        const PrepareMessage &msg)
         {
             RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
                    msg.view(), msg.batchstart(), msg.opnum());
@@ -633,7 +633,7 @@ namespace replication
             ASSERT((msg.opnum() - msg.batchstart() + 1) ==
                    (unsigned int)msg.request_size());
 
-            // viewChangeTimeout->Reset();
+            viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -688,7 +688,7 @@ namespace replication
         }
 
         void CRAQReplica::HandlePrepareOK(const TransportAddress &remote,
-                                        const PrepareOKMessage &msg)
+                                          const PrepareOKMessage &msg)
         {
             RDebug("Received PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
                    msg.view(), msg.opnum(), msg.replicaidx());
@@ -752,12 +752,12 @@ namespace replication
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
 
-                // nullCommitTimeout->Reset();
+                nullCommitTimeout->Reset();
             }
         }
 
         void CRAQReplica::HandleCommit(const TransportAddress &remote,
-                                     const CommitMessage &msg)
+                                       const CommitMessage &msg)
         {
             RDebug("Received COMMIT " FMT_VIEWSTAMP, msg.view(), msg.opnum());
 
@@ -784,7 +784,7 @@ namespace replication
                 RPanic("Unexpected COMMIT: I'm the leader of this view");
             }
 
-            // viewChangeTimeout->Reset();
+            viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastCommitted)
             {
@@ -832,7 +832,7 @@ namespace replication
         }
 
         void CRAQReplica::HandleStateTransfer(const TransportAddress &remote,
-                                            const StateTransferMessage &msg)
+                                              const StateTransferMessage &msg)
         {
             RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
 
@@ -921,7 +921,7 @@ namespace replication
         }
 
         void CRAQReplica::HandleStartViewChange(const TransportAddress &remote,
-                                              const StartViewChangeMessage &msg)
+                                                const StartViewChangeMessage &msg)
         {
             RDebug("Received STARTVIEWCHANGE " FMT_VIEW " from replica %d", msg.view(),
                    msg.replicaidx());
@@ -984,7 +984,7 @@ namespace replication
         }
 
         void CRAQReplica::HandleDoViewChange(const TransportAddress &remote,
-                                           const DoViewChangeMessage &msg)
+                                             const DoViewChangeMessage &msg)
         {
             RDebug("Received DOVIEWCHANGE " FMT_VIEW
                    " from replica %d, "
@@ -1125,7 +1125,7 @@ namespace replication
         }
 
         void CRAQReplica::HandleStartView(const TransportAddress &remote,
-                                        const StartViewMessage &msg)
+                                          const StartViewMessage &msg)
         {
             RDebug("Received STARTVIEW " FMT_VIEW " op=" FMT_OPNUM
                    " committed=" FMT_OPNUM " entries=%d",
