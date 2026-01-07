@@ -77,12 +77,12 @@ namespace replication
                 Notice("Batching enabled; batch size %d", batchSize);
             }
 
-            this->viewChangeTimeout =
-                new Timeout(transport, 5000, [this]()
-                            { StartViewChange(view + 1); });
-            this->nullCommitTimeout =
-                new Timeout(transport, 1000, [this]()
-                            { SendNullCommit(); });
+            // this->viewChangeTimeout =
+                // new Timeout(transport, 5000, [this]()
+                            // { StartViewChange(view + 1); });
+            // this->nullCommitTimeout =
+            //     new Timeout(transport, 1000, [this]()
+            //                 { SendNullCommit(); });
             this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
                                                      {
         this->lastRequestStateTransferView = 0;
@@ -97,11 +97,11 @@ namespace replication
 
             if (AmLeader())
             {
-                nullCommitTimeout->Start();
+                // nullCommitTimeout->Start();
             }
             else
             {
-                viewChangeTimeout->Start();
+                // viewChangeTimeout->Start();
             }
 
             if (debug_stats_)
@@ -114,8 +114,8 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            delete viewChangeTimeout;
-            delete nullCommitTimeout;
+            // delete viewChangeTimeout;
+            // delete nullCommitTimeout;
             delete stateTransferTimeout;
             delete resendPrepareTimeout;
             delete closeBatchTimeout;
@@ -264,13 +264,13 @@ namespace replication
 
             if (AmLeader())
             {
-                viewChangeTimeout->Stop();
-                nullCommitTimeout->Start();
+                // viewChangeTimeout->Stop();
+                // nullCommitTimeout->Start();
             }
             else
             {
-                viewChangeTimeout->Start();
-                nullCommitTimeout->Stop();
+                // viewChangeTimeout->Start();
+                // nullCommitTimeout->Stop();
                 resendPrepareTimeout->Stop();
                 closeBatchTimeout->Stop();
             }
@@ -287,8 +287,8 @@ namespace replication
             view = newview;
             status = STATUS_VIEW_CHANGE;
 
-            viewChangeTimeout->Reset();
-            nullCommitTimeout->Stop();
+            // viewChangeTimeout->Reset();
+            // nullCommitTimeout->Stop();
             resendPrepareTimeout->Stop();
             closeBatchTimeout->Stop();
 
@@ -317,7 +317,7 @@ namespace replication
                 RWarning("Failed to send null COMMIT message to all replicas");
             }
 
-            nullCommitTimeout->Reset();
+            // nullCommitTimeout->Reset();
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -408,11 +408,11 @@ namespace replication
                 request.ParseFromString(data);
                 HandleRequest(remote, request);
             }
-            else if (type == unloggedRequest.GetTypeName())
-            {
-                unloggedRequest.ParseFromString(data);
-                HandleUnloggedRequest(remote, unloggedRequest);
-            }
+            // else if (type == unloggedRequest.GetTypeName())
+            // {
+            //     unloggedRequest.ParseFromString(data);
+            //     HandleUnloggedRequest(remote, unloggedRequest);
+            // }
             else if (type == prepare.GetTypeName())
             {
                 prepare.ParseFromString(data);
@@ -438,21 +438,21 @@ namespace replication
                 stateTransfer.ParseFromString(data);
                 HandleStateTransfer(remote, stateTransfer);
             }
-            else if (type == startViewChange.GetTypeName())
-            {
-                startViewChange.ParseFromString(data);
-                HandleStartViewChange(remote, startViewChange);
-            }
-            else if (type == doViewChange.GetTypeName())
-            {
-                doViewChange.ParseFromString(data);
-                HandleDoViewChange(remote, doViewChange);
-            }
-            else if (type == startView.GetTypeName())
-            {
-                startView.ParseFromString(data);
-                HandleStartView(remote, startView);
-            }
+            // else if (type == startViewChange.GetTypeName())
+            // {
+            //     startViewChange.ParseFromString(data);
+            //     HandleStartViewChange(remote, startViewChange);
+            // }
+            // else if (type == doViewChange.GetTypeName())
+            // {
+            //     doViewChange.ParseFromString(data);
+            //     HandleDoViewChange(remote, doViewChange);
+            // }
+            // else if (type == startView.GetTypeName())
+            // {
+            //     startView.ParseFromString(data);
+            //     HandleStartView(remote, startView);
+            // }
             else
             {
                 RPanic("Received unexpected message type in CRAQ proto: %s",
@@ -572,7 +572,7 @@ namespace replication
                     }
                 }
 
-                nullCommitTimeout->Reset();
+                // nullCommitTimeout->Reset();
             }
         }
 
@@ -633,7 +633,7 @@ namespace replication
             ASSERT((msg.opnum() - msg.batchstart() + 1) ==
                    (unsigned int)msg.request_size());
 
-            viewChangeTimeout->Reset();
+            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -752,7 +752,7 @@ namespace replication
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
 
-                nullCommitTimeout->Reset();
+                // nullCommitTimeout->Reset();
             }
         }
 
@@ -784,7 +784,7 @@ namespace replication
                 RPanic("Unexpected COMMIT: I'm the leader of this view");
             }
 
-            viewChangeTimeout->Reset();
+            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastCommitted)
             {
@@ -920,68 +920,68 @@ namespace replication
             }
         }
 
-        void CRAQReplica::HandleStartViewChange(const TransportAddress &remote,
-                                                const StartViewChangeMessage &msg)
-        {
-            RDebug("Received STARTVIEWCHANGE " FMT_VIEW " from replica %d", msg.view(),
-                   msg.replicaidx());
+        // void CRAQReplica::HandleStartViewChange(const TransportAddress &remote,
+        //                                         const StartViewChangeMessage &msg)
+        // {
+        //     RDebug("Received STARTVIEWCHANGE " FMT_VIEW " from replica %d", msg.view(),
+        //            msg.replicaidx());
 
-            if (msg.view() < view)
-            {
-                RDebug("Ignoring STARTVIEWCHANGE for older view");
-                return;
-            }
+        //     if (msg.view() < view)
+        //     {
+        //         RDebug("Ignoring STARTVIEWCHANGE for older view");
+        //         return;
+        //     }
 
-            if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
-            {
-                RDebug("Ignoring STARTVIEWCHANGE for current view");
-                return;
-            }
+        //     if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
+        //     {
+        //         RDebug("Ignoring STARTVIEWCHANGE for current view");
+        //         return;
+        //     }
 
-            if ((status != STATUS_VIEW_CHANGE) || (msg.view() > view))
-            {
-                StartViewChange(msg.view());
-            }
+        //     if ((status != STATUS_VIEW_CHANGE) || (msg.view() > view))
+        //     {
+        //         StartViewChange(msg.view());
+        //     }
 
-            ASSERT(msg.view() == view);
+        //     ASSERT(msg.view() == view);
 
-            if (auto msgs = startViewChangeQuorum.AddAndCheckForQuorum(
-                    msg.view(), msg.replicaidx(), msg))
-            {
-                int leader = configuration.GetLeaderIndex(view);
-                // Don't try to send a DoViewChange message to ourselves
-                if (leader != myIdx)
-                {
-                    DoViewChangeMessage dvc;
-                    dvc.set_view(view);
-                    dvc.set_lastnormalview(log.LastViewstamp().view);
-                    dvc.set_lastop(lastOp);
-                    dvc.set_lastcommitted(lastCommitted);
-                    dvc.set_replicaidx(myIdx);
+        //     if (auto msgs = startViewChangeQuorum.AddAndCheckForQuorum(
+        //             msg.view(), msg.replicaidx(), msg))
+        //     {
+        //         int leader = configuration.GetLeaderIndex(view);
+        //         // Don't try to send a DoViewChange message to ourselves
+        //         if (leader != myIdx)
+        //         {
+        //             DoViewChangeMessage dvc;
+        //             dvc.set_view(view);
+        //             dvc.set_lastnormalview(log.LastViewstamp().view);
+        //             dvc.set_lastop(lastOp);
+        //             dvc.set_lastcommitted(lastCommitted);
+        //             dvc.set_replicaidx(myIdx);
 
-                    // Figure out how much of the log to include
-                    opnum_t minCommitted =
-                        std::min_element(
-                            msgs->begin(), msgs->end(),
-                            [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                            {
-                                return a.second.lastcommitted() <
-                                       b.second.lastcommitted();
-                            })
-                            ->second.lastcommitted();
-                    minCommitted = std::min(minCommitted, lastCommitted);
+        //             // Figure out how much of the log to include
+        //             opnum_t minCommitted =
+        //                 std::min_element(
+        //                     msgs->begin(), msgs->end(),
+        //                     [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
+        //                     {
+        //                         return a.second.lastcommitted() <
+        //                                b.second.lastcommitted();
+        //                     })
+        //                     ->second.lastcommitted();
+        //             minCommitted = std::min(minCommitted, lastCommitted);
 
-                    log.Dump(minCommitted, dvc.mutable_entries());
+        //             log.Dump(minCommitted, dvc.mutable_entries());
 
-                    if (!(transport->SendMessageToReplica(this, leader, dvc)))
-                    {
-                        RWarning(
-                            "Failed to send DoViewChange message to leader of new "
-                            "view");
-                    }
-                }
-            }
-        }
+        //             if (!(transport->SendMessageToReplica(this, leader, dvc)))
+        //             {
+        //                 RWarning(
+        //                     "Failed to send DoViewChange message to leader of new "
+        //                     "view");
+        //             }
+        //         }
+        //     }
+        // }
 
         void CRAQReplica::HandleDoViewChange(const TransportAddress &remote,
                                              const DoViewChangeMessage &msg)
@@ -1124,58 +1124,58 @@ namespace replication
             }
         }
 
-        void CRAQReplica::HandleStartView(const TransportAddress &remote,
-                                          const StartViewMessage &msg)
-        {
-            RDebug("Received STARTVIEW " FMT_VIEW " op=" FMT_OPNUM
-                   " committed=" FMT_OPNUM " entries=%d",
-                   msg.view(), msg.lastop(), msg.lastcommitted(), msg.entries_size());
-            RDebug("Currently in view " FMT_VIEW " op " FMT_OPNUM
-                   " committed " FMT_OPNUM,
-                   view, lastOp, lastCommitted);
+        // void CRAQReplica::HandleStartView(const TransportAddress &remote,
+        //                                   const StartViewMessage &msg)
+        // {
+        //     RDebug("Received STARTVIEW " FMT_VIEW " op=" FMT_OPNUM
+        //            " committed=" FMT_OPNUM " entries=%d",
+        //            msg.view(), msg.lastop(), msg.lastcommitted(), msg.entries_size());
+        //     RDebug("Currently in view " FMT_VIEW " op " FMT_OPNUM
+        //            " committed " FMT_OPNUM,
+        //            view, lastOp, lastCommitted);
 
-            if (msg.view() < view)
-            {
-                RWarning("Ignoring STARTVIEW for older view");
-                return;
-            }
+        //     if (msg.view() < view)
+        //     {
+        //         RWarning("Ignoring STARTVIEW for older view");
+        //         return;
+        //     }
 
-            if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
-            {
-                RWarning("Ignoring STARTVIEW for current view");
-                return;
-            }
+        //     if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
+        //     {
+        //         RWarning("Ignoring STARTVIEW for current view");
+        //         return;
+        //     }
 
-            ASSERT(configuration.GetLeaderIndex(msg.view()) != myIdx);
+        //     ASSERT(configuration.GetLeaderIndex(msg.view()) != myIdx);
 
-            if (msg.entries_size() == 0)
-            {
-                ASSERT(msg.lastcommitted() == lastCommitted);
-                ASSERT(msg.lastop() == msg.lastcommitted());
-            }
-            else
-            {
-                if (msg.entries(0).opnum() > lastCommitted + 1)
-                {
-                    RPanic(
-                        "Not enough entries in STARTVIEW message to install new "
-                        "log");
-                }
+        //     if (msg.entries_size() == 0)
+        //     {
+        //         ASSERT(msg.lastcommitted() == lastCommitted);
+        //         ASSERT(msg.lastop() == msg.lastcommitted());
+        //     }
+        //     else
+        //     {
+        //         if (msg.entries(0).opnum() > lastCommitted + 1)
+        //         {
+        //             RPanic(
+        //                 "Not enough entries in STARTVIEW message to install new "
+        //                 "log");
+        //         }
 
-                // Install the new log
-                log.RemoveAfter(msg.lastop() + 1);
-                log.Install(msg.entries().begin(), msg.entries().end());
-            }
+        //         // Install the new log
+        //         log.RemoveAfter(msg.lastop() + 1);
+        //         log.Install(msg.entries().begin(), msg.entries().end());
+        //     }
 
-            EnterView(msg.view());
-            opnum_t oldLastOp = lastOp;
-            lastOp = msg.lastop();
+        //     EnterView(msg.view());
+        //     opnum_t oldLastOp = lastOp;
+        //     lastOp = msg.lastop();
 
-            ASSERT(!AmLeader());
+        //     ASSERT(!AmLeader());
 
-            CommitUpTo(msg.lastcommitted());
-            SendPrepareOKs(oldLastOp);
-        }
+        //     CommitUpTo(msg.lastcommitted());
+        //     SendPrepareOKs(oldLastOp);
+        // }
 
         void CRAQReplica::Close()
         {
