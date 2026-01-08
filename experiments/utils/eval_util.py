@@ -136,6 +136,16 @@ def calculate_statistics_for_run(config, local_out_directory, run):
     stats = {}
 
     regions = get_regions(config)
+    base_process_count = config["client_total"] // len(config["clients"])
+    extra_processes = config["client_total"] % len(config["clients"])
+    # Calculate num_processes list based on order provided in config["clients"]
+    num_processes_list = []
+    for i in range(len(config["clients"])):
+        client = config["clients"][i]
+        num_processes = base_process_count
+        if i < extra_processes:
+            num_processes += 1
+        num_processes_list.append((client, num_processes))
     for region in regions:
         r_op_latencies = {}
         r_op_latency_counts = {}
@@ -145,12 +155,13 @@ def calculate_statistics_for_run(config, local_out_directory, run):
         op_latency_counts = {}
         op_tputs = {}
         op_times = {}
-        for client in config["clients"]:
+
+        for (client, num_processes) in num_processes_list:
             if get_region(config, client) != region:
                 continue
 
             client_dir = client
-            for k in range(config["client_processes_per_client_node"]):
+            for k in range(num_processes):
                 client_out_file = os.path.join(local_out_directory,
                                                client_dir,
                                                '%s-%d-stdout-%d.log' % (client, k, run))

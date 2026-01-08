@@ -63,7 +63,13 @@ class IOCLCodebase:
                                       config['out_directory_name'],
                                       '%s-%d-stats-%d.json' % (client, k, run))
 
-        client_id = i * config["client_processes_per_client_node"] + k
+        base_process_count = config["client_total"] // len(config["clients"])
+        extra_processes = config["client_total"] % len(config["clients"])
+        if i < extra_processes:
+            base_process_count += 1
+        assert(k < base_process_count)
+        client_id = sum([config["client_total"] // len(config["clients"]) + (1 if x < extra_processes else 0) for x in range(i)]) + k
+        # client_id = i * config["client_processes_per_client_node"] + k
 
         bench_mode = config['bench_mode']
 
