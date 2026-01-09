@@ -60,8 +60,6 @@ namespace replication
               batchSize(batchSize),
               log(false),
               prepareOKQuorum(config.QuorumSize() - 1),
-              startViewChangeQuorum(config.QuorumSize() - 1),
-              doViewChangeQuorum(config.QuorumSize() - 1),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
@@ -77,32 +75,12 @@ namespace replication
                 Notice("Batching enabled; batch size %d", batchSize);
             }
 
-            // this->viewChangeTimeout =
-                // new Timeout(transport, 5000, [this]()
-                            // { StartViewChange(view + 1); });
-            // this->nullCommitTimeout =
-            //     new Timeout(transport, 1000, [this]()
-            //                 { SendNullCommit(); });
-            this->stateTransferTimeout = new Timeout(transport, 1000, [this]()
-                                                     {
-        this->lastRequestStateTransferView = 0;
-        this->lastRequestStateTransferOpnum = 0; });
-            this->stateTransferTimeout->Start();
             this->resendPrepareTimeout =
                 new Timeout(transport, 500, [this]()
                             { ResendPrepare(); });
             this->closeBatchTimeout =
                 new Timeout(transport, 300, [this]()
                             { CloseBatch(); });
-
-            if (AmLeader())
-            {
-                // nullCommitTimeout->Start();
-            }
-            else
-            {
-                // viewChangeTimeout->Start();
-            }
 
             if (debug_stats_)
             {
@@ -114,8 +92,6 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            // delete viewChangeTimeout;
-            // delete nullCommitTimeout;
             delete stateTransferTimeout;
             delete resendPrepareTimeout;
             delete closeBatchTimeout;
@@ -264,60 +240,14 @@ namespace replication
 
             if (AmLeader())
             {
-                // viewChangeTimeout->Stop();
-                // nullCommitTimeout->Start();
             }
             else
             {
-                // viewChangeTimeout->Start();
-                // nullCommitTimeout->Stop();
                 resendPrepareTimeout->Stop();
                 closeBatchTimeout->Stop();
             }
 
             prepareOKQuorum.Clear();
-            startViewChangeQuorum.Clear();
-            doViewChangeQuorum.Clear();
-        }
-
-        void CRAQReplica::StartViewChange(view_t newview)
-        {
-            RNotice("Starting view change for view " FMT_VIEW, newview);
-
-            view = newview;
-            status = STATUS_VIEW_CHANGE;
-
-            // viewChangeTimeout->Reset();
-            // nullCommitTimeout->Stop();
-            resendPrepareTimeout->Stop();
-            closeBatchTimeout->Stop();
-
-            StartViewChangeMessage m;
-            m.set_view(newview);
-            m.set_replicaidx(myIdx);
-            m.set_lastcommitted(lastCommitted);
-
-            if (!transport->SendMessageToAll(this, m))
-            {
-                RWarning("Failed to send StartViewChange message to all replicas");
-            }
-        }
-
-        void CRAQReplica::SendNullCommit()
-        {
-            Debug("Sending null commit");
-            CommitMessage cm;
-            cm.set_view(this->view);
-            cm.set_opnum(this->lastCommitted);
-
-            ASSERT(AmLeader());
-
-            if (!(transport->SendMessageToAll(this, cm)))
-            {
-                RWarning("Failed to send null COMMIT message to all replicas");
-            }
-
-            // nullCommitTimeout->Reset();
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -399,20 +329,12 @@ namespace replication
             CommitMessage commit;
             RequestStateTransferMessage requestStateTransfer;
             StateTransferMessage stateTransfer;
-            StartViewChangeMessage startViewChange;
-            DoViewChangeMessage doViewChange;
-            StartViewMessage startView;
 
             if (type == request.GetTypeName())
             {
                 request.ParseFromString(data);
                 HandleRequest(remote, request);
             }
-            // else if (type == unloggedRequest.GetTypeName())
-            // {
-            //     unloggedRequest.ParseFromString(data);
-            //     HandleUnloggedRequest(remote, unloggedRequest);
-            // }
             else if (type == prepare.GetTypeName())
             {
                 prepare.ParseFromString(data);
@@ -438,21 +360,6 @@ namespace replication
                 stateTransfer.ParseFromString(data);
                 HandleStateTransfer(remote, stateTransfer);
             }
-            // else if (type == startViewChange.GetTypeName())
-            // {
-            //     startViewChange.ParseFromString(data);
-            //     HandleStartViewChange(remote, startViewChange);
-            // }
-            // else if (type == doViewChange.GetTypeName())
-            // {
-            //     doViewChange.ParseFromString(data);
-            //     HandleDoViewChange(remote, doViewChange);
-            // }
-            // else if (type == startView.GetTypeName())
-            // {
-            //     startView.ParseFromString(data);
-            //     HandleStartView(remote, startView);
-            // }
             else
             {
                 RPanic("Received unexpected message type in CRAQ proto: %s",
@@ -618,6 +525,7 @@ namespace replication
 
             if (msg.view() > this->view)
             {
+                Debug("Calling state transfer with this view <" FMT_VIEW ,this->view);
                 RequestStateTransfer();
                 pendingPrepares.push_back(
                     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
@@ -653,6 +561,7 @@ namespace replication
 
             if (msg.batchstart() > this->lastOp + 1)
             {
+                Debug("Calling state transfer with batch start");
                 RequestStateTransfer();
                 pendingPrepares.push_back(
                     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
@@ -919,263 +828,6 @@ namespace replication
                 delete msgpair.first;
             }
         }
-
-        // void CRAQReplica::HandleStartViewChange(const TransportAddress &remote,
-        //                                         const StartViewChangeMessage &msg)
-        // {
-        //     RDebug("Received STARTVIEWCHANGE " FMT_VIEW " from replica %d", msg.view(),
-        //            msg.replicaidx());
-
-        //     if (msg.view() < view)
-        //     {
-        //         RDebug("Ignoring STARTVIEWCHANGE for older view");
-        //         return;
-        //     }
-
-        //     if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
-        //     {
-        //         RDebug("Ignoring STARTVIEWCHANGE for current view");
-        //         return;
-        //     }
-
-        //     if ((status != STATUS_VIEW_CHANGE) || (msg.view() > view))
-        //     {
-        //         StartViewChange(msg.view());
-        //     }
-
-        //     ASSERT(msg.view() == view);
-
-        //     if (auto msgs = startViewChangeQuorum.AddAndCheckForQuorum(
-        //             msg.view(), msg.replicaidx(), msg))
-        //     {
-        //         int leader = configuration.GetLeaderIndex(view);
-        //         // Don't try to send a DoViewChange message to ourselves
-        //         if (leader != myIdx)
-        //         {
-        //             DoViewChangeMessage dvc;
-        //             dvc.set_view(view);
-        //             dvc.set_lastnormalview(log.LastViewstamp().view);
-        //             dvc.set_lastop(lastOp);
-        //             dvc.set_lastcommitted(lastCommitted);
-        //             dvc.set_replicaidx(myIdx);
-
-        //             // Figure out how much of the log to include
-        //             opnum_t minCommitted =
-        //                 std::min_element(
-        //                     msgs->begin(), msgs->end(),
-        //                     [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-        //                     {
-        //                         return a.second.lastcommitted() <
-        //                                b.second.lastcommitted();
-        //                     })
-        //                     ->second.lastcommitted();
-        //             minCommitted = std::min(minCommitted, lastCommitted);
-
-        //             log.Dump(minCommitted, dvc.mutable_entries());
-
-        //             if (!(transport->SendMessageToReplica(this, leader, dvc)))
-        //             {
-        //                 RWarning(
-        //                     "Failed to send DoViewChange message to leader of new "
-        //                     "view");
-        //             }
-        //         }
-        //     }
-        // }
-
-        void CRAQReplica::HandleDoViewChange(const TransportAddress &remote,
-                                             const DoViewChangeMessage &msg)
-        {
-            RDebug("Received DOVIEWCHANGE " FMT_VIEW
-                   " from replica %d, "
-                   "lastnormalview=" FMT_VIEW " op=" FMT_OPNUM " committed=" FMT_OPNUM,
-                   msg.view(), msg.replicaidx(), msg.lastnormalview(), msg.lastop(),
-                   msg.lastcommitted());
-
-            if (msg.view() < view)
-            {
-                RDebug("Ignoring DOVIEWCHANGE for older view");
-                return;
-            }
-
-            if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
-            {
-                RDebug("Ignoring DOVIEWCHANGE for current view");
-                return;
-            }
-
-            if ((status != STATUS_VIEW_CHANGE) || (msg.view() > view))
-            {
-                // It's superfluous to send the StartViewChange messages here,
-                // but harmless...
-                StartViewChange(msg.view());
-            }
-
-            ASSERT(configuration.GetLeaderIndex(msg.view()) == myIdx);
-
-            auto msgs = doViewChangeQuorum.AddAndCheckForQuorum(msg.view(),
-                                                                msg.replicaidx(), msg);
-            if (msgs != NULL)
-            {
-                // Find the response with the most up to date log, i.e. the
-                // one with the latest viewstamp
-                view_t latestView = log.LastViewstamp().view;
-                opnum_t latestOp = log.LastViewstamp().opnum;
-                DoViewChangeMessage *latestMsg = NULL;
-
-                for (auto kv : *msgs)
-                {
-                    DoViewChangeMessage &x = kv.second;
-                    if ((x.lastnormalview() > latestView) ||
-                        (((x.lastnormalview() == latestView) &&
-                          (x.lastop() > latestOp))))
-                    {
-                        latestView = x.lastnormalview();
-                        latestOp = x.lastop();
-                        latestMsg = &x;
-                    }
-                }
-
-                // Install the new log. We might not need to do this, if our
-                // log was the most current one.
-                if (latestMsg != NULL)
-                {
-                    RDebug("Selected log from replica %d with lastop=" FMT_OPNUM,
-                           latestMsg->replicaidx(), latestMsg->lastop());
-                    if (latestMsg->entries_size() == 0)
-                    {
-                        // There weren't actually any entries in the
-                        // log. That should only happen in the corner case
-                        // that everyone already had the entire log, maybe
-                        // because it actually is empty.
-                        ASSERT(lastCommitted == msg.lastcommitted());
-                        ASSERT(msg.lastop() == msg.lastcommitted());
-                    }
-                    else
-                    {
-                        if (latestMsg->entries(0).opnum() > lastCommitted + 1)
-                        {
-                            RPanic(
-                                "Received log that didn't include enough entries "
-                                "to "
-                                "install it");
-                        }
-
-                        log.RemoveAfter(latestMsg->lastop() + 1);
-                        log.Install(latestMsg->entries().begin(),
-                                    latestMsg->entries().end());
-                    }
-                }
-                else
-                {
-                    RDebug("My log is most current, lastnormalview=" FMT_VIEW
-                           " lastop=" FMT_OPNUM,
-                           log.LastViewstamp().view, lastOp);
-                }
-
-                // How much of the log should we include when we send the
-                // STARTVIEW message? Start from the lowest committed opnum of
-                // any of the STARTVIEWCHANGE or DOVIEWCHANGE messages we got.
-                //
-                // We need to compute this before we enter the new view
-                // because the saved messages will go away.
-                auto svcs = startViewChangeQuorum.GetMessages(view);
-                opnum_t minCommittedSVC =
-                    std::min_element(
-                        svcs.begin(), svcs.end(),
-                        [](decltype(*svcs.begin()) a, decltype(*svcs.begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommittedDVC =
-                    std::min_element(
-                        msgs->begin(), msgs->end(),
-                        [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
-                minCommitted = std::min(minCommitted, lastCommitted);
-
-                EnterView(msg.view());
-
-                ASSERT(AmLeader());
-
-                lastOp = latestOp;
-                if (latestMsg != NULL)
-                {
-                    CommitUpTo(latestMsg->lastcommitted());
-                }
-
-                // Send a STARTVIEW message with the new log
-                StartViewMessage sv;
-                sv.set_view(view);
-                sv.set_lastop(lastOp);
-                sv.set_lastcommitted(lastCommitted);
-
-                log.Dump(minCommitted, sv.mutable_entries());
-
-                if (!(transport->SendMessageToAll(this, sv)))
-                {
-                    RWarning("Failed to send StartView message to all replicas");
-                }
-            }
-        }
-
-        // void CRAQReplica::HandleStartView(const TransportAddress &remote,
-        //                                   const StartViewMessage &msg)
-        // {
-        //     RDebug("Received STARTVIEW " FMT_VIEW " op=" FMT_OPNUM
-        //            " committed=" FMT_OPNUM " entries=%d",
-        //            msg.view(), msg.lastop(), msg.lastcommitted(), msg.entries_size());
-        //     RDebug("Currently in view " FMT_VIEW " op " FMT_OPNUM
-        //            " committed " FMT_OPNUM,
-        //            view, lastOp, lastCommitted);
-
-        //     if (msg.view() < view)
-        //     {
-        //         RWarning("Ignoring STARTVIEW for older view");
-        //         return;
-        //     }
-
-        //     if ((msg.view() == view) && (status != STATUS_VIEW_CHANGE))
-        //     {
-        //         RWarning("Ignoring STARTVIEW for current view");
-        //         return;
-        //     }
-
-        //     ASSERT(configuration.GetLeaderIndex(msg.view()) != myIdx);
-
-        //     if (msg.entries_size() == 0)
-        //     {
-        //         ASSERT(msg.lastcommitted() == lastCommitted);
-        //         ASSERT(msg.lastop() == msg.lastcommitted());
-        //     }
-        //     else
-        //     {
-        //         if (msg.entries(0).opnum() > lastCommitted + 1)
-        //         {
-        //             RPanic(
-        //                 "Not enough entries in STARTVIEW message to install new "
-        //                 "log");
-        //         }
-
-        //         // Install the new log
-        //         log.RemoveAfter(msg.lastop() + 1);
-        //         log.Install(msg.entries().begin(), msg.entries().end());
-        //     }
-
-        //     EnterView(msg.view());
-        //     opnum_t oldLastOp = lastOp;
-        //     lastOp = msg.lastop();
-
-        //     ASSERT(!AmLeader());
-
-        //     CommitUpTo(msg.lastcommitted());
-        //     SendPrepareOKs(oldLastOp);
-        // }
 
         void CRAQReplica::Close()
         {

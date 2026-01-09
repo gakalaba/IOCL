@@ -83,11 +83,7 @@ namespace replication
             std::map<uint64_t, ClientTableEntry> clientTable;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-            QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-            QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
 
-            // Timeout *viewChangeTimeout;
-            // Timeout *nullCommitTimeout;
             Timeout *stateTransferTimeout;
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
@@ -104,7 +100,6 @@ namespace replication
             void RequestStateTransfer();
             void EnterView(view_t newview);
             void StartViewChange(view_t newview);
-            void SendNullCommit();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
             void CloseBatch();
@@ -125,12 +120,6 @@ namespace replication
                 const proto::RequestStateTransferMessage &msg);
             void HandleStateTransfer(const TransportAddress &remote,
                                      const proto::StateTransferMessage &msg);
-            void HandleStartViewChange(const TransportAddress &remote,
-                                       const proto::StartViewChangeMessage &msg);
-            void HandleDoViewChange(const TransportAddress &remote,
-                                    const proto::DoViewChangeMessage &msg);
-            void HandleStartView(const TransportAddress &remote,
-                                 const proto::StartViewMessage &msg);
         };
 
     } // namespace craq
