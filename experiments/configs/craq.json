@@ -8,8 +8,8 @@
       "client_processes_per_client_node"
     ]
   ],
-  "replication_protocol": ["craq"],
-  "client_protocol_mode": ["craq"],
+  "replication_protocol": ["vr"],
+  "client_protocol_mode": ["vr"],
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
@@ -125,10 +125,10 @@
     6,
     7
   ],
-  "client_debug_output": false,
-  "server_debug_output": false,
-  "client_debug_stats": false,
-  "server_debug_stats": false,
+  "client_debug_output": true,
+  "server_debug_output": true,
+  "client_debug_stats": true,
+  "server_debug_stats": true,
   "client_experiment_length": 14,
   "client_rand_sleep": 0,
   "client_ramp_down": 4,
@@ -270,8 +270,8 @@
   "make_env": {},
   "server_rdma_port": 9087,
   "rxe_cfg_path": "",
-  "client_read_percentage": 1000,
-  "client_write_percentage": 0,
+  "client_read_percentage": 500,
+  "client_write_percentage": 500,
   "client_conflict_percentage": 2,
   "client_max_processors": 2,
   "client_random_coordinator": false,
@@ -287,7 +287,7 @@
   "server_cpuprofile": false,
   "server_durable": false,
   "server_rpc_port": 8087,
-  "client_gc_debug_trace": false,
+  "client_gc_debug_trace": true,
   "client_cpuprofile": false,
-  "server_gc_debug_trace": false
+  "server_gc_debug_trace": true
 }
