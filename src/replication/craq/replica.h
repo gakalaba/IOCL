@@ -65,7 +65,6 @@ namespace replication
             int numReplicas;
             opnum_t lastCommitted;
             opnum_t lastOp;
-            opnum_t lastRequestStateTransferOpnum;
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
                 pendingPrepares;
             proto::PrepareMessage lastPrepare;
@@ -98,7 +97,6 @@ namespace replication
             void ExecuteOperation(const Request &entry);
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
-            void RequestStateTransfer();
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
             [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
@@ -121,11 +119,6 @@ namespace replication
                                  const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
-            void HandleRequestStateTransfer(
-                const TransportAddress &remote,
-                const proto::RequestStateTransferMessage &msg);
-            void HandleStateTransfer(const TransportAddress &remote,
-                                     const proto::StateTransferMessage &msg);
         };
 
     } // namespace craq

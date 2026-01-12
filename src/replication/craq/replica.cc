@@ -67,7 +67,6 @@ namespace replication
             this->view = 0;
             this->lastOp = 0;
             this->lastCommitted = 0;
-            this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
 
             if (batchSize > 1)
@@ -215,31 +214,6 @@ namespace replication
             }
         }
 
-        void CRAQReplica::RequestStateTransfer()
-        {
-            RequestStateTransferMessage m;
-            m.set_view(view);
-            m.set_opnum(lastCommitted);
-
-            if ((lastRequestStateTransferOpnum != 0)  &&
-                (lastRequestStateTransferOpnum == lastCommitted))
-            {
-                RDebug("Skipping state transfer request " FMT_VIEWSTAMP
-                       " because we already requested it",
-                       view, lastCommitted);
-                return;
-            }
-
-            RNotice("Requesting state transfer: " FMT_VIEWSTAMP, view, lastCommitted);
-
-            this->lastRequestStateTransferOpnum = lastCommitted;
-
-            if (!BackwardsPropagateMessageInChain(m))
-            {
-                RWarning("Failed to backwards propagate RequestStateTransfer message");
-            }
-        }
-
         void CRAQReplica::UpdateClientTable(const Request &req)
         {
             ClientTableEntry &entry = clientTable[req.clientid()];
@@ -366,8 +340,6 @@ namespace replication
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
             CommitMessage commit;
-            RequestStateTransferMessage requestStateTransfer;
-            StateTransferMessage stateTransfer;
             
             if (type == request.GetTypeName())
             {
@@ -388,16 +360,6 @@ namespace replication
             {
                 commit.ParseFromString(data);
                 HandleCommit(remote, commit);
-            }
-            else if (type == requestStateTransfer.GetTypeName())
-            {
-                requestStateTransfer.ParseFromString(data);
-                HandleRequestStateTransfer(remote, requestStateTransfer);
-            }
-            else if (type == stateTransfer.GetTypeName())
-            {
-                stateTransfer.ParseFromString(data);
-                HandleStateTransfer(remote, stateTransfer);
             }
             else
             {
@@ -485,7 +447,7 @@ namespace replication
 
             UpdateClientTable(msg.req());
 
-            // Leader Upcall
+            // Leader Upcall: will always be true, can comment out 
             bool replicate = false;
             string res;
             LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
@@ -587,7 +549,7 @@ namespace replication
             if (msg.batchstart() > this->lastOp + 1)
             {
                 Debug("Calling state transfer due to gap between last operation seen and start of batch received");
-                RequestStateTransfer();
+                // RequestStateTransfer();
                 pendingPrepares.push_back(
                     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
                 return;
@@ -685,7 +647,7 @@ namespace replication
 
             if (msg.opnum() > this->lastOp)
             {
-                RequestStateTransfer();
+                // RequestStateTransfer();
                 return;
             }
 
@@ -698,141 +660,6 @@ namespace replication
                     RWarning("Failed to back propagate COMMIT message from tail");
                 }
                 Debug("Backwards propagating commit");
-            }
-        }
-
-        void CRAQReplica::HandleRequestStateTransfer(
-            const TransportAddress &remote, const RequestStateTransferMessage &msg)
-        {
-            RDebug("Received REQUESTSTATETRANSFER " FMT_VIEWSTAMP, msg.view(),
-                   msg.opnum());
-
-            if (status != STATUS_NORMAL)
-            {
-                RDebug("Ignoring REQUESTSTATETRANSFER due to abnormal status");
-                return;
-            }
-
-            RNotice("Sending state transfer from " FMT_VIEWSTAMP " to " FMT_VIEWSTAMP,
-                    msg.view(), msg.opnum(), view, lastCommitted);
-
-            StateTransferMessage reply;
-            reply.set_view(view);
-            reply.set_opnum(lastCommitted);
-
-            log.Dump(msg.opnum() + 1, reply.mutable_entries());
-
-            transport->SendMessage(this, remote, reply);
-        }
-
-        void CRAQReplica::HandleStateTransfer(const TransportAddress &remote,
-                                              const StateTransferMessage &msg)
-        {
-            RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
-
-            opnum_t oldLastOp = lastOp;
-
-            /* Install the new log entries */
-            for (auto newEntry : msg.entries())
-            {
-                if (newEntry.opnum() <= lastCommitted)
-                {
-                    // Already committed this operation; nothing to be done.
-#if PARANOID
-                    const LogEntry *entry = log.Find(newEntry.opnum());
-                    ASSERT(entry->viewstamp.opnum == newEntry.opnum());
-                    ASSERT(entry->viewstamp.view == newEntry.view());
-//          ASSERT(entry->request == newEntry.request());
-#endif
-                }
-                else if (newEntry.opnum() <= lastOp)
-                {
-                    RPanic("Should not hit this case, irrelevant to views");
-                    // We already have an entry with this opnum, but maybe
-                    // it's from an older view?
-                    const LogEntry *entry = log.Find(newEntry.opnum());
-                    ASSERT(entry->viewstamp.opnum == newEntry.opnum());
-                    ASSERT(entry->viewstamp.view <= newEntry.view());
-
-                    if (entry->viewstamp.view == newEntry.view())
-                    {
-                        // We already have this operation in our log.
-                        ASSERT(entry->state == LOG_STATE_DIRTY);
-#if PARANOID
-//              ASSERT(entry->request == newEntry.request());
-#endif
-                    }
-                    else
-                    {
-                        RPanic("Should not hit this case, irrelevant to views");
-                        // Our operation was from an older view, so obviously
-                        // it didn't survive a view change. Throw out any
-                        // later log entries and replace with this one.
-                        ASSERT(entry->state != LOG_STATE_CLEAN);
-                        log.RemoveAfter(newEntry.opnum());
-                        lastOp = newEntry.opnum();
-                        oldLastOp = lastOp;
-
-                        viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        log.Append(vs, newEntry.request(), LOG_STATE_DIRTY);
-                    }
-                }
-                else
-                {
-                    // This is a new operation to us. Add it to the log.
-                    ASSERT(newEntry.opnum() == lastOp + 1);
-
-                    viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    log.Append(vs, newEntry.request(), LOG_STATE_DIRTY);
-                    Debug("new entry opnum is %lu, lastop is %lu", newEntry.opnum(),lastOp);
-    
-                    if (!AmTail())
-                    {
-                        PrepareMessage p;
-                        p.set_view(view);
-                        p.set_opnum(newEntry.opnum());
-                        p.set_batchstart(newEntry.opnum());
-                        Request *r = p.add_request();
-                        *r = newEntry.request();
-                        lastPrepare = p;
-                        if (!ForwardPropagateMessageInChain(p))
-                        {
-                            RWarning("Failed to ressend prepare message to replica after receiving state transfer");
-                        }
-                        resendPrepareTimeout->Reset();
-                    }
-                    else
-                    {
-                        CommitUpTo(newEntry.opnum());
-
-                        CommitMessage cm;
-                        cm.set_view(this->view);
-                        cm.set_opnum(this->lastCommitted);
-
-                        if (!BackwardsPropagateMessageInChain(cm))
-                        {
-                            RWarning("Failed to backwards propagate COMMIT message from tail");
-                        } 
-                        Debug("Sending commit for write from tail");
-                    }
-
-                    lastOp++;
-                }
-            }
-
-            /* Execute committed operations */
-            ASSERT(msg.opnum() <= lastOp);
-            SendPrepareOKs(oldLastOp);
-
-            // Process pending prepares
-            std::list<std::pair<TransportAddress *, PrepareMessage>> pending =
-                pendingPrepares;
-            pendingPrepares.clear();
-            for (auto &msgpair : pending)
-            {
-                RDebug("Processing pending prepare message");
-                HandlePrepare(*msgpair.first, msgpair.second);
-                delete msgpair.first;
             }
         }
 
