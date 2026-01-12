@@ -658,12 +658,6 @@ namespace replication
                 return;
             }
 
-            if (!AmHead())
-            {
-                RWarning("Ignoring PREPAREOK because I'm not the head");
-                return;
-            }
-
             resendPrepareTimeout->Reset();
         }
 
