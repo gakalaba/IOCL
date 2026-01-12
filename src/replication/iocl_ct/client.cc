@@ -80,7 +80,6 @@ namespace replication
 
             Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
                   msg.shardtag(), msg.predlist().size());
-            Debug("size of the message before: %lu", msg.ByteSizeLong());
             string request_str;
 
             // Issue coordination requests
@@ -110,7 +109,6 @@ namespace replication
                 }
             }
             msg.clear_shardlist();
-            Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
 
             uint64_t reqId = ++lastReqId;
             // Timeout *timer =
