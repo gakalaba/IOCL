@@ -56,17 +56,17 @@ namespace replication
         CRAQReplica::CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
                                  Transport *transport, unsigned int batchSize,
                                  AppReplica *app, bool debug_stats)
-            : Replica(config, groupIdx, myIdx, transport, app),
+            : myIdx{myIdx},
+              numReplicas{config.n},
+              Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
-              prepareOKQuorum(config.QuorumSize() - 1),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
             this->view = 0;
             this->lastOp = 0;
             this->lastCommitted = 0;
-            this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
 
@@ -92,7 +92,6 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            delete stateTransferTimeout;
             delete resendPrepareTimeout;
             delete closeBatchTimeout;
 
@@ -109,12 +108,53 @@ namespace replication
             }
         }
 
-        bool CRAQReplica::AmLeader() const
+       bool CRAQReplica::ForwardPropagateMessageInChain(const Message &m)
+       {
+        if (AmTail())
         {
-            return (configuration.GetLeaderIndex(view) == myIdx);
+            Panic("Tail can't forward propagate message, it's the last node in the chain");
         }
+        return transport->SendMessageToReplica(this, myIdx + 1, m);
+       } 
 
-        void CRAQReplica::CommitUpTo(opnum_t upto)
+       bool CRAQReplica::BackwardsPropagateMessageInChain(const Message &m)
+       {
+        if (AmHead())
+        {
+            Panic("Head can't backwards propagate message, it's the first node in the chain");
+        }
+        return transport->SendMessageToReplica(this, myIdx - 1, m);
+       } 
+       
+       void CRAQReplica::ExecuteOperation(const Request &request)
+       {
+            RDebug("Executing request " FMT_OPNUM, lastCommitted);
+            ReplyMessage reply;
+            Execute(lastCommitted, request, reply);
+
+            reply.set_view(this->view);
+            reply.set_opnum(lastCommitted);
+            reply.set_clientreqid(request.clientreqid());
+
+            // Store reply in the client table
+            ClientTableEntry &cte = clientTable[request.clientid()];
+            if (cte.lastReqId <= request.clientreqid())
+            {
+                cte.lastReqId = request.clientreqid();
+                cte.replied = true;
+                cte.reply = reply;
+            }
+
+            /* Send reply */
+            auto iter = clientAddresses.find(request.clientid());
+            if (iter != clientAddresses.end())
+            {
+                transport->SendMessage(this, *iter->second, reply);
+            }
+       }
+
+       // TODO: right now, just commiting writes. Also add reads to log
+       void CRAQReplica::CommitUpTo(opnum_t upto)
         {
             while (lastCommitted < upto)
             {
@@ -130,39 +170,12 @@ namespace replication
 
                 const Request request = entry->request;
 
-                /* Execute it */
-                RDebug("Executing request " FMT_OPNUM, lastCommitted);
-                ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
-
                 /* Mark it as committed */
-                log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
+                log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
 
-                // Store reply in the client table
-                ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                if (cte.lastReqId <= entry->request.clientreqid())
+                if (AmHead())
                 {
-                    cte.lastReqId = entry->request.clientreqid();
-                    cte.replied = true;
-                    cte.reply = reply;
-                }
-                else
-                {
-                    // We've subsequently prepared another operation from the
-                    // same client. So this request must have been completed
-                    // at the client, and there's no need to record the
-                    // result.
-                }
-
-                /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
+                    ExecuteOperation(request);
                 }
             }
         }
@@ -183,7 +196,7 @@ namespace replication
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
-                ASSERT(entry->state == LOG_STATE_PREPARED);
+                ASSERT(entry->state == LOG_STATE_DIRTY);
                 UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
@@ -195,10 +208,9 @@ namespace replication
                        " for new uncommitted operation",
                        reply.view(), reply.opnum());
 
-                if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                if (!BackwardsPropagateMessageInChain(reply))
                 {
-                    RWarning("Failed to send PrepareOK message to leader");
+                    RWarning("Failed to backwards propagate PrepareOK message");
                 }
             }
         }
@@ -209,8 +221,7 @@ namespace replication
             m.set_view(view);
             m.set_opnum(lastCommitted);
 
-            if ((lastRequestStateTransferOpnum != 0) &&
-                (lastRequestStateTransferView == view) &&
+            if ((lastRequestStateTransferOpnum != 0)  &&
                 (lastRequestStateTransferOpnum == lastCommitted))
             {
                 RDebug("Skipping state transfer request " FMT_VIEWSTAMP
@@ -221,33 +232,12 @@ namespace replication
 
             RNotice("Requesting state transfer: " FMT_VIEWSTAMP, view, lastCommitted);
 
-            this->lastRequestStateTransferView = view;
             this->lastRequestStateTransferOpnum = lastCommitted;
 
-            if (!transport->SendMessageToAll(this, m))
+            if (!BackwardsPropagateMessageInChain(m))
             {
-                RWarning("Failed to send RequestStateTransfer message to all replicas");
+                RWarning("Failed to backwards propagate RequestStateTransfer message");
             }
-        }
-
-        void CRAQReplica::EnterView(view_t newview)
-        {
-            RNotice("Entering new view " FMT_VIEW, newview);
-
-            view = newview;
-            status = STATUS_NORMAL;
-            lastBatchEnd = lastOp;
-
-            if (AmLeader())
-            {
-            }
-            else
-            {
-                resendPrepareTimeout->Stop();
-                closeBatchTimeout->Stop();
-            }
-
-            prepareOKQuorum.Clear();
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -268,23 +258,71 @@ namespace replication
 
         void CRAQReplica::ResendPrepare()
         {
-            ASSERT(AmLeader());
             if (lastOp == lastCommitted)
             {
                 return;
             }
-            RNotice("Resending prepare");
-            if (!(transport->SendMessageToAll(this, lastPrepare)))
+            RNotice("Resending prepare with op %lu", lastPrepare.opnum());
+            if (!ForwardPropagateMessageInChain(lastPrepare))
             {
-                RWarning("Failed to ressend prepare message to all replicas");
+                RWarning("Failed to ressend prepare message");
             }
             // Keep retrying
             resendPrepareTimeout->Reset();
         }
 
+        bool CRAQReplica::IsDuplicateRequest(const TransportAddress &remote, const RequestMessage &msg)
+        {
+            // Check the client table to see if this is a duplicate request
+            auto kv = clientTable.find(msg.req().clientid());
+            if (kv != clientTable.end())
+            {
+                const ClientTableEntry &entry = kv->second;
+                if (msg.req().clientreqid() < entry.lastReqId)
+                {
+                    RNotice("Ignoring stale request");
+                    return true;
+                }
+                if (msg.req().clientreqid() == entry.lastReqId)
+                {
+                    // This is a duplicate request. Resend the reply if we
+                    // have one. We might not have a reply to resend if we're
+                    // waiting for the other replicas; in that case, just
+                    // discard the request.
+                    if (entry.replied)
+                    {
+                        RNotice("Received duplicate request; resending reply");
+                        if (!(transport->SendMessage(this, remote, entry.reply)))
+                        {
+                            RWarning("Failed to resend reply to client");
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        RNotice(
+                            "Received duplicate request but no reply available; "
+                            "ignoring");
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        void CRAQReplica::AddToClientTable(const TransportAddress &remote, const RequestMessage &msg)
+        {
+            clientAddresses.erase(msg.req().clientid());
+            clientAddresses.insert(
+                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
+                    msg.req().clientid(),
+                    std::unique_ptr<TransportAddress>(remote.clone())));
+        }
+
         void CRAQReplica::CloseBatch()
         {
-            ASSERT(AmLeader());
+            ASSERT(AmHead());
             ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
@@ -308,10 +346,11 @@ namespace replication
             }
             lastPrepare = p;
 
-            if (!(transport->SendMessageToAll(this, p)))
+            if (!ForwardPropagateMessageInChain(p))
             {
-                RWarning("Failed to send prepare message to all replicas");
+                RWarning("Failed to send prepare message to next replica from head");
             }
+            Debug("Propagated prepare message (write batch) from head");
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();
@@ -329,7 +368,7 @@ namespace replication
             CommitMessage commit;
             RequestStateTransferMessage requestStateTransfer;
             StateTransferMessage stateTransfer;
-
+            
             if (type == request.GetTypeName())
             {
                 request.ParseFromString(data);
@@ -370,64 +409,40 @@ namespace replication
         void CRAQReplica::HandleRequest(const TransportAddress &remote,
                                         const RequestMessage &msg)
         {
-            // Latency_Start(&rec_to_upcall_lat_);
-            viewstamp_t v;
+            replication::LinearizeableOperation linop;
+            linop.ParseFromString(msg.req().op());
+            string op = linop.op();
 
+            if (op == "put")
+            {
+                HandleWriteRequest(remote, msg);
+            }
+            else if (op == "get")
+            {
+                HandleReadRequest(remote, msg);
+            }
+            else
+            {
+                RPanic("Received unexpected op in CRAQ proto: %s",
+                       op);
+            }
+        }
+
+        // TODO: implement version requests
+        void CRAQReplica::HandleReadRequest(const TransportAddress &remote,
+                                        const RequestMessage &msg)
+        {
+            Debug("Handling read request");
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring request due to abnormal status");
                 return;
             }
 
-            if (!AmLeader())
-            {
-                RDebug("Ignoring request because I'm not the leader");
-                return;
-            }
+            AddToClientTable(remote, msg);
 
-            // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
+            if (IsDuplicateRequest(remote, msg)) return;
 
-            // Check the client table to see if this is a duplicate request
-            auto kv = clientTable.find(msg.req().clientid());
-            if (kv != clientTable.end())
-            {
-                const ClientTableEntry &entry = kv->second;
-                if (msg.req().clientreqid() < entry.lastReqId)
-                {
-                    RNotice("Ignoring stale request");
-                    return;
-                }
-                if (msg.req().clientreqid() == entry.lastReqId)
-                {
-                    // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
-                    // waiting for the other replicas; in that case, just
-                    // discard the request.
-                    if (entry.replied)
-                    {
-                        RNotice("Received duplicate request; resending reply");
-                        if (!(transport->SendMessage(this, remote, entry.reply)))
-                        {
-                            RWarning("Failed to resend reply to client");
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        RNotice(
-                            "Received duplicate request but no reply available; "
-                            "ignoring");
-                        return;
-                    }
-                }
-            }
-
-            // Update the client table
             UpdateClientTable(msg.req());
 
             // Leader Upcall
@@ -439,47 +454,75 @@ namespace replication
             // Check whether this request should be committed to replicas
             if (!replicate)
             {
-                RDebug("Not replicating to replicas");
-                ReplyMessage reply;
-                reply.set_reply(res);
-                reply.set_view(0);
-                reply.set_opnum(0);
-                reply.set_clientreqid(msg.req().clientreqid());
-                cte.replied = true;
-                cte.reply = reply;
-                transport->SendMessage(this, remote, reply);
+                RPanic("Should always replicate when using CRAQ");
+            }
+
+            ExecuteOperation(msg.req());
+        }
+
+        void CRAQReplica::HandleWriteRequest(const TransportAddress &remote,
+                                        const RequestMessage &msg)
+        {
+            // Latency_Start(&rec_to_upcall_lat_);
+            Debug("Handling write request");
+            viewstamp_t v;
+
+            if (status != STATUS_NORMAL)
+            {
+                RNotice("Ignoring request due to abnormal status");
+                return;
+            }
+
+            if (!AmHead())
+            {
+                RDebug("Ignoring write request because I'm not the head");
+                return;
+            }
+
+            AddToClientTable(remote, msg); 
+
+            if (IsDuplicateRequest(remote, msg)) return;
+
+            UpdateClientTable(msg.req());
+
+            // Leader Upcall
+            bool replicate = false;
+            string res;
+            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
+            ClientTableEntry &cte = clientTable[msg.req().clientid()];
+
+            // Check whether this request should be committed to replicas
+            if (!replicate)
+            {
+                RPanic("Should always replicate when using CRAQ");
+            }
+
+            Request request;
+            request.set_op(res);
+            request.set_clientid(msg.req().clientid());
+            request.set_clientreqid(msg.req().clientreqid());
+
+            /* Assign it an opnum */
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+
+            RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+
+            /* Add the request to my log */
+            log.Append(v, request, LOG_STATE_DIRTY);
+
+            if (lastOp - lastBatchEnd + 1 > batchSize)
+            {
+                CloseBatch();
             }
             else
             {
-                Request request;
-                request.set_op(res);
-                request.set_clientid(msg.req().clientid());
-                request.set_clientreqid(msg.req().clientreqid());
-
-                /* Assign it an opnum */
-                ++this->lastOp;
-                v.view = this->view;
-                v.opnum = this->lastOp;
-
-                RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
-                /* Add the request to my log */
-                log.Append(v, request, LOG_STATE_PREPARED);
-
-                if (lastOp - lastBatchEnd + 1 > batchSize)
+                RDebug("Keeping in batch");
+                if (!closeBatchTimeout->Active())
                 {
-                    CloseBatch();
+                    closeBatchTimeout->Start();
                 }
-                else
-                {
-                    RDebug("Keeping in batch");
-                    if (!closeBatchTimeout->Active())
-                    {
-                        closeBatchTimeout->Start();
-                    }
-                }
-
-                // nullCommitTimeout->Reset();
             }
         }
 
@@ -517,31 +560,14 @@ namespace replication
                 return;
             }
 
-            if (msg.view() < this->view)
+            if (AmHead())
             {
-                RDebug("Ignoring PREPARE due to stale view");
-                return;
-            }
-
-            if (msg.view() > this->view)
-            {
-                Debug("Calling state transfer with this view <" FMT_VIEW ,this->view);
-                RequestStateTransfer();
-                pendingPrepares.push_back(
-                    std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
-                return;
-            }
-
-            if (AmLeader())
-            {
-                RPanic("Unexpected PREPARE: I'm the leader of this view");
+                RPanic("Unexpected PREPARE: I'm the head of this chain");
             }
 
             ASSERT(msg.batchstart() <= msg.opnum());
             ASSERT((msg.opnum() - msg.batchstart() + 1) ==
                    (unsigned int)msg.request_size());
-
-            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -551,17 +577,16 @@ namespace replication
                 reply.set_view(msg.view());
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
-                if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                if (!BackwardsPropagateMessageInChain(reply))
                 {
-                    RWarning("Failed to send PrepareOK message to leader");
+                    RWarning("Failed to backwards propagate PrepareOK message");
                 }
                 return;
             }
 
             if (msg.batchstart() > this->lastOp + 1)
             {
-                Debug("Calling state transfer with batch start");
+                Debug("Calling state transfer due to gap between last operation seen and start of batch received");
                 RequestStateTransfer();
                 pendingPrepares.push_back(
                     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
@@ -570,7 +595,7 @@ namespace replication
 
             /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
-            for (auto &req : msg.request())
+            for (const auto &req : msg.request())
             {
                 op++;
                 if (op <= lastOp)
@@ -578,21 +603,46 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
+                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
                 UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
 
-            /* Build reply and send it to the leader */
+            if (!AmTail())
+            {
+                lastPrepare = msg;
+                if (!ForwardPropagateMessageInChain(msg))
+                {
+                    RWarning("Failed to forward propagate write");
+                }
+                Debug("Propagating write");
+                resendPrepareTimeout->Reset();
+                
+            }
+            else
+            {
+                CommitUpTo(lastOp);
+
+                CommitMessage cm;
+                cm.set_view(this->view);
+                cm.set_opnum(this->lastCommitted);
+
+                if (!BackwardsPropagateMessageInChain(cm))
+                {
+                    RWarning("Failed to backward propagate COMMIT message from tail");
+                } 
+                Debug("Sending commit for write from tail");
+            }
+
             PrepareOKMessage reply;
             reply.set_view(msg.view());
             reply.set_opnum(msg.opnum());
             reply.set_replicaidx(myIdx);
 
-            if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+            if (!BackwardsPropagateMessageInChain(reply))
             {
-                RWarning("Failed to send PrepareOK message to leader");
+                RWarning("Failed to backwards propagate PrepareOK message");
             }
         }
 
@@ -608,61 +658,13 @@ namespace replication
                 return;
             }
 
-            if (msg.view() < this->view)
+            if (!AmHead())
             {
-                RDebug("Ignoring PREPAREOK due to stale view");
+                RWarning("Ignoring PREPAREOK because I'm not the head");
                 return;
             }
 
-            if (msg.view() > this->view)
-            {
-                RequestStateTransfer();
-                return;
-            }
-
-            if (!AmLeader())
-            {
-                RWarning("Ignoring PREPAREOK because I'm not the leader");
-                return;
-            }
-
-            viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (auto msgs =
-                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
-            {
-                /*
-                 * We have a quorum of PrepareOK messages for this
-                 * opnumber. Execute it and all previous operations.
-                 *
-                 * (Note that we might have already executed it. That's fine,
-                 * we just won't do anything.)
-                 *
-                 * This also notifies the client of the result.
-                 */
-                CommitUpTo(msg.opnum());
-
-                if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                {
-                    return;
-                }
-
-                /*
-                 * Send COMMIT message to the other replicas.
-                 *
-                 * This can be done asynchronously, so it really ought to be
-                 * piggybacked on the next PREPARE or something.
-                 */
-                CommitMessage cm;
-                cm.set_view(this->view);
-                cm.set_opnum(this->lastCommitted);
-
-                if (!(transport->SendMessageToAll(this, cm)))
-                {
-                    RWarning("Failed to send COMMIT message to all replicas");
-                }
-
-                // nullCommitTimeout->Reset();
-            }
+            resendPrepareTimeout->Reset();
         }
 
         void CRAQReplica::HandleCommit(const TransportAddress &remote,
@@ -676,28 +678,14 @@ namespace replication
                 return;
             }
 
-            if (msg.view() < this->view)
+            if (AmTail())
             {
-                RDebug("Ignoring COMMIT due to stale view");
-                return;
+                RPanic("Unexpected COMMIT: I'm the tail of this chain");
             }
-
-            if (msg.view() > this->view)
-            {
-                RequestStateTransfer();
-                return;
-            }
-
-            if (AmLeader())
-            {
-                RPanic("Unexpected COMMIT: I'm the leader of this view");
-            }
-
-            // viewChangeTimeout->Reset();
 
             if (msg.opnum() <= this->lastCommitted)
             {
-                RDebug("Ignoring COMMIT; already committed that operation");
+                RDebug("Ignoring COMMIT; already committed that operation, opnum is %lu and lastCommitted is %lu", msg.opnum(), this->lastCommitted);
                 return;
             }
 
@@ -708,6 +696,15 @@ namespace replication
             }
 
             CommitUpTo(msg.opnum());
+
+            if (!AmHead())
+            {
+                if (!BackwardsPropagateMessageInChain(msg))
+                {
+                    RWarning("Failed to back propagate COMMIT message from tail");
+                }
+                Debug("Backwards propagating commit");
+            }
         }
 
         void CRAQReplica::HandleRequestStateTransfer(
@@ -719,12 +716,6 @@ namespace replication
             if (status != STATUS_NORMAL)
             {
                 RDebug("Ignoring REQUESTSTATETRANSFER due to abnormal status");
-                return;
-            }
-
-            if (msg.view() > view)
-            {
-                RequestStateTransfer();
                 return;
             }
 
@@ -745,12 +736,6 @@ namespace replication
         {
             RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
 
-            if (msg.view() < view)
-            {
-                RWarning("Ignoring state transfer for older view");
-                return;
-            }
-
             opnum_t oldLastOp = lastOp;
 
             /* Install the new log entries */
@@ -768,6 +753,7 @@ namespace replication
                 }
                 else if (newEntry.opnum() <= lastOp)
                 {
+                    RPanic("Should not hit this case, irrelevant to views");
                     // We already have an entry with this opnum, but maybe
                     // it's from an older view?
                     const LogEntry *entry = log.Find(newEntry.opnum());
@@ -777,23 +763,24 @@ namespace replication
                     if (entry->viewstamp.view == newEntry.view())
                     {
                         // We already have this operation in our log.
-                        ASSERT(entry->state == LOG_STATE_PREPARED);
+                        ASSERT(entry->state == LOG_STATE_DIRTY);
 #if PARANOID
 //              ASSERT(entry->request == newEntry.request());
 #endif
                     }
                     else
                     {
+                        RPanic("Should not hit this case, irrelevant to views");
                         // Our operation was from an older view, so obviously
                         // it didn't survive a view change. Throw out any
                         // later log entries and replace with this one.
-                        ASSERT(entry->state != LOG_STATE_COMMITTED);
+                        ASSERT(entry->state != LOG_STATE_CLEAN);
                         log.RemoveAfter(newEntry.opnum());
                         lastOp = newEntry.opnum();
                         oldLastOp = lastOp;
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                        log.Append(vs, newEntry.request(), LOG_STATE_DIRTY);
                     }
                 }
                 else
@@ -801,27 +788,53 @@ namespace replication
                     // This is a new operation to us. Add it to the log.
                     ASSERT(newEntry.opnum() == lastOp + 1);
 
-                    lastOp++;
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
-                }
-            }
+                    log.Append(vs, newEntry.request(), LOG_STATE_DIRTY);
+                    Debug("new entry opnum is %lu, lastop is %lu", newEntry.opnum(),lastOp);
+    
+                    if (!AmTail())
+                    {
+                        PrepareMessage p;
+                        p.set_view(view);
+                        p.set_opnum(newEntry.opnum());
+                        p.set_batchstart(newEntry.opnum());
+                        Request *r = p.add_request();
+                        *r = newEntry.request();
+                        lastPrepare = p;
+                        if (!ForwardPropagateMessageInChain(p))
+                        {
+                            RWarning("Failed to ressend prepare message to replica after receiving state transfer");
+                        }
+                        resendPrepareTimeout->Reset();
+                    }
+                    else
+                    {
+                        CommitUpTo(newEntry.opnum());
 
-            if (msg.view() > view)
-            {
-                EnterView(msg.view());
+                        CommitMessage cm;
+                        cm.set_view(this->view);
+                        cm.set_opnum(this->lastCommitted);
+
+                        if (!BackwardsPropagateMessageInChain(cm))
+                        {
+                            RWarning("Failed to backwards propagate COMMIT message from tail");
+                        } 
+                        Debug("Sending commit for write from tail");
+                    }
+
+                    lastOp++;
+                }
             }
 
             /* Execute committed operations */
             ASSERT(msg.opnum() <= lastOp);
-            CommitUpTo(msg.opnum());
             SendPrepareOKs(oldLastOp);
 
             // Process pending prepares
             std::list<std::pair<TransportAddress *, PrepareMessage>> pending =
                 pendingPrepares;
             pendingPrepares.clear();
-            for (auto &msgpair : pendingPrepares)
+            for (auto &msgpair : pending)
             {
                 RDebug("Processing pending prepare message");
                 HandlePrepare(*msgpair.first, msgpair.second);

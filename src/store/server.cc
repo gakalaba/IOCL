@@ -379,7 +379,7 @@ int main(int argc, char **argv)
     }
     case PROTO_CRAQ:
     {
-        Debug("Making application request strongstore server using CRAQ --> FIXME but for now just creating VR server");
+        Debug("Making application request strongstore server using CRAQ");
         server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
@@ -531,7 +531,7 @@ int main(int argc, char **argv)
     }
     case PROTO_CRAQ:
     {
-        Debug("Making linearizable (CRAQ) replica --> FIXME for now just making VR replica");
+        Debug("Making linearizable (CRAQ) replica");
         replica = new replication::craq::CRAQReplica(
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),

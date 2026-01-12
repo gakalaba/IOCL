@@ -43,11 +43,14 @@
 
 namespace replication {
 
+// todo: make this scoped and cleaner
 enum LogEntryState {
     LOG_STATE_COMMITTED,
     LOG_STATE_PREPARED,
     LOG_STATE_SPECULATIVE,  // specpaxos only
-    LOG_STATE_FASTPREPARED  // fastpaxos only
+    LOG_STATE_FASTPREPARED,  // fastpaxos only
+    LOG_STATE_DIRTY, // craq only
+    LOG_STATE_CLEAN // craq only
 };
 
 struct LogEntry {

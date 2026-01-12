@@ -39,7 +39,6 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "replication/common/log.h"
-#include "replication/common/quorumset.h"
 #include "replication/common/replica.h"
 #include "replication/craq/craq-proto.pb.h"
 
@@ -62,9 +61,10 @@ namespace replication
 
         private:
             view_t view;
+            int myIdx;
+            int numReplicas;
             opnum_t lastCommitted;
             opnum_t lastOp;
-            view_t lastRequestStateTransferView;
             opnum_t lastRequestStateTransferOpnum;
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
                 pendingPrepares;
@@ -82,9 +82,6 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
-            QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-
-            Timeout *stateTransferTimeout;
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
 
@@ -94,21 +91,30 @@ namespace replication
 
             bool debug_stats_;
 
-            bool AmLeader() const;
+            [[nodiscard]] inline bool AmHead() const {return myIdx == 0;}
+            [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
+            [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
+            [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
+            void ExecuteOperation(const Request &entry);
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
             void RequestStateTransfer();
-            void EnterView(view_t newview);
-            void StartViewChange(view_t newview);
             void UpdateClientTable(const Request &req);
             void ResendPrepare();
+            [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
+                                const proto::RequestMessage &msg);
+            void AddToClientTable(const TransportAddress &remote, 
+                                const proto::RequestMessage &msg);
             void CloseBatch();
 
             void HandleRequest(const TransportAddress &remote,
                                const proto::RequestMessage &msg);
+            void HandleWriteRequest(const TransportAddress &remote,
+                               const proto::RequestMessage &msg);
+            void HandleReadRequest(const TransportAddress &remote,
+                               const proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
-
             void HandlePrepare(const TransportAddress &remote,
                                const proto::PrepareMessage &msg);
             void HandlePrepareOK(const TransportAddress &remote,
