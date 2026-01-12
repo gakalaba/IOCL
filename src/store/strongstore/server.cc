@@ -174,20 +174,45 @@ namespace strongstore
                                 const std::string &type, const std::string &data,
                                 void *meta_data)
     {
+        auto t_enter = now_us();
         if (type == get_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             get_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleGet(remote, get_);
+            auto t_after_handle = now_us();
+            Notice("Get: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                t_before_parse - t_enter,
+                t_after_parse - t_before_parse,
+                t_after_handle - t_after_parse,
+                t_after_handle - t_enter);
         }
         else if (type == op_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             op_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleSendOperation(remote, op_);
+            auto t_after_handle = now_us();
+            Notice("Op: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                t_before_parse - t_enter,
+                t_after_parse - t_before_parse,
+                t_after_handle - t_after_parse,
+                t_after_handle - t_enter);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             rw_commit_c_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleRWCommitCoordinator(remote, rw_commit_c_);
+            auto t_after_handle = now_us();
+            Notice("rw_commit_c_: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                t_before_parse - t_enter,
+                t_after_parse - t_before_parse,
+                t_after_handle - t_after_parse,
+                t_after_handle - t_enter);
         }
         else if (type == rw_commit_p_.GetTypeName())
         {
@@ -272,6 +297,7 @@ namespace strongstore
             value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
             // respond back to the client (shard client)
+            Notice("Sending GetReply...");
             transport_->SendMessage(this, remote, get_reply_);
 
             transactions_.FinishGet(transaction_id, key);
@@ -934,6 +960,7 @@ namespace strongstore
         rw_commit_c_reply_.set_status(REPLY_OK);
         commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
         nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
+        Notice("Sending rw_commit_c_reply...");
 
         transport_->SendMessage(this, *remote, rw_commit_c_reply_);
 
@@ -1732,6 +1759,7 @@ namespace strongstore
         op_reply_.set_transaction_id(transaction_id);
 
         // Notice("        (G) Sending REPLY on Wire %lu", now_us());
+        Notice("Sending Linearizeable OperationReply...");
         transport_->SendMessage(this, *remote, op_reply_);
 
         delete remote;

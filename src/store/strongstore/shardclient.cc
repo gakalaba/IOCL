@@ -64,20 +64,45 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         Debug("Got message wahoo");
+        auto t_enter = now_us();
         if (type == get_reply_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             get_reply_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleGetReply(get_reply_);
+            auto t_after_handle = now_us();
+            Notice("GetReply: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                t_before_parse - t_enter,
+                t_after_parse - t_before_parse,
+                t_after_handle - t_after_parse,
+                t_after_handle - t_enter);
         }
         else if (type == op_reply_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             op_reply_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleSendOperationReply(op_reply_);
+            auto t_after_handle = now_us();
+            Notice("OpReply: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                    t_before_parse - t_enter,
+                    t_after_parse - t_before_parse,
+                    t_after_handle - t_after_parse,
+                    t_after_handle - t_enter);
         }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
+            auto t_before_parse = now_us();
             rw_commit_c_reply_.ParseFromString(data);
+            auto t_after_parse = now_us();
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
+            auto t_after_handle = now_us();
+            Notice("rw_commit_c_reply_: dispatch=%lu parse=%lu handle=%lu total=%lu",
+                    t_before_parse - t_enter,
+                    t_after_parse - t_before_parse,
+                    t_after_handle - t_after_parse,
+                    t_after_handle - t_enter);
         }
         else if (type == rw_commit_p_reply_.GetTypeName())
         {
@@ -216,6 +241,7 @@ namespace strongstore
         get_.set_key(key);
         get_.set_for_update(for_update);
 
+        Notice("Sending Get...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
     }
 
@@ -336,14 +362,13 @@ namespace strongstore
                  ++itl, ++itr) {
                 Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
             }
-            Debug("the size of the op is %lu", op_.ByteSizeLong());
         } else {
             Debug("Not IOCL, so not setting myshardtag and pred_list");
-            Debug("the size of the op is %lu", op_.ByteSizeLong());
         }
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         // Notice("    (B) Sending on wire %lu", now_us());
+        Notice("Sending Linearizeable Operation...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
@@ -518,6 +543,7 @@ namespace strongstore
         }
 
         // Notice("    (B) Sending on wire %lu", now_us());
+        Notice("Sending RWCommitCoordinator...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
     }
 

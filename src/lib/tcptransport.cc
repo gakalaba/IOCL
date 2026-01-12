@@ -51,6 +51,8 @@
 #include "lib/configuration.h"
 #include "lib/message.h"
 
+#include "store/common/backend/timingdebug.h"
+
 const size_t MAX_TCP_SIZE = 100; // XXX
 const uint32_t MAGIC = 0x06121983;
 const int SOCKET_BUF_SIZE = 1048576;
@@ -487,8 +489,10 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
           outq_before);
 
     // Serialize message
+    auto t0 = now_us();
     string data;
     ASSERT(m.SerializeToString(&data));
+    auto t1 = now_us();
     string type = m.GetTypeName();
     size_t typeLen = type.length();
     size_t dataLen = data.length();
@@ -524,6 +528,7 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     ASSERT((size_t)(ptr + dataLen - buf) == totalLen);
     memcpy(ptr, data.c_str(), dataLen);
     ptr += dataLen;
+    auto t2 = now_us();
 
     if (bufferevent_write(ev, buf, totalLen) < 0)
     {
@@ -531,6 +536,7 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
         fprintf(stderr, "tcp write failed\n");
         return false;
     }
+    auto t3 = now_us();
     // --- Debug after write ---
     size_t outq_after = evbuffer_get_length(outbuf);
     Debug("TCP OUTQ after write to %s:%d = %zu bytes (added %zu)",
@@ -545,6 +551,8 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
       return false;
     }
     Latency_End(&sockWriteLat);*/
+    Notice("TX breakdown: proto_ser=%lu us, framing=%lu us, bev_write=%lu us, bytes(wire)=%zu payload=%zu",
+       t1 - t0, t2 - t1, t3 - t2, totalLen, dataLen);
     return true;
 }
 
@@ -856,8 +864,10 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         // Debug("Receiving %ld byte message", totalSize);
 
         char buf[totalSize];
+        auto t_msg_start = now_us();
         size_t copied = evbuffer_remove(evbuf, buf, totalSize);
         ASSERT(copied == totalSize);
+
 
         // Parse message
         char *ptr = buf + sizeof(*sz) + sizeof(*magic);
@@ -880,6 +890,7 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 
         // transport->mtx.lock();
         auto addr = transport->tcpAddresses.find(bev);
+
         // transport->mtx.unlock();
         if (addr == transport->tcpAddresses.end())
         {
@@ -888,9 +899,18 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         else
         {
             // Dispatch
+            auto t_before_dispatch = now_us();
             Debug("Received %lu bytes %s message.", totalSize, msgType.c_str());
             info->receiver->ReceiveMessage(addr->second.first, msgType, msg,
                                            nullptr);
+            auto t_after_dispatch = now_us();
+
+            Notice("RX breakdown: bytes(wire)=%lu, payload=%lu, total=%lu us, pre-dispatch=%lu us, dispatch+parse+handler=%lu us",
+                totalSize,
+                msgLen,
+                t_after_dispatch - t_msg_start,
+                t_before_dispatch - t_msg_start,
+                t_after_dispatch - t_before_dispatch);
             // Debug("Done processing large %s message", msgType.c_str());
         }
     }
