@@ -296,7 +296,6 @@ namespace replication
 
         void CRAQReplica::CloseBatch()
         {
-            ASSERT(AmHead());
             ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
@@ -573,14 +572,7 @@ namespace replication
 
             if (!AmTail())
             {
-                lastPrepare = msg;
-                if (!ForwardPropagateMessageInChain(msg))
-                {
-                    RWarning("Failed to forward propagate write");
-                }
-                Debug("Propagating write");
-                resendPrepareTimeout->Reset();
-                
+                CloseBatch();
             }
             else
             {
