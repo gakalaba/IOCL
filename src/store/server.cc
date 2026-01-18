@@ -553,6 +553,8 @@ void Cleanup(int signal)
 {
     Notice("Gracefully exiting after signal %d.", signal);
     tport->Stop();
+    server->DumpTimestamps();
+    tport->DumpNumbers();
     if (FLAGS_stats_file.size() > 0)
     {
         Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());

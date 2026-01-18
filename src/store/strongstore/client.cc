@@ -36,6 +36,14 @@
 #include "lib/configuration.h"
 #include "lib/latency.h"
 #include "store/common/common.h"
+#include "store/common/backend/timingdebug.h"
+
+uint64_t t_get_enter_client_get[300000];
+uint64_t t_get_enter_client_get_index = 0;
+uint64_t t_commit_enter_client_commit[300000];
+uint64_t t_commit_enter_client_commit_index = 0;
+uint64_t t_op_enter_client_op[300000];
+uint64_t t_op_enter_client_op_index = 0;
 
 using namespace std;
 
@@ -524,15 +532,16 @@ namespace strongstore
     void Client::Get(Session &s, const std::string &key, get_callback gcb,
                      get_timeout_callback gtcb, uint32_t timeout)
     {
+        t_get_enter_client_get[t_get_enter_client_get_index++] = now_us();
         auto &session = static_cast<StrongSession &>(s);
 
         auto tid = session.transaction_id();
 
-        Debug("GET [%lu : %s]", tid, key.c_str());
+        // Debug("GET [%lu : %s]", tid, key.c_str());
 
         if (session.needs_aborts())
         {
-            Debug("[%lu] Need to abort", tid);
+            // Debug("[%lu] Need to abort", tid);
             gcb(REPLY_FAIL, "", "", Timestamp());
             return;
         }
@@ -691,6 +700,7 @@ namespace strongstore
                              op_callback ocb, op_timeout_callback otcb,
                              uint32_t timeout)
     {
+        t_op_enter_client_op[t_op_enter_client_op_index++] = now_us();
         auto &session = static_cast<StrongSession &>(s);
 
         auto arid = next_apprequest_id_++;
@@ -803,6 +813,7 @@ namespace strongstore
     /* Attempts to commit the ongoing transaction. */
     void Client::Commit(Session &s, commit_callback ccb, commit_timeout_callback ctcb, uint32_t timeout)
     {
+        t_commit_enter_client_commit[t_commit_enter_client_commit_index++] = now_us();
         auto &session = static_cast<StrongSession &>(s);
 
         auto tid = session.transaction_id();
@@ -912,6 +923,24 @@ namespace strongstore
         rss::EndTransaction(service_name_, session);
 
         transport_->Timer(ms, std::bind(ccb, tstatus));
+    }
+
+    void Client::DumpTimestamps() {
+        // Dump Get timestamps
+        Notice("Get Timestamps:");
+        for (uint64_t i = 0; i < t_get_enter_client_get_index; i++) {
+            Notice("  t_get_enter_client_get[%lu] = %lu", i, t_get_enter_client_get[i]);
+        }
+        Notice("Commit timestamps:");
+        for (uint64_t i = 0; i < t_commit_enter_client_commit_index; i++) {
+            Notice("  t_commit_enter_client_commit[%lu] = %lu", i, t_commit_enter_client_commit[i]);
+        }
+        Notice("Op timestamps:");
+        for (uint64_t i = 0; i < t_op_enter_client_op_index; i++) {
+            Notice("  t_op_enter_client_op[%lu] = %lu", i, t_op_enter_client_op[i]);
+        }
+        // Dump timestamps from one of the shard clients
+        sclients_[0]->DumpTimestamps();
     }
 
     void Client::Abort(Session &s, abort_callback acb, abort_timeout_callback atcb, uint32_t timeout)

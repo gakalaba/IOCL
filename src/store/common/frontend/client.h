@@ -109,6 +109,7 @@ class Client {
 
     virtual bool IsLinearizeable() = 0;
     virtual bool IsIOCL() = 0;
+    virtual void DumpTimestamps() = 0;
 
     inline Stats &GetStats() { return stats; }
 

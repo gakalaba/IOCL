@@ -271,6 +271,8 @@ namespace strongstore
         bool IsLinearizeable() override;
         bool IsIOCL() override;
 
+        void DumpTimestamps() override;
+
     private:
         const static std::size_t MAX_SHARDS = 16;
 

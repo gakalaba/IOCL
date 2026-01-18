@@ -847,6 +847,8 @@ int main(int argc, char **argv)
     CALLGRIND_DUMP_STATS;
 
     Notice("Cleaning up after experiment.");
+    bench->DumpTimestamps();
+    tport->DumpNumbers();
 
     FlushStats();
 

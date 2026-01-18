@@ -77,6 +77,11 @@ public:
         return SendMessageToReplica(src, groupIdx, replicaIdx, m);
     }
 
+    virtual void DumpNumbers() override
+    {
+        // Nothing to dump
+    }
+
     virtual bool
     SendMessageToReplica(TransportReceiver *src,
                          int groupIdx,

@@ -139,6 +139,7 @@ namespace strongstore
 
         Stats &GetStats() override;
         void SeeAllTxns() override;
+        void DumpTimestamps() override;
 
     private:
         class PendingRWCommitCoordinatorReply

@@ -107,6 +107,7 @@ public:
     virtual bool SendMessageToGroup(TransportReceiver *src,
                                     int groupIdx,
                                     const Message &m) = 0;
+    virtual void DumpNumbers() = 0;
     /* Send message to failure coordinator
      */
     virtual bool SendMessageToFC(TransportReceiver *src,

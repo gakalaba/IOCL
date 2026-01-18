@@ -31,6 +31,38 @@
 
 #include "lib/configuration.h"
 
+// For Get handler:
+uint64_t t_getreply_handle_start[300000];
+uint64_t t_getreply_handle_start_index = 0;
+uint64_t t_getreply_handle_end[300000];
+uint64_t t_getreply_handle_end_index = 0;
+
+uint64_t t_get_enter_shardclient_get[300000];
+uint64_t t_get_enter_shardclient_get_index = 0;
+// For Commit handler:
+uint64_t t_commitreply_handle_start[300000];
+uint64_t t_commitreply_handle_start_index = 0;
+uint64_t t_commitreply_handle_end[300000];
+uint64_t t_commitreply_handle_end_index = 0;
+
+uint64_t t_commit_enter_shardclient_commitcoordinator[300000];
+uint64_t t_commit_enter_shardclient_commitcoordinator_index = 0;
+// For Op handler:
+uint64_t t_opreply_handle_start[300000];
+uint64_t t_opreply_handle_start_index = 0;
+uint64_t t_opreply_handle_end[300000];
+uint64_t t_opreply_handle_end_index = 0;
+
+uint64_t t_op_enter_shardclient_op[300000];
+uint64_t t_op_enter_shardclient_op_index = 0;
+
+uint64_t t_client_dispatch_getreply[300000];
+uint64_t t_client_dispatch_getreply_index = 0;
+uint64_t t_client_dispatch_commitreply[300000];
+uint64_t t_client_dispatch_commitreply_index = 0;
+uint64_t t_client_dispatch_opreply[300000];
+uint64_t t_client_dispatch_opreply_index = 0;
+
 namespace strongstore
 {
 
@@ -64,45 +96,23 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         Debug("Got message wahoo");
-        auto t_enter = now_us();
         if (type == get_reply_.GetTypeName())
         {
-            auto t_before_parse = now_us();
+            t_client_dispatch_getreply[t_client_dispatch_getreply_index++] = now_us();
             get_reply_.ParseFromString(data);
-            auto t_after_parse = now_us();
             HandleGetReply(get_reply_);
-            auto t_after_handle = now_us();
-            Notice("GetReply: dispatch=%lu parse=%lu handle=%lu total=%lu",
-                t_before_parse - t_enter,
-                t_after_parse - t_before_parse,
-                t_after_handle - t_after_parse,
-                t_after_handle - t_enter);
         }
         else if (type == op_reply_.GetTypeName())
         {
-            auto t_before_parse = now_us();
+            t_client_dispatch_opreply[t_client_dispatch_opreply_index++] = now_us();
             op_reply_.ParseFromString(data);
-            auto t_after_parse = now_us();
             HandleSendOperationReply(op_reply_);
-            auto t_after_handle = now_us();
-            Notice("OpReply: dispatch=%lu parse=%lu handle=%lu total=%lu",
-                    t_before_parse - t_enter,
-                    t_after_parse - t_before_parse,
-                    t_after_handle - t_after_parse,
-                    t_after_handle - t_enter);
         }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
-            auto t_before_parse = now_us();
+            t_client_dispatch_commitreply[t_client_dispatch_commitreply_index++] = now_us();
             rw_commit_c_reply_.ParseFromString(data);
-            auto t_after_parse = now_us();
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
-            auto t_after_handle = now_us();
-            Notice("rw_commit_c_reply_: dispatch=%lu parse=%lu handle=%lu total=%lu",
-                    t_before_parse - t_enter,
-                    t_after_parse - t_before_parse,
-                    t_after_handle - t_after_parse,
-                    t_after_handle - t_enter);
         }
         else if (type == rw_commit_p_reply_.GetTypeName())
         {
@@ -217,6 +227,7 @@ namespace strongstore
                           get_callback gcb, get_timeout_callback gtcb,
                           uint32_t timeout, bool for_update)
     {
+        t_get_enter_shardclient_get[t_get_enter_shardclient_get_index++] = now_us();
         // Send the GET operation to appropriate shard.
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
@@ -241,19 +252,19 @@ namespace strongstore
         get_.set_key(key);
         get_.set_for_update(for_update);
 
-        Notice("Sending Get...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
     }
 
     void ShardClient::HandleGetReply(const proto::GetReply &reply)
     {
+        t_getreply_handle_start[t_getreply_handle_start_index++] = now_us();
         uint64_t req_id = reply.rid().client_req_id();
         int status = reply.status();
 
         auto itr = pendingGets.find(req_id);
         if (itr == pendingGets.end())
         {
-            Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+            // Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
 
@@ -264,8 +275,8 @@ namespace strongstore
         pendingGets.erase(itr);
         delete req;
 
-        Debug("[%lu] [shard %i] Received GET reply: %s %d",
-              transaction_id, shard_idx_, key.c_str(), status);
+        // Debug("[%lu] [shard %i] Received GET reply: %s %d",
+        //       transaction_id, shard_idx_, key.c_str(), status);
 
         std::string val;
         Timestamp ts;
@@ -275,10 +286,11 @@ namespace strongstore
             ts = Timestamp(reply.timestamp());
         }
 
-        Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
+        // Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
         transactions_[transaction_id].addReadSet(key, ts);
         read_sets_[transaction_id][key] = val;
 
+        t_getreply_handle_end[t_getreply_handle_end_index++] = now_us();
         gcb(status, key, val, ts);
     }
 
@@ -304,6 +316,7 @@ namespace strongstore
                                   std::list<uint16_t> &outstandingOperationRefCount,
                                   bool isIOCL)
     {
+        t_op_enter_shardclient_op[t_op_enter_shardclient_op_index++] = now_us();
         // Send the operation to appropriate shard.
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
@@ -368,13 +381,13 @@ namespace strongstore
 
         Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
         // Notice("    (B) Sending on wire %lu", now_us());
-        Notice("Sending Linearizeable Operation...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
     // IOCL receive the response
     void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
+        t_opreply_handle_start[t_opreply_handle_start_index++] = now_us();
         // Notice("    (H) Got the reply NOW %lu", now_us());
         Debug("shard client got LinearizeableReply!");
         uint64_t req_id = reply.rid().client_req_id();
@@ -403,7 +416,64 @@ namespace strongstore
 
         // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
 
+        t_opreply_handle_end[t_opreply_handle_end_index++] = now_us();
         ocb(status, retval, pred_list);
+    }
+
+    void ShardClient::DumpTimestamps() {
+        // Dump Get Reply timestamps
+        Notice("Get Reply Handle Start Timestamps:");
+        for (uint64_t i = 0; i < t_getreply_handle_start_index; i++) {
+            Notice("  t_getreply_handle_start[%lu] = %lu", i, t_getreply_handle_start[i]);
+        }
+        Notice("Get Reply Handle End Timestamps:");
+        for (uint64_t i = 0; i < t_getreply_handle_end_index; i++) {
+            Notice("  t_getreply_handle_end[%lu] = %lu", i, t_getreply_handle_end[i]);
+        }
+        // Dump Commit Reply timestamps
+        Notice("Commit Reply Handle Start Timestamps:");
+        for (uint64_t i = 0; i < t_commitreply_handle_start_index; i++) {
+            Notice("  t_commitreply_handle_start[%lu] = %lu", i, t_commitreply_handle_start[i]);
+        }
+        Notice("Commit Reply Handle End Timestamps:");
+        for (uint64_t i = 0; i < t_commitreply_handle_end_index; i++) {
+            Notice("  t_commitreply_handle_end[%lu] = %lu", i, t_commitreply_handle_end[i]);
+        }
+        // Dump Operation Reply timestamps
+        Notice("Operation Reply Handle Start Timestamps:");
+        for (uint64_t i = 0; i < t_opreply_handle_start_index; i++) {
+            Notice("  t_opreply_handle_start[%lu] = %lu", i, t_opreply_handle_start[i]);
+        }
+        Notice("Operation Reply Handle End Timestamps:");
+        for (uint64_t i = 0; i < t_opreply_handle_end_index; i++) {
+            Notice("  t_opreply_handle_end[%lu] = %lu", i, t_opreply_handle_end[i]);
+        }
+        // Dump Get timestamps
+        Notice("Get Enter ShardClient Get Timestamps:");
+        for (uint64_t i = 0; i < t_get_enter_shardclient_get_index; i++) {
+            Notice("  t_get_enter_shardclient_get[%lu] = %lu", i, t_get_enter_shardclient_get[i]);
+        }
+        // Dump Commit timestamps
+        Notice("Commit Enter ShardClient CommitCoordinator Timestamps:");
+        for (uint64_t i = 0; i < t_commit_enter_shardclient_commitcoordinator_index; i++) {
+            Notice("  t_commit_enter_shardclient_commitcoordinator[%lu] = %lu", i, t_commit_enter_shardclient_commitcoordinator[i]);
+        }
+        // Dump Operation timestamps
+        Notice("Operation Enter ShardClient Op Timestamps:");
+        for (uint64_t i = 0; i < t_op_enter_shardclient_op_index; i++) {
+            Notice("  t_op_enter_shardclient_op[%lu] = %lu", i, t_op_enter_shardclient_op[i]);
+        }
+        // Dump received timestamps
+        for (uint64_t i = 0; i < t_client_dispatch_getreply_index; i++) {
+            Notice("  t_client_dispatch_getreply[%lu] = %lu", i, t_client_dispatch_getreply[i]);
+        }
+        for (uint64_t i = 0; i < t_client_dispatch_commitreply_index; i++) {
+            Notice("  t_client_dispatch_commitreply[%lu] = %lu", i, t_client_dispatch_commitreply[i]);
+        }
+        for (uint64_t i = 0; i < t_client_dispatch_opreply_index; i++) {
+            Notice("  t_client_dispatch_opreply[%lu] = %lu", i, t_client_dispatch_opreply[i]);
+        }
+
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,
@@ -516,6 +586,7 @@ namespace strongstore
         const std::set<int> participants, Timestamp &nonblock_timestamp,
         rw_coord_commit_callback ccb, rw_coord_commit_timeout_callback ctcb, uint32_t timeout)
     {
+        t_commit_enter_shardclient_commitcoordinator[t_commit_enter_shardclient_commitcoordinator_index++] = now_us();
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);
 
         auto search = transactions_.find(transaction_id);
@@ -543,12 +614,12 @@ namespace strongstore
         }
 
         // Notice("    (B) Sending on wire %lu", now_us());
-        Notice("Sending RWCommitCoordinator...");
         transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
     }
 
     void ShardClient::HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply)
     {
+        t_commitreply_handle_start[t_commitreply_handle_start_index++] = now_us();
         // Notice("    (H) Got the reply NOW %lu", now_us());
         uint64_t req_id = reply.rid().client_req_id();
 
@@ -570,6 +641,7 @@ namespace strongstore
 
         Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
+        t_commitreply_handle_end[t_commitreply_handle_end_index++] = now_us();
         ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
     }
 

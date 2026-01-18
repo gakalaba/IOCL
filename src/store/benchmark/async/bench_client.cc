@@ -43,6 +43,18 @@
 #include "store/common/backend/timingdebug.h"
 
 DEFINE_LATENCY(op);
+uint64_t t_get_issue[30000];
+uint64_t t_get_index = 0;
+uint64_t t_op_issue[300000];
+uint64_t t_op_index = 0;
+uint64_t t_commit_issue[30000];
+uint64_t t_commit_index = 0;
+uint64_t t_getreply_cb[30000];
+uint64_t t_getreply_index = 0;
+uint64_t t_opreply_cb[300000];
+uint64_t t_opreply_index = 0;
+uint64_t t_commitreply_cb[30000];
+uint64_t t_commitreply_index = 0;
 
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
                                  Transport &transport, uint64_t id,
@@ -109,6 +121,37 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     } else {
         transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNext, this));
     }
+}
+
+void BenchmarkClient::DumpTimestamps()
+{
+    Notice("get issue timestamps:");
+    for (size_t i = 0; i < t_get_index; i++) {
+        Notice("  t_get_issue[%zu] = %lu", i, t_get_issue[i]);
+    }
+    Notice("op issue timestamps:");
+    for (size_t i = 0; i < t_op_index; i++) {
+        Notice("  t_op_issue[%zu] = %lu", i, t_op_issue[i]);
+    }
+    Notice("commit issue timestamps:");
+    for (size_t i = 0; i < t_commit_index; i++) {
+        Notice("  t_commit_issue[%zu] = %lu", i, t_commit_issue[i]);
+    }
+    Notice("getreply callback timestamps:");
+    for (size_t i = 0; i < t_getreply_index; i++) {
+        Notice("  t_getreply_cb[%zu] = %lu", i, t_getreply_cb[i]);
+    }
+    Notice("opreply callback timestamps:");
+    for (size_t i = 0; i < t_opreply_index; i++) {
+        Notice("  t_opreply_cb[%zu] = %lu", i, t_opreply_cb[i]);
+    }
+    Notice("commitreply callback timestamps:");
+    for (size_t i = 0; i < t_commitreply_index; i++) {
+        Notice("  t_commitreply_cb[%zu] = %lu", i, t_commitreply_cb[i]);
+    }
+    auto &client = *clients_[0];
+    client.DumpTimestamps();
+
 }
 
 void BenchmarkClient::SendNext()
@@ -318,6 +361,8 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     switch (op.type)
     {
     case GET:
+        t_get_issue[t_get_index] = now_us();
+        t_get_index++;
         client.Get(session, op.key, gcb, gtcb, timeout_);
         break;
 
@@ -330,6 +375,8 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
         break;
 
     case COMMIT:
+        t_commit_issue[t_commit_index] = now_us();
+        t_commit_index++;
         client.Commit(session, ccb, ctcb, timeout_);
         break;
 
@@ -390,6 +437,8 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
     std::string op_str;
+    t_op_issue[t_op_index] = now_us();
+    t_op_index++;
 
     switch (op.type)
     {
@@ -439,13 +488,15 @@ void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status
 void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
                                   const std::string &key, const std::string &val, Timestamp ts)
 {
-    Debug("[%lu] Get(%s) callback", session_id, key.c_str());
+    t_getreply_cb[t_getreply_index] = now_us();
+    t_getreply_index++;
+    // Debug("[%lu] Get(%s) callback", session_id, key.c_str());
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
     ss.incr_responses();
-    Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
+    // Debug("fanout = %d and responses = %lu", ss.transaction()->Fanout(), ss.responses());
 
     if (status == REPLY_OK)
     {
@@ -524,6 +575,8 @@ void BenchmarkClient::PutTimeout(const uint64_t session_id, int status,
 void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
                                              int status, const std::string &retval)
 {
+    t_opreply_cb[t_opreply_index] = now_us();
+    t_opreply_index++;
     Debug("session [%lu] running ReceiveOperationResponse callback in benchclient! status = %d and retval = %s", session_id, status, retval.c_str());
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
@@ -582,6 +635,8 @@ void BenchmarkClient::SendOperationTimeout(const uint64_t session_id,
 
 void BenchmarkClient::CommitCallback(const uint64_t session_id, transaction_status_t status)
 {
+    t_commitreply_cb[t_commitreply_index] = now_us();
+    t_commitreply_index++;
     Debug("[%lu] Commit callback.", session_id);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());

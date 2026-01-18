@@ -114,6 +114,7 @@ namespace strongstore
                             const std::string &data,
                             void *meta_data);
         void Close();
+        void DumpTimestamps();
 
         void Begin(uint64_t transaction_id, const Timestamp &start_time);
         void Get(uint64_t id, const std::string &key, get_callback gcb,

@@ -57,6 +57,29 @@ const size_t MAX_TCP_SIZE = 100; // XXX
 const uint32_t MAGIC = 0x06121983;
 const int SOCKET_BUF_SIZE = 1048576;
 
+uint64_t t_rx_ready_getreply[600000];
+uint64_t t_rx_ready_getreply_index = 0;
+uint64_t t_rx_ready_commitreply[600000];
+uint64_t t_rx_ready_commitreply_index = 0;
+uint64_t t_rx_ready_opreply[600000];
+uint64_t t_rx_ready_opreply_index = 0;
+
+
+
+uint64_t t_tx_enqueue_get[600000];
+uint64_t t_tx_enqueue_get_index = 0;
+uint64_t t_tx_enqueue_commit[600000];
+uint64_t t_tx_enqueue_commit_index = 0;
+uint64_t t_tx_enqueue_op[600000];
+uint64_t t_tx_enqueue_op_index = 0;
+
+
+uint64_t t_srv_rx_ready_get[600000];
+uint64_t t_srv_rx_ready_get_index = 0;
+uint64_t t_srv_rx_ready_commit[600000];
+uint64_t t_srv_rx_ready_commit_index = 0;
+uint64_t t_srv_rx_ready_op[600000];
+uint64_t t_srv_rx_ready_op_index = 0;
 using std::pair;
 
 TCPTransportAddress::TCPTransportAddress(const sockaddr_in &addr)
@@ -489,10 +512,8 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
           outq_before);
 
     // Serialize message
-    auto t0 = now_us();
     string data;
     ASSERT(m.SerializeToString(&data));
-    auto t1 = now_us();
     string type = m.GetTypeName();
     size_t typeLen = type.length();
     size_t dataLen = data.length();
@@ -528,7 +549,19 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
     ASSERT((size_t)(ptr + dataLen - buf) == totalLen);
     memcpy(ptr, data.c_str(), dataLen);
     ptr += dataLen;
-    auto t2 = now_us();
+
+    if (m.GetTypeName().c_str() == string("strongstore.proto.Get"))
+    {
+        t_tx_enqueue_get[t_tx_enqueue_get_index++] = now_us();
+    }
+    else if (m.GetTypeName().c_str() == string("strongstore.proto.RWCommitCoordinator"))
+    {
+        t_tx_enqueue_commit[t_tx_enqueue_commit_index++] = now_us();
+    }
+    else if (m.GetTypeName().c_str() == string("replication.LinearizeableOperation"))
+    {
+        t_tx_enqueue_op[t_tx_enqueue_op_index++] = now_us();
+    }
 
     if (bufferevent_write(ev, buf, totalLen) < 0)
     {
@@ -536,7 +569,6 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
         fprintf(stderr, "tcp write failed\n");
         return false;
     }
-    auto t3 = now_us();
     // --- Debug after write ---
     size_t outq_after = evbuffer_get_length(outbuf);
     Debug("TCP OUTQ after write to %s:%d = %zu bytes (added %zu)",
@@ -551,8 +583,6 @@ bool TCPTransport::SendMessageInternal(TransportReceiver *src,
       return false;
     }
     Latency_End(&sockWriteLat);*/
-    Notice("TX breakdown: proto_ser=%lu us, framing=%lu us, bev_write=%lu us, bytes(wire)=%zu payload=%zu",
-       t1 - t0, t2 - t1, t3 - t2, totalLen, dataLen);
     return true;
 }
 
@@ -833,9 +863,12 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
     struct evbuffer *evbuf = bufferevent_get_input(bev);
+    // int processed = 0;
+    // const int kMaxMsgs = 8; // try 4, 8, 16
 
     while (evbuffer_get_length(evbuf) > 0)
     {
+        // if (processed++ >= kMaxMsgs) return;
         uint32_t *magic;
         magic = (uint32_t *)evbuffer_pullup(evbuf, sizeof(*magic));
         if (magic == NULL)
@@ -855,6 +888,7 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         size_t totalSize = *sz;
         ASSERT(totalSize < 1073741826);
 
+
         if (evbuffer_get_length(evbuf) < totalSize)
         {
             // Debug("Don't have %ld bytes for a message yet, only %ld",
@@ -864,7 +898,6 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         // Debug("Receiving %ld byte message", totalSize);
 
         char buf[totalSize];
-        auto t_msg_start = now_us();
         size_t copied = evbuffer_remove(evbuf, buf, totalSize);
         ASSERT(copied == totalSize);
 
@@ -878,6 +911,19 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 
         ASSERT((size_t)(ptr + typeLen - buf) < totalSize);
         string msgType(ptr, typeLen);
+        if (msgType == "strongstore.proto.GetReply") {
+            t_rx_ready_getreply[t_rx_ready_getreply_index++] = now_us();
+        } else if (msgType == "strongstore.proto.RWCommitCoordinatorReply") {
+            t_rx_ready_commitreply[t_rx_ready_commitreply_index++] = now_us();
+        } else if (msgType == "strongstore.proto.LinearizeableReply") {
+            t_rx_ready_opreply[t_rx_ready_opreply_index++] = now_us();
+        } else if (msgType == "strongstore.proto.Get") {
+            t_srv_rx_ready_get[t_srv_rx_ready_get_index++] = now_us();
+        } else if (msgType == "strongstore.proto.RWCommitCoordinator") {
+            t_srv_rx_ready_commit[t_srv_rx_ready_commit_index++] = now_us();
+        } else if (msgType == "replication.LinearizeableOperation") {
+            t_srv_rx_ready_op[t_srv_rx_ready_op_index++] = now_us();
+        }
         ptr += typeLen;
 
         size_t msgLen = *((size_t *)ptr);
@@ -899,20 +945,47 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         else
         {
             // Dispatch
-            auto t_before_dispatch = now_us();
             Debug("Received %lu bytes %s message.", totalSize, msgType.c_str());
             info->receiver->ReceiveMessage(addr->second.first, msgType, msg,
                                            nullptr);
-            auto t_after_dispatch = now_us();
-
-            Notice("RX breakdown: bytes(wire)=%lu, payload=%lu, total=%lu us, pre-dispatch=%lu us, dispatch+parse+handler=%lu us",
-                totalSize,
-                msgLen,
-                t_after_dispatch - t_msg_start,
-                t_before_dispatch - t_msg_start,
-                t_after_dispatch - t_before_dispatch);
             // Debug("Done processing large %s message", msgType.c_str());
         }
+    }
+}
+
+void TCPTransport::DumpNumbers() {
+    Debug("TCP RX timestamps:");
+    for (size_t i = 0; i < t_rx_ready_getreply_index; i++) {
+        Notice("  t_rx_ready_getreply[%zu] = %lu", i, t_rx_ready_getreply[i]);
+    }
+    for (size_t i = 0; i < t_rx_ready_commitreply_index; i++) {
+        Notice("  t_rx_ready_commitreply[%zu] = %lu", i, t_rx_ready_commitreply[i]);
+    }
+    for (size_t i = 0; i < t_rx_ready_opreply_index; i++) {
+        Notice("  t_rx_ready_opreply[%zu] = %lu", i, t_rx_ready_opreply[i]);
+    }
+    Debug("TCP TX timestamps:");
+    for (size_t i = 0; i < t_tx_enqueue_get_index; i++) {
+        Notice("  t_tx_enqueue_get[%zu] = %lu", i, t_tx_enqueue_get[i]);
+    }
+    for (size_t i = 0; i < t_tx_enqueue_commit_index; i++) {
+        Notice("  t_tx_enqueue_commit[%zu] = %lu", i, t_tx_enqueue_commit[i]);
+    }
+    for (size_t i = 0; i < t_tx_enqueue_op_index; i++) {
+        Notice("  t_tx_enqueue_op[%zu] = %lu", i, t_tx_enqueue_op[i]);
+    }
+    Notice("GetReady timestamps size = %lu", t_srv_rx_ready_get_index);
+    size_t start = (size_t)(7 * t_srv_rx_ready_get_index / 10);
+    for (size_t i = start; i < t_srv_rx_ready_get_index; i++) {
+        Notice("  t_srv_rx_ready_get[%zu] = %lu", i, t_srv_rx_ready_get[i]);
+    }
+    start = (size_t)(7 * t_srv_rx_ready_commit_index / 10);
+    for (size_t i = start; i < t_srv_rx_ready_commit_index; i++) {
+        Notice("  t_srv_rx_ready_commit[%zu] = %lu", i, t_srv_rx_ready_commit[i]);
+    }
+    start = (size_t)(7 * t_srv_rx_ready_op_index / 10);
+    for (size_t i = start; i < t_srv_rx_ready_op_index; i++) {
+        Notice("  t_srv_rx_ready_op[%zu] = %lu", i, t_srv_rx_ready_op[i]);
     }
 }
 
