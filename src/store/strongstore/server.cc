@@ -36,52 +36,6 @@
 #include <memory>
 #include <unordered_set>
 
-// For deserialization of gets:
-uint64_t t_srv_get_dispatch_in[200000];
-uint64_t t_srv_get_dispatch_in_index = 0;
-uint64_t t_srv_get_parsed[200000];
-uint64_t t_srv_get_parsed_index = 0;
-// For Get handler:
-uint64_t t_srv_get_handler_start[200000];
-uint64_t t_srv_get_handler_start_index = 0;
-uint64_t t_srv_get_before_send[200000];
-uint64_t t_srv_get_before_send_index = 0;
-uint64_t t_srv_get_after_send[200000];
-uint64_t t_srv_get_after_send_index = 0;
-uint64_t t_srv_get_handler_before_lock[200000];
-uint64_t t_srv_get_handler_before_lock_index = 0;
-uint64_t t_srv_get_handler_after_lock[200000];
-uint64_t t_srv_get_handler_after_lock_index = 0;
-// For deserialization of commits:
-uint64_t t_srv_rw_commit_c_dispatch_in[200000];
-uint64_t t_srv_rw_commit_c_dispatch_in_index = 0;
-uint64_t t_srv_rw_commit_c_parsed[200000];
-uint64_t t_srv_rw_commit_c_parsed_index = 0;
-// For Commit handler:
-uint64_t t_srv_rw_commit_c_handler_start[200000];
-uint64_t t_srv_rw_commit_c_handler_start_index = 0;
-uint64_t t_srv_rw_commit_c_before_send[200000];
-uint64_t t_srv_rw_commit_c_before_send_index = 0;
-uint64_t t_srv_rw_commit_c_after_send[200000];
-uint64_t t_srv_rw_commit_c_after_send_index = 0;
-uint64_t t_srv_rw_commit_c_handler_before_lock[200000];
-uint64_t t_srv_rw_commit_c_handler_before_lock_index = 0;
-uint64_t t_srv_rw_commit_c_handler_after_lock[200000];
-uint64_t t_srv_rw_commit_c_handler_after_lock_index = 0;
-// For deserialization of ops:
-uint64_t t_srv_op_dispatch_in[600000];
-uint64_t t_srv_op_dispatch_in_index = 0;
-uint64_t t_srv_op_parsed[600000];
-uint64_t t_srv_op_parsed_index = 0;
-// For Op handler:
-uint64_t t_srv_op_handler_start[600000];
-uint64_t t_srv_op_handler_start_index = 0;
-uint64_t t_srv_op_before_send[600000];
-uint64_t t_srv_op_before_send_index = 0;
-uint64_t t_srv_op_after_send[600000];
-uint64_t t_srv_op_after_send_index = 0;
-
-
 
 namespace strongstore
 {
@@ -223,23 +177,17 @@ namespace strongstore
     {
         if (type == get_.GetTypeName())
         {
-            t_srv_get_dispatch_in[t_srv_get_dispatch_in_index++] = now_us();
             get_.ParseFromString(data);
-            t_srv_get_parsed[t_srv_get_parsed_index++] = now_us();
             HandleGet(remote, get_);
         }
         else if (type == op_.GetTypeName())
         {
-            t_srv_op_dispatch_in[t_srv_op_dispatch_in_index++] = now_us();
             op_.ParseFromString(data);
-            t_srv_op_parsed[t_srv_op_parsed_index++] = now_us();
             HandleSendOperation(remote, op_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
-            t_srv_rw_commit_c_dispatch_in[t_srv_rw_commit_c_dispatch_in_index++] = now_us();
             rw_commit_c_.ParseFromString(data);
-            t_srv_rw_commit_c_parsed[t_srv_rw_commit_c_parsed_index++] = now_us();
             HandleRWCommitCoordinator(remote, rw_commit_c_);
         }
         else if (type == rw_commit_p_.GetTypeName())
@@ -284,107 +232,11 @@ namespace strongstore
     }
 
     void Server::DumpTimestamps() {
-        Notice("Server %d/%d GET timestamps:", shard_idx_, replica_idx_);
-        Notice("  t_srv_get_dispatch_in (size = %lu):", t_srv_get_dispatch_in_index);
-        size_t start = (size_t)(7 * t_srv_get_dispatch_in_index / 10);
-        for (size_t i = start; i < t_srv_get_dispatch_in_index; i++) {
-            Notice("    t_srv_get_dispatch_in[%zu] = %lu", i, t_srv_get_dispatch_in[i]);
-        }
-        Notice("  t_srv_get_parsed:");
-        start = (size_t)(7 * t_srv_get_parsed_index / 10);
-        for (size_t i = start; i < t_srv_get_parsed_index; i++) {
-            Notice("    t_srv_get_parsed[%zu] = %lu", i, t_srv_get_parsed[i]);
-        }
-        Notice("  t_srv_get_handler_start:");
-        start = (size_t)(7 * t_srv_get_handler_start_index / 10);
-        for (size_t i = start; i < t_srv_get_handler_start_index; i++) {
-            Notice("    t_srv_get_handler_start[%zu] = %lu", i, t_srv_get_handler_start[i]);
-        }
-        Notice("  t_srv_get_before_send:");
-        start = (size_t)(7 * t_srv_get_before_send_index / 10);
-        for (size_t i = start; i < t_srv_get_before_send_index; i++) {
-            Notice("    t_srv_get_before_send[%zu] = %lu", i, t_srv_get_before_send[i]);
-        }
-        Notice("  t_srv_get_after_send:");
-        start = (size_t)(7 * t_srv_get_after_send_index / 10);
-        for (size_t i = start; i < t_srv_get_after_send_index; i++) {
-            Notice("    t_srv_get_after_send[%zu] = %lu", i, t_srv_get_after_send[i]);
-        }
-        Notice("  t_srv_get_handler_before_lock:");
-        start = (size_t)(7 * t_srv_get_handler_before_lock_index / 10);
-        for (size_t i = start; i < t_srv_get_handler_before_lock_index; i++) {
-            Notice("    t_srv_get_handler_before_lock[%zu] = %lu", i, t_srv_get_handler_before_lock[i]);
-        }
-        Notice("  t_srv_get_handler_after_lock:");
-        start = (size_t)(7 * t_srv_get_handler_after_lock_index / 10);
-        for (size_t i = start; i < t_srv_get_handler_after_lock_index; i++) {
-            Notice("    t_srv_get_handler_after_lock[%zu] = %lu", i, t_srv_get_handler_after_lock[i]);
-        }
-        Notice("  t_srv_rw_commit_c_dispatch_in:");
-        start = (size_t)(7 * t_srv_rw_commit_c_dispatch_in_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_dispatch_in_index; i++) {
-            Notice("    t_srv_rw_commit_c_dispatch_in[%zu] = %lu", i, t_srv_rw_commit_c_dispatch_in[i]);
-        }
-        Notice("  t_srv_rw_commit_c_parsed:");
-        start = (size_t)(7 * t_srv_rw_commit_c_parsed_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_parsed_index; i++) {
-            Notice("    t_srv_rw_commit_c_parsed[%zu] = %lu", i, t_srv_rw_commit_c_parsed[i]);
-        }
-        Notice("  t_srv_rw_commit_c_handler_start:");
-        start = (size_t)(7 * t_srv_rw_commit_c_handler_start_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_handler_start_index; i++) {
-            Notice("    t_srv_rw_commit_c_handler_start[%zu] = %lu", i, t_srv_rw_commit_c_handler_start[i]);
-        }
-        Notice("  t_srv_rw_commit_c_before_send:");
-        start = (size_t)(7 * t_srv_rw_commit_c_before_send_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_before_send_index; i++) {
-            Notice("    t_srv_rw_commit_c_before_send[%zu] = %lu", i, t_srv_rw_commit_c_before_send[i]);
-        }
-        Notice("  t_srv_rw_commit_c_after_send:");
-        start = (size_t)(7 * t_srv_rw_commit_c_after_send_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_after_send_index; i++) {
-            Notice("    t_srv_rw_commit_c_after_send[%zu] = %lu", i, t_srv_rw_commit_c_after_send[i]);
-        }
-        Notice("  t_srv_rw_commit_c_handler_before_lock:");
-        start = (size_t)(7 * t_srv_rw_commit_c_handler_before_lock_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_handler_before_lock_index; i++) {
-            Notice("    t_srv_rw_commit_c_handler_before_lock[%zu] = %lu", i, t_srv_rw_commit_c_handler_before_lock[i]);
-        }
-        Notice("  t_srv_rw_commit_c_handler_after_lock:");
-        start = (size_t)(7 * t_srv_rw_commit_c_handler_after_lock_index / 10);
-        for (size_t i = start; i < t_srv_rw_commit_c_handler_after_lock_index; i++) {
-            Notice("    t_srv_rw_commit_c_handler_after_lock[%zu] = %lu", i, t_srv_rw_commit_c_handler_after_lock[i]);
-        }
-        Notice("  t_srv_op_dispatch_in:");
-        start = (size_t)(7 * t_srv_op_dispatch_in_index / 10);
-        for (size_t i = start; i < t_srv_op_dispatch_in_index; i++) {
-            Notice("    t_srv_op_dispatch_in[%zu] = %lu", i, t_srv_op_dispatch_in[i]);
-        }
-        Notice("  t_srv_op_parsed:");
-        start = (size_t)(7 * t_srv_op_parsed_index / 10);
-        for (size_t i = start; i < t_srv_op_parsed_index; i++) {
-            Notice("    t_srv_op_parsed[%zu] = %lu", i, t_srv_op_parsed[i]);
-        }
-        Notice("  t_srv_op_handler_start:");
-        start = (size_t)(7 * t_srv_op_handler_start_index / 10);
-        for (size_t i = start; i < t_srv_op_handler_start_index; i++) {
-            Notice("    t_srv_op_handler_start[%zu] = %lu", i, t_srv_op_handler_start[i]);
-        }
-        Notice("  t_srv_op_before_send:");
-        start = (size_t)(7 * t_srv_op_before_send_index / 10);
-        for (size_t i = start; i < t_srv_op_before_send_index; i++) {
-            Notice("    t_srv_op_before_send[%zu] = %lu", i, t_srv_op_before_send[i]);
-        }
-        Notice("  t_srv_op_after_send:");
-        start = (size_t)(7 * t_srv_op_after_send_index / 10);
-        for (size_t i = start; i < t_srv_op_after_send_index; i++) {
-            Notice("    t_srv_op_after_send[%zu] = %lu", i, t_srv_op_after_send[i]);
-        }
+        return;
     }
 
     void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
     {
-        t_srv_get_handler_start[t_srv_get_handler_start_index++] = now_us();
         uint64_t client_id = msg.rid().client_id();
         uint64_t client_req_id = msg.rid().client_req_id();
         uint64_t transaction_id = msg.transaction_id();
@@ -405,9 +257,7 @@ namespace strongstore
         }
         else
         {
-            t_srv_get_handler_before_lock[t_srv_get_handler_before_lock_index++] = now_us();
             r = locks_.AcquireReadLock(transaction_id, timestamp, key);
-            t_srv_get_handler_after_lock[t_srv_get_handler_after_lock_index++] = now_us();
         }
 
         if (r.status == LockStatus::ACQUIRED)
@@ -427,9 +277,7 @@ namespace strongstore
             value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
             // respond back to the client (shard client)
-            t_srv_get_before_send[t_srv_get_before_send_index++] = now_us();
             transport_->SendMessage(this, remote, get_reply_);
-            t_srv_get_after_send[t_srv_get_after_send_index++] = now_us();
 
             transactions_.FinishGet(transaction_id, key);
         }
@@ -475,8 +323,6 @@ namespace strongstore
 
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
-        t_srv_op_handler_start[t_srv_op_handler_start_index++] = now_us();
-        // Notice("        (C) Received op on server side %lu", now_us());
         Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
 
@@ -884,8 +730,6 @@ namespace strongstore
 
     void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::RWCommitCoordinator &msg)
     {
-        t_srv_rw_commit_c_handler_start[t_srv_rw_commit_c_handler_start_index++] = now_us();
-        // Notice("        (C) Received op on server side %lu", now_us());
         uint64_t client_id = msg.rid().client_id();
         uint64_t client_req_id = msg.rid().client_req_id();
 
@@ -908,9 +752,7 @@ namespace strongstore
         {
             // Debug("[%lu] Coordinator preparing", transaction_id);
 
-            t_srv_rw_commit_c_handler_before_lock[t_srv_rw_commit_c_handler_before_lock_index++] = now_us();
             LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-            t_srv_rw_commit_c_handler_after_lock[t_srv_rw_commit_c_handler_after_lock_index++] = now_us();
             if (ar.status == LockStatus::ACQUIRED)
             {
                 ASSERT(ar.wound_rws.size() == 0);
@@ -1096,9 +938,7 @@ namespace strongstore
         commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
         nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
-        t_srv_rw_commit_c_before_send[t_srv_rw_commit_c_before_send_index++] = now_us();
         transport_->SendMessage(this, *remote, rw_commit_c_reply_);
-        t_srv_rw_commit_c_after_send[t_srv_rw_commit_c_after_send_index++] = now_us();
 
         delete remote;
         delete reply;
@@ -1894,10 +1734,7 @@ namespace strongstore
         op_reply_.set_return_value(retval);
         op_reply_.set_transaction_id(transaction_id);
 
-        // Notice("        (G) Sending REPLY on Wire %lu", now_us());
-        t_srv_op_before_send[t_srv_op_before_send_index++] = now_us();
         transport_->SendMessage(this, *remote, op_reply_);
-        t_srv_op_after_send[t_srv_op_after_send_index++] = now_us();
 
         delete remote;
         delete reply;
@@ -1905,7 +1742,6 @@ namespace strongstore
 
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
-        // Notice("        (G) Sending REPLY on Wire %lu", now_us());
         // Debug("[%lu] Commiting", transaction_id);
 
         const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
@@ -2108,9 +1944,6 @@ namespace strongstore
                 }
 
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
-                // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
-                // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-                // Notice("            (F) Adding response routine to event queue now %lu", now_us());
                 if (commit_wait_us > 0) {
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
@@ -2203,7 +2036,6 @@ namespace strongstore
 
         PendingOperationReply *pending_reply = search->second;
         pending_operation_replies_.erase(search);
-        // Notice("            (F) Adding response routine to event queue now %lu", now_us());
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
 
         RespondToClientOperation(pending_reply, transaction_id, status, retval);
