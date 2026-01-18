@@ -827,12 +827,12 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
     TCPTransportTCPListener *info = (TCPTransportTCPListener *)arg;
     TCPTransport *transport = info->transport;
     struct evbuffer *evbuf = bufferevent_get_input(bev);
-    // int processed = 0;
-    // const int kMaxMsgs = 8; // try 4, 8, 16
+    int processed = 0;
+    const int kMaxMsgs = 8;
 
     while (evbuffer_get_length(evbuf) > 0)
     {
-        // if (processed++ >= kMaxMsgs) return;
+        if (processed++ >= kMaxMsgs) return;
         uint32_t *magic;
         magic = (uint32_t *)evbuffer_pullup(evbuf, sizeof(*magic));
         if (magic == NULL)
