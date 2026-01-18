@@ -912,7 +912,12 @@ namespace strongstore
 
         rss::EndTransaction(service_name_, session);
 
-        transport_->Timer(ms, std::bind(ccb, tstatus));
+        if (ms == 0) {
+            ccb(tstatus);
+            return;
+        } else {
+            transport_->Timer(ms, std::bind(ccb, tstatus));
+        }
     }
 
     void Client::DumpTimestamps() {
