@@ -226,7 +226,8 @@ void SimulatedTransport::Run()
         {
             QueuedMessage &q = queue.front();
             TransportReceiver *dst = endpoints[q.dst];
-            dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, q.msg, nullptr);
+            // WRONG FOR NOW
+            dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, nullptr, 0, nullptr);
             queue.pop_front();
         }
 

@@ -86,7 +86,8 @@ class Client : public TransportReceiver {
         uint32_t timeout = DEFAULT_UNLOGGED_OP_TIMEOUT) = 0;
 
     virtual void ReceiveMessage(const TransportAddress &remote,
-                                const string &type, const string &data,
+                                const string &type, char *data,
+                                size_t size,
                                 void *meta_data) override;
     virtual void Close() override;
    protected:

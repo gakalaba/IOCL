@@ -170,7 +170,8 @@ bool ReplTransport::DeliverMessage(const ReplTransportAddress &addr,
     const QueuedMessage &m = state.msgs.at(index);
     string data;
     m.msg->SerializeToString(&data);
-    state.receiver->ReceiveMessage(*m.src, m.msg->GetTypeName(), data, nullptr);
+    // WRONG FOR NOW
+    state.receiver->ReceiveMessage(*m.src, m.msg->GetTypeName(), nullptr, 0, nullptr);
     return true;
 }
 

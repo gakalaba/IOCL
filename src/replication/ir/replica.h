@@ -57,10 +57,11 @@ public:
 
     // Message handlers.
     void ReceiveMessage(const TransportAddress &remote,
-                        const std::string &type, const std::string &data,
+                        const std::string &type, char *data,
+                        size_t size,
                         void *meta_data);
     void HandleMessage(const TransportAddress &remote,
-                       const std::string &type, const std::string &data);
+                       const std::string &type, char *data, size_t size);
     void HandleProposeInconsistent(const TransportAddress &remote,
                                    const proto::ProposeInconsistentMessage &msg);
     void HandleFinalizeInconsistent(const TransportAddress &remote,

@@ -111,7 +111,8 @@ namespace strongstore
 
         void ReceiveMessage(const TransportAddress &remote,
                             const std::string &type,
-                            const std::string &data,
+                            char *data,
+                            size_t size,
                             void *meta_data);
         void Close();
         void DumpTimestamps();

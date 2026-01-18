@@ -59,7 +59,8 @@ public:
 
     virtual void ReceiveMessage(const TransportAddress &remote,
                                 const string &type,
-                                const string &data,
+                                char *data,
+                                size_t size,
                                 void *meta_data) = 0;
     virtual void Close() = 0;
 

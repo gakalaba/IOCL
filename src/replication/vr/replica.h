@@ -58,7 +58,7 @@ namespace replication
             void Close();
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
-                                const string &data, void *meta_data);
+                                char *data, size_t size, void *meta_data);
             void HandleOperation(LinearizeableOperation &msg, uint64_t clientid, uint64_t clientreqid) override;
             void HandleRequest(const string &reqMsg, uint64_t clientid, uint64_t clientreqid) override;
 

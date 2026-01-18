@@ -154,7 +154,8 @@ namespace replication
         }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,
-                                      const string &type, const string &data,
+                                      const string &type, char *data,
+                                      size_t size,
                                       void *meta_data)
         {
             proto::ReplyMessage reply;
@@ -162,17 +163,17 @@ namespace replication
 
             if (type == reply.GetTypeName())
             {
-                reply.ParseFromString(data);
+                reply.ParseFromArray(data, size);
                 HandleReply(remote, reply);
             }
             else if (type == unloggedReply.GetTypeName())
             {
-                unloggedReply.ParseFromString(data);
+                unloggedReply.ParseFromArray(data, size);
                 HandleUnloggedReply(remote, unloggedReply);
             }
             else
             {
-                Client::ReceiveMessage(remote, type, data, meta_data);
+                Client::ReceiveMessage(remote, type, data, size, meta_data);
             }
         }
 

@@ -61,57 +61,58 @@ namespace strongstore
 
     void ShardClient::ReceiveMessage(const TransportAddress &remote,
                                      const std::string &type,
-                                     const std::string &data, void *meta_data)
+                                     char *data,
+                                     size_t size, void *meta_data)
     {
         Debug("Got message wahoo");
         if (type == get_reply_.GetTypeName())
         {
-            get_reply_.ParseFromString(data);
+            get_reply_.ParseFromArray(data, size);
             HandleGetReply(get_reply_);
         }
         else if (type == op_reply_.GetTypeName())
         {
-            op_reply_.ParseFromString(data);
+            op_reply_.ParseFromArray(data, size);
             HandleSendOperationReply(op_reply_);
         }
         else if (type == rw_commit_c_reply_.GetTypeName())
         {
-            rw_commit_c_reply_.ParseFromString(data);
+            rw_commit_c_reply_.ParseFromArray(data, size);
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
         }
         else if (type == rw_commit_p_reply_.GetTypeName())
         {
-            rw_commit_p_reply_.ParseFromString(data);
+            rw_commit_p_reply_.ParseFromArray(data, size);
             HandleRWCommitParticipantReply(rw_commit_p_reply_);
         }
         else if (type == prepare_ok_reply_.GetTypeName())
         {
-            prepare_ok_reply_.ParseFromString(data);
+            prepare_ok_reply_.ParseFromArray(data, size);
             HandlePrepareOKReply(prepare_ok_reply_);
         }
         else if (type == prepare_abort_reply_.GetTypeName())
         {
-            prepare_abort_reply_.ParseFromString(data);
+            prepare_abort_reply_.ParseFromArray(data, size);
             HandlePrepareAbortReply(prepare_abort_reply_);
         }
         else if (type == ro_commit_reply_.GetTypeName())
         {
-            ro_commit_reply_.ParseFromString(data);
+            ro_commit_reply_.ParseFromArray(data, size);
             HandleROCommitReply(ro_commit_reply_);
         }
         else if (type == ro_commit_slow_reply_.GetTypeName())
         {
-            ro_commit_slow_reply_.ParseFromString(data);
+            ro_commit_slow_reply_.ParseFromArray(data, size);
             HandleROCommitSlowReply(ro_commit_slow_reply_);
         }
         else if (type == abort_reply_.GetTypeName())
         {
-            abort_reply_.ParseFromString(data);
+            abort_reply_.ParseFromArray(data, size);
             HandleAbortReply(abort_reply_);
         }
         else if (type == wound_.GetTypeName())
         {
-            wound_.ParseFromString(data);
+            wound_.ParseFromArray(data, size);
             HandleWound(wound_);
         }
         else

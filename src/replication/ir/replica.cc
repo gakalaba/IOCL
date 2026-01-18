@@ -66,15 +66,16 @@ IRReplica::~IRReplica() { }
 
 void
 IRReplica::ReceiveMessage(const TransportAddress &remote,
-                          const string &type, const string &data,
+                          const string &type, char *data,
+                          size_t size,
                           void *meta_data)
 {
-    HandleMessage(remote, type, data);
+    HandleMessage(remote, type, data, size);
 }
 
 void
 IRReplica::HandleMessage(const TransportAddress &remote,
-                         const string &type, const string &data)
+                         const string &type, char *data, size_t size)
 {
     ProposeInconsistentMessage proposeInconsistent;
     FinalizeInconsistentMessage finalizeInconsistent;
@@ -85,25 +86,25 @@ IRReplica::HandleMessage(const TransportAddress &remote,
     StartViewMessage startView;
 
     if (type == proposeInconsistent.GetTypeName()) {
-        proposeInconsistent.ParseFromString(data);
+        proposeInconsistent.ParseFromArray(data, size);
         HandleProposeInconsistent(remote, proposeInconsistent);
     } else if (type == finalizeInconsistent.GetTypeName()) {
-        finalizeInconsistent.ParseFromString(data);
+        finalizeInconsistent.ParseFromArray(data, size);
         HandleFinalizeInconsistent(remote, finalizeInconsistent);
     } else if (type == proposeConsensus.GetTypeName()) {
-        proposeConsensus.ParseFromString(data);
+        proposeConsensus.ParseFromArray(data, size);
         HandleProposeConsensus(remote, proposeConsensus);
     } else if (type == finalizeConsensus.GetTypeName()) {
-        finalizeConsensus.ParseFromString(data);
+        finalizeConsensus.ParseFromArray(data, size);
         HandleFinalizeConsensus(remote, finalizeConsensus);
     } else if (type == doViewChange.GetTypeName()) {
-        doViewChange.ParseFromString(data);
+        doViewChange.ParseFromArray(data, size);
         HandleDoViewChange(remote, doViewChange);
     } else if (type == startView.GetTypeName()) {
-        startView.ParseFromString(data);
+        startView.ParseFromArray(data, size);
         HandleStartView(remote, startView);
     } else if (type == unloggedRequest.GetTypeName()) {
-        unloggedRequest.ParseFromString(data);
+        unloggedRequest.ParseFromArray(data, size);
         HandleUnlogged(remote, unloggedRequest);
     } else {
         Panic("Received unexpected message type in IR proto: %s",

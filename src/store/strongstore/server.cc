@@ -172,57 +172,58 @@ namespace strongstore
     }
 
     void Server::ReceiveMessage(const TransportAddress &remote,
-                                const std::string &type, const std::string &data,
+                                const std::string &type, char *data,
+                                size_t size,
                                 void *meta_data)
     {
         if (type == get_.GetTypeName())
         {
-            get_.ParseFromString(data);
+            get_.ParseFromArray(data, size);
             HandleGet(remote, get_);
         }
         else if (type == op_.GetTypeName())
         {
-            op_.ParseFromString(data);
+            op_.ParseFromArray(data, size);
             HandleSendOperation(remote, op_);
         }
         else if (type == rw_commit_c_.GetTypeName())
         {
-            rw_commit_c_.ParseFromString(data);
+            rw_commit_c_.ParseFromArray(data, size);
             HandleRWCommitCoordinator(remote, rw_commit_c_);
         }
         else if (type == rw_commit_p_.GetTypeName())
         {
-            rw_commit_p_.ParseFromString(data);
+            rw_commit_p_.ParseFromArray(data, size);
             HandleRWCommitParticipant(remote, rw_commit_p_);
         }
         else if (type == prepare_ok_.GetTypeName())
         {
-            prepare_ok_.ParseFromString(data);
+            prepare_ok_.ParseFromArray(data, size);
             HandlePrepareOK(remote, prepare_ok_);
         }
         else if (type == prepare_abort_.GetTypeName())
         {
-            prepare_abort_.ParseFromString(data);
+            prepare_abort_.ParseFromArray(data, size);
             HandlePrepareAbort(remote, prepare_abort_);
         }
         else if (type == ro_commit_.GetTypeName())
         {
-            ro_commit_.ParseFromString(data);
+            ro_commit_.ParseFromArray(data, size);
             HandleROCommit(remote, ro_commit_);
         }
         else if (type == abort_.GetTypeName())
         {
-            abort_.ParseFromString(data);
+            abort_.ParseFromArray(data, size);
             HandleAbort(remote, abort_);
         }
         else if (type == wound_.GetTypeName())
         {
-            wound_.ParseFromString(data);
+            wound_.ParseFromArray(data, size);
             HandleWound(remote, wound_);
         }
         else if (type == ping_.GetTypeName())
         {
-            ping_.ParseFromString(data);
+            ping_.ParseFromArray(data, size);
             HandlePingMessage(this, remote, ping_);
         }
         else

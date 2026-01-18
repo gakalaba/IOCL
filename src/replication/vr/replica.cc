@@ -391,7 +391,8 @@ namespace replication
         }
 
         void VRReplica::ReceiveMessage(const TransportAddress &remote,
-                                       const string &type, const string &data,
+                                       const string &type, char *data,
+                                       size_t size,
                                        void *meta_data)
         {
             UnloggedRequestMessage unloggedRequest;
@@ -406,47 +407,47 @@ namespace replication
 
             if (type == unloggedRequest.GetTypeName())
             {
-                unloggedRequest.ParseFromString(data);
+                unloggedRequest.ParseFromArray(data, size);
                 HandleUnloggedRequest(remote, unloggedRequest);
             }
             else if (type == prepare.GetTypeName())
             {
-                prepare.ParseFromString(data);
+                prepare.ParseFromArray(data, size);
                 HandlePrepare(remote, prepare);
             }
             else if (type == prepareOK.GetTypeName())
             {
-                prepareOK.ParseFromString(data);
+                prepareOK.ParseFromArray(data, size);
                 HandlePrepareOK(remote, prepareOK);
             }
             else if (type == commit.GetTypeName())
             {
-                commit.ParseFromString(data);
+                commit.ParseFromArray(data, size);
                 HandleCommit(remote, commit);
             }
             else if (type == requestStateTransfer.GetTypeName())
             {
-                requestStateTransfer.ParseFromString(data);
+                requestStateTransfer.ParseFromArray(data, size);
                 HandleRequestStateTransfer(remote, requestStateTransfer);
             }
             else if (type == stateTransfer.GetTypeName())
             {
-                stateTransfer.ParseFromString(data);
+                stateTransfer.ParseFromArray(data, size);
                 HandleStateTransfer(remote, stateTransfer);
             }
             else if (type == startViewChange.GetTypeName())
             {
-                startViewChange.ParseFromString(data);
+                startViewChange.ParseFromArray(data, size);
                 HandleStartViewChange(remote, startViewChange);
             }
             else if (type == doViewChange.GetTypeName())
             {
-                doViewChange.ParseFromString(data);
+                doViewChange.ParseFromArray(data, size);
                 HandleDoViewChange(remote, doViewChange);
             }
             else if (type == startView.GetTypeName())
             {
-                startView.ParseFromString(data);
+                startView.ParseFromArray(data, size);
                 HandleStartView(remote, startView);
             }
             else

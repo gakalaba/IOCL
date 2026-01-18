@@ -883,7 +883,7 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
 
         ASSERT((size_t)(ptr + msgLen - buf) <= totalSize);
         string msg(ptr, msgLen);
-        ptr += msgLen;
+        // ptr += msgLen;
 
         // transport->mtx.lock();
         auto addr = transport->tcpAddresses.find(bev);
@@ -897,8 +897,7 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         {
             // Dispatch
             Debug("Received %lu bytes %s message.", totalSize, msgType.c_str());
-            info->receiver->ReceiveMessage(addr->second.first, msgType, msg,
-                                           nullptr);
+            info->receiver->ReceiveMessage(addr->second.first, msgType, ptr, msgLen, nullptr);
             // Debug("Done processing large %s message", msgType.c_str());
         }
     }

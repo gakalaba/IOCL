@@ -38,7 +38,7 @@ public:
     virtual ~MessageServer();
 
     virtual void ReceiveMessage(const TransportAddress &remote,
-                                const std::string &type, const std::string &data,
+                                const std::string &type, char *data, size_t size,
                                 void *meta_data) override;
 
     virtual inline Stats &GetStats() override { return stats; };

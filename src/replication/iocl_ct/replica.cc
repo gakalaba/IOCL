@@ -551,7 +551,8 @@ namespace replication
         }
 
         void IOCL_CTReplica::ReceiveMessage(const TransportAddress &remote,
-                                       const string &type, const string &data,
+                                       const string &type, char *data,
+                                       size_t size,
                                        void *meta_data)
         {
             UnloggedRequestMessage unloggedRequest;
@@ -572,75 +573,75 @@ namespace replication
             if (type == coordReq.GetTypeName())
             {
                 // Successor request arrived
-                coordReq.ParseFromString(data);
+                coordReq.ParseFromArray(data, size);
                 HandleCoordination(remote, coordReq);
             }
             else if (type == coordResp.GetTypeName())
             {
                 // Predecessor reply arrived
-                coordResp.ParseFromString(data);
+                coordResp.ParseFromArray(data, size);
                 HandleCoordinationReply(remote, coordResp);
             }
             else if (type == coordFinal.GetTypeName())
             {
                 // Predecessor final ACK arrived
-                coordFinal.ParseFromString(data);
+                coordFinal.ParseFromArray(data, size);
                 HandleCoordinationFinal(remote, coordFinal);
             }
             else if (type == unorderedPrepare.GetTypeName())
             {
-                unorderedPrepare.ParseFromString(data);
+                unorderedPrepare.ParseFromArray(data, size);
                 HandleUnorderedPrepare(remote, unorderedPrepare);
             }
             else if (type == unorderedPrepareOK.GetTypeName())
             {
                 // Request persisted at quorum -- ensue regular VR prepare
-                unorderedPrepareOK.ParseFromString(data);
+                unorderedPrepareOK.ParseFromArray(data, size);
                 HandleUnorderedPrepareOK(remote, unorderedPrepareOK);
             }
             else if (type == unloggedRequest.GetTypeName())
             {
-                unloggedRequest.ParseFromString(data);
+                unloggedRequest.ParseFromArray(data, size);
                 HandleUnloggedRequest(remote, unloggedRequest);
             }
             else if (type == prepare.GetTypeName())
             {
-                prepare.ParseFromString(data);
+                prepare.ParseFromArray(data, size);
                 HandlePrepare(remote, prepare);
             }
             else if (type == prepareOK.GetTypeName())
             {
-                prepareOK.ParseFromString(data);
+                prepareOK.ParseFromArray(data, size);
                 HandlePrepareOK(remote, prepareOK);
             }
             else if (type == commit.GetTypeName())
             {
-                commit.ParseFromString(data);
+                commit.ParseFromArray(data, size);
                 HandleCommit(remote, commit);
             }
             else if (type == requestStateTransfer.GetTypeName())
             {
-                requestStateTransfer.ParseFromString(data);
+                requestStateTransfer.ParseFromArray(data, size);
                 HandleRequestStateTransfer(remote, requestStateTransfer);
             }
             else if (type == stateTransfer.GetTypeName())
             {
-                stateTransfer.ParseFromString(data);
+                stateTransfer.ParseFromArray(data, size);
                 HandleStateTransfer(remote, stateTransfer);
             }
             else if (type == startViewChange.GetTypeName())
             {
-                startViewChange.ParseFromString(data);
+                startViewChange.ParseFromArray(data, size);
                 HandleStartViewChange(remote, startViewChange);
             }
             else if (type == doViewChange.GetTypeName())
             {
-                doViewChange.ParseFromString(data);
+                doViewChange.ParseFromArray(data, size);
                 HandleDoViewChange(remote, doViewChange);
             }
             else if (type == startView.GetTypeName())
             {
-                startView.ParseFromString(data);
+                startView.ParseFromArray(data, size);
                 HandleStartView(remote, startView);
             }
             else

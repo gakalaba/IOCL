@@ -36,7 +36,7 @@ MessageServer::~MessageServer()
 }
 
 void MessageServer::ReceiveMessage(const TransportAddress &remote,
-                                   const std::string &type, const std::string &data, void *meta_data)
+                                   const std::string &type, char *data, size_t size, void *meta_data)
 {
   auto msgHandlerItr = msgHandlers.find(type);
   if (msgHandlerItr == msgHandlers.end())
@@ -44,7 +44,7 @@ void MessageServer::ReceiveMessage(const TransportAddress &remote,
     Panic("Received unexpected message type: %s", type.c_str());
   }
 
-  msgHandlerItr->second.first->ParseFromString(data);
+  msgHandlerItr->second.first->ParseFromArray(data, size);
   (this->*msgHandlerItr->second.second)(remote, msgHandlerItr->second.first);
   // stats.Increment(type);
 }

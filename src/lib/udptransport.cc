@@ -871,7 +871,8 @@ deliver:
                 // Don't deliver a message to the sending replica
                 if (raddr != senderAddr)
                 {
-                    receiver->ReceiveMessage(senderAddr, msgType, msg, meta_data);
+                    // WRONG FOR NOW
+                    receiver->ReceiveMessage(senderAddr, msgType, nullptr, 0, meta_data);
                 }
             }
         }
@@ -879,7 +880,8 @@ deliver:
     else
     {
         TransportReceiver *receiver = receivers[fd];
-        receiver->ReceiveMessage(senderAddr, msgType, msg, meta_data);
+        // WRONG FOR NOW
+        receiver->ReceiveMessage(senderAddr, msgType, nullptr, 0, meta_data);
     }
 
     if (reorderBuffer.valid)
