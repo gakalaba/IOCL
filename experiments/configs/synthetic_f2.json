@@ -55,28 +55,28 @@
     ["us-east-1-1", "us-west-1-1", "eu-west-1-1"],
     ["us-east-1-2", "us-west-1-2", "eu-west-1-2"],
 
-    ["us-west-1-0", "us-east-1-1", "eu-west-1-2"],
-    ["us-west-1-1", "us-east-1-2", "eu-west-1-0"],
-    ["us-west-1-2", "us-east-1-0", "eu-west-1-1"],
+    ["us-west-1-0", "us-east-1-0", "eu-west-1-0"],
+    ["us-west-1-1", "us-east-1-1", "eu-west-1-1"],
+    ["us-west-1-2", "us-east-1-2", "eu-west-1-2"],
 
-    ["eu-west-1-0", "us-west-1-2", "us-east-1-0"],
-    ["eu-west-1-1", "us-west-1-0", "us-east-1-2"],
-    ["eu-west-1-2", "us-west-1-1", "us-east-1-1"]
+    ["eu-west-1-0", "us-west-1-0", "us-east-1-0"],
+    ["eu-west-1-1", "us-west-1-1", "us-east-1-1"],
+    ["eu-west-1-2", "us-west-1-2", "us-east-1-2"]
   ],
   "client_total": [
     [
-      1, 2, 4, 8, 16
+      1, 2, 4, 6, 8
     ],
     [
-      1, 2, 4, 8, 16
+      2, 4, 8, 12, 16
     ]
   ],
   "client_processes_per_client_node": [
     [
-      1, 2, 4, 8, 16
+      1, 2, 4, 6, 8
     ],
     [
-      1, 2, 4, 8, 16
+      2, 4, 8, 12, 16
     ]
   ],
   "client_threads_per_process": 1,
@@ -180,17 +180,17 @@
   "region_rtt_latencies": {
     "ca": {
       "ca": 0,
-      "ir": 151,
-      "jp": 113
+      "ir": 150,
+      "jp": 150
     },
     "ir": {
-      "ca": 151,
+      "ca": 150,
       "ir": 0,
-      "jp": 220
+      "jp": 150
     },
     "jp": {
-      "ca": 113,
-      "ir": 220,
+      "ca": 150,
+      "ir": 150,
       "jp": 0
     }
   },
