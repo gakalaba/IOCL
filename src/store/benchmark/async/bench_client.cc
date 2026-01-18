@@ -226,11 +226,14 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
         std::size_t next_client_index = (cur_client_index + 1) % clients_.size();
 
         auto &cur_client = *clients_[cur_client_index];
-        rss::Session rss_session = cur_client.EndSession(ss.session());
 
         auto &next_client = *clients_[next_client_index];
 
-        auto &session = next_client.ContinueSession(rss_session);
+        auto search = session_states_.find(session_id);
+        ASSERT(search != session_states_.end());
+        auto &ss = search->second;
+        auto &session = ss.session();
+
         ASSERT(session_id == session.id());
 
         ss.start_transaction(session, transaction, ecb, next_client_index);

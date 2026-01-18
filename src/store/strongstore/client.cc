@@ -27,8 +27,6 @@
  **********************************************************************/
 #include "store/strongstore/client.h"
 
-#include <rss/lib.h>
-
 #include <cmath>
 #include <cstdlib>
 #include <functional>
@@ -94,16 +92,11 @@ namespace strongstore
 
         if (consistency != LIN) {
             CalculateCoordinatorChoices();
-
-            rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
         }
     }
 
     Client::~Client()
     {
-        if (consistency_ != LIN) {
-            rss::UnregisterRSSService(service_name_);
-        }
 
         if (debug_stats_)
         {
@@ -436,7 +429,7 @@ namespace strongstore
      */
     void Client::Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
     {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueBegin, this, std::ref(session), bcb));
+        ContinueBegin(session, bcb);
     }
 
     void Client::ContinueBegin(Session &s, begin_callback bcb)
@@ -495,7 +488,7 @@ namespace strongstore
      */
     void Client::Retry(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
     {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueRetry, this, std::ref(session), bcb));
+        ContinueRetry(session, bcb);
     }
 
     void Client::ContinueRetry(Session &s, begin_callback bcb)
@@ -910,8 +903,6 @@ namespace strongstore
             Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
         }
 
-        rss::EndTransaction(service_name_, session);
-
         if (ms == 0) {
             ccb(tstatus);
             return;
@@ -977,8 +968,6 @@ namespace strongstore
             abort_callback acb = req->acb;
             pending_reqs_.erase(req_id);
             delete req;
-
-            rss::EndTransaction(service_name_, session);
 
             Debug("[%lu] Abort finished", tid);
             acb();
@@ -1079,8 +1068,6 @@ namespace strongstore
             auto &min_read_ts = session.min_read_ts();
             Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
 
-            rss::EndTransaction(service_name_, session);
-
             Debug("[%lu] COMMIT OK", tid);
             ccb(COMMITTED);
         }
@@ -1117,8 +1104,6 @@ namespace strongstore
 
             auto &min_read_ts = session.min_read_ts();
             Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
-
-            rss::EndTransaction(service_name_, session);
 
             Debug("[%lu] COMMIT OK", tid);
             ccb(COMMITTED);
