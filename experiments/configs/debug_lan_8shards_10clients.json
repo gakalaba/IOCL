@@ -13,13 +13,9 @@
     ]
   ],
   "replication_protocol": [
-    "iocl_ct",
-    "vr",
     "strong"
   ],
   "client_protocol_mode": [
-    "iocl_ct",
-    "vr",
     "span-lock"
   ],
   "server_names": [
@@ -35,8 +31,6 @@
     "mex-cent-1-0"
   ],
   "consistency": [
-    "lin",
-    "lin",
     "ss"
   ],
   "num_instances": 1,
@@ -106,26 +100,10 @@
     ]
   ],
   "client_total": [
-    [
-      10, 20, 30, 40, 80, 120, 160, 240, 320, 640
-    ],
-    [
-      10, 20, 30, 40, 80, 120, 160, 240, 320, 640
-    ],
-    [
-      10, 20, 30, 40, 80, 120, 160, 240, 320, 640
-    ]
+    [30]
   ],
   "client_processes_per_client_node": [
-    [
-      1, 2, 3, 4, 8, 12, 16, 24, 32, 64
-    ],
-    [
-      1, 2, 3, 4, 8, 12, 16, 24, 32, 64
-    ],
-    [
-      1, 2, 3, 4, 8, 12, 16, 24, 32, 64
-    ]
+    [0]
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -181,6 +159,7 @@
   "client_key_selector": "uniform",
   "client_wo_replacement": true,
   "client_fanout": 1,
+  "server_replicate": false,
   "client_issue_concurrent": true,
   "rw_num_ops_txn": 1,
   "server_load_time": 20,
@@ -240,10 +219,10 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 14,
+  "client_experiment_length": 35,
   "client_rand_sleep": 0,
-  "client_ramp_down": 4,
-  "client_ramp_up": 4,
+  "client_ramp_down": 15,
+  "client_ramp_up": 15,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
