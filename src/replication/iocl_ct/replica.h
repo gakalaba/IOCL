@@ -69,19 +69,21 @@ namespace replication
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
             const uint64_t intkey;
+            const bool is_singleton;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request, uint64_t shardtag, uint64_t intkey)
+                    const Request &request, uint64_t shardtag, uint64_t intkey, bool singleton)
                 : viewstamp(viewstamp),
                   state(state),
                   request(request),
                   myShardTag(shardtag),
                   ACKs(0),
-                  intkey(intkey) {}
+                  intkey(intkey),
+                  is_singleton(singleton) {}
             virtual ~IoclEntry() {}
         };
         // Comparison operator for ordering IoclEntries

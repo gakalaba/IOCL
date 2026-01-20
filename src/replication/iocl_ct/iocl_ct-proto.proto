@@ -37,8 +37,9 @@ message PrepareMessage {
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
     repeated Request request = 4;
-    repeated uint64 shardTags = 5;
-    repeated PredListHolder timestamp_chains = 6;
+    repeated bool singletons = 5;
+    repeated uint64 shardTags = 6;
+    repeated PredListHolder timestamp_chains = 7;
 }
 
 message PrepareOKMessage {
@@ -52,8 +53,9 @@ message UnorderedPrepareMessage {
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
     repeated Request request = 4;
-    repeated uint64 shardTags = 5;
-    repeated PredListHolder predLists = 6;
+    repeated bool singletons = 5;
+    repeated uint64 shardTags = 6;
+    repeated PredListHolder predLists = 7;
 }
 
 message UnorderedPrepareOKMessage {

@@ -456,6 +456,7 @@ namespace replication
                 const IoclEntry& entry = *unorderedBagByOpnum[i];
                 ASSERT(entry.viewstamp.view == view);
                 *r = entry.request;
+                up.add_singletons(entry.is_singleton);
                 up.add_shardtags(entry.myShardTag);
                 Debug("adding pred list of size %d to UnorderedPrepareMessage", entry.predList.predlist_size());
                 PredListHolder* pl = up.add_predlists();
@@ -498,6 +499,7 @@ namespace replication
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
+                p.add_singletons(entry->is_singleton);
                 *r = entry->request;
                 Debug("adding timestamp chain of size %lu to PrepareMessage", entry->predecessorArrivalTs.size());
                 p.add_shardtags(entry->myShardTag);
@@ -721,7 +723,7 @@ namespace replication
             auto result = unorderedBag.emplace(
                 shardtag,
                 std::make_unique<IoclEntry>(
-                    v, IOCL_STATE_ARRIVED, request, shardtag, msg.intkey()
+                    v, IOCL_STATE_ARRIVED, request, shardtag, msg.intkey(), is_singleton
                 )
             );
             auto it = result.first;
@@ -749,8 +751,10 @@ namespace replication
                     entryPtr->predecessorArrivalTs.size());
 
             /* Add entry to "ordered" unorderedBag (for batching) */
-            Debug("Adding entry to unorderedBag");
-            if (!is_singleton) unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            if (!is_singleton) {
+                Debug("Adding entry to unorderedBagByOpnum");
+                unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            }
             Debug("The entry's inteky is %lu", entryPtr->intkey);
 
             /* Go through any outstanding predecessor replies and add them in */
@@ -1098,8 +1102,19 @@ namespace replication
                 /* Find the entry */
                 auto it = unorderedBag.find(shardtag);
                 if (it == unorderedBag.end()) {
-                    Panic("Replica didn't have request with shardtag %lu in unorderedBag during Prepare",
+                    if (!msg.singletons(i)) {
+                        Panic("Replica didn't have request with shardtag %lu in unorderedBag during Prepare and it's NOT a singleton",
                         shardtag);
+                    }
+                    auto result = unorderedBag.emplace(
+                        shardtag,
+                        std::make_unique<IoclEntry>(
+                            viewstamp_t(msg.view(), op), IOCL_STATE_PREPARED, req, shardtag, 0, true
+                        )
+                    );
+                    it = result.first;
+                    bool inserted = result.second;
+                    ASSERT(inserted);
                 }
                 IoclEntry *entry = it->second.get();
                 /* Update its state */
@@ -1210,6 +1225,7 @@ namespace replication
                 /* Add the request to the unordered bag */
                 Debug("replica is adding req with shardtag %lu to unordered bag", msg.shardtags(i));
                 uint64_t shardtag = msg.shardtags(i);
+                bool is_singleton = msg.singletons(i);
 
                 /* For now we don't replicate the intkey at replicas
                 Instead, if a new leader takes over, it can get its key from 
@@ -1217,7 +1233,7 @@ namespace replication
                 auto result = unorderedBag.emplace(
                     shardtag,
                     std::make_unique<IoclEntry>(
-                        viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag, 0
+                        viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag, 0, is_singleton
                     )
                 );
                 auto it = result.first;
