@@ -255,7 +255,7 @@ namespace strongstore
                       uint32_t timeout) override;
 
         bool IsLinearizeable() override;
-        uint64_t SendAsynchOperation(Session &session, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb) override;
+        uint64_t SendAsynchOperation(Session &session, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb, bool singleton) override;
         bool IsIOCL() override;
 
     private:

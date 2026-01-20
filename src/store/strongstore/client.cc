@@ -760,7 +760,7 @@ namespace strongstore
         sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
     }
 
-    uint64_t Client::SendAsynchOperation(Session &s, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb)
+    uint64_t Client::SendAsynchOperation(Session &s, request_utils::Operation optype, uint64_t key, request_utils::Value newValue, request_utils::Value oldValue, transformed_callback trcb, bool singleton)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -832,7 +832,7 @@ namespace strongstore
         };
 
         // //std::cout << "[Client::SendAsynchRequest] Sending request to shard client..." << std::endl;
-        sclients_[i]->SendAsynchOperation(tid, optype, key, oldValue, newValue, rcb1, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
+        sclients_[i]->SendAsynchOperation(tid, optype, key, oldValue, newValue, rcb1, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL(), singleton);
         // //std::cout << "[Client::SendAsynchRequest] Request sent." << std::endl;
 
         return tid;

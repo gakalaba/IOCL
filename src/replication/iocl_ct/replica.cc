@@ -716,6 +716,7 @@ namespace replication
 
             /* Add the request to the unordered bag */
             uint64_t shardtag = msg.shardtag();
+            bool is_singleton = msg.singleton();
 
             auto result = unorderedBag.emplace(
                 shardtag,
@@ -749,7 +750,7 @@ namespace replication
 
             /* Add entry to "ordered" unorderedBag (for batching) */
             Debug("Adding entry to unorderedBag");
-            unorderedBagByOpnum.emplace(v.opnum, entryPtr);
+            if (!is_singleton) unorderedBagByOpnum.emplace(v.opnum, entryPtr);
             Debug("The entry's inteky is %lu", entryPtr->intkey);
 
             /* Go through any outstanding predecessor replies and add them in */
@@ -770,6 +771,27 @@ namespace replication
                 Debug("Had no pending predecessor replies");
             }
 
+            // For singleton requests, we can skip the first round of unordered replication
+            // Check whether this request should be committed to replicas
+            if (is_singleton)
+            {
+                RDebug("Not replicating unordered first round");
+
+                /* Progress state to Persisted */
+                entryPtr->state = IOCL_STATE_PERSISTED;
+
+                /* Assign Arrival Timestamp */
+                auto ts_it = lastReadyTS.find(entryPtr->intkey);
+                uint64_t ts = (ts_it == lastReadyTS.end()) ? 0 : ts_it->second;
+                entryPtr->arrivalTs = std::max(shardTS, ts);
+                entryPtr->finalTs = entryPtr->arrivalTs; // will be updated later
+                shardTS++;
+
+                /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                perKeySubqueues[entryPtr->intkey].insert(entryPtr);
+                ReadyRoutine(entryPtr);
+                return;
+            }
 
             RDebug("Received Unordered REQUEST, assigning unordered " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
             RDebug("also the shardtag is %lu, and the batchSize is %u", shardtag, batchSize);

@@ -1093,7 +1093,8 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
         //std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
         Panic("NOT YET SUPPORTEDunsupported operation type");
     }
-    auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb);
+    bool singleton = false;
+    auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb, singleton);
     
     return std::make_tuple(true, Value(std::to_string(commandId)));
 }

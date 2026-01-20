@@ -141,7 +141,7 @@ namespace strongstore
                                 request_utils::Value newValue, transformed_callback trcb,
                                 std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
                                 std::list<uint16_t> &outstandingOperationRefCount,
-                                bool isIOCL);
+                                bool isIOCL, bool singleton);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,

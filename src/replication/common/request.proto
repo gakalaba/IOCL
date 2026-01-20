@@ -68,12 +68,13 @@ message LinearizeableOperation {
     }
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
-    optional OpData opd = 3;
-    optional TransformedOpData tropd = 4;
-    optional uint64 shardtag = 5;
-    optional uint64 intkey = 6;
-    repeated uint64 predlist = 7;
-    repeated uint32 shardlist = 8;
+    optional bool singleton = 3;
+    optional OpData opd = 4;
+    optional TransformedOpData tropd = 5;
+    optional uint64 shardtag = 6;
+    optional uint64 intkey = 7;
+    repeated uint64 predlist = 8;
+    repeated uint32 shardlist = 9;
 }
 
 message TransformedLinReply {

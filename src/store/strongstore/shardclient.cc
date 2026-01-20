@@ -353,7 +353,7 @@ namespace strongstore
                                         request_utils::Value newValue, transformed_callback trcb,
                                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
                                         std::list<uint16_t> &outstandingOperationRefCount,
-                                        bool isIOCL)
+                                        bool isIOCL, bool singleton)
     {
         uint64_t req_id = last_req_id_++;
         Debug("Storing the request in pendingReqs with tid = %d and its reqid = %d", transaction_id, req_id);
@@ -532,6 +532,7 @@ namespace strongstore
                  itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
                  ++itl, ++itr) {
             }
+            op_.set_singleton(singleton);
         }
 
         // //std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
