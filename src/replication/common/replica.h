@@ -40,6 +40,12 @@
 #include "lib/viewstamp.h"
 #include "replication/common/log.h"
 #include "replication/common/request.pb.h"
+#include "store/common/timestamp.h"
+
+// TODO: Is this neccesary? same with timestamp include
+namespace strongstore {
+    class CRAQServer; // forward declaration
+}
 
 namespace replication {
 
@@ -82,10 +88,14 @@ class Replica : public TransportReceiver {
     void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                       string &res);
     void ReplicaUpcall(opnum_t opnum, const string &op, string &res);
+    void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res);
     void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                            const string &v, string &retval);
+    void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop);
     template <class MSG>
     void Execute(opnum_t opnum, const Request &msg, MSG &reply);
+    template <class MSG>
+    void Execute(const Timestamp &timestamp, const Request &msg, MSG &reply);
     void UnloggedUpcall(const string &op, string &res);
     template <class MSG>
     void ExecuteUnlogged(const UnloggedRequest &msg, MSG &reply);

@@ -143,7 +143,7 @@ namespace strongstore
         Stats &GetStats() override;
         void SeeAllTxns() override;
 
-    private:
+    protected:
         class PendingRWCommitCoordinatorReply
         {
         public:
@@ -346,9 +346,21 @@ namespace strongstore
         int shard_idx_;
         int replica_idx_;
         Consistency consistency_;
+        LinearizableProtocol linproto_{PROTO_UNKNOWN};
         bool debug_stats_;
 
         uint64_t expected_fire_us;
+    };
+
+    // TODO: move to another file if possible
+    class CRAQServer : public Server
+    {
+        using Server::Server;
+
+    public:
+        void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &response); 
+        void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const replication::LinearizeableOperation &linop);
+
     };
 
 } // namespace strongstore

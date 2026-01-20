@@ -97,7 +97,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency}
+          consistency_{consistency},
+          linproto_{linproto}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -315,6 +316,7 @@ namespace strongstore
     {
         Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
         uint64_t transaction_id = msg.transaction_id();
+        Debug("TransactionId is %lu", transaction_id);
 
         auto reply = new PendingOperationReply(msg.rid().client_id(), msg.rid().client_req_id(), remote.clone());
         reply->key = msg.key();
@@ -1817,6 +1819,7 @@ namespace strongstore
                 Panic("Unrecognized operation.");
             }
         } else {
+            // TODO: edit with enum
             linreq.ParseFromString(op);
             replicate = true;
             response = op;
@@ -1983,6 +1986,71 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
+    void CRAQServer::ReplicaUpcall(const Timestamp &timestamp, const string &op, string &response)
+    {
+        if (consistency_ != LIN)
+        {
+            Panic("Implementation is for linearizable version store");
+        }
+
+        LinearizeableOperation req;
+        req.ParseFromString(op);
+        uint64_t transaction_id = req.transaction_id();
+        TimestampID versionStoreTimestamp{timestamp, transaction_id};
+        Debug("Inside version store ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s, timestamp %lu and transaction_id %lu", req.op().c_str(), req.key().c_str(), req.value().c_str(), timestamp.getTimestamp(), transaction_id);
+        LinearizeableReply reply;
+
+        std::pair<TimestampID, std::string> res;
+        string retval;
+        int status = REPLY_OK;
+        if (req.op() == "get")
+        {
+            Debug("the request is get");
+            if (!store_.get(req.key(), versionStoreTimestamp, res))
+            {
+                Debug("value does not exist");
+                status = REPLY_FAIL;
+            };
+            Debug("Get value %s from %s", res.second.c_str(), req.key().c_str());
+        }
+        else if (req.op() == "put")
+        {
+            Debug("the request is put");
+            store_.put(req.key(), req.value(), versionStoreTimestamp);
+            Debug("put key %s and val %s", req.key().c_str(), req.value().c_str());
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        reply.set_status(status);
+        reply.set_return_value(res.second);
+        reply.set_transaction_id(transaction_id);
+        reply.mutable_rid()->set_client_id(req.rid().client_id());
+        reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
+        reply.SerializeToString(&response);
+
+        auto search = pending_operation_replies_.find(transaction_id);
+        if (search == pending_operation_replies_.end())
+        {
+            // Must be we're not a leader, so we don't want to send duplicate responses to clients
+            ASSERT(replica_idx_ != 0);
+            return;
+        }
+
+        PendingOperationReply *pending_reply = search->second;
+        pending_operation_replies_.erase(search);
+        transport_->TimerMicro(0, std::bind(&CRAQServer::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
+    }
+
+    void CRAQServer::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
+    {
+        uint64_t transaction_id = linop.transaction_id();
+        TimestampID versionStoreTimestamp{timestamp, transaction_id}; 
+
+        store_.put(linop.key(), linop.value(), versionStoreTimestamp);
+    }
+
     // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
     {
@@ -1999,6 +2067,7 @@ namespace strongstore
             {
                 status = REPLY_FAIL;
             };
+            Debug("operation is get for key %s and val %s", req.key().c_str(), retval.c_str());
         }
         else if (req.op() == "put")
         {
@@ -2007,6 +2076,7 @@ namespace strongstore
             {
                 status = REPLY_FAIL;
             };
+            Debug("operation is put for key %s and val %s", req.key().c_str(), req.value().c_str());
         }
         else
         {
@@ -2041,7 +2111,7 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        if (consistency_ == LIN)
+        if (consistency_ == LIN && linproto_ != PROTO_CRAQ)
         {
             linearizeable_kv_store_.put(key, value);
         }

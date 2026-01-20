@@ -125,12 +125,44 @@ namespace replication
         return transport->SendMessageToReplica(this, myIdx - 1, m);
        } 
        
-       void CRAQReplica::ExecuteOperation(const Request &request)
+       // TODO: just pass a reference of linop around
+       void CRAQReplica::ExecuteWriteOperation(const Request &request)
        {
-            RDebug("Executing request " FMT_OPNUM, lastCommitted);
-            ReplyMessage reply;
-            Execute(lastCommitted, request, reply);
+        RDebug("Executing write request " FMT_OPNUM, lastCommitted);
+        LinearizeableOperation linop;
+        ReplyMessage reply;
 
+        linop.ParseFromString(request.op());
+        string key = linop.key();
+
+        keyToVersionNumber[key] = lastCommitted;
+
+        Execute(Timestamp{lastCommitted, linop.transaction_id()}, request, reply);
+        ExecuteOperation(request, reply);
+       }
+
+       void CRAQReplica::ExecuteReadOperation(const Request &request)
+       {
+        RDebug("Executing read request " FMT_OPNUM, lastCommitted);
+        LinearizeableOperation linop;
+        ReplyMessage reply;
+
+        linop.ParseFromString(request.op());
+
+        string key = linop.key();
+        auto iter = keyToVersionNumber.find(key);
+
+        if (iter == keyToVersionNumber.end())
+        {
+            keyToVersionNumber[key] = 0;
+        }
+
+        Execute(Timestamp{keyToVersionNumber[key], linop.transaction_id()}, request, reply);
+        ExecuteOperation(request, reply);
+       }
+
+       void CRAQReplica::ExecuteOperation(const Request &request, ReplyMessage &reply)
+       {
             reply.set_view(this->view);
             reply.set_opnum(lastCommitted);
             reply.set_clientreqid(request.clientreqid());
@@ -146,8 +178,10 @@ namespace replication
 
             /* Send reply */
             auto iter = clientAddresses.find(request.clientid());
+            Debug("executing operationn and trying to send");
             if (iter != clientAddresses.end())
             {
+                Debug("sent");
                 transport->SendMessage(this, *iter->second, reply);
             }
        }
@@ -172,10 +206,18 @@ namespace replication
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
 
-                if (AmHead())
+                replication::LinearizeableOperation linop;
+                linop.ParseFromString(request.op());
+                string op = linop.op();
+
+                Debug("Commiting entry with op %s", op.c_str());
+
+                // TODO: Check logic, instead, lets just update the datastore
+                if (op == "put") 
                 {
-                    ExecuteOperation(request);
+                    ExecuteWriteOperation(request);
                 }
+
             }
         }
 
@@ -316,6 +358,14 @@ namespace replication
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
+                
+                LinearizeableOperation linop;
+                linop.ParseFromString(entry->request.op());
+
+                if (linop.op() == "put")
+                {
+                    ReplicaUpdateStoreUpcall(Timestamp{i, linop.transaction_id()},linop);
+                }
             }
             lastPrepare = p;
 
@@ -418,7 +468,7 @@ namespace replication
                 RPanic("Should always replicate when using CRAQ");
             }
 
-            ExecuteOperation(msg.req());
+            ExecuteReadOperation(msg.req());
         }
 
         void CRAQReplica::HandleWriteRequest(const TransportAddress &remote,
@@ -566,10 +616,16 @@ namespace replication
                 this->lastOp++;
                 // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
+
+                LinearizeableOperation linop;
+                linop.ParseFromString(req.op());
+
+                ReplicaUpdateStoreUpcall(Timestamp{op, linop.transaction_id()},linop);
+                 
                 UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
-
+            
             if (!AmTail())
             {
                 CloseBatch();
@@ -581,6 +637,19 @@ namespace replication
                 CommitMessage cm;
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
+
+                auto requests = msg.request();
+                auto requestCount = requests.size();
+                if (requestCount > 0)
+                {
+                    LinearizeableOperation linop;
+                    linop.ParseFromString(msg.request(requestCount - 1).op());
+                    cm.set_key(linop.key());
+                } 
+                else 
+                {
+                    cm.set_key("");
+                }
 
                 if (!BackwardsPropagateMessageInChain(cm))
                 {
@@ -618,7 +687,7 @@ namespace replication
         void CRAQReplica::HandleCommit(const TransportAddress &remote,
                                        const CommitMessage &msg)
         {
-            RDebug("Received COMMIT " FMT_VIEWSTAMP, msg.view(), msg.opnum());
+            RDebug("Received COMMIT " FMT_VIEWSTAMP " with key %s", msg.view(), msg.opnum(), msg.key().c_str());
 
             if (this->status != STATUS_NORMAL)
             {

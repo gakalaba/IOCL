@@ -40,6 +40,7 @@ message PrepareOKMessage {
 message CommitMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;    
+    required string key = 3;
 }
 
 message RequestStateTransferMessage {

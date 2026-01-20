@@ -70,6 +70,7 @@ namespace replication
             proto::PrepareMessage lastPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
+            std::unordered_map<std::string, opnum_t> keyToVersionNumber;
 
             Log log;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
@@ -94,7 +95,9 @@ namespace replication
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
             [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
-            void ExecuteOperation(const Request &entry);
+            void ExecuteWriteOperation(const Request &entry);
+            void ExecuteReadOperation(const Request &entry);
+            void ExecuteOperation(const Request &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
             void UpdateClientTable(const Request &req);

@@ -32,6 +32,7 @@
  **********************************************************************/
 
 #include "replication/common/replica.h"
+#include "store/strongstore/server.h"
 
 #include <stdlib.h>
 
@@ -73,6 +74,36 @@ void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, co
 
         Debug("Upcall result: %s", res.c_str());
     }
+
+void Replica::ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res) 
+{
+    Debug("Making upcall for timestamp %lu operation %s", timestamp, op.c_str());
+
+    if (auto server = dynamic_cast<strongstore::CRAQServer *>(app))
+    {
+        server->ReplicaUpcall(timestamp, op, res);
+    }
+    else
+    {
+        Panic("Called without CRAQ Replica");
+    }
+
+    Debug("Upcall result: %s", res.c_str());
+}
+
+void Replica::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
+{
+    Debug("Making upcall for linop %s", linop.op().c_str());
+
+    if (auto server = dynamic_cast<strongstore::CRAQServer *>(app))
+    {
+        server->ReplicaUpdateStoreUpcall(timestamp, linop);
+    }
+    else
+    {
+        Panic("Called without CRAQ Replica");
+    }
+}
 
 void Replica::UnloggedUpcall(const string &op, string &res) {
     app->UnloggedUpcall(op, res);

@@ -40,6 +40,15 @@ void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply) {
 }
 
 template <class MSG>
+void Replica::Execute(const Timestamp &timestamp, const Request &msg, MSG &reply)
+{
+    string res;
+    ReplicaUpcall(timestamp, msg.op(), res);
+
+    reply.set_reply(res);
+}
+
+template <class MSG>
 void Replica::ExecuteUnlogged(const UnloggedRequest &msg, MSG &reply) {
     string res;
     UnloggedUpcall(msg.op(), res);

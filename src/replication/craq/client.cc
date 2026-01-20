@@ -47,7 +47,7 @@ namespace replication
 
         CRAQClient::CRAQClient(const transport::Configuration &config, Transport *transport,
                                int group, uint64_t clientid)
-            : Client(config, transport, group, clientid)
+            : Client(config, transport, group, clientid) 
         {
             lastReqId = 0;
         }
@@ -113,6 +113,7 @@ namespace replication
             return;
         }
 
+        // TODO: Send read to different clients
         void CRAQClient::SendRequest(const PendingRequest *req)
         {
             proto::RequestMessage reqMsg;
