@@ -8,7 +8,8 @@ message RequestMessage {
     required replication.Request req = 1;
     required uint64 shardTag = 2;
     required uint64 intkey = 3;
-    repeated uint64 predlist = 4;
+    required bool singleton = 4;
+    repeated uint64 predlist = 5;
 }
 
 message PredListHolder {

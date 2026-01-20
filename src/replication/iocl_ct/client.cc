@@ -87,9 +87,11 @@ namespace replication
             uint64_t theintkey = msg.intkey();
             reqMsg.set_shardtag(msg.shardtag());
             reqMsg.set_intkey(msg.intkey());
+            reqMsg.set_singleton(msg.singleton());
             msg.clear_shardtag();
             msg.clear_predlist();
             msg.clear_intkey();
+            msg.clear_singleton();
             // Issue coordination requests
             proto::SuccessorRequestMessage coordReqMsg;
             coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
