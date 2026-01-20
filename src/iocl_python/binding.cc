@@ -566,7 +566,7 @@ std::unique_ptr<BenchmarkClient> CreateBenchmarkClient() {
 }
 
 // AsyncSendRequest - Asynchronous version of SendRequest
-std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal) {
+std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, request_utils::Operation op, int64_t key, const request_utils::Value& newVal, const request_utils::Value& oldVal, bool singleton = false) {
     // std::cout << "[AsyncSendRequest] op=" << static_cast<int>(op) << std::endl;
     // std::cout << typeid(session_id).name() << typeid(op).name() << typeid(key).name() << typeid(newVal).name() <<  typeid(oldVal).name() << std::endl;
     
@@ -575,7 +575,7 @@ std::pair<bool, request_utils::Value> AsyncSendRequest(uint64_t session_id, requ
         benchmarkClient = CreateBenchmarkClient();
     }
     
-    std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchOperation(session_id, op, key, newVal, oldVal);
+    std::tuple<bool, request_utils::Value> result = benchmarkClient->SendAsynchOperation(session_id, op, key, newVal, oldVal, singleton);
     
     // Print the result using value_to_python
     (void)value_to_python(std::get<1>(result));
@@ -896,12 +896,12 @@ PYBIND11_MODULE(redisstorepython, m) {
     // }, py::arg("session_id"), py::arg("op"), py::arg("keys"), py::arg("new_values"), py::arg("old_values") = py::none());
 
     // Wrapper for AsyncSendRequest to handle Python types
-    m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, uint64_t key, py::object new_values, py::object old_values) {
+    m.def("async_send_request", [](uint64_t session_id, request_utils::Operation op, uint64_t key, py::object new_values, py::object old_values, bool singleton) {
         request_utils::Value newVal = python_to_value(new_values);
         request_utils::Value oldVal = python_to_value(old_values);
-        auto result = AsyncSendRequest(session_id, op, key, newVal, oldVal);
+        auto result = AsyncSendRequest(session_id, op, key, newVal, oldVal, singleton);
         return result;
-    }, py::arg("session_id"), py::arg("op"), py::arg("key"), py::arg("new_values"), py::arg("old_values") = py::none());
+    }, py::arg("session_id"), py::arg("op"), py::arg("key"), py::arg("new_values"), py::arg("old_values") = py::none(), py::arg("singleton") = false);
 
     // Wrapper for AsyncGetResponse to handle Python types
     m.def("async_get_response", &AsyncGetResponse, py::arg("session_id"), py::arg("command_id"));

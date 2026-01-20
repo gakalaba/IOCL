@@ -84,7 +84,7 @@ public:
     void SendNextAppRequest();
     void ExecuteCallback(uint64_t transaction_id, transaction_status_t result);
 
-    std::tuple<bool, request_utils::Value> SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue);
+    std::tuple<bool, request_utils::Value> SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, request_utils::Value newValue, request_utils::Value oldValue, bool singleton = false);
     std::tuple<request_utils::Value, uint64_t> AwaitAsynchResponse(const uint64_t session_id, uint64_t commandId);
 
     inline bool IsFullyDone() { return done; }

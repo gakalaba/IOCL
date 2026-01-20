@@ -1004,7 +1004,7 @@ void BenchmarkClient::Finish()
 }
 
 // Transformed IOCL Apps!!
-std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, Value newValue, Value oldValue)
+std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t session_id, request_utils::Operation opType, int64_t key, Value newValue, Value oldValue, bool singleton)
 {
     // //std::cout << "[SendAsynchRequest] Called with session_id=" << session_id
     //           << ", opType=" << static_cast<int>(opType)
@@ -1093,7 +1093,6 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
         //std::cout << "[SendAsynchRequest] ERROR: Unsupported operation type " << static_cast<int>(opType) << std::endl;
         Panic("NOT YET SUPPORTEDunsupported operation type");
     }
-    bool singleton = false;
     auto commandId = client.SendAsynchOperation(session, opType, key, newValue, oldValue, rcb, singleton);
     
     return std::make_tuple(true, Value(std::to_string(commandId)));
