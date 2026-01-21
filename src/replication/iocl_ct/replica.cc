@@ -709,17 +709,19 @@ namespace replication
             request.set_clientid(msg.req().clientid());
             request.set_clientreqid(msg.req().clientreqid());
 
-            /* Assign it an opnum within this view --> this is 
-                strictly to compy with quorum checking which 
-                currently is unique per viewstamp_t */
-            ++this->lastUnorderedOp;
-            v.view = this->view;
-            v.opnum = this->lastUnorderedOp;
-
-            /* Add the request to the unordered bag */
             uint64_t shardtag = msg.shardtag();
             bool is_singleton = msg.singleton();
 
+            /* Assign it an opnum within this view --> this is 
+                strictly to compy with quorum checking which 
+                currently is unique per viewstamp_t */
+            if (!is_singleton) {
+                ++this->lastUnorderedOp;
+                v.view = this->view;
+                v.opnum = this->lastUnorderedOp;
+            }
+
+            /* Add the request to the unordered bag */
             auto result = unorderedBag.emplace(
                 shardtag,
                 std::make_unique<IoclEntry>(
