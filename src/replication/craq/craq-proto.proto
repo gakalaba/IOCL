@@ -60,3 +60,11 @@ message StateTransferMessage {
     required uint64 opnum = 2;
     repeated LogEntry entries = 3;
 }
+
+message VersionRequestMessage {
+    required string key = 1;
+}
+
+message VersionResponseMessage {
+    required uint64 opnum = 1;
+}

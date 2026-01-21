@@ -204,7 +204,8 @@ namespace replication
                 const Request request = entry->request;
 
                 /* Mark it as committed */
-                log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
+                bool status = log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
+                Debug("Status is %d", status);
 
                 replication::LinearizeableOperation linop;
                 linop.ParseFromString(request.op());
@@ -254,6 +255,17 @@ namespace replication
                     RWarning("Failed to backwards propagate PrepareOK message");
                 }
             }
+        }
+
+        void CRAQReplica::SendVersionRequest(const Request &request)
+        {
+            // VersionRequestMessage msg;
+            // LinearizeableOperation linop;
+            // linop.ParseFromString(request.op());
+            // msg.set_key(linop.key());
+
+            // pendingReads[]
+
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -327,7 +339,7 @@ namespace replication
             return false;
         }
 
-        void CRAQReplica::AddToClientTable(const TransportAddress &remote, const RequestMessage &msg)
+        void CRAQReplica::UpdateClientAddresses(const TransportAddress &remote, const RequestMessage &msg)
         {
             clientAddresses.erase(msg.req().clientid());
             clientAddresses.insert(
@@ -450,7 +462,7 @@ namespace replication
                 return;
             }
 
-            AddToClientTable(remote, msg);
+            UpdateClientAddresses(remote, msg);
 
             if (IsDuplicateRequest(remote, msg)) return;
 
@@ -466,6 +478,13 @@ namespace replication
             if (!replicate)
             {
                 RPanic("Should always replicate when using CRAQ");
+            }
+
+            // TODO: increment lastOp in prepares for non-head replicas
+            if (lastOp != lastCommitted)
+            {
+                // SendVersionRequest(msg.req());
+                // return;
             }
 
             ExecuteReadOperation(msg.req());
@@ -490,7 +509,7 @@ namespace replication
                 return;
             }
 
-            AddToClientTable(remote, msg); 
+            UpdateClientAddresses(remote, msg); 
 
             if (IsDuplicateRequest(remote, msg)) return;
 

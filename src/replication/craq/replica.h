@@ -82,6 +82,8 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
+            std::unordered_map<uint64_t, replication::Request> pendingReads;
+
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
 
@@ -95,16 +97,17 @@ namespace replication
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
             [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
-            void ExecuteWriteOperation(const Request &entry);
-            void ExecuteReadOperation(const Request &entry);
+            void ExecuteWriteOperation(const Request &request);
+            void ExecuteReadOperation(const Request &request);
             void ExecuteOperation(const Request &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
-            void UpdateClientTable(const Request &req);
+            void SendVersionRequest(const Request &request);
+            void UpdateClientTable(const Request &request);
             void ResendPrepare();
             [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
                                 const proto::RequestMessage &msg);
-            void AddToClientTable(const TransportAddress &remote, 
+            void UpdateClientAddresses(const TransportAddress &remote, 
                                 const proto::RequestMessage &msg);
             void CloseBatch();
 
