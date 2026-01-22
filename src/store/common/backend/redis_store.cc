@@ -199,8 +199,11 @@ namespace redis
             store[key] = Value::NewHash({});
             store[key].type = ValueType::HASH;
         }
+
         bool isNew = (store[key].hash.find(field) == store[key].hash.end());
+
         store[key].hash[field] = val;
+
         return Value::NewString(isNew ? "1" : "0");
     }
 
@@ -239,7 +242,7 @@ namespace redis
     }
 
     // ZADD: treat the sorted set as a hash mapping member->score.
-    Value RedisStore::zadd(const std::string &key, const std::string &member, const std::string &score)
+    Value RedisStore::zadd(const std::string &key, const std::string &score, const std::string &member)
     {
         if (store.find(key) == store.end() || store[key].type != ValueType::HASH)
         {
