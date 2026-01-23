@@ -1086,7 +1086,11 @@ std::tuple<bool, Value> BenchmarkClient::SendAsynchOperation(const uint64_t sess
         break;
 
     case request_utils::Operation::ZREVRANGE:
-        // //std::cout << "[SendAsynchRequest] Operation: ZEVRANGE" << std::endl;
+        // //std::cout << "[SendAsynchRequest] Operation: ZREVRANGE" << std::endl;
+        break;
+
+    case request_utils::Operation::ZAPPEND:
+        // //std::cout << "[SendAsynchRequest] Operation: ZAPPEND" << std::endl;
         break;
 
     default:
