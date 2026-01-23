@@ -424,6 +424,9 @@ namespace strongstore
         case request_utils::Operation::ZREVRANGE:
             op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZREVRANGE);
             break;
+        case request_utils::Operation::ZAPPEND:
+            op_.mutable_tropd()->mutable_op()->set_op(replication::AsynchOperation::ZAPPEND);
+            break;
         default:
             Panic("Not implemented ops yet");
         }

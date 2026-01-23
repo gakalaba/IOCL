@@ -88,21 +88,24 @@ namespace redis
             //std::cout << "executing ZRANGE" << std::endl;
             int start = 1;  // default value
             int stop = 10;  // default value
-            
+
             try {
                 start = std::stoi(cmd.value.str);
             } catch (...) {
                 //std::cout << "ZRANGE: Failed to convert start value, using default: " << start << std::endl;
             }
-            
+
             try {
                 stop = std::stoi(cmd.oldValue.str);
             } catch (...) {
                 //std::cout << "ZRANGE: Failed to convert stop value, using default: " << stop << std::endl;
             }
-            
+
             return zrange(cmd.key, start, stop);
         }
+        case Operation::ZAPPEND:
+            //std::cout << "executing ZAPPEND" << std::endl;
+            return zappend(cmd.key, cmd.value.str);
         default:
             //std::cout << "cannot execute unsupported operation" << std::endl;
             std::cerr << "Operation not supported.\n";
@@ -399,6 +402,31 @@ namespace redis
         }
 
         return Value::NewList(result);
+    }
+
+    // ZAPPEND: acts like LPUSH but on sorted sets with auto-incrementing scores.
+    // Maintains a per-key counter to ensure ordering (newer items have higher scores).
+    Value RedisStore::zappend(const std::string &key, const std::string &member)
+    {
+        // Use a counter key to track the next score for this sorted set
+        std::string counter_key = key + ":__zappend_counter__";
+
+        // Get or initialize counter
+        double score = 1.0;
+        if (store.find(counter_key) != store.end() && store[counter_key].type == ValueType::STRING)
+        {
+            try {
+                score = std::stod(store[counter_key].str) + 1.0;
+            } catch (...) {
+                score = 1.0;
+            }
+        }
+
+        // Store the updated counter
+        store[counter_key] = Value::NewString(std::to_string(score));
+
+        // Add to sorted set using zadd (reuses existing logic)
+        return zadd(key, std::to_string(score), member);
     }
 
 } // namespace redis

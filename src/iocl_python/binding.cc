@@ -842,6 +842,7 @@ PYBIND11_MODULE(redisstorepython, m) {
         .value("ZSCORE", request_utils::Operation::ZSCORE)
         .value("ZREVRANGE", request_utils::Operation::ZREVRANGE)
         .value("ZRANGE", request_utils::Operation::ZRANGE)
+        .value("ZAPPEND", request_utils::Operation::ZAPPEND)
         .export_values();  // Optional: allows using Operation.GET, etc. directly
 
     // Expose ValueType enum

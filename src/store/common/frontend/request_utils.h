@@ -105,7 +105,8 @@ namespace request_utils
         ZINCRBY,
         ZSCORE,
         ZRANGE,
-        ZREVRANGE
+        ZREVRANGE,
+        ZAPPEND
     };
 
     // A Command object carrying the operation, key, value and an optional extra field (oldValue).

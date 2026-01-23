@@ -1967,6 +1967,9 @@ namespace strongstore
         case AsynchOperation::ZREVRANGE:
             c.op = Operation::ZREVRANGE;
             break;
+        case AsynchOperation::ZAPPEND:
+            c.op = Operation::ZAPPEND;
+            break;
         default:
             Panic("Not implemented ops yet");
         }

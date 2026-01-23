@@ -78,7 +78,8 @@ namespace redis
         ZINCRBY,
         ZSCORE,
         ZRANGE,
-        ZREVRANGE
+        ZREVRANGE,
+        ZAPPEND
     };
 
     // A Command object carrying the operation, key, value and an optional extra field (oldValue).
@@ -125,6 +126,7 @@ namespace redis
         Value zscore(const std::string &key, const std::string &value);
         Value zrange(const std::string &key, int start, int stop);
         Value zrevrange(const std::string &key, int start, int stop);
+        Value zappend(const std::string &key, const std::string &member);
 
     private:
         std::unordered_map<std::string, Value> store;
