@@ -13,13 +13,9 @@
     ]
   ],
   "replication_protocol": [
-    "iocl_ct",
-    "vr",
     "strong"
   ],
   "client_protocol_mode": [
-    "iocl-ct",
-    "vr",
     "span-lock"
   ],
   "server_names": [
@@ -35,8 +31,6 @@
     "mex-cent-1-0"
   ],
   "consistency": [
-    "lin",
-    "lin",
     "ss"
   ],
   "num_instances": 1,
@@ -117,17 +111,33 @@
       "us-east-1-2",
       "us-west-1-1",
       "eu-west-1-1"
-    ]  
+    ]
   ],
   "client_total": [
-    [4, 8, 16, 32, 64, 128, 180, 240, 300],
-    [4, 8, 16, 32, 64, 128, 180, 240, 300],
-    [4, 8, 16, 32, 64, 128, 180, 240, 300]
+    [
+      4,
+      8,
+      16,
+      32,
+      64,
+      128,
+      176,
+      240,
+      288
+    ]
   ],
   "client_processes_per_client_node": [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -390,9 +400,8 @@
   "server_cpuprofile": false,
   "server_durable": false,
   "server_rpc_port": 8087,
-  "client_gc_debug_trace": false, 
+  "client_gc_debug_trace": false,
   "client_cpuprofile": false,
   "server_gc_debug_trace": false,
-  "partitioner": "load_balanced",
-  "client_zipf_coefficient": 1.2
+  "COMMENTpartitioner": "load_balanced"
 }
