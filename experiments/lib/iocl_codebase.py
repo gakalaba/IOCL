@@ -154,6 +154,17 @@ class IOCLCodebase:
         if 'client_wrap_command' in config and len(config['client_wrap_command']) > 0:
             client_command = config['client_wrap_command'] % client_command
 
+        if 'perf_profile' in config and config['perf_profile']:
+            # protocol = config['replication_protocol']
+            # if (protocol == "strong"):
+            #     protocol = "spanner"
+            # protocol += ".data"
+            perf_data_file = os.path.join(exp_directory,
+                                       config['out_directory_name'],
+                                       "perf.data")
+            client_command = 'perf record -F 999 --call-graph dwarf,16384 -g -o %s -- %s' % (perf_data_file, client_command) # More info but takes long
+            # client_command = 'perf record -F 999 -g -o %s -- %s' % (perf_data_file, client_command)
+
         if 'pin_client_processes' in config and isinstance(config['pin_client_processes'], list) and len(config['pin_client_processes']) > 0:
             # core = config['pin_client_processes'][client_id %
             #                                       len(config['pin_client_processes'])]
@@ -161,9 +172,6 @@ class IOCLCodebase:
             all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
             core = next_core_for_machine(client_host, all_cores)
             client_command = 'taskset 0x%x %s' % (1 << core, client_command)
-        
-        if 'perf_profile' in config and config['perf_profile']:
-            client_command = 'sudo perf record -F 999 -g -- %s' % (client_command)
 
 
         if 'run_locally' in config and config['run_locally']:

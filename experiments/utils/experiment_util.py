@@ -38,7 +38,7 @@ def collect_exp_data(config, remote_exp_directory, local_directory_base, executo
     for client in config['clients']:
         client_host = get_client_host(config, client)
         download_futures.append(executor.submit(copy_remote_directory_to_local, os.path.join(
-            local_directory_base, client), config['emulab_user'], client_host, remote_directory))
+            local_directory_base, client), config['emulab_user'], client_host, remote_directory, perf_profile=True))
     return download_futures
 
 

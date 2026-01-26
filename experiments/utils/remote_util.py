@@ -76,9 +76,46 @@ def copy_path_to_remote_host(local_path, remote_user,
     subprocess.call(args)
 
 
-def copy_remote_directory_to_local(local_directory, remote_user, remote_host, remote_directory, tar_file='logs.tar', file_filter='.'):
+def copy_remote_directory_to_local(local_directory, remote_user, remote_host, remote_directory, tar_file='logs.tar', file_filter='.', perf_profile=False):
     os.makedirs(local_directory, exist_ok=True)
     tar_file_path = os.path.join(remote_directory, tar_file)
+    if (perf_profile):
+        print("Generating perf flamegraph...")
+        infile = os.path.join(remote_directory, "perf.data")
+        outfile = os.path.join(remote_directory, "perf.perf")
+
+        with open(outfile, "w") as f:
+            subprocess.run(
+                ["perf", "script", "-i", infile],
+                check=True,
+                stdout=f,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
+
+        print("Folding perf data...")
+        infile = outfile
+        outfile = os.path.join(remote_directory, "perf.folded")
+        with open(outfile, "w") as f:
+            subprocess.run(
+                    ["/users/akalaba/FlameGraph/stackcollapse-perf.pl", infile],
+                    check=True,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                )
+
+        print("Generating flamegraph SVG...")
+        infile = outfile
+        outfile = os.path.join(remote_directory, "perf.svg")
+        with open(outfile, "w") as f:
+            subprocess.run(
+                    ["/users/akalaba/FlameGraph/flamegraph.pl", infile],
+                    check=True,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                )
     run_remote_command_sync('cd %s && tar -czf %s %s' % (remote_directory, tar_file_path, file_filter),
                             remote_user, remote_host)
     subprocess.call(["scp", "-r", "-p", '%s@%s:%s' %
