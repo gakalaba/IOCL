@@ -9,6 +9,7 @@ from utils.remote_util import *
 from utils.git_util import *
 from utils.eval_util import *
 from lib.experiment_codebase import *
+NUM_CORES_PER_MACHINE = 16
 
 
 def is_using_master(config):
@@ -131,11 +132,26 @@ def wait_for_clients_to_terminate(config, client_ssh_threads):
 
 
 def start_clients(config, local_exp_directory, remote_exp_directory, run):
-    assert(config["client_total"] > 0)
-    assert(len(config["clients"]) > 0)
+    N = config["client_total"]
+    assert(N > 0)
+    M = len(config["clients"])
+    assert(M > 0)
     client_processes = []
-    base_process_count = config["client_total"] // len(config["clients"])
-    extra_processes = config["client_total"] % len(config["clients"])
+    procs_per_machine = [0] * M
+    remaining = N
+    for i in range(M):
+        take = min(NUM_CORES_PER_MACHINE, remaining)
+        procs_per_machine[i] += take
+        remaining -= take
+        if remaining == 0:
+            break
+
+    # Phase 2: round-robin the rest across all machines
+    i = 0
+    while remaining > 0:
+        procs_per_machine[i] += 1
+        remaining -= 1
+        i = (i + 1) % M
     for i in range(len(config["clients"])):
         client = config["clients"][i]
         if is_exp_local(config):
@@ -144,9 +160,7 @@ def start_clients(config, local_exp_directory, remote_exp_directory, run):
 
         client_host = get_client_host(config, client)
         appended_client_commands = ""
-        num_processes = base_process_count
-        if i < extra_processes:
-            num_processes += 1
+        num_processes = procs_per_machine[i]
         for k in range(num_processes):
             appended_client_commands += get_client_cmd(
                 config, i, k, run, local_exp_directory, remote_exp_directory)
@@ -518,8 +532,8 @@ def run_experiment(config_file, client_config_idx, executor):
             if is_using_master(config):
                 master_thread.terminate()
                 kill_master(config, remote_exp_directory)
-            print("Waiting{} seconds for servers to shutdown".format(10))
-            time.sleep(10)
+            # print("Waiting{} seconds for servers to shutdown".format(10))
+            # time.sleep(10)
         return executor.submit(collect_and_calculate, config,
                                client_config_idx, remote_exp_directory, local_out_directory,
                                executor)

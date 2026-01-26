@@ -6,6 +6,7 @@ from lib.experiment_codebase import *
 from utils.experiment_util import *
 from utils.remote_util import *
 MACHINE_CORE_COUNTER = {}
+NUM_CORES_PER_MACHINE = 16
 
 def next_core_for_machine(machine, core_list):
     """
@@ -62,13 +63,31 @@ class IOCLCodebase:
             stats_file = os.path.join(exp_directory,
                                       config['out_directory_name'],
                                       '%s-%d-stats-%d.json' % (client, k, run))
+        N = config["client_total"]
+        assert(N > 0)
+        M = len(config["clients"])
+        assert(M > 0)
+        procs_per_machine = [0] * M
+        remaining = N
+        for mi in range(M):
+            take = min(NUM_CORES_PER_MACHINE, remaining)
+            procs_per_machine[mi] += take
+            remaining -= take
+            if remaining == 0:
+                break
 
-        base_process_count = config["client_total"] // len(config["clients"])
-        extra_processes = config["client_total"] % len(config["clients"])
-        if i < extra_processes:
-            base_process_count += 1
-        assert(k < base_process_count)
-        client_id = sum([config["client_total"] // len(config["clients"]) + (1 if x < extra_processes else 0) for x in range(i)]) + k
+        # Phase 2: round-robin the rest across all machines
+        rr = 0
+        while remaining > 0:
+            procs_per_machine[rr] += 1
+            remaining -= 1
+            rr = (rr + 1) % M
+        prefix = [0] * (M + 1)
+        for mi, cnt in enumerate(procs_per_machine):
+            prefix[mi + 1] = prefix[mi] + cnt
+
+        client_id = prefix[i] + k
+        # client_id = sum([config["client_total"] // len(config["clients"]) + (1 if x < extra_processes else 0) for x in range(i)]) + k
         # client_id = i * config["client_processes_per_client_node"] + k
 
         bench_mode = config['bench_mode']

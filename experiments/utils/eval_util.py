@@ -9,7 +9,7 @@ import concurrent
 import collections
 import operator
 import math
-
+NUM_CORES_PER_MACHINE = 16
 
 def convert_latency_nanos_to_millis(latencies):
     return list(map(lambda x: x / 1e6, latencies))
@@ -136,16 +136,32 @@ def calculate_statistics_for_run(config, local_out_directory, run):
     stats = {}
 
     regions = get_regions(config)
-    base_process_count = config["client_total"] // len(config["clients"])
-    extra_processes = config["client_total"] % len(config["clients"])
+    N = config["client_total"]
+    assert(N > 0)
+    M = len(config["clients"])
+    assert(M > 0)
+    client_processes = []
+    procs_per_machine = [0] * M
+    remaining = N
+    for i in range(M):
+        take = min(NUM_CORES_PER_MACHINE, remaining)
+        procs_per_machine[i] += take
+        remaining -= take
+        if remaining == 0:
+            break
+
+    # Phase 2: round-robin the rest across all machines
+    i = 0
+    while remaining > 0:
+        procs_per_machine[i] += 1
+        remaining -= 1
+        i = (i + 1) % M
+
     # Calculate num_processes list based on order provided in config["clients"]
     num_processes_list = []
     for i in range(len(config["clients"])):
         client = config["clients"][i]
-        num_processes = base_process_count
-        if i < extra_processes:
-            num_processes += 1
-        num_processes_list.append((client, num_processes))
+        num_processes_list.append((client, procs_per_machine[i]))
     for region in regions:
         r_op_latencies = {}
         r_op_latency_counts = {}
