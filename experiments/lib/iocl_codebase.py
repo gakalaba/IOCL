@@ -161,6 +161,10 @@ class IOCLCodebase:
             all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
             core = next_core_for_machine(client_host, all_cores)
             client_command = 'taskset 0x%x %s' % (1 << core, client_command)
+        
+        if 'perf_profile' in config and config['perf_profile']:
+            client_command = 'sudo perf record -F 999 -g -- %s' % (client_command)
+
 
         if 'run_locally' in config and config['run_locally']:
             stdout_file = os.path.join(exp_directory,

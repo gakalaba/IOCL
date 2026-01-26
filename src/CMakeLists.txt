@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.10)
 # set the project name and version
 project(TAPIR VERSION 1.0)
 
+# For perf-friendly profiling
+add_compile_options(-g -fno-omit-frame-pointer)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fno-omit-frame-pointer")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fno-omit-frame-pointer")
+
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
