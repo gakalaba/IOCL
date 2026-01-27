@@ -77,6 +77,7 @@ namespace micro
         bool wo_replacement_;
         int txn_idx_;
         std::vector<int> allKeyIdxs;
+        std::vector<int> allOpTypes; // pregenerate the opType too
         int max_txns_per_client_;
     };
 

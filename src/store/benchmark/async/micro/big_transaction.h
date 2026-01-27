@@ -41,7 +41,7 @@ namespace micro
     class BasicBigTransaction : public AsyncTransaction
     {
     public:
-        BasicBigTransaction(KeySelector *keySelector, uint64_t fanout, uint32_t read_percentage, gsl::span<int> s);
+        BasicBigTransaction(KeySelector *keySelector, uint64_t fanout, uint32_t read_percentage, gsl::span<int> s, gsl::span<int> ot);
         virtual ~BasicBigTransaction();
 
     protected:
@@ -50,6 +50,10 @@ namespace micro
         inline const std::string &GetKey(int i) const
         {
             return keySelector->GetKey(keyIdxs[i]);
+        }
+        inline const int GetOpType(int i) const
+        {
+            return opTypes[i];
         }
 
         inline size_t GetNumKeys() const { return keyIdxs.size(); };
@@ -61,6 +65,7 @@ namespace micro
 
     private:
         gsl::span<int> keyIdxs;
+        gsl::span<int> opTypes;
         std::string ttype_;
         uint64_t fanout_;
         uint32_t read_percentage_;
