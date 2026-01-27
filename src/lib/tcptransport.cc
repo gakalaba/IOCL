@@ -290,6 +290,7 @@ void TCPTransport::ConnectTCP(
 
     struct bufferevent *bev = bufferevent_socket_new(libeventBase, fd,
                                                      BEV_OPT_CLOSE_ON_FREE);
+                                                    //  BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
 
     // mtx.lock();
     tcpOutgoing[dstSrc] = bev;
@@ -790,6 +791,7 @@ void TCPTransport::TCPAcceptCallback(evutil_socket_t fd, short what, void *arg)
         // Create a buffered event
         bev = bufferevent_socket_new(transport->libeventBase, newfd,
                                      BEV_OPT_CLOSE_ON_FREE);
+                                    //  BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
         bufferevent_setcb(bev, TCPReadableCallback, NULL,
                           TCPIncomingEventCallback, info);
         if (bufferevent_enable(bev, EV_READ | EV_WRITE) < 0)

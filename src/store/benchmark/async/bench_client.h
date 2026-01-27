@@ -44,6 +44,7 @@
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
+#include <thread>
 
 typedef std::function<void(transaction_status_t)> execute_callback;
 
@@ -277,6 +278,9 @@ private:
     // Own the transport to ensure it outlives the client
     // The transport_ reference above points to this owned object
     std::unique_ptr<Transport> owned_transport_;
+
+    // Main event loop thread to tear down later
+    std::thread eventloop_thread_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */

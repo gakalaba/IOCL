@@ -26,7 +26,6 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/bench_client.h"
-#include <thread>
 
 #include <sys/time.h>
 #include <sys/eventfd.h>
@@ -108,6 +107,11 @@ BenchmarkClient::~BenchmarkClient()
     auto &ss = search->second;
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
+    transport_.Stop();
+    if (eventloop_thread_.joinable()) {
+        eventloop_thread_.join();          // wait until event_base_dispatch returns
+    }
+    Notice("Stopped event loop and Joined the thread it ran on");
 }
 
 void BenchmarkClient::StartTransformedEventLoop()
@@ -165,7 +169,7 @@ uint64_t BenchmarkClient::CustomInit()
     // std::cout.flush();
     // std::cerr << "About to start event loop thread (stderr)..." << std::endl;
     // std::cerr.flush();
-    std::thread(std::bind(&BenchmarkClient::StartTransformedEventLoop, this)).detach();
+    eventloop_thread_ = std::thread(&BenchmarkClient::StartTransformedEventLoop, this);
     // std::cout << "Event loop thread started, about to return sid=" << sid << std::endl;
     // std::cout.flush();
     // std::cerr << "Event loop thread started (stderr), sid=" << sid << std::endl;
