@@ -249,6 +249,15 @@ private:
     // IOCL Project stuff
     bool issueConcurrent = false;
     uint64_t fanout = 0;
+
+    struct ReplyRec {
+        uint32_t type;
+        uint32_t client_id;
+        uint64_t latency_ns;
+        uint64_t curr_nanos;
+    };
+
+    std::vector<ReplyRec> reply_recs_;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */
