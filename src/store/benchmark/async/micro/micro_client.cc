@@ -63,6 +63,7 @@ namespace micro
     {
         ASSERT(fanout > 0);
         allKeyIdxs.reserve(fanout * max_txns_per_client_);
+        allOpTypes.reserve(fanout * max_txns_per_client_);
         std::unordered_set<int> seenKeys_;
         std::mt19937 &rand = GetRand();
         for (int i = 0; i < max_txns_per_client_; i++) {
@@ -81,6 +82,18 @@ namespace micro
                     allKeyIdxs.push_back(ki);
                 }
             }
+            srand(time(0));
+            for (int i = 0; i < fanout; ++i)
+            {
+                if ((rand() % 100) < read_percentage_)
+                {
+                    allOpTypes.push_back(0); // read
+                }
+                else
+                {
+                    allOpTypes.push_back(1); // write
+                }
+            }
         }
     }
 
@@ -95,7 +108,8 @@ namespace micro
             Panic("Exceeded max txns per client!");
         }
         txn_idx_++;
-        return new BasicBigTransaction(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_));
+        return new BasicBigTransaction(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_),
+                                                                            gsl::span<int>(allOpTypes).subspan(this_txn_id * fanout_, fanout_));
     }
 
     AsyncAppRequest *MicroClient::GetNextAppRequest()
@@ -105,7 +119,8 @@ namespace micro
             Panic("Exceeded max txns per client!");
         }
         txn_idx_++;
-        return new BasicAppRequest(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_));
+        return new BasicAppRequest(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_),
+                                                                            gsl::span<int>(allOpTypes).subspan(this_txn_id * fanout_, fanout_));
     }
 
 

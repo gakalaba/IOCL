@@ -35,13 +35,15 @@ namespace micro
     BasicBigTransaction::BasicBigTransaction(KeySelector *keySelector,
     uint64_t fanout,
     uint32_t read_percentage,
-    gsl::span<int> s)
+    gsl::span<int> s,
+    gsl::span<int> ot)
         : AsyncTransaction(),
           keySelector(keySelector),
           ttype_{"basic_1BT"},
           fanout_{fanout},
           read_percentage_{read_percentage},
-          keyIdxs{s}
+          keyIdxs{s},
+          opTypes{ot}
     {
     }
 
@@ -58,8 +60,7 @@ namespace micro
         }
         else if (0 < op_index && op_index <= fanout_)
         {
-            srand(time(0));
-            if ((rand() % 100) < read_percentage_)
+            if (GetOpType(op_index - 1) == 0)
             {
                 Debug("sending Get on key = %s", GetKey(op_index - 1).c_str());
                 return Get(GetKey(op_index - 1));
