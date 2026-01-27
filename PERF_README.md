@@ -9,4 +9,5 @@
 
 `sudo perf script -i spanner.data > spanner.perf`
 `./FlameGraph/stackcollapse-perf.pl spanner.perf > spanner.folded`
-`./FlameGraph/flamegraph.pl vr.folded > vr_flame.svg`
+`./FlameGraph/flamegraph.pl vr.folded > vr_flame.svg
+`sudo perf report --stdio -i vr.data | head -n 80``
