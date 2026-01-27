@@ -87,6 +87,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
     rand_ = (std::mt19937)(id * rand());
 
     _Latency_Init(&latency, "txn");
+    reply_recs_.reserve(1'000'000);
 }
 
 BenchmarkClient::~BenchmarkClient()
@@ -829,18 +830,22 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
                 {
                     gettimeofday(&startMeasureTime, NULL);
                     startMeasureTime.tv_sec -= ns / 1000000000ULL;
-                    startMeasureTime.tv_usec -= (ns % 1000000000ULL) / 1000ULL;
                     // std::cout << "#start," << startMeasureTime.tv_sec << ","
                     // << startMeasureTime.tv_usec << std::endl;
                 }
                 uint64_t currNanos = curr.tv_sec * 1000000000ULL + curr.tv_nsec;
+                uint32_t type = 0;
                 if (transaction != NULL) {
-                    std::cout << transaction->GetTransactionType() << ',' << ns << ',' << currNanos << ','
-                          << client_id_ << std::endl;
+                    type = 1;
                 } else {
-                    std::cout << appreq->GetTransactionType() << ',' << ns << ',' << currNanos << ','
-                              << client_id_ << std::endl;
+                    type = 2;
                 }
+                reply_recs_.push_back(ReplyRec{
+                    type,
+                    static_cast<uint32_t>(client_id_),
+                    ns,
+                    currNanos
+                });
                 latencies.push_back(ns);
             }
         }
@@ -906,8 +911,36 @@ void BenchmarkClient::Finish()
     gettimeofday(&endTime, NULL);
     struct timeval diff = timeval_sub(endTime, startMeasureTime);
 
-    std::cout << "#end," << diff.tv_sec << "," << diff.tv_usec << "," << client_id_
-              << std::endl;
+    // Now output everything to the file
+    FILE* f = stdout;
+    // Make stdout fully buffered (important if redirected to a file)
+    static bool buffering_set = false;
+    if (!buffering_set) {
+        setvbuf(stdout, nullptr, _IOFBF, 1 << 20); // 1MB buffer
+        buffering_set = true;
+    }
+
+    for (const auto& r : reply_recs_) {
+        if (r.type == 1) {
+            fprintf(f, "%s,%llu,%llu,%u\n",
+                    "basic_1BT",
+                    (unsigned long long)r.latency_ns,
+                    (unsigned long long)r.curr_nanos,
+                    r.client_id);
+        } else if (r.type == 2) {
+            fprintf(f, "%s,%llu,%llu,%u\n",
+                    "basic_appreq",
+                    (unsigned long long)r.latency_ns,
+                    (unsigned long long)r.curr_nanos,
+                    r.client_id);
+        }
+    }
+
+    fprintf(f, "#end,%ld,%ld,%d\n",
+            diff.tv_sec,
+            diff.tv_usec,
+            client_id_);
+    fflush(f); // single flush at the end
 
     Notice("Completed %d requests in " FMT_TIMEVAL_DIFF " seconds", n,
            VA_TIMEVAL_DIFF(diff));
