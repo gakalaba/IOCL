@@ -792,7 +792,7 @@ namespace strongstore
                     session = std::ref(session)](uint64_t s, request_utils::Value retval,
                                                 uint64_t tid, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
-            std::cerr << "[Client::SendAsynchRequest::rcb1] Callback for tid=" << tid << std::endl;
+            // std::cerr << "[Client::SendAsynchRequest::rcb1] Callback for tid=" << tid << std::endl;
             session.get().set_executing();
             if (isIOCL) {
                 auto it1 = p.begin();
