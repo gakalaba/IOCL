@@ -135,9 +135,9 @@ namespace replication
         linop.ParseFromString(request.op());
         string key = linop.key();
 
-        keyToVersionNumber[key] = lastCommitted;
+        keyToVersionNumber[key] = std::max(keyToVersionNumber[key], lastCommitted);
 
-        Execute(Timestamp{lastCommitted, linop.transaction_id()}, request, reply);
+        Execute(Timestamp{lastCommitted}, request, reply);
         ExecuteOperation(request, reply);
        }
 
@@ -149,15 +149,7 @@ namespace replication
 
         linop.ParseFromString(request.op());
 
-        string key = linop.key();
-        auto iter = keyToVersionNumber.find(key);
-
-        if (iter == keyToVersionNumber.end())
-        {
-            keyToVersionNumber[key] = 0;
-        }
-
-        Execute(Timestamp{keyToVersionNumber[key], linop.transaction_id()}, request, reply);
+        Execute(Timestamp{keyToVersionNumber[linop.key()]}, request, reply);
         ExecuteOperation(request, reply);
        }
 
@@ -178,10 +170,8 @@ namespace replication
 
             /* Send reply */
             auto iter = clientAddresses.find(request.clientid());
-            Debug("executing operationn and trying to send");
             if (iter != clientAddresses.end())
             {
-                Debug("sent");
                 transport->SendMessage(this, *iter->second, reply);
             }
        }
@@ -213,7 +203,6 @@ namespace replication
 
                 Debug("Commiting entry with op %s", op.c_str());
 
-                // TODO: Check logic, instead, lets just update the datastore
                 if (op == "put") 
                 {
                     ExecuteWriteOperation(request);
@@ -259,13 +248,19 @@ namespace replication
 
         void CRAQReplica::SendVersionRequest(const Request &request)
         {
-            // VersionRequestMessage msg;
-            // LinearizeableOperation linop;
-            // linop.ParseFromString(request.op());
-            // msg.set_key(linop.key());
+            VersionRequestMessage msg;
+            LinearizeableOperation linop;
+            linop.ParseFromString(request.op());
+            msg.set_key(linop.key());
+            msg.set_clientid(request.clientid());
+            msg.set_clientreqid(request.clientreqid());
+            msg.set_replicaidx(myIdx);
 
-            // pendingReads[]
+            Debug("Sending version request for key %s", linop.key().c_str());
 
+            pendingReads[{request.clientid(), request.clientreqid()}] = request;
+
+            transport->SendMessageToReplica(this, numReplicas - 1, msg);
         }
 
         void CRAQReplica::UpdateClientTable(const Request &req)
@@ -401,6 +396,8 @@ namespace replication
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
             CommitMessage commit;
+            VersionRequestMessage versionRequest;
+            VersionResponseMessage versionResponse;
             
             if (type == request.GetTypeName())
             {
@@ -421,6 +418,16 @@ namespace replication
             {
                 commit.ParseFromString(data);
                 HandleCommit(remote, commit);
+            }
+            else if (type == versionRequest.GetTypeName())
+            {
+                versionRequest.ParseFromString(data);
+                HandleVersionRequest(remote, versionRequest);
+            }
+            else if (type == versionResponse.GetTypeName())
+            {
+                versionResponse.ParseFromString(data);
+                HandleVersionResponse(remote, versionResponse);
             }
             else
             {
@@ -451,11 +458,9 @@ namespace replication
             }
         }
 
-        // TODO: implement version requests
-        void CRAQReplica::HandleReadRequest(const TransportAddress &remote,
-                                        const RequestMessage &msg)
+        void CRAQReplica::HandleReadRequest(const TransportAddress &remote, const RequestMessage &msg)
         {
-            Debug("Handling read request");
+            Debug("Handling read request for client id %lu and client request id %lu", msg.req().clientid(), msg.req().clientreqid());
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring request due to abnormal status");
@@ -480,11 +485,10 @@ namespace replication
                 RPanic("Should always replicate when using CRAQ");
             }
 
-            // TODO: increment lastOp in prepares for non-head replicas
-            if (lastOp != lastCommitted)
+            if (this->lastOp != lastCommitted)
             {
-                // SendVersionRequest(msg.req());
-                // return;
+                SendVersionRequest(msg.req());
+                return;
             }
 
             ExecuteReadOperation(msg.req());
@@ -494,7 +498,7 @@ namespace replication
                                         const RequestMessage &msg)
         {
             // Latency_Start(&rec_to_upcall_lat_);
-            Debug("Handling write request");
+            Debug("Handling write request for client id %lu and client request id %lu", msg.req().clientid(), msg.req().clientreqid());
             viewstamp_t v;
 
             if (status != STATUS_NORMAL)
@@ -741,6 +745,44 @@ namespace replication
                 }
                 Debug("Backwards propagating commit");
             }
+        }
+
+        void CRAQReplica::HandleVersionRequest(const TransportAddress &remote, const VersionRequestMessage &msg)
+        {
+            if (!AmTail())
+            {
+                Panic("Received version request at a non-tail node");
+            }
+
+            Debug("Handling version request for key %s", msg.key().c_str());
+            VersionResponseMessage response;
+            response.set_clientid(msg.clientid());
+            response.set_clientreqid(msg.clientreqid());
+            response.set_opnum(keyToVersionNumber[msg.key()]);
+
+            transport->SendMessageToReplica(this, msg.replicaidx(), response); 
+        }
+
+        void CRAQReplica::HandleVersionResponse(const TransportAddress &remote, const VersionResponseMessage &msg)
+        {
+            std::pair<uint32_t, uint32_t> requestClientId = {msg.clientid(), msg.clientreqid()};
+            auto it = pendingReads.find(requestClientId);
+            if (it == pendingReads.end())
+            {
+                Debug("Old version request, no longer pending");
+                return;
+            }
+
+            Request request = it->second;
+            LinearizeableOperation linop;
+            linop.ParseFromString(request.op());
+            Debug("Handling version response for key %s and opnum %d", linop.key().c_str(), msg.opnum());
+
+            keyToVersionNumber[linop.key()] = std::max(keyToVersionNumber[linop.key()], msg.opnum());
+
+            ExecuteReadOperation(request);
+
+            pendingReads.erase({msg.clientid(), msg.clientreqid()});
         }
 
         void CRAQReplica::Close()

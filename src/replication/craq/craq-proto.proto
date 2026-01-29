@@ -63,8 +63,13 @@ message StateTransferMessage {
 
 message VersionRequestMessage {
     required string key = 1;
+    required uint64 clientid = 2;
+    required uint64 clientreqid = 3;
+    required uint32 replicaIdx = 4;
 }
 
 message VersionResponseMessage {
-    required uint64 opnum = 1;
+    required uint64 clientid = 1;
+    required uint64 clientreqid = 2;
+    required uint64 opnum = 3;
 }

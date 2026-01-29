@@ -32,6 +32,7 @@
 #ifndef _CRAQ_REPLICA_H_
 #define _CRAQ_REPLICA_H_
 
+#include <algorithm>
 #include <list>
 #include <map>
 #include <memory>
@@ -60,6 +61,14 @@ namespace replication
                                 const string &data, void *meta_data);
 
         private:
+            // TODO: Use instead of continuously deserializing linop
+            // struct DeserializedLinearizeableOperation
+            // {
+            //     uint32_t clientid;
+            //     uint32_t clientreqid;
+            //     LinearizeableOperation linop;
+
+            // };
             view_t view;
             int myIdx;
             int numReplicas;
@@ -82,7 +91,19 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
-            std::unordered_map<uint64_t, replication::Request> pendingReads;
+            struct PairHash
+            {
+                std::size_t operator()(const std::pair<uint64_t, uint64_t> &p) const noexcept
+                {
+                    uint64_t h1 = std::hash<uint64_t>()(p.first);
+                    uint64_t h2 = std::hash<uint64_t>()(p.second);
+
+                    // Very good hash mixing (from boost::hash_combine)
+                    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+                }
+            };
+
+            std::unordered_map<std::pair<uint64_t, uint64_t>, replication::Request, PairHash> pendingReads; // contain reads waiting on version responses
 
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
@@ -125,6 +146,10 @@ namespace replication
                                  const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
+            void HandleVersionRequest(const TransportAddress &remote,
+                                const proto::VersionRequestMessage &msg);
+            void HandleVersionResponse(const TransportAddress &remote,
+                                const proto::VersionResponseMessage &msg);
         };
 
     } // namespace craq
