@@ -5,6 +5,21 @@ import shutil
 from lib.experiment_codebase import *
 from utils.experiment_util import *
 from utils.remote_util import *
+MACHINE_CORE_COUNTER = {}
+NUM_CORES_PER_MACHINE = 16
+
+def next_core_for_machine(machine, core_list):
+    """
+    Returns the next core for this machine using an in-memory counter.
+    No files, no locks: since this Python script runs sequentially.
+    """
+    if machine not in MACHINE_CORE_COUNTER:
+        MACHINE_CORE_COUNTER[machine] = 0
+
+    counter = MACHINE_CORE_COUNTER[machine]
+    MACHINE_CORE_COUNTER[machine] += 1
+
+    return core_list[counter % len(core_list)]
 
 
 class TransformedCodebase:
@@ -70,6 +85,15 @@ class TransformedCodebase:
         else:
             config_file_path = os.path.join(remote_exp_directory, config.get('_config_file_basename', ''))
 
+        # pin process!
+        taskset = ""
+
+        if 'pin_client_processes' in config and isinstance(config['pin_client_processes'], list) and len(config['pin_client_processes']) > 0:
+            all_cores = config["pin_server_processes"]  # 16 cores on this machine, 0-15
+            core = next_core_for_machine(client_host, all_cores)
+            taskset = 'taskset -c %d ' % (core)
+
+
         # Build the client command ONCE with all required parameters
         client_command = "".join(
             [
@@ -79,7 +103,9 @@ class TransformedCodebase:
                     python_dir,
                     "; source ",
                     config["python_venv"],
-                    "; python ",
+                    "; ",
+                    taskset,
+                    "python ",
                     python_cmd,
                     " --config=",
                     config_file_path,
@@ -527,15 +553,15 @@ class TransformedCodebase:
         if "server_wrap_command" in config and len(config["server_wrap_command"]) > 0:
             replica_command = config["server_wrap_command"] % replica_command
 
-        if (
-            "pin_server_processes" in config
-            and isinstance(config["pin_server_processes"], list)
-            and len(config["pin_server_processes"]) > 0
-        ):
-            core = config["pin_server_processes"][
-                server_id % len(config["pin_server_processes"])
-            ]
-            replica_command = "taskset 0x%x %s" % (1 << core, replica_command)
+        if 'pin_server_processes' in config and isinstance(config['pin_server_processes'], list) and len(config['pin_server_processes']) > 0:
+            # if (config["client_protocol_mode"] == "span-lock"):
+            #     core = config['pin_server_processes'][server_id %
+            #                                       len(config['pin_server_processes'])]
+            # else:
+            machine = config["shards"][shard_idx][replica_idx]
+            all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
+            core = next_core_for_machine(machine, all_cores)
+            replica_command = 'taskset 0x%x %s' % (1 << core, replica_command)
 
         # Wrapping additional information around command
         if "run_locally" in config and config["run_locally"]:
