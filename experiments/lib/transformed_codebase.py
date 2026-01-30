@@ -21,9 +21,13 @@ def next_core_for_machine(machine, core_list):
 
     return core_list[counter % len(core_list)]
 
+def clear_cores():
+    print("Clearing assigned cores for pinning purposes!")
+    MACHINE_CORE_COUNTER.clear()
 
 class TransformedCodebase:
     # TODO:: add in the flag for replication protocol that both the clients and servers will use to spawn proper rep. client (VRClient or IOCLclient)
+
     def get_client_cmd(
         self, config, i, k, run, local_exp_directory, remote_exp_directory
     ):

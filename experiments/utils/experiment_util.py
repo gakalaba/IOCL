@@ -481,6 +481,7 @@ def run_experiment(config_file, client_config_idx, executor):
             retries = 0
             master_thread = None
             server_threads = None
+            clear_cores()
             while not servers_alive and retries <= config['max_retries']:
                 if is_using_master(config):
                     kill_master(config, remote_exp_directory)

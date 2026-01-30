@@ -1,5 +1,6 @@
 from .iocl_codebase import IOCLCodebase
 from .transformed_codebase import TransformedCodebase
+from .transformed_codebase import clear_cores
 
 
 __BUILDERS__ = {
