@@ -64,15 +64,18 @@
     ["eu-west-1-1", "us-east-1-0", "us-west-1-0"]
   ],
   "client_total": [
-    [1],
-    [1]
+    [640],
+    [640]
   ],
   "client_processes_per_client_node": [
-    [1],
-    [1]
+    [128],
+    [128]
   ],
   "client_threads_per_process": 1,
   "clients": [
+    "client-1-0",
+    "client-2-0",
+    "client-3-0",
     "client-0-0"
   ],
   "server_regions": {
@@ -80,17 +83,20 @@
       "us-east-1-0",
       "us-east-1-1",
       "us-east-1-2",
+      "client-3-0",
       "client-0-0"
     ],
     "ir": [
       "us-west-1-0",
       "us-west-1-1",
-      "us-west-1-2"
+      "us-west-1-2",
+      "client-1-0"
     ],
     "jp": [
       "eu-west-1-0",
       "eu-west-1-1",
-      "eu-west-1-2"
+      "eu-west-1-2",
+      "client-2-0"
     ]
   },
   "server_port": 7087,
@@ -161,10 +167,10 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 45,
+  "client_experiment_length": 80,
   "client_rand_sleep": 0,
-  "client_ramp_down": 10,
-  "client_ramp_up": 10,
+  "client_ramp_down": 15,
+  "client_ramp_up": 15,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
