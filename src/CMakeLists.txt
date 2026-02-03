@@ -29,6 +29,9 @@ link_libraries(${LIBEVENT_LIB})
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/gflags)
 link_libraries(gflags::gflags)
 
+# require googletest
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
+
 # add third-party JSON library
 include_directories(${CMAKE_SOURCE_DIR}/third_party/json/single_include)
 
