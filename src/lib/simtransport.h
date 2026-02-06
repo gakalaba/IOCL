@@ -79,9 +79,12 @@ public:
     void AddFilter(int id, filter_t filter);
     void RemoveFilter(int id);
     int Timer(uint64_t ms, timer_callback_t cb);
+    int TimerMicro(uint64_t us, timer_callback_t cb){Panic("unimplemented");};
     bool CancelTimer(int id);
     void CancelAllTimers();
+    void Stop(){Panic("unimplemented");};
     void Stop(bool immediately = false);
+    void Close(TransportReceiver *receiver){Panic("unimplemented");};
 
     void DispatchTP(std::function<void *()> f, std::function<void(void *)> cb);
 

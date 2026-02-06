@@ -236,7 +236,7 @@
   "plot_tput_lat_y_label": "Latency (ms)",
   "input_latency_scale": 1000000000,
   "output_latency_scale": 1000,
-  "src_commit_hash": "dev-craq",
+  "src_commit_hash": "dev/craq-local",
   "stats_file_name": "stats.json",
   "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
   "base_mounted_fs_path": "/mnt/extra",
@@ -255,7 +255,8 @@
   "src_directory": "/users/akalaba/IOCL/src",
   "make_collect_bins": [
     "store/benchmark/async/benchmark",
-    "store/server"
+    "store/server",
+    "replication/craq/tests/craq-test"
   ],
   "make_clean": false,
   "remote_bin_directory_nfs_enabled": false,
