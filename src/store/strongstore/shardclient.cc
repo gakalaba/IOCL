@@ -509,33 +509,34 @@ namespace strongstore
             op_.set_shardtag(myshardtag);
             Debug("MY shard tag = %lu", myshardtag);
             op_.set_intkey(key); // for iocl optimization
-
-            // Construct predecessor list
-            auto it1 = outstandingOperationList.begin();
-            auto it2 = outstandingOperationRefCount.begin();
-            pendingOp->pred_list.reserve(outstandingOperationList.size());
-            while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
-                // increment refcount entry
-                (*it2)++;
-                // Add this entry to predecessor list and the RPC message
-                op_.add_predlist((*it1).first);
-                op_.add_shardlist((*it1).second);
-                pendingOp->pred_list.push_back(*it1);
-                Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
-                ++it1;
-                ++it2;
-            }
-            // Add self to outstanding operations and refcount lists
-            outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
-            outstandingOperationRefCount.push_back(1);
-            // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
-            auto itl = outstandingOperationList.begin();
-            auto itr = outstandingOperationRefCount.begin();
-            for (;
-                 itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
-                 ++itl, ++itr) {
-            }
             op_.set_singleton(singleton);
+            if (!singleton) {
+                // Construct predecessor list
+                auto it1 = outstandingOperationList.begin();
+                auto it2 = outstandingOperationRefCount.begin();
+                pendingOp->pred_list.reserve(outstandingOperationList.size());
+                while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
+                    // increment refcount entry
+                    (*it2)++;
+                    // Add this entry to predecessor list and the RPC message
+                    op_.add_predlist((*it1).first);
+                    op_.add_shardlist((*it1).second);
+                    pendingOp->pred_list.push_back(*it1);
+                    Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
+                    ++it1;
+                    ++it2;
+                }
+                // Add self to outstanding operations and refcount lists
+                outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
+                outstandingOperationRefCount.push_back(1);
+                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
+                auto itl = outstandingOperationList.begin();
+                auto itr = outstandingOperationRefCount.begin();
+                for (;
+                    itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
+                    ++itl, ++itr) {
+                }
+            }
         }
 
         // //std::cout << "transport is nonNULL " << (transport_ != NULL) << std::endl;
@@ -628,10 +629,10 @@ namespace strongstore
             break;
         }
 
-        Debug("PendingAsynchOperations looks like:");
-        for (auto const& pair : pendingAsynchOperations) {
-            Debug("  req_id: %lu, tid: %lu", pair.first, pair.second->transaction_id);
-        }
+        // Debug("PendingAsynchOperations looks like:");
+        // for (auto const& pair : pendingAsynchOperations) {
+        //     Debug("  req_id: %lu, tid: %lu", pair.first, pair.second->transaction_id);
+        // }
         auto itr = pendingAsynchOperations.find(req_id);
         if (itr == pendingAsynchOperations.end())
         {

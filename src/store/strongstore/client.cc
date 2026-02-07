@@ -788,18 +788,18 @@ namespace strongstore
 
         // //std::cout << "[Client::SendAsynchRequest] Shard index: " << i << std::endl;
 
-        auto rcb1 = [this, trcb, isIOCL,
+        auto rcb1 = [this, trcb, isIOCL, singleton,
                     session = std::ref(session)](uint64_t s, request_utils::Value retval,
                                                 uint64_t tid, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
             // std::cerr << "[Client::SendAsynchRequest::rcb1] Callback for tid=" << tid << std::endl;
             session.get().set_executing();
-            if (isIOCL) {
+            if (isIOCL && !singleton) {
                 auto it1 = p.begin();
                 auto it2 = this->outstandingOperationRefCount_.begin();
                 auto it3 = this->outstandingOperationList_.begin();
                 // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
-                // will never loop if VR, since pred_list is empty
+                // will never loop if VR or singleton, since pred_list is empty
                 while (it1 != p.end()) {
                     (*it2)--;
                     if ((*it2) <= 0) {
