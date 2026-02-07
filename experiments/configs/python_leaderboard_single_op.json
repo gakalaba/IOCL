@@ -30,7 +30,8 @@
     "us-west-1-2",
     "eu-west-1-0",
     "eu-west-1-1",
-    "eu-west-1-2"
+    "eu-west-1-2",
+    "mex-cent-1-0"
   ],
   "consistency": [
     "lin",
@@ -48,49 +49,151 @@
   "network_config": "network.json",
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
-  "fault_tolerance": 1,
-  "num_shards": 9,
+  "fault_tolerance": 2,
+  "num_shards": 10,
   "shards": [
-    ["us-east-1-0", "us-west-1-0", "eu-west-1-0"],
-    ["us-west-1-1", "eu-west-1-1", "us-east-1-1"],
-    ["eu-west-1-2", "us-east-1-2", "us-west-1-2"],
-
-    ["us-east-1-1", "us-west-1-2", "eu-west-1-0"],
-    ["us-west-1-2", "eu-west-1-0", "us-east-1-2"],
-    ["eu-west-1-0", "us-east-1-2", "us-west-1-1"],
-
-    ["us-east-1-2", "us-west-1-1", "eu-west-1-1"],
-    ["us-west-1-0", "eu-west-1-2", "us-east-1-0"],
-    ["eu-west-1-1", "us-east-1-0", "us-west-1-0"]
+    [
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-east-1-2",
+      "us-east-1-0",
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-2",
+      "us-east-1-1",
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-2",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-1"
+    ]
   ],
   "client_total": [
-    [128],
-    [128]
+    [160, 80, 40, 20],
+    [1600, 800, 400, 200]
   ],
   "client_processes_per_client_node": [
-    [64],
-    [64]
+    [8, 4, 2, 1],
+    [80, 40, 20, 10]
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0"
+    "client-1-0",
+    "client-2-0",
+    "client-3-0",
+    "client-4-0",
+    "client-5-0",
+    "client-6-0",
+    "client-7-0",
+    "client-8-0",
+    "client-9-0",
+    "client-1-1",
+    "client-2-1",
+    "client-3-1",
+    "client-4-1",
+    "client-5-1",
+    "client-6-1",
+    "client-7-1",
+    "client-8-1",
+    "client-9-1",
+    "client-0-0",
+    "client-0-1"
   ],
   "server_regions": {
     "ca": [
       "us-east-1-0",
       "us-east-1-1",
+      "client-1-0",
+      "client-6-0",
+      "client-2-1",
+      "client-7-1"
+    ],
+    "va": [
       "us-east-1-2",
-      "client-0-0"
+      "us-west-1-0",
+      "client-2-0",
+      "client-7-0",
+      "client-3-1",
+      "client-8-1"
     ],
     "ir": [
-      "us-west-1-0",
       "us-west-1-1",
-      "us-west-1-2"
+      "us-west-1-2",
+      "client-3-0",
+      "client-8-0",
+      "client-4-1",
+      "client-9-1"
     ],
-    "jp": [
+    "or": [
       "eu-west-1-0",
       "eu-west-1-1",
-      "eu-west-1-2"
+      "client-4-0",
+      "client-9-0",
+      "client-5-1",
+      "client-0-0"
+    ],
+    "jp": [
+      "eu-west-1-2",
+      "mex-cent-1-0",
+      "client-5-0",
+      "client-1-1",
+      "client-6-1",
+      "client-0-1"
     ]
   },
   "server_port": 7087,
@@ -119,7 +222,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "debugapps",
+  "experiment_name": "benchapps",
   "codebase_name": "transformed",
   "pin_client_processes": [
     0,
@@ -172,17 +275,37 @@
   "region_rtt_latencies": {
     "ca": {
       "ca": 0,
-      "ir": 150,
-      "jp": 150
+      "va": 72,
+      "ir": 151,
+      "or": 59,
+      "jp": 113
+    },
+    "va": {
+      "ca": 72,
+      "va": 0,
+      "ir": 88,
+      "or": 93,
+      "jp": 162
     },
     "ir": {
-      "ca": 150,
+      "ca": 151,
+      "va": 88,
       "ir": 0,
-      "jp": 150
+      "or": 145,
+      "jp": 220
+    },
+    "or": {
+      "ca": 59,
+      "va": 93,
+      "ir": 145,
+      "or": 0,
+      "jp": 121
     },
     "jp": {
-      "ca": 150,
-      "ir": 150,
+      "ca": 113,
+      "va": 162,
+      "ir": 220,
+      "or": 121,
       "jp": 0
     }
   },
