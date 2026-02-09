@@ -1986,7 +1986,7 @@ namespace strongstore
         reply.SerializeToString(&response);
     }
 
-    void CRAQServer::ReplicaUpcall(const Timestamp &timestamp, const string &op, string &response)
+    void Server::ReplicaUpcall(const Timestamp &timestamp, const string &op, string &response)
     {
         if (consistency_ != LIN)
         {
@@ -2040,10 +2040,10 @@ namespace strongstore
 
         PendingOperationReply *pending_reply = search->second;
         pending_operation_replies_.erase(search);
-        transport_->TimerMicro(0, std::bind(&CRAQServer::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
+        transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
     }
 
-    void CRAQServer::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
+    void Server::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
     {
         uint64_t transaction_id = linop.transaction_id();
         TimestampID versionStoreTimestamp{timestamp, transaction_id}; 

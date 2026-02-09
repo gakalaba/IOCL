@@ -42,11 +42,6 @@
 #include "replication/common/request.pb.h"
 #include "store/common/timestamp.h"
 
-// TODO: Is this neccesary? same with timestamp include
-namespace strongstore {
-    class CRAQServer; // forward declaration
-}
-
 namespace replication {
 
 class Replica;
@@ -70,6 +65,8 @@ class AppReplica {
                                string &str2){};
     virtual void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                                    const string &v, string &retval){};
+    virtual void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res){};
+    virtual void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop){};
     // Invoke call back for unreplicated operations run on only one replica
     virtual void UnloggedUpcall(const string &str1, string &str2){};
     // Invoke callback on leader status change

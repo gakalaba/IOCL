@@ -380,7 +380,7 @@ int main(int argc, char **argv)
     case PROTO_CRAQ:
     {
         Debug("Making application request strongstore server using CRAQ");
-        server = new strongstore::CRAQServer(consistency, shard_config,
+        server = new strongstore::Server(consistency, shard_config,
                                          replica_config, FLAGS_server_id,
                                          FLAGS_group_idx, FLAGS_replica_idx,
                                          tport, strongstore::LinearizableProtocol::PROTO_CRAQ, FLAGS_debug_stats);

@@ -4,7 +4,3 @@ file(GLOB SourceFiles "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
 
 add_library(ReplicationCommon ${SourceFiles} ${PROTO_SRCS} ${PROTO_HDRS})
 target_include_directories(ReplicationCommon PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
-target_link_libraries(ReplicationCommon PUBLIC rss)
-target_link_libraries(ReplicationCommon PUBLIC ReplicationCRAQ)
-target_link_libraries(ReplicationCommon PUBLIC ReplicationVR)
-target_link_libraries(ReplicationCommon PUBLIC ReplicationIOCL_CT)
