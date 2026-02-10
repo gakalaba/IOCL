@@ -1,0 +1,41 @@
+set datafile separator ','
+set title "get\\_zrange vs. get\\_ranks\\_by\\_sort\\_key"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange_v_get_ranks_by_sort_key.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-43-39/2026-02-06-08-43-45/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_zrange client\\_total=160" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-43-39/2026-02-06-08-52-25/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_zrange client\\_total=80" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-43-39/2026-02-06-08-47-22/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_zrange client\\_total=40" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-43-39/2026-02-06-08-49-52/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_zrange client\\_total=20" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-55-02/2026-02-06-08-55-04/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_zrange client\\_total=1600" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-55-02/2026-02-06-08-57-37/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_zrange client\\_total=800" ls 6 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-55-02/2026-02-06-09-00-10/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_zrange client\\_total=400" ls 7 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-55-02/2026-02-06-09-02-42/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_zrange client\\_total=200" ls 8 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-22-02/2026-02-06-09-22-07/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_sort\\_key client\\_total=160" ls 9 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-22-02/2026-02-06-09-24-37/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_sort\\_key client\\_total=80" ls 10 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-22-02/2026-02-06-09-27-08/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_sort\\_key client\\_total=40" ls 11 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-22-02/2026-02-06-09-29-38/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_sort\\_key client\\_total=20" ls 12 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-32-14/2026-02-06-09-32-16/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_sort\\_key client\\_total=1600" ls 13 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-32-14/2026-02-06-09-34-49/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_sort\\_key client\\_total=800" ls 14 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-32-14/2026-02-06-09-37-22/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_sort\\_key client\\_total=400" ls 15 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-32-14/2026-02-06-09-39-55/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_sort\\_key client\\_total=200" ls 16 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-09-59-21/2026-02-06-09-59-26/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=2 \\client_total=160" ls 17 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-09-59-21/2026-02-06-10-01-57/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=2 \\client_total=80" ls 18 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-09-59-21/2026-02-06-10-04-27/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=2 \\client_total=40" ls 19 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-09-59-21/2026-02-06-10-06-57/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=2 \\client_total=20" ls 20 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-10-09-33/2026-02-06-10-09-35/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_symbols N=2 \\client_total=1600" ls 21 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-10-09-33/2026-02-06-10-12-07/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_symbols N=2 \\client_total=800" ls 22 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-10-09-33/2026-02-06-10-14-39/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_symbols N=2 \\client_total=400" ls 23 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_2/2026-02-06-10-09-33/2026-02-06-10-17-10/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_symbols N=2 \\client_total=200" ls 24 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-11-25-48/2026-02-06-11-25-48/2026-02-06-11-35-57/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=10 \\client_total=160" ls 25 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-11-25-48/2026-02-06-11-25-48/2026-02-06-11-28-23/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=10 \\client_total=80" ls 26 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-11-25-48/2026-02-06-11-25-48/2026-02-06-11-30-54/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=10 \\client_total=40" ls 37 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-11-25-48/2026-02-06-11-25-48/2026-02-06-11-33-24/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols N=10 \\client_total=20" ls 28 with lines

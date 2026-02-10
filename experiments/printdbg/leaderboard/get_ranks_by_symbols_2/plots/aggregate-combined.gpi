@@ -1,0 +1,21 @@
+set datafile separator ','
+set title "aggregate-combined"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/plots/aggregate-combined.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-09-59-21/2026-02-06-09-59-26/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-09-59-21/2026-02-06-10-01-57/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-09-59-21/2026-02-06-10-04-27/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-09-59-21/2026-02-06-10-06-57/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-10-09-33/2026-02-06-10-09-35/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-10-09-33/2026-02-06-10-12-07/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 6 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-10-09-33/2026-02-06-10-14-39/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 7 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-06-09-59-21/2026-02-06-10-09-33/2026-02-06-10-17-10/out/plots/aggregate-combined.csv' using 1:2 title "out" ls 8 with lines
