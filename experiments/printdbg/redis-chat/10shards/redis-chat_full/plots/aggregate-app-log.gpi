@@ -1,0 +1,22 @@
+set datafile separator ','
+set title "Redis-Chat App"
+set key bottom right
+set ytics ("0.5"    -log10(1-0.5), \
+           "0.90"    -log10(1-0.9), \
+           "0.99"    -log10(1-0.99), \
+           "0.999"  -log10(1-0.999), \
+           "0.9999" -log10(1-0.9999))
+
+set xlabel 'Latency (ms)'
+set xtics (0, 200, 600, 1000, 1400)
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/full-app-log.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-app-log.csv' using 1:(-log10(1-$2)) title "Concurrent App on Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-app-log.csv' using 1:(-log10(1-$2)) title "Sequential App on VR" ls 2 with lines

@@ -1,0 +1,24 @@
+set datafile separator ','
+set title "aggregate-region-0-create-private-room-log"
+set key bottom right
+set ytics (0,0.9,0.99,0.999,0.9999,1.0)
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/plots/aggregate-region-0-create-private-room-log.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-08-52-44/2026-02-05-08-52-48/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)):yticlabels(3) title "out" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-08-52-44/2026-02-05-08-54-40/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-08-52-44/2026-02-05-08-56-32/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-08-52-44/2026-02-05-08-58-22/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-08-52-44/2026-02-05-09-00-13/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-09-02-10/2026-02-05-09-02-12/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 6 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-09-02-10/2026-02-05-09-04-04/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 7 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-09-02-10/2026-02-05-09-05-56/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 8 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-09-02-10/2026-02-05-09-07-48/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 9 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-05-08-52-44/2026-02-05-09-02-10/2026-02-05-09-09-40/out/plots/aggregate-region-0-create-private-room-log.csv' using 1:(-log10(1-$2)) title "out" ls 10 with lines

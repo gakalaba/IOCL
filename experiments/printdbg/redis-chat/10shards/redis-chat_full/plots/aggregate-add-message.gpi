@@ -1,0 +1,20 @@
+set datafile separator ','
+set title "add\\_message vs. get\\_messages"
+set key bottom right
+set xlabel 'Latency (ms)'
+set xtics (100, 200, 300, 400, 500, 600, 700, 800, 1000)
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/aggregate-add-message-get-messages.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-add-message.csv' using 1:2 title "Ellis add\\_message" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-add-message.csv' using 1:2 title "VR add\\_message" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-get-messages.csv' using 1:2 title "Ellis get\\_messages" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-get-messages.csv' using 1:2 title "VR get\\_messages" ls 4 with lines
+
+

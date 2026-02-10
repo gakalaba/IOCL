@@ -1,0 +1,23 @@
+set datafile separator ','
+set title "create\\_private\\_room vs. create\\_user"
+set key bottom right
+set xlabel 'Latency (ms)'
+set xtics (200, 400, 600, 800, 1000, 1200, 1400, 1600)
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,17'
+set output '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/comparison_3outstanding.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+
+set style line 5 dashtype 2 linecolor "red" linewidth 2
+set style line 6 dashtype 2 linecolor "black" linewidth 2
+
+
+plot '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_private_room/2026-02-05-08-52-44/2026-02-05-08-56-32/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_private\\_room" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_private_room/2026-02-05-09-02-10/2026-02-05-09-05-56/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_private\\_room" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_WO_bcrypt/2026-02-05-09-32-19/2026-02-05-09-36-07/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_user WO bcrypt" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_WO_bcrypt/2026-02-05-09-43-49/2026-02-05-09-47-36/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_user WO bcrypt" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_W_bcrypt/2026-02-05-10-28-39/2026-02-05-10-32-28/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_user W bcrypt" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_W_bcrypt/2026-02-05-10-38-07/2026-02-05-10-41-54/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_user W bcrypt" ls 6 with lines
