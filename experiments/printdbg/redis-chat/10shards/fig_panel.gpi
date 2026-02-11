@@ -1,0 +1,78 @@
+set datafile separator ','
+
+# --- Wide output ---
+set terminal pngcairo size 2400,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat-3panel.png'
+
+# Margins tuned for shared Y label
+set lmargin 10
+set rmargin 3
+set tmargin 2
+set bmargin 4
+
+# Shared line styles
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue"  linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 dashtype 2 linecolor "red"   linewidth 2
+set style line 6 dashtype 2 linecolor "black" linewidth 2
+
+set multiplot layout 1,3
+
+# ==================================================
+# PANEL 1 (LEFT) — Log tail CDF
+# ==================================================
+set title "Redis Chat App"
+set key bottom right
+set xlabel 'Latency (ms)'
+
+set xtics (0, 200, 600, 1000, 1400)
+set ytics ("0.5"    -log10(1-0.5), \
+           "0.90"   -log10(1-0.9), \
+           "0.99"   -log10(1-0.99), \
+           "0.999"  -log10(1-0.999), \
+           "0.9999" -log10(1-0.9999))
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-app-log.csv' using 1:(-log10(1-$2)) title "Concurrent App on Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-app-log.csv' using 1:(-log10(1-$2)) title "Sequential App on VR" ls 2 with lines
+
+
+# ==================================================
+# PANEL 2 (CENTER) — add_message vs get_messages
+# ==================================================
+set title "add\\_message vs. get\\_messages"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel        # keep label only on left panel
+set xtics (100, 200, 300, 400, 500, 600, 700, 800, 1000)
+set ytics auto      # restore y ticks
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-add-message.csv' using 1:2 title "Ellis add\\_message" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-add-message.csv' using 1:2 title "VR add\\_message" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-10-55-31/2026-02-05-10-59-20/out/plots/aggregate-get-messages.csv' using 1:2 title "Ellis get\\_messages" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/redis-chat_full/2026-02-05-11-05-03/2026-02-05-11-08-52/out/plots/aggregate-get-messages.csv' using 1:2 title "VR get\\_messages" ls 4 with lines
+
+
+# ==================================================
+# PANEL 3 (RIGHT) — create_private_room vs create_user
+# ==================================================
+set title "create\\_private\\_room vs. create\\_user"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel
+set xtics (200, 400, 600, 800, 1000, 1200, 1400, 1600)
+set ytics auto
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_private_room/2026-02-05-08-52-44/2026-02-05-08-56-32/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_private\\_room" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_private_room/2026-02-05-09-02-10/2026-02-05-09-05-56/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_private\\_room" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_WO_bcrypt/2026-02-05-09-32-19/2026-02-05-09-36-07/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_user WO bcrypt" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_WO_bcrypt/2026-02-05-09-43-49/2026-02-05-09-47-36/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_user WO bcrypt" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_W_bcrypt/2026-02-05-10-28-39/2026-02-05-10-32-28/out/plots/aggregate-app.csv' using 1:2 title "Ellis create\\_user W bcrypt" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/redis-chat/10shards/create_user_W_bcrypt/2026-02-05-10-38-07/2026-02-05-10-41-54/out/plots/aggregate-app.csv' using 1:2 title "VR create\\_user W bcrypt" ls 6 with lines
+
+unset multiplot
+unset output

@@ -1,0 +1,16 @@
+set datafile separator ','
+set title "Redis Leaderboard App"
+set key bottom right
+set xlabel 'Latency (ms)'
+set xtics (0, 1000, 2000, 3000, 4000, 5000)
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/leaderboard/full_app.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-13-52-25/2026-02-06-14-05-08/out/plots/aggregate-app.csv' using 1:2 title "Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-14-10-19/2026-02-06-14-12-56/out/plots/aggregate-app.csv' using 1:2 title "VR" ls 2 with lines

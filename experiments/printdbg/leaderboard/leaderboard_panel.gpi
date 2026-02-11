@@ -1,0 +1,77 @@
+set datafile separator ','
+
+# --- Output: 3 plots side-by-side ---
+set terminal pngcairo size 2400,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-3panel.png'
+
+# Margins tuned for shared Y label + consistent alignment
+set lmargin 10
+set rmargin 3
+set tmargin 2
+set bmargin 4
+
+# Line styles (union across panels; keep consistent colors/dashes)
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 dashtype 2 linecolor "blue" linewidth 2
+set style line 4 dashtype 2 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+
+set multiplot layout 1,3
+
+# =========================
+# Panel 1 (left): Full app
+# =========================
+set title "Redis Leaderboard App"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set xtics (0, 1000, 2000, 3000, 4000, 5000)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-13-52-25/2026-02-06-14-05-08/out/plots/aggregate-app.csv' using 1:2 title "Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-14-10-19/2026-02-06-14-12-56/out/plots/aggregate-app.csv' using 1:2 title "VR" ls 2 with lines
+
+
+# =========================
+# Panel 2 (middle): compare ops
+# =========================
+set title "Query Application-Level Requests"
+# set title "get\\_zrange vs.\n get\\_ranks\\_by\\_sort\\_key vs.\n get\\_ranks\\_by\\_symbols"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel
+set xtics (500, 1500, 2500, 3500, 4500, 5500)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-43-39/2026-02-06-08-52-25/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_zrange" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_zrange/2026-02-06-08-55-02/2026-02-06-08-57-37/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_zrange" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-22-02/2026-02-06-09-24-37/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_sort\\_key" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_sort_key/2026-02-06-09-32-14/2026-02-06-09-34-49/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_sort\\_key" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_10/2026-02-06-11-25-48/2026-02-06-11-28-23/out/plots/aggregate-app.csv' using 1:2 title "Ellis get\\_ranks\\_by\\_symbols" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/get_ranks_by_symbols_10/2026-02-06-11-38-34/2026-02-06-11-41-11/out/plots/aggregate-app.csv' using 1:2 title "VR get\\_ranks\\_by\\_symbols" ls 6 with lines
+
+
+# =========================
+# Panel 3 (right): update_company_market_capitalization
+# =========================
+set title "update\\_company\\_market\\_capitalization"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel
+set xtics (100, 140, 180, 220, 260, 280)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-13-52-25/2026-02-06-14-05-08/out/plots/aggregate-update-company-market-capitalization.csv' using 1:2 title "Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/leaderboard/leaderboard-full/2026-02-06-14-10-19/2026-02-06-14-12-56/out/plots/aggregate-update-company-market-capitalization.csv' using 1:2 title "VR" ls 2 with lines
+
+unset multiplot
+unset output
+
