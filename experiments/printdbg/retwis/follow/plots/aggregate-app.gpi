@@ -1,0 +1,25 @@
+set datafile separator ','
+set title "follow vs. unfollow"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/retwis/follow/plots/aggregate-app.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-10-43-55/2026-02-09-10-44-00/out/plots/aggregate-app.csv' using 1:2 title "IOCL follow" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-10-43-55/2026-02-09-10-50-15/out/plots/aggregate-app.csv' using 1:2 title "IOCL follow" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-10-43-55/2026-02-09-10-55-54/out/plots/aggregate-app.csv' using 1:2 title "IOCL follow" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-11-02-40/2026-02-09-11-02-44/out/plots/aggregate-app.csv' using 1:2 title "VR follow" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-11-02-40/2026-02-09-11-08-25/out/plots/aggregate-app.csv' using 1:2 title "VR follow" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/follow/2026-02-09-11-02-40/2026-02-09-11-14-10/out/plots/aggregate-app.csv' using 1:2 title "VR follow" ls 6 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-11-55-09/2026-02-09-11-55-14/out/plots/aggregate-app.csv' using 1:2 title "IOCL unfollow" ls 7 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-11-55-09/2026-02-09-12-01-29/out/plots/aggregate-app.csv' using 1:2 title "IOCL unfollow" ls 8 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-11-55-09/2026-02-09-12-07-44/out/plots/aggregate-app.csv' using 1:2 title "IOCL unfollow" ls 9 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-12-15-19/2026-02-09-12-15-22/out/plots/aggregate-app.csv' using 1:2 title "VR unfollow" ls 10 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-12-15-19/2026-02-09-12-20-59/out/plots/aggregate-app.csv' using 1:2 title "VR unfollow" ls 11 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/unfollow/2026-02-09-12-15-19/2026-02-09-12-26-41/out/plots/aggregate-app.csv' using 1:2 title "VR unfollow" ls 12 with lines

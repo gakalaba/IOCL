@@ -1,0 +1,401 @@
+{
+  "COMMENT<client_wo_replacement>": true,
+  "COMMENT<partitioner>": "load_balanced",
+  "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg/2026-02-11-12-41-58/2026-02-11-12-41-58",
+  "base_mounted_fs_path": "/mnt/extra",
+  "base_python_directory": "/users/akalaba/transformed_apps/retwis-app/async",
+  "base_remote_bin_directory_nfs": "/users/akalaba/IOCL",
+  "base_remote_exp_directory": "/mnt/extra/experiments",
+  "bench_mode": "closed",
+  "benchmark_name": "micro",
+  "bin_directory_name": "bin",
+  "cdf_plots": {
+    "font": "DejaVu Sans,12",
+    "height": 600,
+    "width": 800,
+    "x_label": "Latency (ms)",
+    "y_label": "Cumulative ratio of operations"
+  },
+  "client_abort_backoff": 1,
+  "client_bin_name": "benchmark",
+  "client_cdf_plot_blacklist": [],
+  "client_combine_ro_ops": [
+    "get_timeline"
+  ],
+  "client_combine_stats_blacklist": [],
+  "client_conflict_percentage": 2,
+  "client_cpuprofile": false,
+  "client_debug_output": false,
+  "client_debug_stats": false,
+  "client_disable_gc": true,
+  "client_experiment_length": 300,
+  "client_fanout": 1,
+  "client_gc_debug_trace": false,
+  "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+  "client_issue_concurrent": true,
+  "client_key_selector": "uniform",
+  "client_max_attempts": -1,
+  "client_max_backoff": 2500,
+  "client_max_processors": 2,
+  "client_message_timeout": 60000,
+  "client_name_format_str": "%s",
+  "client_num_keys": 10000000,
+  "client_processes_per_client_node": 20,
+  "client_protocol_mode": "iocl_ct",
+  "client_ramp_down": 30,
+  "client_ramp_up": 120,
+  "client_rand_sleep": 0,
+  "client_random_coordinator": false,
+  "client_read_percentage": 1000,
+  "client_retry_aborted": true,
+  "client_rmw_percentage": 0,
+  "client_stats_blacklist": [],
+  "client_threads_per_process": 1,
+  "client_total": 400,
+  "client_write_percentage": 0,
+  "client_zipf_coefficient": 1.2,
+  "client_zipfian_s": 2,
+  "client_zipfian_v": 1,
+  "clients": [
+    "client-1-0",
+    "client-2-0",
+    "client-3-0",
+    "client-4-0",
+    "client-5-0",
+    "client-6-0",
+    "client-7-0",
+    "client-8-0",
+    "client-9-0",
+    "client-1-1",
+    "client-2-1",
+    "client-3-1",
+    "client-4-1",
+    "client-5-1",
+    "client-6-1",
+    "client-7-1",
+    "client-8-1",
+    "client-9-1",
+    "client-0-0",
+    "client-0-1"
+  ],
+  "codebase_name": "transformed",
+  "consistency": "lin",
+  "default_remote_shell": "bash",
+  "emulab_user": "root",
+  "experiment_independent_vars": [
+    [
+      "consistency",
+      "replication_protocol",
+      "client_protocol_mode",
+      "base_python_directory",
+      "client_total",
+      "client_processes_per_client_node"
+    ],
+    [
+      "client_total",
+      "client_processes_per_client_node"
+    ]
+  ],
+  "experiment_independent_vars_unused": [],
+  "experiment_name": "benchapps",
+  "fault_tolerance": 2,
+  "input_latency_scale": 1000000000,
+  "make_clean": false,
+  "make_collect_bins": [
+    "store/benchmark/async/benchmark",
+    "store/server"
+  ],
+  "make_env": {},
+  "master_bin_name": "master",
+  "master_port": 7077,
+  "master_server_name": "california",
+  "max_bandwidth": "10gibps",
+  "max_file_descriptors": 1000000,
+  "max_retries": 1,
+  "mpl": 1,
+  "network_config": "network.json",
+  "num_experiment_runs": 1,
+  "num_instances": 1,
+  "num_shards": 10,
+  "out_directory_name": "out",
+  "output_latency_scale": 1000,
+  "pin_client_processes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "pin_server_processes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "plot_cdf_png_font": "DejaVu Sans,12",
+  "plot_cdf_png_height": 600,
+  "plot_cdf_png_width": 800,
+  "plot_cdf_series_title": "Protocol",
+  "plot_cdf_x_label": "Latency (ms)",
+  "plot_cdf_y_label": "Cumulative ratio of operations",
+  "plot_directory_name": "plots",
+  "plot_tput_lat_png_font": "DejaVu Sans,12",
+  "plot_tput_lat_png_height": 600,
+  "plot_tput_lat_png_width": 800,
+  "plot_tput_lat_series_title": "Charizard",
+  "plot_tput_lat_x_label": "Throughput (ops/sec)",
+  "plot_tput_lat_y_label": "Latency (ms)",
+  "plots": [
+    {
+      "font": "DejaVu Sans,12",
+      "height": 600,
+      "name": "tput-p50",
+      "series_indep_vars_idx": 0,
+      "series_titles": [
+        "IOCL_CT",
+        "View-Stamped Replication"
+      ],
+      "width": 800,
+      "x_indep_vars_idx": 1,
+      "x_label": "Throughput (txn/s)",
+      "x_var": [
+        "run_stats",
+        "combined",
+        "tput",
+        "p50"
+      ],
+      "x_var_is_config": false,
+      "y_label": "p50 Latency",
+      "y_var": [
+        "run_stats",
+        "combined",
+        "p50",
+        "p50"
+      ]
+    }
+  ],
+  "project_name": "praxis-pg0",
+  "python_app_name": "main.py",
+  "python_venv": "/users/akalaba/transformed_apps/redis-app/bin/activate",
+  "region_rtt_latencies": {
+    "ca": {
+      "ca": 0,
+      "ir": 151,
+      "jp": 113,
+      "or": 59,
+      "va": 72
+    },
+    "ir": {
+      "ca": 151,
+      "ir": 0,
+      "jp": 220,
+      "or": 145,
+      "va": 88
+    },
+    "jp": {
+      "ca": 113,
+      "ir": 220,
+      "jp": 0,
+      "or": 121,
+      "va": 162
+    },
+    "or": {
+      "ca": 59,
+      "ir": 145,
+      "jp": 121,
+      "or": 0,
+      "va": 93
+    },
+    "va": {
+      "ca": 72,
+      "ir": 88,
+      "jp": 162,
+      "or": 93,
+      "va": 0
+    }
+  },
+  "remote_bin_directory_nfs_enabled": false,
+  "replica_config": "replica.config",
+  "replica_config_format_str": "replica-%d.config",
+  "replication_protocol": "iocl_ct",
+  "replication_protocol_settings": {
+    "message_transport_type": "tcp"
+  },
+  "run_locally": false,
+  "rw_num_ops_txn": 1,
+  "rxe_cfg_path": "",
+  "server_bin_name": "server",
+  "server_cpuprofile": false,
+  "server_debug_output": false,
+  "server_debug_stats": false,
+  "server_disable_gc": true,
+  "server_durable": false,
+  "server_emulate_wan": true,
+  "server_gc_debug_trace": false,
+  "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+  "server_load_time": 20,
+  "server_names": [
+    "us-east-1-0",
+    "us-east-1-1",
+    "us-east-1-2",
+    "us-west-1-0",
+    "us-west-1-1",
+    "us-west-1-2",
+    "eu-west-1-0",
+    "eu-west-1-1",
+    "eu-west-1-2",
+    "mex-cent-1-0"
+  ],
+  "server_port": 7087,
+  "server_preload_keys": true,
+  "server_rdma_port": 9087,
+  "server_regions": {
+    "ca": [
+      "us-east-1-0",
+      "us-east-1-1",
+      "client-1-0",
+      "client-6-0",
+      "client-2-1",
+      "client-7-1"
+    ],
+    "ir": [
+      "us-west-1-1",
+      "us-west-1-2",
+      "client-3-0",
+      "client-8-0",
+      "client-4-1",
+      "client-9-1"
+    ],
+    "jp": [
+      "eu-west-1-2",
+      "mex-cent-1-0",
+      "client-5-0",
+      "client-1-1",
+      "client-6-1",
+      "client-0-1"
+    ],
+    "or": [
+      "eu-west-1-0",
+      "eu-west-1-1",
+      "client-4-0",
+      "client-9-0",
+      "client-5-1",
+      "client-0-0"
+    ],
+    "va": [
+      "us-east-1-2",
+      "us-west-1-0",
+      "client-2-0",
+      "client-7-0",
+      "client-3-1",
+      "client-8-1"
+    ]
+  },
+  "server_rpc_port": 8087,
+  "shard_config": "shard.config",
+  "shard_config_format_str": "shard-%d.config",
+  "shards": [
+    [
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-east-1-2",
+      "us-east-1-0",
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-2",
+      "us-east-1-1",
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-2",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-1"
+    ]
+  ],
+  "src_commit_hash": "new_transform",
+  "src_directory": "/users/akalaba/IOCL/src",
+  "stats_file_name": "stats.json",
+  "stats_merge_lists": [
+    "txn_groups",
+    "commit_branch"
+  ],
+  "truetime_error": 0,
+  "use_master": false
+}

@@ -1,0 +1,18 @@
+set datafile separator ','
+set title "aggregate-region-4-combined"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/plots/aggregate-region-4-combined.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/2026-02-10-07-36-13/out/plots/aggregate-region-4-combined.csv' using 1:2 title "out" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/2026-02-10-07-41-44/out/plots/aggregate-region-4-combined.csv' using 1:2 title "out" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/2026-02-10-07-47-15/out/plots/aggregate-region-4-combined.csv' using 1:2 title "out" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/2026-02-10-07-52-46/out/plots/aggregate-region-4-combined.csv' using 1:2 title "out" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-10-07-36-07/2026-02-10-07-36-07/2026-02-10-07-58-16/out/plots/aggregate-region-4-combined.csv' using 1:2 title "out" ls 5 with lines

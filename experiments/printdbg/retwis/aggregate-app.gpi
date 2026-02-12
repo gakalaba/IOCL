@@ -1,0 +1,16 @@
+set datafile separator ','
+set title "Retwis App"
+set key bottom right
+set xlabel 'Latency (ms)'
+set xtics (500, 1500, 2500, 3500)
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/retwis/full-app.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-20-57-09/2026-02-11-21-15-27/out/plots/aggregate-app.csv' using 1:2 title "Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-app.csv' using 1:2 title "VR" ls 2 with lines

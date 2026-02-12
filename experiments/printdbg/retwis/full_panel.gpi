@@ -1,0 +1,85 @@
+set datafile separator ','
+
+# --- Output: 3 plots side-by-side ---
+set terminal pngcairo size 2400,600 enhanced dashed font 'DejaVu Sans,20'
+set output '/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-3panel.png'
+
+# Margins tuned for shared Y label + consistent alignment
+set lmargin 10
+set rmargin 3
+set tmargin 2
+set bmargin 4
+
+# Line styles (union across panels; keep consistent colors/dashes)
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 dashtype 4 linecolor "blue" linewidth 2
+set style line 4 dashtype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+
+set multiplot layout 1,3
+# Panel labels under each subplot (screen coordinates)
+set label 101 "(a)"      at screen 0.19,0.02 center font ",18"
+set label 102 "(b)"   at screen 0.525,0.02 center font ",18"
+set label 103 "(c)"     at screen 0.86,0.02 center font ",18"
+
+
+# =========================
+# Panel 1 (left): Full app
+# =========================
+set title "Retwis App"
+set key bottom right
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set xtics (500, 1500, 2500, 3500)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-20-57-09/2026-02-11-21-15-27/out/plots/aggregate-app.csv' using 1:2 title "Ellis" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-app.csv' using 1:2 title "VR" ls 2 with lines
+
+# =========================
+# Panel 2 (middle): create_user vs create_post
+# =========================
+set title "create\\_user vs. create\\_post"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel
+set xtics (1000, 1500, 2000, 2500, 3000, 3500)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-20-57-09/2026-02-11-21-15-27/out/plots/aggregate-user-create.csv' using 1:2 title "Ellis create\\_user" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-user-create.csv' using 1:2 title "VR create\\_user" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-20-57-09/2026-02-11-21-15-27/out/plots/aggregate-post-create.csv' using 1:2 title "Ellis create\\_post" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-post-create.csv' using 1:2 title "VR create\\_post" ls 4 with lines
+
+# =========================
+# Panel 3 (right): follow/unfollow/timeline
+# =========================
+set title "follow vs. unfollow vs. timeline"
+set key bottom right
+set xlabel 'Latency (ms)'
+unset ylabel
+set xtics (0, 200, 400, 600, 800)
+set ytics auto
+unset yrange
+
+plot \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/correct_follow/2026-02-12-08-04-55/2026-02-12-08-05-01/out/plots/aggregate-follow.csv' using 1:2 title "Ellis follow" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/correct_follow/2026-02-12-08-10-45/2026-02-12-08-10-47/out/plots/aggregate-follow.csv' using 1:2 title "VR follow" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/correct_follow/2026-02-12-08-04-55/2026-02-12-08-05-01/out/plots/aggregate-stop-following.csv' using 1:2 title "Ellis unfollow" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/correct_follow/2026-02-12-08-10-45/2026-02-12-08-10-47/out/plots/aggregate-stop-following.csv' using 1:2 title "VR unfollow" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-20-57-09/2026-02-11-21-15-27/out/plots/aggregate-timeline.csv' using 1:2 title "Ellis get\\_timeline" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/retwis/retwis-full/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-timeline.csv' using 1:2 title "VR get\\_timeline" ls 6 with lines
+
+unset multiplot
+unset output
+unset label 101
+unset label 102
+unset label 103
+
+

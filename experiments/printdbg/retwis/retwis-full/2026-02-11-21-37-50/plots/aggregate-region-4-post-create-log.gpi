@@ -1,0 +1,21 @@
+set datafile separator ','
+set title "aggregate-region-4-post-create-log"
+set key bottom right
+set ytics (0,0.9,0.99,0.999,0.9999,1.0)
+set xlabel 'Latency (ms)'
+set ylabel 'Cumulative ratio of operations'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/plots/aggregate-region-4-post-create-log.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-21-37-52/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)):yticlabels(3) title "out" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-21-43-29/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-21-49-06/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 3 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-21-54-44/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 4 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-22-00-23/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 5 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-22-06-02/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 6 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-02-11-20-57-09/2026-02-11-21-37-50/2026-02-11-22-11-40/out/plots/aggregate-region-4-post-create-log.csv' using 1:(-log10(1-$2)) title "out" ls 7 with lines
