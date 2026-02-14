@@ -30,6 +30,12 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/gflags)
 link_libraries(gflags::gflags)
 
 # require googletest
+# If you vendor googletest
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GMOCK ON  CACHE BOOL "" FORCE)   # optional
+set(gtest_build_tests OFF CACHE BOOL "" FORCE)
+set(gmock_build_tests OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
 
 # add third-party JSON library
