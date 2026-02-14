@@ -2001,7 +2001,7 @@ namespace strongstore
         LinearizeableReply reply;
 
         std::pair<TimestampID, std::string> res;
-        string retval;
+        string retval = "none";
         int status = REPLY_OK;
         if (req.op() == "get")
         {
@@ -2011,6 +2011,7 @@ namespace strongstore
                 Debug("value does not exist");
                 status = REPLY_FAIL;
             };
+            retval = res.second;
             Debug("Get value %s from %s", res.second.c_str(), req.key().c_str());
         }
         else if (req.op() == "put")
@@ -2024,7 +2025,7 @@ namespace strongstore
             Panic("Unrecognized operation.");
         }
         reply.set_status(status);
-        reply.set_return_value(res.second);
+        reply.set_return_value(retval);
         reply.set_transaction_id(transaction_id);
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
@@ -2043,6 +2044,7 @@ namespace strongstore
         transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
     }
 
+    //TODO: remove
     void Server::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
     {
         uint64_t transaction_id = linop.transaction_id();

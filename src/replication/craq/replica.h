@@ -120,7 +120,7 @@ namespace replication
             [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
             void ExecuteWriteOperation(const Request &request);
             void ExecuteReadOperation(const Request &request);
-            void ExecuteOperation(const Request &entry, proto::ReplyMessage &reply);
+            void SendReplyToClient(const Request &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
             void SendVersionRequest(const Request &request);

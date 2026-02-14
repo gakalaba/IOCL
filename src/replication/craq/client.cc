@@ -121,6 +121,7 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
 
+            Notice("Sending client request with id %d", clientid);
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
@@ -184,7 +185,7 @@ namespace replication
             }
 
             PendingRequest *req = it->second;
-            Debug("Client received reply: %lu", reqId);
+            Debug("CRAQ Client received reply: %lu", reqId);
             // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());

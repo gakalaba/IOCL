@@ -78,6 +78,7 @@ void SimulatedTransport::Register(TransportReceiver *receiver,
     ++lastAddr;
     int addr = lastAddr;
     endpoints[addr] = receiver;
+    Debug("Replica with idx %d is registered with lastAddr %d", replicaIdx, lastAddr);
 
     // Tell the receiver its address
     receiver->SetAddress(new SimulatedTransportAddress(addr));
@@ -97,6 +98,7 @@ void SimulatedTransport::Register(TransportReceiver *receiver,
     ++lastAddr;
     int addr = lastAddr;
     endpoints[addr] = receiver;
+    Debug("Replica with group idx %d and idx %d is registered with lastAddr %d", groupIdx, replicaIdx, lastAddr);
     // Tell the receiver its address
     receiver->SetAddress(new SimulatedTransportAddress(addr));
 
@@ -105,12 +107,12 @@ void SimulatedTransport::Register(TransportReceiver *receiver,
     // If this is registered as a replica, record the index
     if (g_replicaIdxs.find(groupIdx) == g_replicaIdxs.end())
     {
-        std::map<int, int> new_map({{addr, replicaIdx}});
+        std::map<int, int> new_map({{replicaIdx, addr}});
         g_replicaIdxs[groupIdx] = new_map;
     }
     else
     {
-        g_replicaIdxs[groupIdx][addr] = replicaIdx;
+        g_replicaIdxs[groupIdx][replicaIdx] = addr;
     }
 }
 
@@ -148,6 +150,7 @@ bool SimulatedTransport::SendMessageInternal(TransportReceiver *src,
     delete msg;
 
     QueuedMessage q(dst, srcAddr, m.GetTypeName(), msgData);
+    Notice("Message from addr %d to addr %d is queued", dst, srcAddr);
 
     if (delay == 0)
     {
@@ -191,22 +194,14 @@ SimulatedTransport::LookupAddress(const transport::Configuration &cfg,
 SimulatedTransportAddress
 SimulatedTransport::LookupAddress(const transport::Configuration &cfg,
                                   int groupIdx,
-                                  int idx)
+                                  int replicaIdx)
 {
-    for (auto &kv : configurations)
-    {
-        if (*(kv.second) == cfg)
-        {
-            // Configuration matches. Does the index?
-            const SimulatedTransportAddress *addr =
-                dynamic_cast<const SimulatedTransportAddress *>(kv.first->GetAddress());
-            if (g_replicaIdxs[groupIdx][addr->addr] == idx)
-            {
-                // Matches.
-                return *addr;
-            }
-        }
+    if (g_replicaIdxs.count(groupIdx) > 0 && g_replicaIdxs[groupIdx].count(replicaIdx) > 0) {
+        int addrInt = g_replicaIdxs[groupIdx][replicaIdx];
+        return SimulatedTransportAddress(addrInt);
     }
+
+    Panic("No replica %d in group %d was registered", replicaIdx, groupIdx);
 }
 
 const SimulatedTransportAddress *
@@ -226,6 +221,7 @@ void SimulatedTransport::Run()
         {
             QueuedMessage &q = queue.front();
             TransportReceiver *dst = endpoints[q.dst];
+            Notice("Message from addr %d to addr %d popped", q.src, q.dst);
             dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, q.msg, nullptr);
             queue.pop_front();
         }
@@ -244,6 +240,7 @@ void SimulatedTransport::Run()
         // ...then retry to see if there are more queued messages to
         // deliver first
     } while (!queue.empty() || (processTimers && !timers.empty()));
+    Notice("Finished reading from the queue");
 }
 
 void SimulatedTransport::AddFilter(int id, filter_t filter)
@@ -307,7 +304,7 @@ bool SimulatedTransport::SendMessageInternal(TransportReceiver *src,
                                              const SimulatedTransportAddress &dstAddr,
                                              const Message &m)
 {
-    return true;
+    return SendMessageInternal(src, dstAddr, m, false);
 }
 
 bool SimulatedTransport::SendMessageToReplica(TransportReceiver *src,
@@ -315,5 +312,12 @@ bool SimulatedTransport::SendMessageToReplica(TransportReceiver *src,
                                               int replicaIdx,
                                               const google::protobuf::Message &m)
 {
-    return true;
+    const transport::Configuration *config = configurations[src];
+    
+    // Look up the address of the target replica
+    SimulatedTransportAddress dstAddr = LookupAddress(*config, groupIdx, replicaIdx);
+    Notice("Sending message from replica with group index %d and replica idx %d to addr %d", groupIdx, replicaIdx, dstAddr.GetAddr());
+    
+    // Use the existing SendMessageInternal to actually send the message
+    return SendMessageInternal(src, dstAddr, m, false);
 }

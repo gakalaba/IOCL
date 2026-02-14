@@ -113,6 +113,7 @@ namespace replication
         {
             Panic("Tail can't forward propagate message, it's the last node in the chain");
         }
+        Debug("Forward propagating message to %d", myIdx + 1);
         return transport->SendMessageToReplica(this, myIdx + 1, m);
        } 
 
@@ -122,6 +123,7 @@ namespace replication
         {
             Panic("Head can't backwards propagate message, it's the first node in the chain");
         }
+        Debug("Backwards propagates message to %d", myIdx - 1);
         return transport->SendMessageToReplica(this, myIdx - 1, m);
        } 
        
@@ -138,7 +140,10 @@ namespace replication
         keyToVersionNumber[key] = std::max(keyToVersionNumber[key], lastCommitted);
 
         Execute(Timestamp{lastCommitted}, request, reply);
-        ExecuteOperation(request, reply);
+        if (AmHead())
+        {
+            SendReplyToClient(request, reply);
+        }
        }
 
        void CRAQReplica::ExecuteReadOperation(const Request &request)
@@ -150,10 +155,10 @@ namespace replication
         linop.ParseFromString(request.op());
 
         Execute(Timestamp{keyToVersionNumber[linop.key()]}, request, reply);
-        ExecuteOperation(request, reply);
+        SendReplyToClient(request, reply);
        }
 
-       void CRAQReplica::ExecuteOperation(const Request &request, ReplyMessage &reply)
+       void CRAQReplica::SendReplyToClient(const Request &request, ReplyMessage &reply)
        {
             reply.set_view(this->view);
             reply.set_opnum(lastCommitted);
@@ -172,6 +177,7 @@ namespace replication
             auto iter = clientAddresses.find(request.clientid());
             if (iter != clientAddresses.end())
             {
+                Debug("Found message, sending to client");
                 transport->SendMessage(this, *iter->second, reply);
             }
        }
@@ -345,6 +351,7 @@ namespace replication
 
         void CRAQReplica::CloseBatch()
         {
+            ASSERT(!AmTail());
             ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
@@ -369,9 +376,10 @@ namespace replication
                 LinearizeableOperation linop;
                 linop.ParseFromString(entry->request.op());
 
-                if (linop.op() == "put")
+                if (AmHead() && linop.op() == "put")
                 {
-                    ReplicaUpdateStoreUpcall(Timestamp{i, linop.transaction_id()},linop);
+                    // TODO: Remove
+                    // ReplicaUpdateStoreUpcall(Timestamp{i, linop.transaction_id()},linop);
                 }
             }
             lastPrepare = p;
@@ -379,8 +387,13 @@ namespace replication
             if (!ForwardPropagateMessageInChain(p))
             {
                 RWarning("Failed to send prepare message to next replica from head");
+                Notice("Failed to send prepare message to next replica from head");
             }
-            Debug("Propagated prepare message (write batch) from head");
+            else 
+            {
+                Notice("Sent message from idx %d to idx %d", myIdx, myIdx + 1);
+            }
+            Debug("Propagated prepare message (write batch) from idx %d", myIdx);
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();
@@ -611,7 +624,9 @@ namespace replication
                 reply.set_view(msg.view());
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
-                if (!BackwardsPropagateMessageInChain(reply))
+                // TODO: Fix, idt we need this if prepare is guarenteed to be sent
+                Notice("Dont backwards propagate prepareOK for now");
+                // if (!BackwardsPropagateMessageInChain(reply))
                 {
                     RWarning("Failed to backwards propagate PrepareOK message");
                 }
@@ -643,7 +658,8 @@ namespace replication
                 LinearizeableOperation linop;
                 linop.ParseFromString(req.op());
 
-                ReplicaUpdateStoreUpcall(Timestamp{op, linop.transaction_id()},linop);
+                // TODO: Remove from interface
+                // ReplicaUpdateStoreUpcall(Timestamp{op, linop.transaction_id()},linop);
                  
                 UpdateClientTable(req);
             }
@@ -686,10 +702,10 @@ namespace replication
             reply.set_opnum(msg.opnum());
             reply.set_replicaidx(myIdx);
 
-            if (!BackwardsPropagateMessageInChain(reply))
-            {
-                RWarning("Failed to backwards propagate PrepareOK message");
-            }
+            // if (!BackwardsPropagateMessageInChain(reply))
+            // {
+                // RWarning("Failed to backwards propagate PrepareOK message");
+            // }
         }
 
         void CRAQReplica::HandlePrepareOK(const TransportAddress &remote,
@@ -760,6 +776,7 @@ namespace replication
             response.set_clientreqid(msg.clientreqid());
             response.set_opnum(keyToVersionNumber[msg.key()]);
 
+            Notice("Sending message to replica via version response");
             transport->SendMessageToReplica(this, msg.replicaidx(), response); 
         }
 
