@@ -74,9 +74,6 @@ namespace replication
                 Notice("Batching enabled; batch size %d", batchSize);
             }
 
-            this->resendPrepareTimeout =
-                new Timeout(transport, 500, [this]()
-                            { ResendPrepare(); });
             this->closeBatchTimeout =
                 new Timeout(transport, 300, [this]()
                             { CloseBatch(); });
@@ -91,7 +88,6 @@ namespace replication
 
         CRAQReplica::~CRAQReplica()
         {
-            delete resendPrepareTimeout;
             delete closeBatchTimeout;
 
             if (debug_stats_)
@@ -217,41 +213,6 @@ namespace replication
             }
         }
 
-        void CRAQReplica::SendPrepareOKs(opnum_t oldLastOp)
-        {
-            /* Send PREPAREOKs for new uncommitted operations */
-            for (opnum_t i = oldLastOp; i <= lastOp; i++)
-            {
-                /* It has to be new *and* uncommitted */
-                if (i <= lastCommitted)
-                {
-                    continue;
-                }
-
-                const LogEntry *entry = log.Find(i);
-                if (!entry)
-                {
-                    RPanic("Did not find operation " FMT_OPNUM " in log", i);
-                }
-                ASSERT(entry->state == LOG_STATE_DIRTY);
-                UpdateClientTable(entry->request);
-
-                PrepareOKMessage reply;
-                reply.set_view(view);
-                reply.set_opnum(i);
-                reply.set_replicaidx(myIdx);
-
-                RDebug("Sending PREPAREOK " FMT_VIEWSTAMP
-                       " for new uncommitted operation",
-                       reply.view(), reply.opnum());
-
-                if (!BackwardsPropagateMessageInChain(reply))
-                {
-                    RWarning("Failed to backwards propagate PrepareOK message");
-                }
-            }
-        }
-
         void CRAQReplica::SendVersionRequest(const Request &request)
         {
             VersionRequestMessage msg;
@@ -283,21 +244,6 @@ namespace replication
             entry.lastReqId = req.clientreqid();
             entry.replied = false;
             entry.reply.Clear();
-        }
-
-        void CRAQReplica::ResendPrepare()
-        {
-            if (lastOp == lastCommitted)
-            {
-                return;
-            }
-            RNotice("Resending prepare with op %lu", lastPrepare.opnum());
-            if (!ForwardPropagateMessageInChain(lastPrepare))
-            {
-                RWarning("Failed to ressend prepare message");
-            }
-            // Keep retrying
-            resendPrepareTimeout->Reset();
         }
 
         bool CRAQReplica::IsDuplicateRequest(const TransportAddress &remote, const RequestMessage &msg)
@@ -376,7 +322,6 @@ namespace replication
                 LinearizeableOperation linop;
                 linop.ParseFromString(entry->request.op());
             }
-            lastPrepare = p;
 
             if (!ForwardPropagateMessageInChain(p))
             {
@@ -390,7 +335,6 @@ namespace replication
             Debug("Propagated prepare message (write batch) from idx %d", myIdx);
             lastBatchEnd = lastOp;
 
-            resendPrepareTimeout->Reset();
             closeBatchTimeout->Stop();
         }
 
@@ -401,7 +345,6 @@ namespace replication
             RequestMessage request;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
-            PrepareOKMessage prepareOK;
             CommitMessage commit;
             VersionRequestMessage versionRequest;
             VersionResponseMessage versionResponse;
@@ -415,11 +358,6 @@ namespace replication
             {
                 prepare.ParseFromString(data);
                 HandlePrepare(remote, prepare);
-            }
-            else if (type == prepareOK.GetTypeName())
-            {
-                prepareOK.ParseFromString(data);
-                HandlePrepareOK(remote, prepareOK);
             }
             else if (type == commit.GetTypeName())
             {
@@ -613,17 +551,6 @@ namespace replication
             if (msg.opnum() <= this->lastOp)
             {
                 RDebug("Ignoring PREPARE; already prepared that operation");
-                // Resend the prepareOK message
-                PrepareOKMessage reply;
-                reply.set_view(msg.view());
-                reply.set_opnum(msg.opnum());
-                reply.set_replicaidx(myIdx);
-                // TODO: Fix, idt we need this if prepare is guarenteed to be sent
-                Notice("Dont backwards propagate prepareOK for now");
-                // if (!BackwardsPropagateMessageInChain(reply))
-                {
-                    RWarning("Failed to backwards propagate PrepareOK message");
-                }
                 return;
             }
 
@@ -687,31 +614,6 @@ namespace replication
                 } 
                 Debug("Sending commit for write from tail");
             }
-
-            PrepareOKMessage reply;
-            reply.set_view(msg.view());
-            reply.set_opnum(msg.opnum());
-            reply.set_replicaidx(myIdx);
-
-            // if (!BackwardsPropagateMessageInChain(reply))
-            // {
-                // RWarning("Failed to backwards propagate PrepareOK message");
-            // }
-        }
-
-        void CRAQReplica::HandlePrepareOK(const TransportAddress &remote,
-                                          const PrepareOKMessage &msg)
-        {
-            RDebug("Received PREPAREOK <" FMT_VIEW ", " FMT_OPNUM "> from replica %d",
-                   msg.view(), msg.opnum(), msg.replicaidx());
-
-            if (this->status != STATUS_NORMAL)
-            {
-                RDebug("Ignoring PREPAREOK due to abnormal status");
-                return;
-            }
-
-            resendPrepareTimeout->Reset();
         }
 
         void CRAQReplica::HandleCommit(const TransportAddress &remote,

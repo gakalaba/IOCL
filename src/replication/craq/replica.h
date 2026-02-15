@@ -76,7 +76,6 @@ namespace replication
             opnum_t lastOp;
             std::list<std::pair<TransportAddress *, proto::PrepareMessage>>
                 pendingPrepares;
-            proto::PrepareMessage lastPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
             std::unordered_map<std::string, opnum_t> keyToVersionNumber;
@@ -122,10 +121,8 @@ namespace replication
             void ExecuteReadOperation(const Request &request);
             void SendReplyToClient(const Request &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
-            void SendPrepareOKs(opnum_t oldLastOp);
             void SendVersionRequest(const Request &request);
             void UpdateClientTable(const Request &request);
-            void ResendPrepare();
             [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
                                 const proto::RequestMessage &msg);
             void UpdateClientAddresses(const TransportAddress &remote, 
@@ -142,8 +139,6 @@ namespace replication
                                        const proto::UnloggedRequestMessage &msg);
             void HandlePrepare(const TransportAddress &remote,
                                const proto::PrepareMessage &msg);
-            void HandlePrepareOK(const TransportAddress &remote,
-                                 const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
             void HandleVersionRequest(const TransportAddress &remote,
