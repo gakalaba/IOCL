@@ -134,7 +134,6 @@ namespace strongstore
         void ReplicaUpcall(opnum_t opnum, const string &op,
                            string &response) override;
         void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res) override;
-        void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const replication::LinearizeableOperation &linop) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 
@@ -353,18 +352,6 @@ namespace strongstore
 
         uint64_t expected_fire_us;
     };
-
-    // TODO: move to another file if possible
-    // class CRAQServer : public Server
-    // {
-    //     using Server::Server;
-
-    // public:
-    //     // void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &response); 
-    //     // void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const replication::LinearizeableOperation &linop);
-
-    // };
-
 } // namespace strongstore
 
 #endif /* _STRONG_SERVER_H_ */

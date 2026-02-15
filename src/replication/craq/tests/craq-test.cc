@@ -67,10 +67,6 @@ class CRAQApp : public AppReplica {
 public:
     CRAQApp(std::vector<string> *o, std::vector<string> *u) : ops(o), unloggedOps(u) { }
 
-    void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop){
-       Panic("Replica update should not be called");
-    };
-
     void ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response){
        Panic("Replica update app request should not be called");
     };

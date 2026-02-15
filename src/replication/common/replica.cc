@@ -84,13 +84,6 @@ void Replica::ReplicaUpcall(const Timestamp &timestamp, const string &op, string
     Debug("Upcall result: %s", res.c_str());
 }
 
-void Replica::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
-{
-    Debug("Making upcall for linop %s", linop.op().c_str());
-
-    app->ReplicaUpdateStoreUpcall(timestamp, linop);
-}
-
 void Replica::UnloggedUpcall(const string &op, string &res) {
     app->UnloggedUpcall(op, res);
 }

@@ -2044,15 +2044,6 @@ namespace strongstore
         transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
     }
 
-    //TODO: remove
-    void Server::ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop)
-    {
-        uint64_t transaction_id = linop.transaction_id();
-        TimestampID versionStoreTimestamp{timestamp, transaction_id}; 
-
-        store_.put(linop.key(), linop.value(), versionStoreTimestamp);
-    }
-
     // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
     {

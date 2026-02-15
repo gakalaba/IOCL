@@ -66,7 +66,6 @@ class AppReplica {
     virtual void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                                    const string &v, string &retval){};
     virtual void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res){};
-    virtual void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop){};
     // Invoke call back for unreplicated operations run on only one replica
     virtual void UnloggedUpcall(const string &str1, string &str2){};
     // Invoke callback on leader status change
@@ -88,7 +87,6 @@ class Replica : public TransportReceiver {
     void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res);
     void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                            const string &v, string &retval);
-    void ReplicaUpdateStoreUpcall(const Timestamp &timestamp, const LinearizeableOperation &linop);
     template <class MSG>
     void Execute(opnum_t opnum, const Request &msg, MSG &reply);
     template <class MSG>

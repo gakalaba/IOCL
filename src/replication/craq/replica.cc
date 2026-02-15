@@ -375,12 +375,6 @@ namespace replication
                 
                 LinearizeableOperation linop;
                 linop.ParseFromString(entry->request.op());
-
-                if (AmHead() && linop.op() == "put")
-                {
-                    // TODO: Remove
-                    // ReplicaUpdateStoreUpcall(Timestamp{i, linop.transaction_id()},linop);
-                }
             }
             lastPrepare = p;
 
@@ -658,9 +652,6 @@ namespace replication
                 LinearizeableOperation linop;
                 linop.ParseFromString(req.op());
 
-                // TODO: Remove from interface
-                // ReplicaUpdateStoreUpcall(Timestamp{op, linop.transaction_id()},linop);
-                 
                 UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
