@@ -72,7 +72,7 @@ public:
     };
 
     void ReplicaUpcall(opnum_t opnum, const string &req, string &reply) {
-        Notice("Replica upcall should not be called");
+        Panic("Replica upcall should not be called");
     }
 
     void ReplicaUpcall(const Timestamp &timestamp, const string &op, string &res) 
@@ -138,7 +138,7 @@ struct CRAQTestParam
     int batchSize;
     int shards;
     int replicasPerShard;
-    int clients;
+    int clientsPerShard;
 };
 
 
@@ -146,7 +146,7 @@ class CRAQTest : public  ::testing::TestWithParam<CRAQTestParam>
 {
     struct ClientStruct
     {
-        CRAQClient *client;
+        std::vector<CRAQClient *> clientList;
         string key;
     };
 
@@ -204,7 +204,13 @@ protected:
                 apps.emplace_back(&ops[appIndex], &unloggedOps[appIndex]);
                 replicas.push_back(new CRAQReplica(*config, group, replicaIndex, transport, param.batchSize, &apps[appIndex], true));
            }
-            clients[group] = {new CRAQClient(*config, transport, group, group), "key1"};
+
+            string key = "key" + std::to_string(group);
+            Notice("key is set to %s", key);
+            ClientStruct clientStruct;
+            clientStruct.key = key;
+            clients[group] = clientStruct;
+            clients[group].clientList.push_back(new CRAQClient(*config, transport, group, group));
         }
 
         string request_str;
@@ -225,15 +231,16 @@ protected:
             linop.SerializeToString(&request_str);
             auto upcall = [this](const string &req, const string &reply) {return true;};
 
-            clientInfo.client->Invoke(request_str, upcall);
+            clientInfo.clientList[0]->Invoke(request_str, upcall);
             clientOps.push_back(request_str);
             transport->Run();
 
-            for (int i = 0; i < config->n; i++) 
+            for (int i = 0; i < replicasPerGroup; i++) 
             {
+                int appIndex = (clientIndex * replicasPerGroup) + i;
                 std::pair<size_t, std::string> val;
                 string key = clientInfo.key;
-                apps[i].store.get(key, val);
+                apps[appIndex].store.get(key, val);
                 
                 EXPECT_EQ(val.second, clientInfo.key);
             }
@@ -245,7 +252,7 @@ protected:
            });
     }
 
-    virtual void ClientSendNext(int clientIndex, Client::continuation_t upcall, std::string op, std::string key) {
+    virtual void ClientSendNext(int clientIndex, Client::continuation_t upcall, std::string op, std::string key, int clientListIndex = 0) {
         string request_str;
 
         auto clientInfo = clients[clientIndex];
@@ -261,7 +268,7 @@ protected:
 
         linop.SerializeToString(&request_str);
 
-        clientInfo.client->Invoke(request_str, upcall);
+        clientInfo.clientList[clientListIndex]->Invoke(request_str, upcall);
         clientOps.push_back(request_str);
     }
 
@@ -275,10 +282,12 @@ protected:
         unloggedOps.clear();
 
         for (auto &kv : clients) {
-            delete kv.second.client;
+            for (CRAQClient *c : kv.second.clientList) {
+                delete c;
+            }
+            kv.second.clientList.clear();
         }
-        clients.clear();;
-
+        clients.clear();
         delete transport;
         delete config;
     }
@@ -308,7 +317,7 @@ TEST_P(CRAQTest, SimpleGet)
 
     for (int clientIndex = 0; clientIndex < groups; clientIndex++)
     {
-        ClientSendNext(clientIndex, simpleGetUpcall, "get", "key1");
+        ClientSendNext(clientIndex, simpleGetUpcall, "get", clients[clientIndex].key);
     }
     transport->Run();
 
@@ -334,6 +343,6 @@ TEST_P(CRAQTest, SimpleGet)
 INSTANTIATE_TEST_CASE_P(test,
                         CRAQTest,
                         ::testing::Values(
-                            CRAQTestParam{1, 1, 3},
-                            CRAQTestParam{1, 10, 3}
+                            CRAQTestParam{1, 1, 3, 0},
+                            CRAQTestParam{1, 10, 3, 0}
                         ));
