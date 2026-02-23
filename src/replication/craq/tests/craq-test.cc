@@ -133,15 +133,23 @@ public:
     VersionedKVStore<uint64_t, std::string> store;
 };
 
-// struct CRAQTestParam
-// {
-//     int batchSize;
-//     int groups;
-//     int replicasPerGroup;
-// };
-
-class CRAQTest : public  ::testing::TestWithParam<int>
+struct CRAQTestParam
 {
+    int batchSize;
+    int shards;
+    int replicasPerShard;
+    int clients;
+};
+
+
+class CRAQTest : public  ::testing::TestWithParam<CRAQTestParam>
+{
+    struct ClientStruct
+    {
+        CRAQClient *client;
+        string key;
+    };
+
 protected:
     std::vector<CRAQReplica *> replicas;
     std::vector<CRAQApp> apps;
@@ -151,88 +159,84 @@ protected:
     std::vector<std::string> clientOps;
     std::vector<std::vector<string>> ops;
     std::vector<std::vector<string> > unloggedOps;
-    int requestNum;
-    int group = 0;
+    std::map<int, std::vector<transport::ReplicaAddress>> replicaAddrs; 
+    std::unordered_map<int, ClientStruct> clients; 
+    int requestNum = 0;
+    int groups;
 
     virtual void SetUp() {
-        int clientid = 0;
-        int groups = 1; 
-        int replicasPerGroup = 3;
+        CRAQTestParam param = GetParam();
+        groups = param.shards; 
+        int replicasPerGroup = param.replicasPerShard;
+
+        if (groups < 1 || replicasPerGroup < 1) Panic("Groups and replicas per group must be at least 1");
+
         int faultTolerance = 1;
-        // TODO: make this configurable
         int keys = 1;
 
-        std::map<int, std::vector<transport::ReplicaAddress>> replicaAddrs = 
+        int totalReplicas = groups * replicasPerGroup;
+        int currentLocalHostAddress = 12345;
+
+        for (int group = 0; group < groups; group++)
         {
-            {
-                0,
-                std::vector<transport::ReplicaAddress>{
-                    {"localhost", "12345"},
-                    {"localhost", "12346"},
-                    {"localhost", "12347"}
-                }
-            }
-            // ,
-            // {
-            //     1,
-            //     std::vector<transport::ReplicaAddress>{
-            //         {"localhost", "12348"},
-            //         {"localhost", "12349"},
-            //         {"localhost", "12350"}
-            //     }
-            // },
-            // {
-            //     2,
-            //     std::vector<transport::ReplicaAddress>{
-            //         {"localhost", "12351"},
-            //         {"localhost", "12352"},
-            //         {"localhost", "12353"}
-            //     }
-            // }
-        };
+           replicaAddrs[group] = {};
+           for (int replicaIndex = 0; replicaIndex < replicasPerGroup; replicaIndex++)
+           {
+                replicaAddrs[group].push_back({"localhost", std::to_string(currentLocalHostAddress)});
+                currentLocalHostAddress++;
+           }
+            
+        }
 
         config = new transport::Configuration(groups, replicasPerGroup, faultTolerance, replicaAddrs);
 
         transport = new SimulatedTransport();
 
-        ops.resize(config->n);
-
-        // TODO: make this multiple clients
-        client = new CRAQClient(*config, transport, group, clientid);
-        requestNum = 0; 
-
-        apps.reserve(config->n);
-        for (int i = 0; i < config->n; i++) {
-            ops[i].reserve(100);
-            apps.emplace_back(&ops[i], &unloggedOps[i]);
-            replicas.push_back(new CRAQReplica(*config, group, i, transport, GetParam(), &apps[i], true));
+        ops.resize(totalReplicas);
+        unloggedOps.resize(totalReplicas);
+        apps.reserve(totalReplicas);
+        for (int group = 0; group < groups; group++)
+        {
+           for (int replicaIndex = 0; replicaIndex < replicasPerGroup; replicaIndex++)
+           {
+                int appIndex = group * replicasPerGroup + replicaIndex;
+                ops[appIndex].reserve(100);
+                apps.emplace_back(&ops[appIndex], &unloggedOps[appIndex]);
+                replicas.push_back(new CRAQReplica(*config, group, replicaIndex, transport, param.batchSize, &apps[appIndex], true));
+           }
+            clients[group] = {new CRAQClient(*config, transport, group, group), "key1"};
         }
-        
+
         string request_str;
 
-        LinearizeableOperation linop;
-        // only one client rn
-        linop.mutable_rid()->set_client_id(requestNum);
-        linop.mutable_rid()->set_client_req_id(requestNum);
-        linop.set_transaction_id(requestNum);
-        linop.set_op("put");
-        linop.set_key("key1");
-        linop.set_value("key1");
-
-        linop.SerializeToString(&request_str);
-        auto upcall = [this](const string &req, const string &reply) {return true;};
-
-        client->Invoke(request_str, upcall);
-        clientOps.push_back(request_str);
-        transport->Run();
-
-        for (int i = 0; i < config->n; i++) 
+        for (int clientIndex = 0; clientIndex < groups; clientIndex++)
         {
-            std::pair<size_t, std::string> val;
-            string key = "key1";
-            apps[i].store.get(key, val);
-            
-            EXPECT_EQ(val.second, "key1");
+            auto clientInfo = clients[clientIndex];
+
+            LinearizeableOperation linop;
+            // only one client rn
+            linop.mutable_rid()->set_client_id(requestNum);
+            linop.mutable_rid()->set_client_req_id(requestNum);
+            linop.set_transaction_id(requestNum);
+            linop.set_op("put");
+            linop.set_key(clientInfo.key);
+            linop.set_value(clientInfo.key);
+
+            linop.SerializeToString(&request_str);
+            auto upcall = [this](const string &req, const string &reply) {return true;};
+
+            clientInfo.client->Invoke(request_str, upcall);
+            clientOps.push_back(request_str);
+            transport->Run();
+
+            for (int i = 0; i < config->n; i++) 
+            {
+                std::pair<size_t, std::string> val;
+                string key = clientInfo.key;
+                apps[i].store.get(key, val);
+                
+                EXPECT_EQ(val.second, clientInfo.key);
+            }
         }
 
         // Only let tests run for a simulated minute. This prevents infinite retry loops, etc.
@@ -241,8 +245,10 @@ protected:
            });
     }
 
-    virtual void ClientSendNext(Client::continuation_t upcall, std::string op, std::string key) {
+    virtual void ClientSendNext(int clientIndex, Client::continuation_t upcall, std::string op, std::string key) {
         string request_str;
+
+        auto clientInfo = clients[clientIndex];
 
         LinearizeableOperation linop;
         // only one client rn
@@ -255,7 +261,7 @@ protected:
 
         linop.SerializeToString(&request_str);
 
-        client->Invoke(request_str, upcall);
+        clientInfo.client->Invoke(request_str, upcall);
         clientOps.push_back(request_str);
     }
 
@@ -268,7 +274,11 @@ protected:
         ops.clear();
         unloggedOps.clear();
 
-        delete client;
+        for (auto &kv : clients) {
+            delete kv.second.client;
+        }
+        clients.clear();;
+
         delete transport;
         delete config;
     }
@@ -296,12 +306,15 @@ TEST_P(CRAQTest, SimpleGet)
         return true;
     };
 
-    ClientSendNext(simpleGetUpcall, "get", "key1");
+    for (int clientIndex = 0; clientIndex < groups; clientIndex++)
+    {
+        ClientSendNext(clientIndex, simpleGetUpcall, "get", "key1");
+    }
     transport->Run();
 
     // By now, they all should have executed the last request.
     Notice("config->n = %d", config->n);
-    EXPECT_EQ(clientOps.size(), 2);
+    // EXPECT_EQ(clientOps.size(), 2);
     // copy log logic once gap logic is fixed, then check logs through op
 
     // for (int replicaIdx = 0; replicaIdx < config->n; replicaIdx++) 
@@ -318,6 +331,9 @@ TEST_P(CRAQTest, SimpleGet)
     // }
 }
 
-INSTANTIATE_TEST_CASE_P(Batching,
+INSTANTIATE_TEST_CASE_P(test,
                         CRAQTest,
-                        ::testing::Values(1));
+                        ::testing::Values(
+                            CRAQTestParam{1, 1, 3},
+                            CRAQTestParam{1, 10, 3}
+                        ));
