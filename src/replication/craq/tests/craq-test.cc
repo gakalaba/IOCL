@@ -83,24 +83,24 @@ public:
         LinearizeableReply reply;
         req.ParseFromString(op);
         uint64_t transaction_id = req.transaction_id();
-        std::pair<uint64_t, std::string> value;
+        std::pair<uint64_t, uint64_t> value;
 
         string retval;
         int status = REPLY_OK;
         if (req.op() == "get")
         {
-            Debug("the request is get");
+            Debug("the request is get for timestamp %d", timestamp.getTimestamp());
             if (!store.get(req.key(), timestamp.getTimestamp(), value))
             {
                 Debug("value does not exist");
                 status = REPLY_FAIL;
             };
-            Debug("Get value %s from %s", value.second.c_str(), req.key().c_str());
+            Debug("Get value %d from %s", value.second, req.key().c_str());
         }
         else if (req.op() == "put")
         {
-            Debug("the request is put");
-            store.put(req.key(), req.value(), transaction_id);
+            Debug("the request is put for timestamp %d",  timestamp.getTimestamp());
+            store.put(req.key(), std::stoi(req.value()), timestamp.getTimestamp());
             Debug("put key %s and val %s", req.key().c_str(), req.value().c_str());
         }
         else
@@ -108,7 +108,7 @@ public:
             Panic("Unrecognized operation.");
         }
         reply.set_status(status);
-        reply.set_return_value(value.second);
+        reply.set_return_value(std::to_string(value.second));
         reply.set_transaction_id(transaction_id);
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
@@ -130,7 +130,7 @@ public:
         str2 = str1;
     }
 
-    VersionedKVStore<uint64_t, std::string> store;
+    VersionedKVStore<uint64_t, uint64_t> store;
 };
 
 struct CRAQTestParam
@@ -150,99 +150,96 @@ class CRAQTest : public  ::testing::TestWithParam<CRAQTestParam>
         string key;
     };
 
+    using ShardType = int;
+
 protected:
-    std::vector<CRAQReplica *> replicas;
-    std::vector<CRAQApp> apps;
+    std::unordered_map<ShardType, std::vector<CRAQReplica *>> replicas;
+    std::unordered_map<ShardType, std::vector<CRAQApp>> apps;
     CRAQClient *client;
     SimulatedTransport *transport;
     transport::Configuration *config;
     std::vector<std::string> clientOps;
     std::vector<std::vector<string>> ops;
     std::vector<std::vector<string> > unloggedOps;
-    std::map<int, std::vector<transport::ReplicaAddress>> replicaAddrs; 
-    std::unordered_map<int, ClientStruct> clients; 
+    std::map<ShardType, std::vector<transport::ReplicaAddress>> replicaAddrs; 
+    std::unordered_map<ShardType, ClientStruct> clients; 
     int requestNum = 0;
-    int groups;
+    int shards;
+    int clientsPerShard;
 
     virtual void SetUp() {
         CRAQTestParam param = GetParam();
-        groups = param.shards; 
-        int replicasPerGroup = param.replicasPerShard;
+        shards = param.shards; 
+        int replicasPerShard = param.replicasPerShard;
+        clientsPerShard = param.clientsPerShard;
 
-        if (groups < 1 || replicasPerGroup < 1) Panic("Groups and replicas per group must be at least 1");
+        if (shards < 1 || replicasPerShard < 1 || clientsPerShard < 1) Panic("Shards and clients/replicas per shard must be at least 1");
 
         int faultTolerance = 1;
         int keys = 1;
 
-        int totalReplicas = groups * replicasPerGroup;
+        int totalReplicas = shards * replicasPerShard;
         int currentLocalHostAddress = 12345;
 
-        for (int group = 0; group < groups; group++)
+        for (ShardType shard = 0; shard < shards; shard++)
         {
-           replicaAddrs[group] = {};
-           for (int replicaIndex = 0; replicaIndex < replicasPerGroup; replicaIndex++)
+           replicaAddrs[shard] = {};
+           for (int replicaIndex = 0; replicaIndex < replicasPerShard; replicaIndex++)
            {
-                replicaAddrs[group].push_back({"localhost", std::to_string(currentLocalHostAddress)});
+                replicaAddrs[shard].push_back({"localhost", std::to_string(currentLocalHostAddress)});
                 currentLocalHostAddress++;
            }
             
         }
 
-        config = new transport::Configuration(groups, replicasPerGroup, faultTolerance, replicaAddrs);
+        config = new transport::Configuration(shards, replicasPerShard, faultTolerance, replicaAddrs);
 
         transport = new SimulatedTransport();
 
         ops.resize(totalReplicas);
         unloggedOps.resize(totalReplicas);
-        apps.reserve(totalReplicas);
-        for (int group = 0; group < groups; group++)
+        for (ShardType shard = 0; shard < shards; shard++)
         {
-           for (int replicaIndex = 0; replicaIndex < replicasPerGroup; replicaIndex++)
+           replicas[shard].reserve(replicasPerShard);
+           apps[shard].reserve(replicasPerShard);
+           for (int replicaIndex = 0; replicaIndex < replicasPerShard; replicaIndex++)
            {
-                int appIndex = group * replicasPerGroup + replicaIndex;
+                int appIndex = shard * replicasPerShard + replicaIndex;
                 ops[appIndex].reserve(100);
-                apps.emplace_back(&ops[appIndex], &unloggedOps[appIndex]);
-                replicas.push_back(new CRAQReplica(*config, group, replicaIndex, transport, param.batchSize, &apps[appIndex], true));
+
+                apps[shard].emplace_back(&ops[appIndex], &unloggedOps[appIndex]);
+                replicas[shard].push_back(new CRAQReplica(*config, shard, replicaIndex, transport, param.batchSize, &apps[shard][replicaIndex], true));
            }
 
-            string key = "key" + std::to_string(group);
+            string key = "key" + std::to_string(shard);
             Notice("key is set to %s", key);
             ClientStruct clientStruct;
             clientStruct.key = key;
-            clients[group] = clientStruct;
-            clients[group].clientList.push_back(new CRAQClient(*config, transport, group, group));
+            clients[shard] = clientStruct;
+
+            for (int clientIndex = 0; clientIndex < clientsPerShard; clientIndex++)
+            {
+                clients[shard].clientList.push_back(new CRAQClient(*config, transport, shard, shard * clientsPerShard + clientIndex));
+            }
         }
 
         string request_str;
 
-        for (int clientIndex = 0; clientIndex < groups; clientIndex++)
+        for (ShardType shard = 0; shard < shards; shard++)
         {
-            auto clientInfo = clients[clientIndex];
+            auto &clientInfo = clients[shard];
 
-            LinearizeableOperation linop;
-            // only one client rn
-            linop.mutable_rid()->set_client_id(requestNum);
-            linop.mutable_rid()->set_client_req_id(requestNum);
-            linop.set_transaction_id(requestNum);
-            linop.set_op("put");
-            linop.set_key(clientInfo.key);
-            linop.set_value(clientInfo.key);
+            ClientSendNext(shard, putUpcall, "put");
 
-            linop.SerializeToString(&request_str);
-            auto upcall = [this](const string &req, const string &reply) {return true;};
-
-            clientInfo.clientList[0]->Invoke(request_str, upcall);
-            clientOps.push_back(request_str);
             transport->Run();
 
-            for (int i = 0; i < replicasPerGroup; i++) 
+            for (int replicaIndex = 0; replicaIndex < replicasPerShard; replicaIndex++) 
             {
-                int appIndex = (clientIndex * replicasPerGroup) + i;
-                std::pair<size_t, std::string> val;
+                std::pair<size_t, uint64_t> val;
                 string key = clientInfo.key;
-                apps[appIndex].store.get(key, val);
+                apps[shard][replicaIndex].store.get(key, val);
                 
-                EXPECT_EQ(val.second, clientInfo.key);
+                EXPECT_EQ(val.second, requestNum);
             }
         }
 
@@ -252,29 +249,33 @@ protected:
            });
     }
 
-    virtual void ClientSendNext(int clientIndex, Client::continuation_t upcall, std::string op, std::string key, int clientListIndex = 0) {
+    virtual void ClientSendNext(int shard, Client::continuation_t upcall, std::string op, int clientIndex = 0) {
         string request_str;
 
-        auto clientInfo = clients[clientIndex];
+        auto &clientInfo = clients[shard];
 
         LinearizeableOperation linop;
-        // only one client rn
-        linop.mutable_rid()->set_client_id(requestNum);
+        linop.mutable_rid()->set_client_id(shard * clientsPerShard + clientIndex);
+        // must be fixed!
         linop.mutable_rid()->set_client_req_id(requestNum);
         linop.set_transaction_id(requestNum);
-        linop.set_key(key);
-        linop.set_value(key);
         linop.set_op(op);
+        linop.set_key(clientInfo.key);
+        Debug("Putting val %d", requestNum);
+        linop.set_value(std::to_string(requestNum));
 
         linop.SerializeToString(&request_str);
 
-        clientInfo.clientList[clientListIndex]->Invoke(request_str, upcall);
+        clientInfo.clientList[clientIndex]->Invoke(request_str, upcall);
         clientOps.push_back(request_str);
     }
 
     virtual void TearDown() {
-        for (auto x : replicas) {
-            delete x;
+        for (auto kv : replicas) {
+            for (auto replica : kv.second)
+            {
+                delete replica;
+            }
         }
 
         replicas.clear();
@@ -291,58 +292,112 @@ protected:
         delete transport;
         delete config;
     }
+
+public:
+
+    std::function<bool(const std::string &req,
+                    const std::string &reply)> getUpcall =
+        [this](const std::string &req,
+            const std::string &reply) -> bool {
+
+            LinearizeableOperation linop;
+            LinearizeableReply linreply;
+            bool parsed;
+
+            parsed = linop.ParseFromString(req);
+            EXPECT_TRUE(parsed);
+            parsed = linreply.ParseFromString(reply);
+            EXPECT_TRUE(parsed);
+
+            EXPECT_EQ(linreply.status(), REPLY_OK);
+            EXPECT_EQ(linop.transaction_id(),
+                    linreply.transaction_id());
+            EXPECT_EQ(requestNum,
+                    std::stoi(linreply.return_value()));
+
+            transport->CancelAllTimers();
+
+            return true;
+        };
+
+        std::function<bool(const std::string &req,
+                    const std::string &reply)> putUpcall =
+        [this](const std::string &req,
+            const std::string &reply) -> bool {
+
+            LinearizeableOperation linop;
+            LinearizeableReply linreply;
+            bool parsed;
+
+            parsed = linop.ParseFromString(req);
+            EXPECT_TRUE(parsed);
+            parsed = linreply.ParseFromString(reply);
+            EXPECT_TRUE(parsed);
+
+            Notice("client upcall is called for put",
+                linreply.return_value().c_str());
+
+            EXPECT_EQ(linreply.status(), REPLY_OK);
+
+            transport->CancelAllTimers();
+
+            return true;
+        };
 };
 
 TEST_P(CRAQTest, SimpleGet)
 {
-    auto simpleGetUpcall = [this](const string &req, const string &reply) {
-        LinearizeableOperation linop;
-        LinearizeableReply linreply;
-        bool parsed;
-
-        parsed = linop.ParseFromString(req);
-        EXPECT_TRUE(parsed);
-        parsed = linreply.ParseFromString(reply);
-        EXPECT_TRUE(parsed);
-
-        Notice("client upcall is called with retval %s", linreply.return_value().c_str()); 
-
-        EXPECT_EQ(linreply.status(), REPLY_OK);
-        EXPECT_EQ(linop.transaction_id(), linreply.transaction_id());
-        EXPECT_EQ(linop.value(), linreply.return_value());
-
-        transport->CancelAllTimers();
-        return true;
-    };
-
-    for (int clientIndex = 0; clientIndex < groups; clientIndex++)
+    for (int shard = 0; shard < shards; shard++)
     {
-        ClientSendNext(clientIndex, simpleGetUpcall, "get", clients[clientIndex].key);
+        ClientSendNext(shard, getUpcall, "get");
     }
     transport->Run();
 
-    // By now, they all should have executed the last request.
-    Notice("config->n = %d", config->n);
-    // EXPECT_EQ(clientOps.size(), 2);
     // copy log logic once gap logic is fixed, then check logs through op
+}
 
-    // for (int replicaIdx = 0; replicaIdx < config->n; replicaIdx++) 
-    // {
-    //     EXPECT_EQ(ops[replicaIdx].size(), 2);
-    // }
+TEST_P(CRAQTest, AllClientsWrite)
+{
+    int iterations = 5;
+    requestNum = 1;
+    for (int requestPerShard = 0; requestPerShard < iterations; requestPerShard++)
+    {
 
-    // for (int logIdx = 0; logIdx < clientOps.size(); logIdx++)
-    // {
-    //     for (int replicaIdx = 0; replicaIdx < config->n; replicaIdx++) 
-    //     {
-    //         EXPECT_EQ(clientOps[logIdx], ops[replicaIdx][logIdx]);
-    //     }
-    // }
+        for (int shard = 0; shard < shards; shard++)
+        {
+            for (int writingClientIndex = 0; writingClientIndex < GetParam().clientsPerShard; writingClientIndex++)
+            {
+                ClientSendNext(shard, putUpcall, "put", writingClientIndex);
+                transport->Run();
+
+                // check write can be read by all clients
+                for (int clientIndex = 0; clientIndex < GetParam().clientsPerShard; clientIndex++)
+                {
+                    ClientSendNext(shard, getUpcall, "get");
+                }
+
+                // check write can be read by all replicas
+                for (int replicaIndex = 0; replicaIndex < config->n; replicaIndex++)
+                {
+                    std::pair<size_t, uint64_t> val;
+                    string key = clients[shard].key;
+                    bool success = apps[shard][replicaIndex].store.get(key, val);
+                    EXPECT_TRUE(success);
+                    EXPECT_EQ(val.second, requestNum);
+                }
+
+                transport->Run();
+                requestNum++;
+            }
+        }
+    }
 }
 
 INSTANTIATE_TEST_CASE_P(test,
                         CRAQTest,
                         ::testing::Values(
-                            CRAQTestParam{1, 1, 3, 0},
-                            CRAQTestParam{1, 10, 3, 0}
+                            CRAQTestParam{1, 1, 3, 1},      // basic setup
+                            CRAQTestParam{1, 10, 3, 1},     // many shards
+                            CRAQTestParam{1, 2, 3, 10},       // many clients
+                            CRAQTestParam{1, 10, 10, 10}       // many all
                         ));
