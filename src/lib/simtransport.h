@@ -75,6 +75,12 @@ public:
                   const transport::Configuration &config,
                   int groupIdx,
                   int replicaIdx);
+    bool IsQueueEmpty();
+    bool IsBufferedQueueEmpty();
+    void SetBufferingMessage(string &bufferingMessage);
+    void ResetBufferingMessage();
+    string PopEvent();
+    string PopBufferedEvent();
     void Run();
     void AddFilter(int id, filter_t filter);
     void RemoveFilter(int id);
@@ -127,6 +133,8 @@ private:
     };
 
     std::deque<QueuedMessage> queue;
+    std::deque<QueuedMessage> bufferedQueue;
+    string bufferingMessage{};
     std::map<int, TransportReceiver *> endpoints;
     int lastAddr;
     //    std::map<int,int> replicas;

@@ -210,6 +210,62 @@ SimulatedTransport::LookupMulticastAddress(const transport::Configuration *cfg)
     return NULL;
 }
 
+bool SimulatedTransport::IsQueueEmpty()
+{
+    return queue.empty();
+}
+
+bool SimulatedTransport::IsBufferedQueueEmpty()
+{
+    return bufferedQueue.empty();
+}
+
+void SimulatedTransport::SetBufferingMessage(string &thatBufferingMessage)
+{
+    bufferingMessage = thatBufferingMessage;
+}
+
+void SimulatedTransport::ResetBufferingMessage()
+{
+    bufferingMessage = "";
+}
+
+string SimulatedTransport::PopEvent()
+{
+    if (queue.empty())
+    {
+        Panic("No event in queue");
+    }
+
+    QueuedMessage q = std::move(queue.front());
+    Notice("Message from addr %d to addr %d popped of type %s", q.src, q.dst, q.type.c_str());
+    if (q.type != bufferingMessage)
+    {
+        Notice("Executing");
+        TransportReceiver *dst = endpoints[q.dst];
+        dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, q.msg, nullptr);
+    }
+    else 
+    {
+        Notice("not executing");
+        bufferedQueue.push_back(q);
+    }
+    queue.pop_front();
+
+    return q.type;
+}
+
+string SimulatedTransport::PopBufferedEvent()
+{
+    QueuedMessage q = std::move(bufferedQueue.front());
+    Notice("Message from addr %d to addr %d popped from buffered queue of type %s", q.src, q.dst, q.type.c_str());
+    TransportReceiver *dst = endpoints[q.dst];
+    dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, q.msg, nullptr);
+    bufferedQueue.pop_front();
+
+    return q.type;
+}
+
 void SimulatedTransport::Run()
 {
     LookupAddresses();
@@ -219,11 +275,7 @@ void SimulatedTransport::Run()
         // Process queue
         while (!queue.empty())
         {
-            QueuedMessage &q = queue.front();
-            TransportReceiver *dst = endpoints[q.dst];
-            Notice("Message from addr %d to addr %d popped", q.src, q.dst);
-            dst->ReceiveMessage(SimulatedTransportAddress(q.src), q.type, q.msg, nullptr);
-            queue.pop_front();
+            PopEvent();
         }
 
         // If there's a timer, deliver the earliest one only

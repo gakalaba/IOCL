@@ -223,7 +223,7 @@ namespace replication
             msg.set_clientreqid(request.clientreqid());
             msg.set_replicaidx(myIdx);
 
-            Debug("Sending version request for key %s", linop.key().c_str());
+            Debug("Sending version request for key %s for client %d and client request id %d", linop.key().c_str(), request.clientid(), request.clientreqid());
 
             pendingReads[{request.clientid(), request.clientreqid()}] = request;
 
@@ -669,17 +669,17 @@ namespace replication
             response.set_clientreqid(msg.clientreqid());
             response.set_opnum(keyToVersionNumber[msg.key()]);
 
-            Notice("Sending message to replica via version response");
+            Notice("Sending message to replica via version response, timestamp to read is %d", keyToVersionNumber[msg.key()]);
             transport->SendMessageToReplica(this, msg.replicaidx(), response); 
         }
 
         void CRAQReplica::HandleVersionResponse(const TransportAddress &remote, const VersionResponseMessage &msg)
         {
-            std::pair<uint32_t, uint32_t> requestClientId = {msg.clientid(), msg.clientreqid()};
+            std::pair<uint64_t, uint64_t> requestClientId = {msg.clientid(), msg.clientreqid()};
             auto it = pendingReads.find(requestClientId);
             if (it == pendingReads.end())
             {
-                Debug("Old version request, no longer pending");
+                Debug("Old version request for clientid %d and client request id %d, no longer pending", msg.clientid(), msg.clientreqid());
                 return;
             }
 

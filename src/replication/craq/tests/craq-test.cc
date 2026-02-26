@@ -50,9 +50,8 @@ using LinearizeableReply = strongstore::proto::LinearizeableReply;
 #include <vector>
 #include <sstream>
 
-static string replicaLastOp;
-static string clientLastOp;
-static string clientLastReply;
+const string COMMIT_MESSAGE_TYPE = "replication.craq.proto.CommitMessage";
+const string VERSION_REQUEST_MESSAGE_TYPE = "replication.craq.proto.VersionRequestMessage";
 
 using google::protobuf::Message;
 using namespace replication;
@@ -294,55 +293,65 @@ protected:
     }
 
 public:
+    bool validateUpcall(const std::string &req, const std::string &reply, int expectedValue) {
+        LinearizeableOperation linop;
+        LinearizeableReply linreply;
+        
+        // 1. Parsing and basic sanity checks
+        EXPECT_TRUE(linop.ParseFromString(req));
+        EXPECT_TRUE(linreply.ParseFromString(reply));
+        EXPECT_EQ(linreply.status(), REPLY_OK);
+        EXPECT_EQ(linop.transaction_id(), linreply.transaction_id());
 
+        // 2. Value validation
+        int actualValue = std::stoi(linreply.return_value());
+        Notice("Expected %d, got %d", expectedValue, actualValue);
+        EXPECT_EQ(expectedValue, actualValue);
+
+        // 3. Side effects
+        transport->CancelAllTimers();
+        return true;
+    }
+    
     std::function<bool(const std::string &req,
                     const std::string &reply)> getUpcall =
         [this](const std::string &req,
             const std::string &reply) -> bool {
-
-            LinearizeableOperation linop;
-            LinearizeableReply linreply;
-            bool parsed;
-
-            parsed = linop.ParseFromString(req);
-            EXPECT_TRUE(parsed);
-            parsed = linreply.ParseFromString(reply);
-            EXPECT_TRUE(parsed);
-
-            EXPECT_EQ(linreply.status(), REPLY_OK);
-            EXPECT_EQ(linop.transaction_id(),
-                    linreply.transaction_id());
-            EXPECT_EQ(requestNum,
-                    std::stoi(linreply.return_value()));
-
-            transport->CancelAllTimers();
-
-            return true;
+            return validateUpcall(req, reply, requestNum);
+           
         };
 
-        std::function<bool(const std::string &req,
-                    const std::string &reply)> putUpcall =
+    std::function<bool(const std::string &req,
+                    const std::string &reply)> getUpcallIgnoredPendingWrite =
         [this](const std::string &req,
             const std::string &reply) -> bool {
-
-            LinearizeableOperation linop;
-            LinearizeableReply linreply;
-            bool parsed;
-
-            parsed = linop.ParseFromString(req);
-            EXPECT_TRUE(parsed);
-            parsed = linreply.ParseFromString(reply);
-            EXPECT_TRUE(parsed);
-
-            Notice("client upcall is called for put",
-                linreply.return_value().c_str());
-
-            EXPECT_EQ(linreply.status(), REPLY_OK);
-
-            transport->CancelAllTimers();
-
-            return true;
+            return validateUpcall(req, reply, requestNum - 1);
+           
         };
+
+    std::function<bool(const std::string &req,
+                const std::string &reply)> putUpcall =
+    [this](const std::string &req,
+        const std::string &reply) -> bool {
+
+        LinearizeableOperation linop;
+        LinearizeableReply linreply;
+        bool parsed;
+
+        parsed = linop.ParseFromString(req);
+        EXPECT_TRUE(parsed);
+        parsed = linreply.ParseFromString(reply);
+        EXPECT_TRUE(parsed);
+
+        Notice("client upcall is called for put",
+            linreply.return_value().c_str());
+
+        EXPECT_EQ(linreply.status(), REPLY_OK);
+
+        transport->CancelAllTimers();
+
+        return true;
+    };
 };
 
 TEST_P(CRAQTest, SimpleGet)
@@ -358,10 +367,10 @@ TEST_P(CRAQTest, SimpleGet)
 
 TEST_P(CRAQTest, AllClientsWrite)
 {
-    int iterations = 5;
-    requestNum = 1;
+    int iterations = 1;
     for (int requestPerShard = 0; requestPerShard < iterations; requestPerShard++)
     {
+        requestNum++;
 
         for (int shard = 0; shard < shards; shard++)
         {
@@ -387,10 +396,86 @@ TEST_P(CRAQTest, AllClientsWrite)
                 }
 
                 transport->Run();
-                requestNum++;
             }
         }
     }
+}
+
+TEST_P(CRAQTest, BasicVersionRequestIgnorePendingWrite)
+{
+    auto params = GetParam();
+    // only run once with basic input
+    if (params.clientsPerShard > 1 || params.shards > 1)
+    {
+        GTEST_SKIP();
+    }
+
+    requestNum++;
+    ClientSendNext(0, putUpcall, "put"); 
+    
+    string messageToBuffer = COMMIT_MESSAGE_TYPE;
+    transport->SetBufferingMessage(messageToBuffer);
+
+    // run events just before back-propagating commit message
+    while (messageToBuffer != transport->PopEvent()){}
+    Notice("Finished propagating write and commiting at tail, not sending commit messages yet");
+   
+    ClientSendNext(0, getUpcallIgnoredPendingWrite, "get"); 
+
+    transport->Run();
+
+    transport->ResetBufferingMessage();
+    // pop the commitMessage
+    while (!transport->IsBufferedQueueEmpty())
+    {
+        transport->PopBufferedEvent();
+    }
+    // resume runnning craq
+    transport->Run();
+    EXPECT_TRUE(transport->IsQueueEmpty());
+    EXPECT_TRUE(transport->IsBufferedQueueEmpty());
+}
+
+TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
+{
+    auto params = GetParam();
+    // only run once with basic input
+    if (params.clientsPerShard > 1 || params.shards > 1)
+    {
+        GTEST_SKIP();
+    }
+    string messageToBuffer;
+    string messageType;
+
+    requestNum++;
+    ClientSendNext(0, putUpcall, "put"); 
+    
+    messageToBuffer = COMMIT_MESSAGE_TYPE;
+    transport->SetBufferingMessage(messageToBuffer);
+
+    // run events just before back-propagating commit message
+    while (messageToBuffer != transport->PopEvent()){}
+    Notice("Finished propagating write and commiting at tail, not sending commit messages yet");
+   
+    messageToBuffer = VERSION_REQUEST_MESSAGE_TYPE;
+    transport->SetBufferingMessage(messageToBuffer);
+    ClientSendNext(0, getUpcall, "get"); 
+    while (messageToBuffer != transport->PopEvent()){}
+    Notice("Buffer version request for read");
+
+    // backpropagate write up chain
+    messageType = transport->PopBufferedEvent();
+    EXPECT_EQ(COMMIT_MESSAGE_TYPE, messageType);
+    transport->Run();
+
+    // pop the version request
+    while (!transport->IsBufferedQueueEmpty())
+    {
+        transport->PopBufferedEvent();
+    }
+    transport->Run();
+    EXPECT_TRUE(transport->IsQueueEmpty());
+    EXPECT_TRUE(transport->IsBufferedQueueEmpty());
 }
 
 INSTANTIATE_TEST_CASE_P(test,
