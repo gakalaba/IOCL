@@ -123,63 +123,87 @@ namespace replication
         return transport->SendMessageToReplica(this, myIdx - 1, m);
        } 
        
-       // TODO: just pass a reference of linop around
-       void CRAQReplica::ExecuteWriteOperation(const Request &request)
-       {
-        RDebug("Executing write request " FMT_OPNUM, lastCommitted);
-        LinearizeableOperation linop;
-        ReplyMessage reply;
-
-        linop.ParseFromString(request.op());
-        string key = linop.key();
-
-        keyToVersionNumber[key] = std::max(keyToVersionNumber[key], lastCommitted);
-
-        Execute(Timestamp{lastCommitted}, request, reply);
-        if (AmHead())
+        Request CRAQReplica::ToRequest(const replication::LinearizeableOperation &linRequest)
         {
-            SendReplyToClient(request, reply);
+            Request request;
+            string linop_string;
+
+            linRequest.SerializeToString(&linop_string);
+            request.set_op(linop_string);
+            request.set_clientid(linRequest.rid().client_id());
+            request.set_clientreqid(linRequest.rid().client_req_id());
+
+            return request;
         }
-       }
 
-       void CRAQReplica::ExecuteReadOperation(const Request &request)
-       {
-        RDebug("Executing read request " FMT_OPNUM, lastCommitted);
-        LinearizeableOperation linop;
-        ReplyMessage reply;
+        LinearizeableOperation CRAQReplica::ToLinearizableRequest(const Request &request)
+        {
+            LinearizeableOperation linRequest;
+            linRequest.ParseFromString(request.op());
+            linRequest.mutable_rid()->set_client_id(request.clientid());
+            linRequest.mutable_rid()->set_client_req_id(request.clientreqid());
 
-        linop.ParseFromString(request.op());
+            return linRequest;
+        }
 
-        Execute(Timestamp{keyToVersionNumber[linop.key()]}, request, reply);
-        SendReplyToClient(request, reply);
-       }
+        void CRAQReplica::ExecuteWriteOperation(const LinearizeableOperation &linRequest)
+        {
+            RDebug("Executing write request " FMT_OPNUM, lastCommitted);
+            ReplyMessage reply;
 
-       void CRAQReplica::SendReplyToClient(const Request &request, ReplyMessage &reply)
-       {
+            const string key = linRequest.key();
+
+            keyToVersionNumber[key] = std::max(keyToVersionNumber[key], lastCommitted);
+
+            Request request = ToRequest(linRequest);
+
+            Execute(Timestamp{lastCommitted}, request, reply);
+            if (AmHead())
+            {
+                SendReplyToClient(linRequest, reply);
+            }
+        }
+
+        void CRAQReplica::ExecuteReadOperation(const LinearizeableOperation &linRequest)
+        {
+            RDebug("Executing read request " FMT_OPNUM, lastCommitted);
+            ReplyMessage reply;
+
+            Request request = ToRequest(linRequest);
+
+            Execute(Timestamp{keyToVersionNumber[linRequest.key()]}, request, reply);
+            SendReplyToClient(linRequest, reply);
+        }
+
+        void CRAQReplica::SendReplyToClient(const LinearizeableOperation &request, ReplyMessage &reply)
+        {
             reply.set_view(this->view);
             reply.set_opnum(lastCommitted);
-            reply.set_clientreqid(request.clientreqid());
+            reply.set_clientreqid(request.rid().client_req_id());
 
             // Store reply in the client table
-            ClientTableEntry &cte = clientTable[request.clientid()];
-            if (cte.lastReqId <= request.clientreqid())
+            ClientTableEntry &cte = clientTable[request.rid().client_id()];
+            if (cte.lastReqId <= request.rid().client_req_id())
             {
-                cte.lastReqId = request.clientreqid();
+                if (request.op() == PUT_OPERATION)
+                {
+                    cte.lastReqId = request.rid().client_req_id();
+                }
                 cte.replied = true;
                 cte.reply = reply;
             }
 
             /* Send reply */
-            auto iter = clientAddresses.find(request.clientid());
+            auto iter = clientAddresses.find(request.rid().client_id());
             if (iter != clientAddresses.end())
             {
                 Debug("Found message, sending to client");
                 transport->SendMessage(this, *iter->second, reply);
             }
-       }
+        }
 
-       // TODO: right now, just commiting writes. Also add reads to log
-       void CRAQReplica::CommitUpTo(opnum_t upto)
+        // TODO: right now, just commiting writes. Also add reads to log
+        void CRAQReplica::CommitUpTo(opnum_t upto)
         {
             while (lastCommitted < upto)
             {
@@ -199,66 +223,62 @@ namespace replication
                 bool status = log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
                 Debug("Status is %d", status);
 
-                replication::LinearizeableOperation linop;
-                linop.ParseFromString(request.op());
-                string op = linop.op();
+                replication::LinearizeableOperation linRequest = ToLinearizableRequest(request);
+                const string op = linRequest.op();
 
                 Debug("Commiting entry with op %s", op.c_str());
 
-                if (op == "put") 
+                if (op == PUT_OPERATION)
                 {
-                    ExecuteWriteOperation(request);
+                    ExecuteWriteOperation(linRequest);
                 }
-
             }
         }
 
-        void CRAQReplica::SendVersionRequest(const Request &request)
+        void CRAQReplica::SendVersionRequest(const LinearizeableOperation &request)
         {
             VersionRequestMessage msg;
-            LinearizeableOperation linop;
-            linop.ParseFromString(request.op());
-            msg.set_key(linop.key());
-            msg.set_clientid(request.clientid());
-            msg.set_clientreqid(request.clientreqid());
+            msg.set_key(request.key());
+            msg.set_clientid(request.rid().client_id());
+            msg.set_clientreqid(request.rid().client_req_id());
             msg.set_replicaidx(myIdx);
 
-            Debug("Sending version request for key %s for client %d and client request id %d", linop.key().c_str(), request.clientid(), request.clientreqid());
+            Debug("Sending version request for key %s for client %d and client request id %d", request.key().c_str(), request.rid().client_id(), request.rid().client_req_id());
 
-            pendingReads[{request.clientid(), request.clientreqid()}] = request;
+            pendingReads[{request.rid().client_id(), request.rid().client_req_id()}] = request;
 
             transport->SendMessageToReplica(this, numReplicas - 1, msg);
         }
 
-        void CRAQReplica::UpdateClientTable(const Request &req)
+        void CRAQReplica::UpdateClientTable(const LinearizeableOperation &req)
         {
-            ClientTableEntry &entry = clientTable[req.clientid()];
+            ClientTableEntry &entry = clientTable[req.rid().client_id()];
 
-            ASSERT(entry.lastReqId <= req.clientreqid());
+            Debug("for clientid %d, last req id is %d while current req id is %d", req.rid().client_id(), entry.lastReqId, req.rid().client_req_id());
+            ASSERT(entry.lastReqId <= req.rid().client_req_id());
 
-            if (entry.lastReqId == req.clientreqid())
+            if (entry.lastReqId == req.rid().client_req_id())
             {
                 return;
             }
 
-            entry.lastReqId = req.clientreqid();
             entry.replied = false;
             entry.reply.Clear();
         }
 
-        bool CRAQReplica::IsDuplicateRequest(const TransportAddress &remote, const RequestMessage &msg)
+        bool CRAQReplica::IsDuplicateRequest(const TransportAddress &remote, const LinearizeableOperation &linRequest)
         {
             // Check the client table to see if this is a duplicate request
-            auto kv = clientTable.find(msg.req().clientid());
+            auto kv = clientTable.find(linRequest.rid().client_id());
             if (kv != clientTable.end())
             {
                 const ClientTableEntry &entry = kv->second;
-                if (msg.req().clientreqid() < entry.lastReqId)
+                if (linRequest.rid().client_req_id() < entry.lastReqId)
                 {
                     RNotice("Ignoring stale request");
                     return true;
                 }
-                if (msg.req().clientreqid() == entry.lastReqId)
+                if (linRequest.rid().client_req_id() == entry.lastReqId)
                 {
                     // This is a duplicate request. Resend the reply if we
                     // have one. We might not have a reply to resend if we're
@@ -286,12 +306,12 @@ namespace replication
             return false;
         }
 
-        void CRAQReplica::UpdateClientAddresses(const TransportAddress &remote, const RequestMessage &msg)
+        void CRAQReplica::UpdateClientAddresses(const TransportAddress &remote, const LinearizeableOperation &linRequest)
         {
-            clientAddresses.erase(msg.req().clientid());
+            clientAddresses.erase(linRequest.rid().client_id());
             clientAddresses.insert(
                 std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
+                    linRequest.rid().client_id(),
                     std::unique_ptr<TransportAddress>(remote.clone())));
         }
 
@@ -318,9 +338,8 @@ namespace replication
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
-                
-                LinearizeableOperation linop;
-                linop.ParseFromString(entry->request.op());
+
+                LinearizeableOperation linRequest = ToLinearizableRequest(entry->request);
             }
 
             if (!ForwardPropagateMessageInChain(p))
@@ -328,7 +347,7 @@ namespace replication
                 RWarning("Failed to send prepare message to next replica from head");
                 Notice("Failed to send prepare message to next replica from head");
             }
-            else 
+            else
             {
                 Notice("Sent message from idx %d to idx %d", myIdx, myIdx + 1);
             }
@@ -342,13 +361,13 @@ namespace replication
                                          const string &type, const string &data,
                                          void *meta_data)
         {
-            RequestMessage request;
+            LinearizeableOperation request;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             CommitMessage commit;
             VersionRequestMessage versionRequest;
             VersionResponseMessage versionResponse;
-            
+
             if (type == request.GetTypeName())
             {
                 request.ParseFromString(data);
@@ -382,19 +401,17 @@ namespace replication
         }
 
         void CRAQReplica::HandleRequest(const TransportAddress &remote,
-                                        const RequestMessage &msg)
+                                        const LinearizeableOperation &linRequest)
         {
-            replication::LinearizeableOperation linop;
-            linop.ParseFromString(msg.req().op());
-            string op = linop.op();
+            const string op = linRequest.op();
 
-            if (op == "put")
+            if (op == PUT_OPERATION)
             {
-                HandleWriteRequest(remote, msg);
+                HandleWriteRequest(remote, linRequest);
             }
-            else if (op == "get")
+            else if (op == GET_OPERATION)
             {
-                HandleReadRequest(remote, msg);
+                HandleReadRequest(remote, linRequest);
             }
             else
             {
@@ -403,26 +420,29 @@ namespace replication
             }
         }
 
-        void CRAQReplica::HandleReadRequest(const TransportAddress &remote, const RequestMessage &msg)
+        void CRAQReplica::HandleReadRequest(const TransportAddress &remote, const LinearizeableOperation &linRequest)
         {
-            Debug("Handling read request for client id %lu and client request id %lu", msg.req().clientid(), msg.req().clientreqid());
+            Debug("Handling read request for client id %lu and client request id %lu", linRequest.rid().client_id(), linRequest.rid().client_req_id());
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring request due to abnormal status");
                 return;
             }
 
-            UpdateClientAddresses(remote, msg);
+            UpdateClientAddresses(remote, linRequest);
 
-            if (IsDuplicateRequest(remote, msg)) return;
+            if (IsDuplicateRequest(remote, linRequest))
+                return;
 
-            UpdateClientTable(msg.req());
+            UpdateClientTable(linRequest);
 
             // Leader Upcall
             bool replicate = false;
             string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
+            string messageString;
+            linRequest.SerializeToString(&messageString);
+            LeaderUpcall(lastCommitted, messageString, replicate, res);
+            ClientTableEntry &cte = clientTable[linRequest.rid().client_id()];
 
             // Check whether this request should be committed to replicas
             if (!replicate)
@@ -430,20 +450,20 @@ namespace replication
                 RPanic("Should always replicate when using CRAQ");
             }
 
-            if (this->lastOp != lastCommitted)
+            if (this->lastOp != lastCommitted && !AmTail())
             {
-                SendVersionRequest(msg.req());
+                SendVersionRequest(linRequest);
                 return;
             }
 
-            ExecuteReadOperation(msg.req());
+            ExecuteReadOperation(linRequest);
         }
 
         void CRAQReplica::HandleWriteRequest(const TransportAddress &remote,
-                                        const RequestMessage &msg)
+                                             const LinearizeableOperation &linRequest)
         {
             // Latency_Start(&rec_to_upcall_lat_);
-            Debug("Handling write request for client id %lu and client request id %lu", msg.req().clientid(), msg.req().clientreqid());
+            Debug("Handling write request for client id %lu and client request id %lu", linRequest.rid().client_id(), linRequest.rid().client_req_id());
             viewstamp_t v;
 
             if (status != STATUS_NORMAL)
@@ -458,17 +478,20 @@ namespace replication
                 return;
             }
 
-            UpdateClientAddresses(remote, msg); 
+            UpdateClientAddresses(remote, linRequest);
 
-            if (IsDuplicateRequest(remote, msg)) return;
+            if (IsDuplicateRequest(remote, linRequest))
+                return;
 
-            UpdateClientTable(msg.req());
+            UpdateClientTable(linRequest);
 
-            // Leader Upcall: will always be true, can comment out 
+            // Leader Upcall: will always be true, can comment out
             bool replicate = false;
             string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
+            string messageString;
+            linRequest.SerializeToString(&messageString);
+            LeaderUpcall(lastCommitted, messageString, replicate, res);
+            ClientTableEntry &cte = clientTable[linRequest.rid().client_id()];
 
             // Check whether this request should be committed to replicas
             if (!replicate)
@@ -477,9 +500,9 @@ namespace replication
             }
 
             Request request;
-            request.set_op(res);
-            request.set_clientid(msg.req().clientid());
-            request.set_clientreqid(msg.req().clientreqid());
+            request.set_op(messageString);
+            request.set_clientid(linRequest.rid().client_id());
+            request.set_clientreqid(linRequest.rid().client_req_id());
 
             /* Assign it an opnum */
             ++this->lastOp;
@@ -576,13 +599,12 @@ namespace replication
                 // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
 
-                LinearizeableOperation linop;
-                linop.ParseFromString(req.op());
+                LinearizeableOperation linRequest = ToLinearizableRequest(req);
 
-                UpdateClientTable(req);
+                UpdateClientTable(linRequest);
             }
             ASSERT(op == msg.opnum());
-            
+
             if (!AmTail())
             {
                 CloseBatch();
@@ -599,11 +621,10 @@ namespace replication
                 auto requestCount = requests.size();
                 if (requestCount > 0)
                 {
-                    LinearizeableOperation linop;
-                    linop.ParseFromString(msg.request(requestCount - 1).op());
-                    cm.set_key(linop.key());
-                } 
-                else 
+                    LinearizeableOperation linRequest = ToLinearizableRequest(msg.request(requestCount - 1));
+                    cm.set_key(linRequest.key());
+                }
+                else
                 {
                     cm.set_key("");
                 }
@@ -611,7 +632,7 @@ namespace replication
                 if (!BackwardsPropagateMessageInChain(cm))
                 {
                     RWarning("Failed to backward propagate COMMIT message from tail");
-                } 
+                }
                 Debug("Sending commit for write from tail");
             }
         }
@@ -670,7 +691,7 @@ namespace replication
             response.set_opnum(keyToVersionNumber[msg.key()]);
 
             Notice("Sending message to replica via version response, timestamp to read is %d", keyToVersionNumber[msg.key()]);
-            transport->SendMessageToReplica(this, msg.replicaidx(), response); 
+            transport->SendMessageToReplica(this, msg.replicaidx(), response);
         }
 
         void CRAQReplica::HandleVersionResponse(const TransportAddress &remote, const VersionResponseMessage &msg)
@@ -683,14 +704,12 @@ namespace replication
                 return;
             }
 
-            Request request = it->second;
-            LinearizeableOperation linop;
-            linop.ParseFromString(request.op());
-            Debug("Handling version response for key %s and opnum %d", linop.key().c_str(), msg.opnum());
+            LinearizeableOperation linRequest = it->second;
+            Debug("Handling version response for key %s and opnum %d", linRequest.key().c_str(), msg.opnum());
 
-            keyToVersionNumber[linop.key()] = std::max(keyToVersionNumber[linop.key()], msg.opnum());
+            keyToVersionNumber[linRequest.key()] = std::max(keyToVersionNumber[linRequest.key()], msg.opnum());
 
-            ExecuteReadOperation(request);
+            ExecuteReadOperation(linRequest);
 
             pendingReads.erase({msg.clientid(), msg.clientreqid()});
         }

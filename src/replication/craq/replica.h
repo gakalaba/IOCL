@@ -42,6 +42,7 @@
 #include "replication/common/log.h"
 #include "replication/common/replica.h"
 #include "replication/craq/craq-proto.pb.h"
+#include <string_view>
 
 namespace replication
 {
@@ -51,6 +52,9 @@ namespace replication
         class CRAQReplica : public Replica
         {
         public:
+            static constexpr const char *PUT_OPERATION = "put";
+            static constexpr const char *GET_OPERATION = "get";
+
             CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
                         Transport *transport, unsigned int batchSize, AppReplica *app,
                         bool debug_stats);
@@ -61,14 +65,6 @@ namespace replication
                                 const string &data, void *meta_data);
 
         private:
-            // TODO: Use instead of continuously deserializing linop
-            // struct DeserializedLinearizeableOperation
-            // {
-            //     uint32_t clientid;
-            //     uint32_t clientreqid;
-            //     LinearizeableOperation linop;
-
-            // };
             view_t view;
             int myIdx;
             int numReplicas;
@@ -84,6 +80,7 @@ namespace replication
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {
+                // last ack'd request: should only be updated when a write is committed
                 uint64_t lastReqId;
                 bool replied;
                 proto::ReplyMessage reply;
@@ -102,7 +99,7 @@ namespace replication
                 }
             };
 
-            std::unordered_map<std::pair<uint64_t, uint64_t>, replication::Request, PairHash> pendingReads; // contain reads waiting on version responses
+            std::unordered_map<std::pair<uint64_t, uint64_t>, replication::LinearizeableOperation, PairHash> pendingReads; // contain reads waiting on version responses
 
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
@@ -117,24 +114,26 @@ namespace replication
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
             [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
-            void ExecuteWriteOperation(const Request &request);
-            void ExecuteReadOperation(const Request &request);
-            void SendReplyToClient(const Request &entry, proto::ReplyMessage &reply);
+            Request ToRequest(const replication::LinearizeableOperation &linRequest);
+            replication::LinearizeableOperation ToLinearizableRequest(const Request &request);
+            void ExecuteWriteOperation(const replication::LinearizeableOperation &linRequest);
+            void ExecuteReadOperation(const replication::LinearizeableOperation &linRequest);
+            void SendReplyToClient(const replication::LinearizeableOperation &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
-            void SendVersionRequest(const Request &request);
-            void UpdateClientTable(const Request &request);
+            void SendVersionRequest(const replication::LinearizeableOperation &linRequest);
+            void UpdateClientTable(const replication::LinearizeableOperation &linRequest);
             [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
-                                const proto::RequestMessage &msg);
+                                const replication::LinearizeableOperation &linRequest);
             void UpdateClientAddresses(const TransportAddress &remote, 
-                                const proto::RequestMessage &msg);
+                                const replication::LinearizeableOperation &linRequest);
             void CloseBatch();
 
             void HandleRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
+                               const replication::LinearizeableOperation &linRequest);
             void HandleWriteRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
+                               const replication::LinearizeableOperation &linRequest);
             void HandleReadRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
+                               const replication::LinearizeableOperation &linRequest);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
             void HandlePrepare(const TransportAddress &remote,
