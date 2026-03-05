@@ -26,6 +26,7 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/micro/big_transaction.h"
+#include "store/benchmark/async/common/op_selector.h"
 
 #include <unordered_set>
 
@@ -60,7 +61,7 @@ namespace micro
         }
         else if (0 < op_index && op_index <= fanout_)
         {
-            if (GetOpType(op_index - 1) == 0)
+            if (GetOpType(op_index - 1) == OP_READ)
             {
                 Debug("sending Get on key = %s", GetKey(op_index - 1).c_str());
                 return Get(GetKey(op_index - 1));
