@@ -158,9 +158,9 @@ class IOCLCodebase:
             # core = config['pin_client_processes'][client_id %
             #                                       len(config['pin_client_processes'])]
 
-            all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
+            all_cores = config["pin_client_processes"]  # e.g. [0,1,2,...,15]
             core = next_core_for_machine(client_host, all_cores)
-            client_command = 'taskset 0x%x %s' % (1 << core, client_command)
+            client_command = 'taskset -c %d %s' % (core, client_command)
 
         if 'run_locally' in config and config['run_locally']:
             stdout_file = os.path.join(exp_directory,
@@ -387,7 +387,7 @@ class IOCLCodebase:
             machine = config["shards"][shard_idx][replica_idx]
             all_cores = config["pin_server_processes"]  # e.g. [0,1,2,...,15]
             core = next_core_for_machine(machine, all_cores)
-            replica_command = 'taskset 0x%x %s' % (1 << core, replica_command)
+            replica_command = 'taskset -c %d %s' % (core, replica_command)
 
         # Wrapping additional information around command
         if 'run_locally' in config and config['run_locally']:
