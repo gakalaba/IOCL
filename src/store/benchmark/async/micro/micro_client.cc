@@ -27,6 +27,7 @@
  **********************************************************************/
 #include "store/benchmark/async/micro/micro_client.h"
 #include "store/benchmark/async/retwis/add_user.h"
+#include "store/benchmark/async/common/op_selector.h"
 
 #include <iostream>
 
@@ -87,11 +88,11 @@ namespace micro
             {
                 if ((rand() % 100) < read_percentage_)
                 {
-                    allOpTypes.push_back(0); // read
+                    allOpTypes.push_back(OP_READ); // read
                 }
                 else
                 {
-                    allOpTypes.push_back(1); // write
+                    allOpTypes.push_back(OP_WRITE); // write
                 }
             }
         }

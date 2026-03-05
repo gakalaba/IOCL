@@ -26,6 +26,7 @@
  *
  **********************************************************************/
 #include "store/benchmark/async/micro/app_request.h"
+#include "store/benchmark/async/common/op_selector.h"
 
 #include <unordered_set>
 
@@ -56,8 +57,7 @@ namespace micro
         Debug("BASIC_APP_REQUEST with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout_, op_index, read_percentage_);
 
         if (0 <= op_index && op_index < fanout_) {
-            srand(time(0));
-            if (GetOpType(op_index) == 0)
+            if (GetOpType(op_index) == OP_READ)
             {
                 Notice("sending Get on key = %s", GetKey(op_index).c_str());
                 return Get(GetKey(op_index));
