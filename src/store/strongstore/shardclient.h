@@ -47,6 +47,7 @@
 
 #include <set>
 #include <vector>
+#include <random>
 
 #include "lib/assert.h"
 #include "lib/latency.h"

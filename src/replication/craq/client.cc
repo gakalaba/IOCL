@@ -113,19 +113,29 @@ namespace replication
             return;
         }
 
-        // TODO: Send read to different clients
         void CRAQClient::SendRequest(const PendingRequest *req)
         {
-            proto::RequestMessage reqMsg;
-            reqMsg.mutable_req()->set_op(req->request);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            LinearizeableOperation linRequest;
+            linRequest.ParseFromString(req->request);
+            linRequest.mutable_rid()->set_client_id(clientid);
+            linRequest.mutable_rid()->set_client_req_id(req->clientReqId);
+            string op = linRequest.op();
+            int destReplica = 0;
+            Notice("Sending client request with id %d", req->clientReqId);
 
-            Notice("Sending client request with id %d", clientid);
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            if (op == GET_OPERATION)
+            {
+                destReplica = 1;
+                // std::random_device dev;
+                // std::mt19937 rng(dev());
+                // ASSERT(config.n >= 2);
+                // // dont send reads to tail
+                // std::uniform_int_distribution<std::mt19937::result_type> dist(0,config.n - 2);
+                // destReplica = dist(rng);
+                Debug("Get operation, destReplica is %d", destReplica);
+            }
+
+            if (transport->SendMessageToReplica(this, group, destReplica, linRequest))
             {
                 // req->timer->Reset();
             }
@@ -174,7 +184,7 @@ namespace replication
         }
 
         void CRAQClient::HandleReply(const TransportAddress &remote,
-                                   const proto::ReplyMessage &msg)
+                                     const proto::ReplyMessage &msg)
         {
             uint64_t reqId = msg.clientreqid();
             auto it = pendingReqs.find(reqId);

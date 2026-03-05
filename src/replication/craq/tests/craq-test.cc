@@ -312,22 +312,31 @@ public:
         transport->CancelAllTimers();
         return true;
     }
-    
-    std::function<bool(const std::string &req,
-                    const std::string &reply)> getUpcall =
-        [this](const std::string &req,
-            const std::string &reply) -> bool {
-            return validateUpcall(req, reply, requestNum);
-           
-        };
 
-    std::function<bool(const std::string &req,
-                    const std::string &reply)> getUpcallIgnoredPendingWrite =
-        [this](const std::string &req,
-            const std::string &reply) -> bool {
-            return validateUpcall(req, reply, requestNum - 1);
+    std::function<bool(const std::string &, const std::string &)>
+        MakeGetUpcall(int expectedValue)
+        {
+            return [this, expectedValue](const std::string &req,
+                                        const std::string &reply) -> bool {
+                return validateUpcall(req, reply, expectedValue);
+            };
+        }
+    
+    // std::function<bool(const std::string &req,
+    //                 const std::string &reply)> getUpcall =
+    //     [this](const std::string &req,
+    //         const std::string &reply) -> bool {
+    //         return validateUpcall(req, reply, requestNum - 1);
            
-        };
+    //     };
+
+    // std::function<bool(const std::string &req,
+    //                 const std::string &reply)> getUpcallIgnoredPendingWrite =
+    //     [this](const std::string &req,
+    //         const std::string &reply) -> bool {
+    //         return validateUpcall(req, reply, requestNum - 2);
+           
+    //     };
 
     std::function<bool(const std::string &req,
                 const std::string &reply)> putUpcall =
@@ -356,9 +365,11 @@ public:
 
 TEST_P(CRAQTest, SimpleGet)
 {
+    int prevWriteRequestNum = requestNum;
     for (int shard = 0; shard < shards; shard++)
     {
-        ClientSendNext(shard, getUpcall, "get");
+        requestNum++;
+        ClientSendNext(shard, MakeGetUpcall(prevWriteRequestNum), "get");
     }
     transport->Run();
 
@@ -370,19 +381,20 @@ TEST_P(CRAQTest, AllClientsWrite)
     int iterations = 1;
     for (int requestPerShard = 0; requestPerShard < iterations; requestPerShard++)
     {
-        requestNum++;
-
         for (int shard = 0; shard < shards; shard++)
         {
             for (int writingClientIndex = 0; writingClientIndex < GetParam().clientsPerShard; writingClientIndex++)
             {
+                int prevWritingRequestNum = ++requestNum;
                 ClientSendNext(shard, putUpcall, "put", writingClientIndex);
                 transport->Run();
 
                 // check write can be read by all clients
                 for (int clientIndex = 0; clientIndex < GetParam().clientsPerShard; clientIndex++)
                 {
-                    ClientSendNext(shard, getUpcall, "get");
+                    requestNum++;
+                    ClientSendNext(shard, MakeGetUpcall(prevWritingRequestNum), "get");
+                    transport->Run();
                 }
 
                 // check write can be read by all replicas
@@ -392,10 +404,9 @@ TEST_P(CRAQTest, AllClientsWrite)
                     string key = clients[shard].key;
                     bool success = apps[shard][replicaIndex].store.get(key, val);
                     EXPECT_TRUE(success);
-                    EXPECT_EQ(val.second, requestNum);
+                    EXPECT_EQ(val.second, prevWritingRequestNum);
                 }
 
-                transport->Run();
             }
         }
     }
@@ -410,7 +421,7 @@ TEST_P(CRAQTest, BasicVersionRequestIgnorePendingWrite)
         GTEST_SKIP();
     }
 
-    requestNum++;
+    int prevWriteRequestNum = ++requestNum;
     ClientSendNext(0, putUpcall, "put"); 
     
     string messageToBuffer = COMMIT_MESSAGE_TYPE;
@@ -420,7 +431,8 @@ TEST_P(CRAQTest, BasicVersionRequestIgnorePendingWrite)
     while (messageToBuffer != transport->PopEvent()){}
     Notice("Finished propagating write and commiting at tail, not sending commit messages yet");
    
-    ClientSendNext(0, getUpcallIgnoredPendingWrite, "get"); 
+    requestNum++;
+    ClientSendNext(0, MakeGetUpcall(prevWriteRequestNum - 1), "get"); 
 
     transport->Run();
 
@@ -447,7 +459,7 @@ TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
     string messageToBuffer;
     string messageType;
 
-    requestNum++;
+    int prevWriteRequestNum = ++requestNum;
     ClientSendNext(0, putUpcall, "put"); 
     
     messageToBuffer = COMMIT_MESSAGE_TYPE;
@@ -459,7 +471,8 @@ TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
    
     messageToBuffer = VERSION_REQUEST_MESSAGE_TYPE;
     transport->SetBufferingMessage(messageToBuffer);
-    ClientSendNext(0, getUpcall, "get"); 
+    requestNum++;
+    ClientSendNext(0, MakeGetUpcall(prevWriteRequestNum), "get"); 
     while (messageToBuffer != transport->PopEvent()){}
     Notice("Buffer version request for read");
 
@@ -468,6 +481,7 @@ TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
     EXPECT_EQ(COMMIT_MESSAGE_TYPE, messageType);
     transport->Run();
 
+    Notice("Propagated commits");
     // pop the version request
     while (!transport->IsBufferedQueueEmpty())
     {

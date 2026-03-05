@@ -34,6 +34,7 @@
 #define _CRAQ_CLIENT_H_
 
 #include <unordered_map>
+#include <random>
 
 #include "lib/configuration.h"
 #include "replication/common/client.h"
@@ -47,6 +48,9 @@ namespace replication
         class CRAQClient : public Client
         {
         public:
+            [[unused]] static constexpr const char *PUT_OPERATION = "put";
+            static constexpr const char *GET_OPERATION = "get";
+
             CRAQClient(const transport::Configuration &config, Transport *transport,
                      int group, uint64_t clientid);
             virtual ~CRAQClient();

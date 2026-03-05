@@ -50,10 +50,10 @@
     ]
   ],
   "client_total": [
-    64
+   1 
   ],
   "client_processes_per_client_node": [
-    64
+   1
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -74,7 +74,7 @@
   "bench_mode": "closed",
   "mpl": 1,
   "client_key_selector": "uniform",
-  "client_fanout": 200,
+  "client_fanout": 1,
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
@@ -121,7 +121,15 @@
     4,
     5,
     6,
-    7
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
   ],
   "client_debug_output": true,
   "server_debug_output": true,
@@ -236,7 +244,7 @@
   "plot_tput_lat_y_label": "Latency (ms)",
   "input_latency_scale": 1000000000,
   "output_latency_scale": 1000,
-  "src_commit_hash": "dev/craq-local",
+  "src_commit_hash": "dev/craq",
   "stats_file_name": "stats.json",
   "base_local_exp_directory": "/users/akalaba/IOCL/experiments/printdbg",
   "base_mounted_fs_path": "/mnt/extra",
@@ -269,8 +277,8 @@
   "make_env": {},
   "server_rdma_port": 9087,
   "rxe_cfg_path": "",
-  "client_read_percentage": 500,
-  "client_write_percentage": 500,
+  "client_read_percentage": 1000,
+  "client_write_percentage": 0,
   "client_conflict_percentage": 2,
   "client_max_processors": 2,
   "client_random_coordinator": false,

@@ -1276,7 +1276,7 @@ namespace strongstore
     void Server::SendOperationCallback(uint64_t transaction_id, int status)
     {
         ASSERT(status == REPLY_OK);
-        // Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
+        Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
     }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
@@ -2034,6 +2034,7 @@ namespace strongstore
         auto search = pending_operation_replies_.find(transaction_id);
         if (search == pending_operation_replies_.end())
         {
+            Debug("Responding to the client??");
             // Must be we're not a leader, so we don't want to send duplicate responses to clients
             ASSERT(replica_idx_ != 0);
             return;
