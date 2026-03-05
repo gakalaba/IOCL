@@ -6,7 +6,6 @@ from lib.experiment_codebase import *
 from utils.experiment_util import *
 from utils.remote_util import *
 MACHINE_CORE_COUNTER = {}
-NUM_CORES_PER_MACHINE = 16
 
 def next_core_for_machine(machine, core_list):
     """
@@ -93,7 +92,7 @@ class TransformedCodebase:
         taskset = ""
 
         if 'pin_client_processes' in config and isinstance(config['pin_client_processes'], list) and len(config['pin_client_processes']) > 0:
-            all_cores = config["pin_server_processes"]  # 16 cores on this machine, 0-15
+            all_cores = config["pin_client_processes"]  # 16 cores on this machine, 0-15
             core = next_core_for_machine(client_host, all_cores)
             taskset = 'taskset -c %d ' % (core)
 
