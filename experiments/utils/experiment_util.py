@@ -532,8 +532,6 @@ def run_experiment(config_file, client_config_idx, executor):
             if is_using_master(config):
                 master_thread.terminate()
                 kill_master(config, remote_exp_directory)
-            # print("Waiting{} seconds for servers to shutdown".format(10))
-            # time.sleep(10)
         return executor.submit(collect_and_calculate, config,
                                client_config_idx, remote_exp_directory, local_out_directory,
                                executor)
