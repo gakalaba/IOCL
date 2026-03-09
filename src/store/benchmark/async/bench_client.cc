@@ -381,7 +381,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
         return;
     }
 
-    // Operation op = appreq->GetNextOperation(op_index);
+    Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
     // std::string op_str;
 
