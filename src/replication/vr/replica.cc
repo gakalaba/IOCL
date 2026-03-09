@@ -282,6 +282,8 @@ namespace replication
 
         void VRReplica::StartViewChange(view_t newview)
         {
+            Warning("We did call StartViewChange :/");
+            return;
             RNotice("Starting view change for view " FMT_VIEW, newview);
 
             view = newview;
@@ -492,7 +494,7 @@ namespace replication
         void VRReplica::HandleRequestDummy(const TransportAddress &remote,
                                       const DummyRequest &msg)
         {
-            RDebug("Received dummy request");
+            RDebug("Received dummy request with req_id = %d", msg.req_id());
             // Replicate
             DummyReplication p;
             p.set_req_id(msg.req_id());
@@ -500,13 +502,16 @@ namespace replication
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
+            nullCommitTimeout->Reset();
         }
 
         void VRReplica::HandleDummyReplication(const TransportAddress &remote,
                                const proto::DummyReplication &msg)
         {
-            DummyReplication reply;
+            Debug("Receiving HandleDummyReplication! with req_id = %d", msg.req_id());
+            DummyReplicationResponse reply;
             reply.set_req_id(msg.req_id());
+            reply.set_id(myIdx);
 
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))
@@ -519,6 +524,10 @@ namespace replication
                             const proto::DummyReplicationResponse &msg)
         {
             // opnum_t opnum, const std::__cxx11::string &op, std::__cxx11::string &res
+            Debug("Receiving HandleDummyReplicationResponse with req_id = %d", msg.req_id());
+            if (msg.id() > 1) {
+                return;
+            }
             opnum_t opnum = msg.req_id();
             const string &op = "";
             string res;
@@ -530,14 +539,17 @@ namespace replication
             reply.set_req_id(msg.req_id());
             if (iter != clientAddresses.end())
             {
+                Debug("didn't find client!");
                 transport->SendMessage(this, *iter->second, reply);
             }
             DummyCommit cm;
+            cm.set_dummyval(420);
 
             if (!(transport->SendMessageToAll(this, cm)))
             {
                 RWarning("Failed to send COMMIT message to all replicas");
             }
+            nullCommitTimeout->Reset();
         }
 
         void VRReplica::HandleRequest(const TransportAddress &remote,

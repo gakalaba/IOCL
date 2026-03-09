@@ -1709,7 +1709,7 @@ namespace strongstore
     void Server::RespondToClientOperation(PendingOperationReply *reply,
                             uint64_t transaction_id, int status, string retval)
     {
-        Debug("got this status %d and this retval %s", status, retval.c_str());
+        Debug("got this status %d and this retval %s for transaction_id = %d", status, retval.c_str(), transaction_id);
 
         // uint64_t client_id = reply->rid.client_id();
         uint64_t client_req_id = reply->rid.client_req_id();
@@ -1993,8 +1993,9 @@ namespace strongstore
     // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
     {
-        Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
+        // Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
         // LinearizeableReply reply;
+        Debug("inside ReplicaUpcall with req_id = %d", opnum);
         DummyReply dummy_reply;
 
         string retval;
@@ -2031,12 +2032,16 @@ namespace strongstore
         dummy_reply.set_req_id(transaction_id);
         dummy_reply.SerializeToString(&response);
 
+
         auto search = pending_operation_replies_.find(transaction_id);
         if (search == pending_operation_replies_.end())
         {
+            Debug("Didn't find it!");
             // Must be we're not a leader, so we don't want to send duplicate responses to clients
             ASSERT(replica_idx_ != 0);
             return;
+        } else {
+            Debug("Found it! and i'm replica = %d", replica_idx_);
         }
 
         PendingOperationReply *pending_reply = search->second;

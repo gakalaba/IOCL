@@ -281,9 +281,10 @@ namespace strongstore
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
+        uint64_t myshardtag = CreateTag(client_id_, req_id);
         Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
         PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
-        pendingOps[req_id] = pendingOp;
+        pendingOps[myshardtag] = pendingOp;
         // pendingOp->op = op;
         // pendingOp->key = key;
         // pendingOp->val = value;
@@ -292,7 +293,7 @@ namespace strongstore
 
         // TODO: Setup timeout
         dummy_op_.Clear();
-        dummy_op_.set_req_id(req_id);
+        dummy_op_.set_req_id(myshardtag);
         // op_.Clear();
         // op_.mutable_rid()->set_client_id(client_id_);
         // op_.mutable_rid()->set_client_req_id(req_id);
@@ -355,6 +356,7 @@ namespace strongstore
         // Debug("shard client got LinearizeableReply!");
         // uint64_t req_id = reply.rid().client_req_id();
         uint64_t req_id = reply.req_id();
+        Debug("Shard client got reply for client_id = %d and req_id = lu", client_id_, req_id);
         // Debug("the app_request_id = %lu", req_id);
         // int status = reply.status();
         // string retval = reply.return_value();

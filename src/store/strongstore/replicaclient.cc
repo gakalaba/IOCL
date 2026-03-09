@@ -72,7 +72,7 @@ namespace strongstore
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout)
     {
-        Debug("[shard %i] ReplicaClient SendRequest sending msg", shard_idx_);
+        Debug("[shard %i] ReplicaClient SendRequest sending msg with req_id = %d", shard_idx_, msg.req_id());
         // Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
         //       msg.DebugString().c_str());
 
@@ -90,8 +90,8 @@ namespace strongstore
                 msg.SerializeToString(&request_str);
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
-                client->Invoke(
-                    request_str,
+                client->InvokeDummy(
+                    request_str, request_id,
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;

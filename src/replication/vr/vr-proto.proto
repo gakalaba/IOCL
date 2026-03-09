@@ -18,9 +18,11 @@ message DummyReplication {
 
 message DummyReplicationResponse {
     required uint64 req_id = 1;
+    required uint64 id = 2;
 }
 
 message DummyCommit {
+    required uint64 dummyval = 1;
 }
 
 message DummyReply {

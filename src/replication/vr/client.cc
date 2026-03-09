@@ -60,6 +60,24 @@ namespace replication
             }
         }
 
+        void VRClient::InvokeDummy(const string &request, uint64_t transaction_id, continuation_t continuation,
+                              error_continuation_t error_continuation)
+        {
+            // TODO: Currently, invocations never timeout and error_continuation is
+            // never called. It may make sense to set a timeout on the invocation.
+            (void)error_continuation;
+
+            uint64_t reqId = ++lastReqId;
+            // Timeout *timer =
+            //     new Timeout(transport, 500, [this, reqId]()
+            //                 { ResendRequest(reqId); });
+            PendingRequest *req =
+                new PendingRequest(request, reqId, continuation);
+
+            pendingReqs[reqId] = req;
+            SendRequest(req, transaction_id);
+        }
+
         void VRClient::Invoke(const string &request, continuation_t continuation,
                               error_continuation_t error_continuation)
         {
@@ -75,7 +93,7 @@ namespace replication
                 new PendingRequest(request, reqId, continuation);
 
             pendingReqs[reqId] = req;
-            SendRequest(req);
+            SendRequest(req, 0);
         }
 
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
@@ -113,14 +131,16 @@ namespace replication
             return;
         }
 
-        void VRClient::SendRequest(const PendingRequest *req)
+        void VRClient::SendRequest(const PendingRequest *req, uint64_t tid)
         {
-            proto::RequestMessage reqMsg;
-            reqMsg.mutable_req()->set_op(req->request);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            // proto::RequestMessage reqMsg;
+            // reqMsg.mutable_req()->set_op(req->request);
+            // reqMsg.mutable_req()->set_clientid(clientid);
+            // reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            proto::DummyRequest reqMsg;
+            reqMsg.set_req_id(tid);
 
-            Debug("SENDING REQUEST TO LEADER");
+            Debug("SENDING REQUEST TO LEADER for operation with req_id = %lu and type %s", tid, reqMsg.GetTypeName().c_str());
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
@@ -146,7 +166,7 @@ namespace replication
             }
 
             Warning("Client timeout; resending request: %lu", reqId);
-            SendRequest(pendingReqs[reqId]);
+            SendRequest(pendingReqs[reqId], 0);
         }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,

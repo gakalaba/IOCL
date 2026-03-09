@@ -74,6 +74,8 @@ class Client : public TransportReceiver {
     virtual void InvokeIOCL(LinearizeableOperation &msg,
                                     continuation_t continuation,
                                     error_continuation_t error_continuation = nullptr);
+    virtual void InvokeDummy(const string &request, uint64_t tid, continuation_t continuation,
+                        error_continuation_t error_continuation = nullptr);
     virtual void InvokeUnlogged(
         int replicaIdx, const string &request, continuation_t continuation,
         error_continuation_t error_continuation = nullptr,
