@@ -30,3 +30,7 @@ message LinearizeableOperation {
     repeated uint64 predlist = 8;
     repeated uint32 shardlist = 9;
 }
+
+message DummyOperation {
+    required uint64 req_id = 1;
+}

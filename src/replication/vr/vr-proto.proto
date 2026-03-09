@@ -8,6 +8,25 @@ message RequestMessage {
     required replication.Request req = 1;
 }
 
+message DummyRequest {
+    required uint64 req_id = 1;
+}
+
+message DummyReplication {
+    required uint64 req_id = 1;
+}
+
+message DummyReplicationResponse {
+    required uint64 req_id = 1;
+}
+
+message DummyCommit {
+}
+
+message DummyReply {
+    required uint64 req_id = 1;
+}
+
 message ReplyMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;

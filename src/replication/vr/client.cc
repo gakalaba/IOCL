@@ -120,6 +120,7 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
 
+            Debug("SENDING REQUEST TO LEADER");
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
             if (transport->SendMessageToReplica(this, group, 0, reqMsg))
@@ -154,11 +155,19 @@ namespace replication
         {
             proto::ReplyMessage reply;
             proto::UnloggedReplyMessage unloggedReply;
+            proto::DummyReply dummyReply;
 
             if (type == reply.GetTypeName())
             {
                 reply.ParseFromString(data);
                 HandleReply(remote, reply);
+            }
+            else if (type == dummyReply.GetTypeName())
+            {
+                // This is a reply to an unlogged request, but we don't care about
+                // the contents. Just stop the timer and remove the pending request.
+                dummyReply.ParseFromString(data);
+                HandleDummyReply(remote, dummyReply);
             }
             else if (type == unloggedReply.GetTypeName())
             {
@@ -169,6 +178,24 @@ namespace replication
             {
                 Client::ReceiveMessage(remote, type, data, meta_data);
             }
+        }
+
+        void VRClient::HandleDummyReply(const TransportAddress &remote,
+                                    const proto::DummyReply &msg)
+        {
+            uint64_t reqId = msg.req_id();
+            auto it = pendingReqs.find(reqId);
+            if (it == pendingReqs.end())
+            {
+                Debug("Received reply when no request was pending");
+                return;
+            }
+
+            PendingRequest *req = it->second;
+            // req->timer->Stop();
+            pendingReqs.erase(it);
+            req->continuation(req->request, "");
+            delete req;
         }
 
         void VRClient::HandleReply(const TransportAddress &remote,

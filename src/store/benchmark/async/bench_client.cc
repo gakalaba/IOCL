@@ -367,38 +367,38 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    // Generic Operation Callback
+    // // Generic Operation Callback
     auto ocb = std::bind(&BenchmarkClient::ReceiveOperationResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
     auto otcb = std::bind(&BenchmarkClient::SendOperationTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
 
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
-    Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
+    // Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
     if (op_index == ss.fanout())
     {
         Debug("we've sent fanout number of requests, no longer sending more");
         return;
     }
 
-    Operation op = appreq->GetNextOperation(op_index);
+    // Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
-    std::string op_str;
+    // std::string op_str;
 
-    switch (op.type)
-    {
-    case GET:
-        op_str = "get";
-        break;
+    // switch (op.type)
+    // {
+    // case GET:
+    //     op_str = "get";
+    //     break;
 
-    case PUT:
-        op_str = "put";
-        break;
+    // case PUT:
+    //     op_str = "put";
+    //     break;
 
-    default:
-        Panic("unsupported opeartion type %d", op.type);
-    }
-    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
+    // default:
+    //     Panic("unsupported opeartion type %d", op.type);
+    // }
+    client.SendOperation(session, "", "", "", ocb, otcb, 0);
 
     if (issueConcurrent)
     {

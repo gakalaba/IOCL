@@ -68,11 +68,14 @@ namespace strongstore
                       uint64_t client_id, int shard);
         virtual ~ReplicaClient();
 
+        // void SendOperation(uint64_t request_id,
+        //                  replication::LinearizeableOperation &msg,
+        //                  op_callback ocb, op_timeout_callback otcb,
+        //                  uint32_t timeout);
         void SendOperation(uint64_t request_id,
-                         replication::LinearizeableOperation &msg,
-                         op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout);
-
+                    replication::DummyOperation &msg,
+                    op_callback ocb, op_timeout_callback otcb,
+                    uint32_t timeout);
 
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,

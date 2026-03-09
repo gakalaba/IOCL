@@ -393,6 +393,10 @@ namespace replication
                                        void *meta_data)
         {
             RequestMessage request;
+            DummyRequest dummyRequest;
+            DummyReplication dummyReplication;
+            DummyReplicationResponse dummyReplicationResponse;
+            DummyCommit dummyCommit;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
@@ -402,11 +406,36 @@ namespace replication
             StartViewChangeMessage startViewChange;
             DoViewChangeMessage doViewChange;
             StartViewMessage startView;
+            Debug("yyo");
 
-            if (type == request.GetTypeName())
+            // if (type == request.GetTypeName())
+            // {
+            //     request.ParseFromString(data);
+            //     HandleRequest(remote, request);
+            // }
+            if (type == dummyRequest.GetTypeName())
             {
-                request.ParseFromString(data);
-                HandleRequest(remote, request);
+                Debug("DummyRequest Received");
+                dummyRequest.ParseFromString(data);
+                HandleRequestDummy(remote, dummyRequest);
+            }
+            else if (type == dummyReplication.GetTypeName())
+            {
+                Debug("DummyReplication Received");
+                dummyReplication.ParseFromString(data);
+                HandleDummyReplication(remote, dummyReplication);
+            }
+            else if (type == dummyReplicationResponse.GetTypeName())
+            {
+                Debug("DummyReplicationResponse Received");
+                dummyReplicationResponse.ParseFromString(data);
+                HandleDummyReplicationResponse(remote, dummyReplicationResponse);
+            }
+            else if (type == dummyCommit.GetTypeName())
+            {
+                Debug("DummyCommit Received");
+                dummyCommit.ParseFromString(data);
+                HandleDummyCommit(remote, dummyCommit);
             }
             else if (type == unloggedRequest.GetTypeName())
             {
@@ -457,6 +486,57 @@ namespace replication
             {
                 RPanic("Received unexpected message type in VR proto: %s",
                        type.c_str());
+            }
+        }
+
+        void VRReplica::HandleRequestDummy(const TransportAddress &remote,
+                                      const DummyRequest &msg)
+        {
+            RDebug("Received dummy request");
+            // Replicate
+            DummyReplication p;
+            p.set_req_id(msg.req_id());
+            if (!(transport->SendMessageToAll(this, p)))
+            {
+                RWarning("Failed to send prepare message to all replicas");
+            }
+        }
+
+        void VRReplica::HandleDummyReplication(const TransportAddress &remote,
+                               const proto::DummyReplication &msg)
+        {
+            DummyReplication reply;
+            reply.set_req_id(msg.req_id());
+
+            if (!(transport->SendMessageToReplica(
+                    this, configuration.GetLeaderIndex(view), reply)))
+            {
+                RWarning("Failed to send PrepareOK message to leader");
+            }
+
+        }
+        void VRReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
+                            const proto::DummyReplicationResponse &msg)
+        {
+            // opnum_t opnum, const std::__cxx11::string &op, std::__cxx11::string &res
+            opnum_t opnum = msg.req_id();
+            const string &op = "";
+            string res;
+            ReplicaUpcall(opnum, op, res);
+
+            // Send Dummy Commit and added reply to client
+            auto iter = clientAddresses.find(msg.req_id());
+            DummyReply reply;
+            reply.set_req_id(msg.req_id());
+            if (iter != clientAddresses.end())
+            {
+                transport->SendMessage(this, *iter->second, reply);
+            }
+            DummyCommit cm;
+
+            if (!(transport->SendMessageToAll(this, cm)))
+            {
+                RWarning("Failed to send COMMIT message to all replicas");
             }
         }
 
@@ -754,6 +834,12 @@ namespace replication
 
                 nullCommitTimeout->Reset();
             }
+        }
+
+        void VRReplica::HandleDummyCommit(const TransportAddress &remote,
+                                     const DummyCommit &msg)
+        {
+            return;
         }
 
         void VRReplica::HandleCommit(const TransportAddress &remote,

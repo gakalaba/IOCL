@@ -63,14 +63,18 @@ namespace strongstore
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
+    // void ReplicaClient::SendOperation(uint64_t request_id,
+    //                      replication::LinearizeableOperation &msg,
+    //                      op_callback ocb, op_timeout_callback otcb,
+    //                      uint32_t timeout)
     void ReplicaClient::SendOperation(uint64_t request_id,
-                         replication::LinearizeableOperation &msg,
+                         replication::DummyOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout)
     {
         Debug("[shard %i] ReplicaClient SendRequest sending msg", shard_idx_);
-        Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
-              msg.DebugString().c_str());
+        // Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
+        //       msg.DebugString().c_str());
 
         string request_str;
         uint64_t reqId = lastReqId++;
@@ -91,13 +95,16 @@ namespace strongstore
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
-            case LinearizableProtocol::PROTO_IOCL_CT:
-                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-                client->InvokeIOCL(
-                    msg,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                        std::placeholders::_1, std::placeholders::_2));
+            default:
                 break;
+
+            // case LinearizableProtocol::PROTO_IOCL_CT:
+            //     Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
+            //     client->InvokeIOCL(
+            //         msg,
+            //         bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+            //             std::placeholders::_1, std::placeholders::_2));
+            //     break;
         }
     }
 
@@ -105,19 +112,20 @@ namespace strongstore
     bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
                                             const string &reply_str)
     {
-        LinearizeableReply reply;
+        // LinearizeableReply reply;
 
-        reply.ParseFromString(reply_str);
+        // reply.ParseFromString(reply_str);
 
-        Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
-              reply.status());
+        // Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
+        //       reply.status());
         auto itr = this->pendingOperations.find(reqId);
         ASSERT(itr != this->pendingOperations.end());
         PendingOperation *pendingOperation = itr->second;
         op_callback ocb = pendingOperation->ocb;
         this->pendingOperations.erase(itr);
         delete pendingOperation;
-        ocb(reply.status());
+        // ocb(reply.status());
+        ocb(0);
 
         return true;
     }

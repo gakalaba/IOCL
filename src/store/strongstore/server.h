@@ -218,7 +218,8 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
-        void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
+        // void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
+        void HandleSendOperation(const TransportAddress &remote, replication::DummyOperation &msg);
 
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
@@ -317,6 +318,7 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
+        replication::DummyOperation dummy_op_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -326,6 +328,7 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
+        proto::DummyReply dummy_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;
