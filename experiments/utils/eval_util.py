@@ -12,6 +12,8 @@ LATENCY_STATS_TO_PLOT = ['p50', 'p90', 'p95', 'p99']
 def convert_latency_nanos_to_millis(latencies):
     return list(map(lambda x: x / 1e6, latencies))
 
+def gnuplot_quote(path):
+    return path.replace('\\', '\\\\').replace("'", "\\'")
 
 def get_region(config, server):
     for region, servers in config["server_regions"].items():
@@ -540,14 +542,6 @@ def write_line_styles(f):
     f.write('set style line 5 linetype 5 linewidth 2\n')
     f.write('set style line 6 linetype 8 linewidth 2\n')
 
-
-def run_gnuplot(data_files, out_file, script_file):
-    args = ['gnuplot', '-e', "outfile='%s'" % out_file]
-    for i in range(len(data_files)):
-        args += ['-e', "datafile%d='%s'" % (i, data_files[i])]
-    args.append(script_file)
-    subprocess.call(args)
-
 def ensure_plots_directory(base_directory, config):
     plots_directory = os.path.join(base_directory, config['plot_directory_name'])
     os.makedirs(plots_directory, exist_ok=True)
@@ -568,7 +562,7 @@ def generate_csv_for_tput_lat_plot(plot_csv_file, tputs, lats):
 
 
 
-def generate_gnuplot_script_tput_lat(config, plot_script_file):
+def generate_gnuplot_script_tput_lat(config, plot_script_file, plot_csv_file, plot_out_file):
     with open(plot_script_file, 'w') as f:
         f.write("set datafile separator ','\n")
         f.write("set key top left\n")
@@ -578,12 +572,12 @@ def generate_gnuplot_script_tput_lat(config, plot_script_file):
                 (config['plot_tput_lat_png_width'],
                  config['plot_tput_lat_png_height'],
                  config['plot_tput_lat_png_font']))
-        f.write('set output outfile\n')
-        f.write("plot datafile0 title '%s' with linespoint\n" %
-                config['plot_tput_lat_series_title'].replace('_', '\\_'))
+        f.write("set output '%s'\n" % gnuplot_quote(os.path.abspath(plot_out_file)))
+        f.write("plot '%s' title '%s' with linespoint\n" %
+                (gnuplot_quote(os.path.abspath(plot_csv_file)),
+                 config['plot_tput_lat_series_title'].replace('_', '\\_')))
 
-
-def generate_gnuplot_script_tput_lat_agg(config, plot_script_file):
+def generate_gnuplot_script_tput_lat_agg(config, plot_script_file, plot_out_file, files):
     with open(plot_script_file, 'w') as f:
         write_gpi_header(f)
         f.write("set key top left\n")
@@ -593,10 +587,11 @@ def generate_gnuplot_script_tput_lat_agg(config, plot_script_file):
                 (config['plot_tput_lat_png_width'],
                  config['plot_tput_lat_png_height'],
                  config['plot_tput_lat_png_font']))
-        f.write('set output outfile\n')
+        f.write("set output '%s'\n" % gnuplot_quote(os.path.abspath(plot_out_file)))
         write_line_styles(f)
         f.write('plot ')
-        for i in range(len(config['replication_protocol'])):
+
+        for i in range(len(files)):
             # Pull series title from new config schema if present
             series_title = None
             if "plots" in config and len(config["plots"]) > 0:
@@ -606,13 +601,13 @@ def generate_gnuplot_script_tput_lat_agg(config, plot_script_file):
             # fallback to legacy field
             if series_title is None:
                 series_title = config['plot_tput_lat_series_title'][i]
-            f.write("datafile%d title '%s' ls %d with linespoint" % (
-                i, series_title.replace('_', '\\_'), i + 1))
-            if i != len(config['replication_protocol']) - 1:
+            title = series_title.replace('_', '\\_')
+            csv_path = gnuplot_quote(os.path.abspath(files[i]))
+            f.write("'%s' title '%s' ls %d with linespoint" % (csv_path, title, i + 1))
+            if i != len(files) - 1:
                 f.write(', \\\n')
 
 def generate_tput_lat_plot(config, plots_directory, plot_name, tputs, lats):
-    print("GENERATING TPUT-LAT PLOTS IN:", plots_directory)
     if len(tputs) == 0 or len(lats) == 0:
         print("Skipping plot %s because it has no data." % plot_name)
         return
@@ -625,10 +620,10 @@ def generate_tput_lat_plot(config, plots_directory, plot_name, tputs, lats):
         return
 
     plot_script_file = os.path.join(plots_directory, '%s.gpi' % plot_name)
-    generate_gnuplot_script_tput_lat(config, plot_script_file)
-
     plot_out_file = os.path.join(plots_directory, '%s.png' % plot_name)
-    run_gnuplot([plot_csv_file], plot_out_file, plot_script_file)
+
+    generate_gnuplot_script_tput_lat(config, plot_script_file, plot_csv_file, plot_out_file)
+    subprocess.call(['gnuplot', plot_script_file])
 
 def generate_tput_lat_plots(config, base_out_directory, exp_out_directories):
     plots_directory = ensure_plots_directory(base_out_directory, config)
@@ -717,10 +712,10 @@ def generate_agg_tput_lat_plots(config, base_out_directory, out_directories):
             continue
 
         plot_script_file = os.path.join(plots_directory, '%s.gpi' % csv_class)
-        generate_gnuplot_script_tput_lat_agg(config, plot_script_file)
-
         plot_out_file = os.path.join(plots_directory, '%s.png' % csv_class)
-        run_gnuplot(files, plot_out_file, plot_script_file)
+
+        generate_gnuplot_script_tput_lat_agg(config, plot_script_file, plot_out_file, files)
+        subprocess.call(['gnuplot', plot_script_file])
 
 def _collect_leaf_out_dirs(x):
     """
