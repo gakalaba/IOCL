@@ -237,10 +237,10 @@ namespace strongstore
                  get_callback gcb, get_timeout_callback gtcb,
                  uint32_t timeout, bool for_update);
 
-        void HandleGetReply(const proto::GetReply &reply);
+        void HandleGetReply(const proto::DummyGetReply &reply);
         // void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleSendOperationReply(const proto::DummyReply &reply);
-        void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
+        void HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
         void HandlePrepareAbortReply(const proto::PrepareAbortReply &reply);
@@ -264,6 +264,8 @@ namespace strongstore
         proto::Get get_;
         replication::LinearizeableOperation op_;
         replication::DummyOperation dummy_op_;
+        proto::DummyGet dummy_get_;
+        proto::DummyCommit dummy_commit_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -275,6 +277,8 @@ namespace strongstore
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
         proto::DummyReply dummy_reply_;
+        proto::DummyGetReply dummy_get_reply_;
+        proto::DummyCommitReply dummy_commit_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;
@@ -294,6 +298,7 @@ namespace strongstore
 
         // IOCL Operation Metadata
         uint64_t seqno;
+        Timestamp dummyTimestamp;
     };
 
 } // namespace strongstore

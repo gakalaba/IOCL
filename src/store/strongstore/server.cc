@@ -76,6 +76,7 @@ namespace strongstore
         {
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
+        dummyTimestamp = Timestamp(0, 0);
 
         // Debug event loop delay
         // expected_fire_us = 0;
@@ -171,20 +172,21 @@ namespace strongstore
                                 void *meta_data)
     {
         Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %s", type.c_str());
-        if (type == get_.GetTypeName())
+        if (type == dummy_get_.GetTypeName())
         {
-            get_.ParseFromString(data);
-            HandleGet(remote, get_);
+            dummy_get_.ParseFromString(data);
+            HandleGet(remote, dummy_get_);
         }
         else if (type == dummy_op_.GetTypeName())
         {
             dummy_op_.ParseFromString(data);
             HandleSendOperation(remote, dummy_op_);
         }
-        else if (type == rw_commit_c_.GetTypeName())
+        else if (type == dummy_commit_.GetTypeName())
         {
-            rw_commit_c_.ParseFromString(data);
-            HandleRWCommitCoordinator(remote, rw_commit_c_);
+            Debug("Server got commit");
+            dummy_commit_.ParseFromString(data);
+            HandleRWCommitCoordinator(remote, dummy_commit_);
         }
         else if (type == rw_commit_p_.GetTypeName())
         {
@@ -227,90 +229,94 @@ namespace strongstore
         }
     }
 
-    void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
+    void Server::HandleGet(const TransportAddress &remote, proto::DummyGet &msg)
     {
-        uint64_t client_id = msg.rid().client_id();
-        uint64_t client_req_id = msg.rid().client_req_id();
-        uint64_t transaction_id = msg.transaction_id();
+        Debug("getting Get with req_id = %d", msg.req_id());
+        dummy_get_reply_.Clear();
+        dummy_get_reply_.set_req_id(msg.req_id());
+        transport_->SendMessage(this, remote, dummy_get_reply_);
+        // uint64_t client_id = msg.rid().client_id();
+        // uint64_t client_req_id = msg.rid().client_req_id();
+        // uint64_t transaction_id = msg.transaction_id();
 
-        const std::string &key = msg.key();
-        const Timestamp timestamp{msg.timestamp()};
+        // const std::string &key = msg.key();
+        // const Timestamp timestamp{msg.timestamp()};
 
-        bool for_update = msg.has_for_update() && msg.for_update();
+        // bool for_update = msg.has_for_update() && msg.for_update();
 
-        Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
+        // Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
 
-        transactions_.StartGet(transaction_id, remote, key, for_update);
+        // transactions_.StartGet(transaction_id, remote, key, for_update);
 
-        LockAcquireResult r;
-        if (for_update)
-        {
-            r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
-        }
-        else
-        {
-            r = locks_.AcquireReadLock(transaction_id, timestamp, key);
-        }
+        // LockAcquireResult r;
+        // if (for_update)
+        // {
+        //     r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
+        // }
+        // else
+        // {
+        //     r = locks_.AcquireReadLock(transaction_id, timestamp, key);
+        // }
 
-        if (r.status == LockStatus::ACQUIRED)
-        {
-            ASSERT(r.wound_rws.size() == 0);
+        // if (r.status == LockStatus::ACQUIRED)
+        // {
+        //     ASSERT(r.wound_rws.size() == 0);
 
-            std::pair<TimestampID, std::string> value;
-            // read the value from the store! this doesn't need to be replicated
-            ASSERT(store_.get(key, value));
+        //     std::pair<TimestampID, std::string> value;
+        //     // read the value from the store! this doesn't need to be replicated
+        //     ASSERT(store_.get(key, value));
 
-            get_reply_.Clear();
-            get_reply_.mutable_rid()->CopyFrom(msg.rid());
-            get_reply_.set_status(REPLY_OK);
-            get_reply_.set_key(msg.key());
+        //     get_reply_.Clear();
+        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
+        //     get_reply_.set_status(REPLY_OK);
+        //     get_reply_.set_key(msg.key());
 
-            get_reply_.set_val(value.second);
-            value.first.timestamp.serialize(get_reply_.mutable_timestamp());
+        //     get_reply_.set_val(value.second);
+        //     value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
-            // respond back to the client (shard client)
-            transport_->SendMessage(this, remote, get_reply_);
+        //     // respond back to the client (shard client)
+        //     transport_->SendMessage(this, remote, get_reply_);
 
-            transactions_.FinishGet(transaction_id, key);
-        }
-        else if (r.status == LockStatus::FAIL)
-        {
-            Panic("Don't think we should be able to enter this case without WaitDie implemented??");
-            ASSERT(r.wound_rws.size() == 0);
+        //     transactions_.FinishGet(transaction_id, key);
+        // }
+        // else if (r.status == LockStatus::FAIL)
+        // {
+        //     Panic("Don't think we should be able to enter this case without WaitDie implemented??");
+        //     ASSERT(r.wound_rws.size() == 0);
 
-            get_reply_.Clear();
-            get_reply_.mutable_rid()->CopyFrom(msg.rid());
-            get_reply_.set_status(REPLY_FAIL);
-            get_reply_.set_key(msg.key());
+        //     get_reply_.Clear();
+        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
+        //     get_reply_.set_status(REPLY_FAIL);
+        //     get_reply_.set_key(msg.key());
 
-            transport_->SendMessage(this, remote, get_reply_);
+        //     transport_->SendMessage(this, remote, get_reply_);
 
-            const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+        //     const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
-            LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-            transactions_.AbortGet(transaction_id, key);
+        //     LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        //     transactions_.AbortGet(transaction_id, key);
 
-            NotifyPendingRWs(transaction_id, rr.notify_rws);
-        }
-        else if (r.status == LockStatus::WAITING)
-        {
-            auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
-            reply->key = key;
+        //     NotifyPendingRWs(transaction_id, rr.notify_rws);
+        // }
+        // else if (r.status == LockStatus::WAITING)
+        // {
+        //     auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
+        //     reply->key = key;
 
-            if (pending_get_replies_.find(transaction_id) == pending_get_replies_.end()) {
-                // create empty vector
-                pending_get_replies_[transaction_id] = std::vector<PendingGetReply *>();
-            }
-            pending_get_replies_[transaction_id].push_back(reply);
+        //     if (pending_get_replies_.find(transaction_id) == pending_get_replies_.end()) {
+        //         // create empty vector
+        //         pending_get_replies_[transaction_id] = std::vector<PendingGetReply *>();
+        //     }
+        //     pending_get_replies_[transaction_id].push_back(reply);
 
-            transactions_.PauseGet(transaction_id, key);
+        //     transactions_.PauseGet(transaction_id, key);
 
-            WoundPendingRWs(transaction_id, r.wound_rws);
-        }
-        else
-        {
-            NOT_REACHABLE();
-        }
+        //     WoundPendingRWs(transaction_id, r.wound_rws);
+        // }
+        // else
+        // {
+        //     NOT_REACHABLE();
+        // }
     }
 
     // void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
@@ -722,109 +728,128 @@ namespace strongstore
         }
     }
 
-    void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::RWCommitCoordinator &msg)
+    void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::DummyCommit &msg)
     {
-        uint64_t client_id = msg.rid().client_id();
-        uint64_t client_req_id = msg.rid().client_req_id();
+        uint64_t req_id = msg.req_id();
+        // uint64_t client_id = msg.rid().client_id();
+        // uint64_t client_req_id = msg.rid().client_req_id();
 
-        uint64_t transaction_id = msg.transaction_id();
+        // uint64_t transaction_id = msg.transaction_id();
 
-        std::unordered_set<int> participants{msg.participants().begin(),
-                                             msg.participants().end()};
+        // std::unordered_set<int> participants{msg.participants().begin(),
+        //                                      msg.participants().end()};
 
-        const Transaction transaction{msg.transaction()};
-        const Timestamp nonblock_ts{msg.nonblock_timestamp()};
+        // const Transaction transaction{msg.transaction()};
+        // const Timestamp nonblock_ts{msg.nonblock_timestamp()};
 
-        Debug("[%lu] Coordinator for transaction", transaction_id);
+        // Debug("[%lu] Coordinator for transaction", transaction_id);
 
-        const TrueTimeInterval now = tt_.Now();
-        const Timestamp start_ts{now.latest(), client_id};
-        TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
-                                                                   participants, transaction, nonblock_ts);
+        // const TrueTimeInterval now = tt_.Now();
+        // const Timestamp start_ts{now.latest(), client_id};
+        // TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
+        //                                                            participants, transaction, nonblock_ts);
 
-        if (s == PREPARING)
-        {
-            // Debug("[%lu] Coordinator preparing", transaction_id);
+        // if (s == PREPARING)
+        // {
+        //     // Debug("[%lu] Coordinator preparing", transaction_id);
 
-            LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-            if (ar.status == LockStatus::ACQUIRED)
-            {
-                ASSERT(ar.wound_rws.size() == 0);
-                const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
-                transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
-                const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
+        //     LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+        //     if (ar.status == LockStatus::ACQUIRED)
+        //     {
+        //         ASSERT(ar.wound_rws.size() == 0);
+        //         const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
+        //         transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
+        //         const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
-                auto *reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-                auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-                if (!inserted.second) {
-                    Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-                }
-                // pending_rw_commit_c_replies_[transaction_id] = reply;
+        //         auto *reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
+        //         auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+        //         if (!inserted.second) {
+        //             Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+        //         }
+        //         // pending_rw_commit_c_replies_[transaction_id] = reply;
 
-                // TODO: Handle timeout
-                replica_client_->CoordinatorCommit(
-                    transaction_id, start_ts, shard_idx_,
-                    participants, transaction, nonblock_ts, commit_ts,
-                    std::bind(&Server::CommitCoordinatorCallback, this,
-                              transaction_id, std::placeholders::_1),
-                    []() {}, COMMIT_TIMEOUT);
-            }
-            else if (ar.status == LockStatus::FAIL)
-            {
-                Panic("uhhh i don't think this can happen without WaitDie implemented??");
-                ASSERT(ar.wound_rws.size() == 0);
-                // Debug("[%lu] Coordinator prepare failed", transaction_id);
-                LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        //         // TODO: Handle timeout
+        //         replica_client_->CoordinatorCommit(
+        //             transaction_id, start_ts, shard_idx_,
+        //             participants, transaction, nonblock_ts, commit_ts,
+        //             std::bind(&Server::CommitCoordinatorCallback, this,
+        //                       transaction_id, std::placeholders::_1),
+        //             []() {}, COMMIT_TIMEOUT);
+        //     }
+        //     else if (ar.status == LockStatus::FAIL)
+        //     {
+        //         Panic("uhhh i don't think this can happen without WaitDie implemented??");
+        //         ASSERT(ar.wound_rws.size() == 0);
+        //         // Debug("[%lu] Coordinator prepare failed", transaction_id);
+        //         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
-                SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
+        //         SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
 
-                NotifyPendingRWs(transaction_id, rr.notify_rws);
+        //         NotifyPendingRWs(transaction_id, rr.notify_rws);
 
-                transactions_.AbortPrepare(transaction_id);
-            }
-            else if (ar.status == LockStatus::WAITING)
-            {
-                Debug("[%lu] Waiting", transaction_id);
+        //         transactions_.AbortPrepare(transaction_id);
+        //     }
+        //     else if (ar.status == LockStatus::WAITING)
+        //     {
+        //         Debug("[%lu] Waiting", transaction_id);
 
-                auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-                auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-                if (!inserted.second) {
-                    Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-                }
-                // pending_rw_commit_c_replies_[transaction_id] = reply;
+        //         auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
+        //         auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+        //         if (!inserted.second) {
+        //             Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+        //         }
+        //         // pending_rw_commit_c_replies_[transaction_id] = reply;
 
-                transactions_.PausePrepare(transaction_id);
+        //         transactions_.PausePrepare(transaction_id);
 
-                WoundPendingRWs(transaction_id, ar.wound_rws);
-            }
-            else
-            {
-                NOT_REACHABLE();
-            }
+        //         WoundPendingRWs(transaction_id, ar.wound_rws);
+        //     }
+        //     else
+        //     {
+        //         NOT_REACHABLE();
+        //     }
+        // }
+        // else if (s == ABORTED)
+        // {
+        //     // Debug("[%lu] Already aborted", transaction_id);
+
+        //     SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
+
+        //     SendAbortParticipants(transaction_id, participants);
+        // }
+        // else if (s == WAIT_PARTICIPANTS)
+        // {
+        //     // Debug("[%lu] Waiting for other participants", transaction_id);
+
+        //     auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
+        //     auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
+        //     if (!inserted.second) {
+        //         Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
+        //     }
+        //     // pending_rw_commit_c_replies_[transaction_id] = reply;
+        // }
+        // else
+        // {
+        //     NOT_REACHABLE();
+        // }
+        
+        auto *reply = new PendingRWCommitCoordinatorReply(0, 0, remote.clone());
+        auto inserted = pending_rw_commit_c_replies_.insert({req_id, reply});
+        if (!inserted.second) {
+            Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", req_id);
         }
-        else if (s == ABORTED)
-        {
-            // Debug("[%lu] Already aborted", transaction_id);
+        // pending_rw_commit_c_replies_[transaction_id] = reply;
 
-            SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
-
-            SendAbortParticipants(transaction_id, participants);
-        }
-        else if (s == WAIT_PARTICIPANTS)
-        {
-            // Debug("[%lu] Waiting for other participants", transaction_id);
-
-            auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-            auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-            if (!inserted.second) {
-                Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-            }
-            // pending_rw_commit_c_replies_[transaction_id] = reply;
-        }
-        else
-        {
-            NOT_REACHABLE();
-        }
+        // TODO: Handle timeout
+        auto participants = std::unordered_set<int>();
+        Transaction transaction = {};
+        Debug("sending commit with req_id = %d to replica_client", req_id);
+        replica_client_->CoordinatorCommit(
+            req_id, dummyTimestamp, shard_idx_,
+            participants, transaction, dummyTimestamp, dummyTimestamp,
+            std::bind(&Server::CommitCoordinatorCallback, this,
+                        req_id, std::placeholders::_1),
+            []() {}, COMMIT_TIMEOUT);
     }
 
     void Server::ContinueCoordinatorPrepare(uint64_t transaction_id)
@@ -916,23 +941,28 @@ namespace strongstore
         auto search = pending_rw_commit_c_replies_.find(transaction_id);
         if (search == pending_rw_commit_c_replies_.end())
         {
-            // Debug("[%lu] No pending commit coordinator reply found", transaction_id);
+            Debug("[%lu] No pending commit coordinator reply found!!!!", transaction_id);
             return;
         }
 
         PendingRWCommitCoordinatorReply *reply = search->second;
 
-        uint64_t client_id = reply->rid.client_id();
-        uint64_t client_req_id = reply->rid.client_req_id();
+        // uint64_t client_id = reply->rid.client_id();
+        // uint64_t client_req_id = reply->rid.client_req_id();
         const TransportAddress *remote = reply->rid.addr();
 
-        rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
-        rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
-        rw_commit_c_reply_.set_status(REPLY_OK);
-        commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
-        nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
+        // rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
+        // rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        // rw_commit_c_reply_.set_status(REPLY_OK);
+        // commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
+        // nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
-        transport_->SendMessage(this, *remote, rw_commit_c_reply_);
+        DummyCommitReply dummy_reply;
+        dummy_reply.set_req_id(transaction_id);
+
+        Debug("Sending commit reply to client with req_id = %d", transaction_id);
+        // transport_->SendMessage(this, *remote, rw_commit_c_reply_);
+        transport_->SendMessage(this, *remote, dummy_reply);
 
         delete remote;
         delete reply;
@@ -1740,37 +1770,38 @@ namespace strongstore
     {
         // Debug("[%lu] Commiting", transaction_id);
 
-        const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        // const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
         // Commit writes
-        const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-        for (auto &write : transaction.getWriteSet())
-        {
-            // apply all the buffered writes to the store!
-            store_.put(write.first, write.second, {commit_ts, transaction_id});
-        }
+        // const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+        // for (auto &write : transaction.getWriteSet())
+        // {
+        //     // apply all the buffered writes to the store!
+        //     store_.put(write.first, write.second, {commit_ts, transaction_id});
+        // }
 
-        if (transaction.getWriteSet().size() > 0)
-        {
-            min_prepare_timestamp_ = std::max(min_prepare_timestamp_, commit_ts);
-        }
+        // if (transaction.getWriteSet().size() > 0)
+        // {
+        //     min_prepare_timestamp_ = std::max(min_prepare_timestamp_, commit_ts);
+        // }
 
-        LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
+        // LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        // auto prevHolderWriteSet = std::move(transaction.getWriteSet());
+        // TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
 
         // Reply to client
-        SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
+        // SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
+        SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, dummyTimestamp);
 
         // Reply to participants
-        SendPrepareOKRepliesOK(transaction_id, commit_ts);
+        // SendPrepareOKRepliesOK(transaction_id, commit_ts);
 
         // Continue waiting RW transactions
-        NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+        // NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
 
         // Continue waiting RO transactions
-        NotifyPendingROs(fr.notify_ros);
-        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
+        // NotifyPendingROs(fr.notify_ros);
+        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
 
     void Server::ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
@@ -1839,7 +1870,7 @@ namespace strongstore
      */
     void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
     {
-        Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
+        // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
         if (consistency_ == LIN)
         {
@@ -1847,147 +1878,149 @@ namespace strongstore
             ReplicaUpcallAppRequest(opnum, linreq, response);
             return;
         }
+        Debug("Replica upcall with transaction_id = %lu", opnum);
+        CoordinatorCommitTransaction(opnum, dummyTimestamp);
 
-        Request request;
-        Reply reply;
+        // Request request;
+        // Reply reply;
 
-        request.ParseFromString(op);
+        // request.ParseFromString(op);
 
-        int status = REPLY_OK;
-        uint64_t transaction_id = request.txnid();
+        // int status = REPLY_OK;
+        // uint64_t transaction_id = request.txnid();
 
-        if (request.op() == strongstore::proto::Request::PREPARE)
-        {
-            // Debug("[%lu] Received PREPARE", transaction_id);
+        // if (request.op() == strongstore::proto::Request::PREPARE)
+        // {
+        //     // Debug("[%lu] Received PREPARE", transaction_id);
 
-            TransactionState s = transactions_.GetRWTransactionState(transaction_id);
-            if (s == ABORTED)
-            {
-                // Debug("[%lu] Already aborted", transaction_id);
-                status = REPLY_FAIL;
-            }
-            else if (s == NOT_FOUND)
-            { // Replica prepare
-                const Timestamp prepare_ts{request.prepare().timestamp()};
-                int coordinator = request.prepare().coordinator();
-                const Transaction transaction{request.prepare().txn()};
-                const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
+        //     TransactionState s = transactions_.GetRWTransactionState(transaction_id);
+        //     if (s == ABORTED)
+        //     {
+        //         // Debug("[%lu] Already aborted", transaction_id);
+        //         status = REPLY_FAIL;
+        //     }
+        //     else if (s == NOT_FOUND)
+        //     { // Replica prepare
+        //         const Timestamp prepare_ts{request.prepare().timestamp()};
+        //         int coordinator = request.prepare().coordinator();
+        //         const Transaction transaction{request.prepare().txn()};
+        //         const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
 
-                s = transactions_.StartParticipantPrepare(transaction_id, coordinator, transaction, nonblock_ts);
-                ASSERT(s == PREPARING);
+        //         s = transactions_.StartParticipantPrepare(transaction_id, coordinator, transaction, nonblock_ts);
+        //         ASSERT(s == PREPARING);
 
-                LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-                //WHY DOES THIS FAIL!?!?
-                if (ar.status != LockStatus::ACQUIRED) {
-                    Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
-                }
-                ASSERT(ar.status == LockStatus::ACQUIRED);
+        //         LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+        //         //WHY DOES THIS FAIL!?!?
+        //         if (ar.status != LockStatus::ACQUIRED) {
+        //             Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+        //         }
+        //         ASSERT(ar.status == LockStatus::ACQUIRED);
 
-                transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
+        //         transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
 
-                transactions_.FinishParticipantPrepare(transaction_id);
-            }
-            else if (s == PREPARING || s == PREPARED)
-            {
-                // Debug("[%lu] Already prepared", transaction_id);
-            }
-            else
-            {
-                NOT_REACHABLE();
-            }
-        }
-        else if (request.op() == strongstore::proto::Request::COMMIT)
-        {
-            // Debug("[%lu] Received COMMIT", transaction_id);
+        //         transactions_.FinishParticipantPrepare(transaction_id);
+        //     }
+        //     else if (s == PREPARING || s == PREPARED)
+        //     {
+        //         // Debug("[%lu] Already prepared", transaction_id);
+        //     }
+        //     else
+        //     {
+        //         NOT_REACHABLE();
+        //     }
+        // }
+        // else if (request.op() == strongstore::proto::Request::COMMIT)
+        // {
+        //     // Debug("[%lu] Received COMMIT", transaction_id);
 
-            const Timestamp commit_ts{request.commit().commit_timestamp()};
+        //     const Timestamp commit_ts{request.commit().commit_timestamp()};
 
-            if (request.has_prepare())
-            { // Coordinator commit
-                // Debug("[%lu] Coordinator commit", transaction_id);
+        //     if (request.has_prepare())
+        //     { // Coordinator commit
+        //         // Debug("[%lu] Coordinator commit", transaction_id);
 
-                if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
-                {
-                    const Timestamp start_ts{request.prepare().timestamp()};
-                    int coordinator = request.prepare().coordinator();
-                    const std::unordered_set<int> participants{request.prepare().participants().begin(),
-                                                               request.prepare().participants().end()};
-                    const Transaction transaction{request.prepare().txn()};
-                    const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
+        //         if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+        //         {
+        //             const Timestamp start_ts{request.prepare().timestamp()};
+        //             int coordinator = request.prepare().coordinator();
+        //             const std::unordered_set<int> participants{request.prepare().participants().begin(),
+        //                                                        request.prepare().participants().end()};
+        //             const Transaction transaction{request.prepare().txn()};
+        //             const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
 
-                    ASSERT(coordinator == shard_idx_);
+        //             ASSERT(coordinator == shard_idx_);
 
-                    TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
-                                                                               participants, transaction, nonblock_ts);
-                    for (int p : participants)
-                    {
-                        if (p != coordinator)
-                        {
-                            s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
-                        }
-                    }
-                    ASSERT(s == PREPARING);
+        //             TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
+        //                                                                        participants, transaction, nonblock_ts);
+        //             for (int p : participants)
+        //             {
+        //                 if (p != coordinator)
+        //                 {
+        //                     s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
+        //                 }
+        //             }
+        //             ASSERT(s == PREPARING);
 
-                    LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-                    //WHY DOES THIS FAIL!?!?
-                    if (ar.status != LockStatus::ACQUIRED) {
-                        Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
-                    }
-                    ASSERT(ar.status == LockStatus::ACQUIRED);
+        //             LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+        //             //WHY DOES THIS FAIL!?!?
+        //             if (ar.status != LockStatus::ACQUIRED) {
+        //                 Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+        //             }
+        //             ASSERT(ar.status == LockStatus::ACQUIRED);
 
-                    transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
-                }
-                else
-                {
-                    // Debug("[%lu] Already prepared", transaction_id);
-                }
+        //             transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
+        //         }
+        //         else
+        //         {
+        //             // Debug("[%lu] Already prepared", transaction_id);
+        //         }
 
-                uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
-                // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
-                // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-                if (commit_wait_us > 0) {
-                    Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
-                    transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-                } else {
-                    CoordinatorCommitTransaction(transaction_id, commit_ts);
-                }
-            }
-            else
-            { // Participant commit
-                // Debug("[%lu] Participant commit", transaction_id);
-                if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
-                {
-                    transactions_.ParticipantReceivePrepareOK(transaction_id);
-                }
+        //         uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
+        //         // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
+        //         // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
+        //         if (commit_wait_us > 0) {
+        //             Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
+        //             transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
+        //         } else {
+        //             CoordinatorCommitTransaction(transaction_id, commit_ts);
+        //         }
+        //     }
+        //     else
+        //     { // Participant commit
+        //         // Debug("[%lu] Participant commit", transaction_id);
+        //         if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+        //         {
+        //             transactions_.ParticipantReceivePrepareOK(transaction_id);
+        //         }
 
-                ParticipantCommitTransaction(transaction_id, commit_ts);
-            }
-        }
-        else if (request.op() == strongstore::proto::Request::ABORT)
-        {
-            // Debug("[%lu] Received ABORT", transaction_id);
+        //         ParticipantCommitTransaction(transaction_id, commit_ts);
+        //     }
+        // }
+        // else if (request.op() == strongstore::proto::Request::ABORT)
+        // {
+        //     // Debug("[%lu] Received ABORT", transaction_id);
 
-            if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
-            { // replica abort
-                const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+        //     if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
+        //     { // replica abort
+        //         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
-                LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-                auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-                TransactionFinishResult fr = transactions_.Abort(transaction_id);
-                ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
+        //         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        //         auto prevHolderWriteSet = std::move(transaction.getWriteSet());
+        //         TransactionFinishResult fr = transactions_.Abort(transaction_id);
+        //         ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
-                NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-                NotifyPendingROs(fr.notify_ros);
-                NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
-            }
-        }
-        else
-        {
-            NOT_REACHABLE();
-        }
+        //         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+        //         NotifyPendingROs(fr.notify_ros);
+        //         NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+        //     }
+        // }
+        // else
+        // {
+        //     NOT_REACHABLE();
+        // }
 
-        reply.set_status(status);
-        reply.SerializeToString(&response);
+        // reply.set_status(status);
+        // reply.SerializeToString(&response);
     }
 
     // TODO figure out interface for stuff to work with transformed apps

@@ -388,6 +388,8 @@ namespace strongstore
         // (shardtag, shardid) -> refcount
         std::list<std::pair<uint64_t, uint32_t>> outstandingOperationList_;
         std::list<uint16_t> outstandingOperationRefCount_;
+
+        Timestamp dummyTimestamp;
     };
 
 } // namespace strongstore

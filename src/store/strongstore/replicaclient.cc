@@ -206,28 +206,32 @@ namespace strongstore
                                           commit_timeout_callback ctcb,
                                           uint32_t timeout)
     {
-        Debug("[shard %i] Sending fast path COMMIT: %lu", shard_idx_, transaction_id);
+        // Debug("[shard %i] Sending fast path COMMIT: %lu", shard_idx_, transaction_id);
 
+        Debug("Coordinator Commit in Replica_client for req_id = %lu", transaction_id);
         // create commit request
         string request_str;
-        Request request;
-        request.set_op(Request::COMMIT);
-        request.set_txnid(transaction_id);
+        replication::DummyOperation dummy_op;
+        dummy_op.set_req_id(transaction_id);
+        // Request request;
+        // request.set_op(Request::COMMIT);
+        // request.set_txnid(transaction_id);
 
-        auto prepare = request.mutable_prepare();
+        // auto prepare = request.mutable_prepare();
 
-        transaction.serialize(prepare->mutable_txn());
-        start_ts.serialize(prepare->mutable_timestamp());
-        prepare->set_coordinator(coordinator);
-        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
-        for (int p : participants)
-        {
-            prepare->add_participants(p);
-        }
+        // transaction.serialize(prepare->mutable_txn());
+        // start_ts.serialize(prepare->mutable_timestamp());
+        // prepare->set_coordinator(coordinator);
+        // nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+        // for (int p : participants)
+        // {
+        //     prepare->add_participants(p);
+        // }
 
-        commit_ts.serialize(request.mutable_commit()->mutable_commit_timestamp());
+        // commit_ts.serialize(request.mutable_commit()->mutable_commit_timestamp());
 
-        request.SerializeToString(&request_str);
+        // request.SerializeToString(&request_str);
+        dummy_op.SerializeToString(&request_str);
 
         uint64_t reqId = lastReqId++;
         PendingCommit *pendingCommit = new PendingCommit(reqId);
@@ -235,8 +239,13 @@ namespace strongstore
         pendingCommit->ccb = ccb;
         pendingCommit->ctcb = ctcb;
 
-        client->Invoke(
-            request_str,
+        // client->Invoke(
+        //     request_str,
+        //     bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
+        //          std::placeholders::_1, std::placeholders::_2));
+
+        client->InvokeDummy(
+            request_str, transaction_id,
             bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
                  std::placeholders::_1, std::placeholders::_2));
     }

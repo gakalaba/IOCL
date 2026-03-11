@@ -51,6 +51,7 @@ namespace strongstore
         // TODO: Remove hardcoding
         replica_ = 0;
         seqno = 0;
+        dummyTimestamp = Timestamp(0, 0);
     }
 
     ShardClient::~ShardClient() {}
@@ -63,20 +64,20 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         Debug("Got message wahoo");
-        if (type == get_reply_.GetTypeName())
+        if (type == dummy_get_reply_.GetTypeName())
         {
-            get_reply_.ParseFromString(data);
-            HandleGetReply(get_reply_);
+            dummy_get_reply_.ParseFromString(data);
+            HandleGetReply(dummy_get_reply_);
         }
         else if (type == dummy_reply_.GetTypeName())
         {
             dummy_reply_.ParseFromString(data);
             HandleSendOperationReply(dummy_reply_);
         }
-        else if (type == rw_commit_c_reply_.GetTypeName())
+        else if (type == dummy_commit_reply_.GetTypeName())
         {
-            rw_commit_c_reply_.ParseFromString(data);
-            HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
+            dummy_commit_reply_.ParseFromString(data);
+            HandleRWCommitCoordinatorReply(dummy_commit_reply_);
         }
         else if (type == rw_commit_p_reply_.GetTypeName())
         {
@@ -195,64 +196,71 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
+        uint64_t shardtag = CreateTag(client_id_, req_id);
         PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
-        pendingGets[req_id] = pendingGet;
-        pendingGet->key = key;
+        pendingGets[shardtag] = pendingGet;
+        // pendingGet->key = key;
         pendingGet->gcb = gcb;
         pendingGet->gtcb = gtcb;
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-        auto &t = search->second;
-        auto &start_ts = t.start_time();
+        // auto search = transactions_.find(transaction_id);
+        // ASSERT(search != transactions_.end());
+        // auto &t = search->second;
+        // auto &start_ts = t.start_time();
 
         // TODO: Setup timeout
-        get_.Clear();
-        get_.mutable_rid()->set_client_id(client_id_);
-        get_.mutable_rid()->set_client_req_id(req_id);
-        get_.set_transaction_id(transaction_id);
-        start_ts.serialize(get_.mutable_timestamp());
-        get_.set_key(key);
-        get_.set_for_update(for_update);
+        dummy_get_.Clear();
+        dummy_get_.set_req_id(shardtag);
+        // get_.Clear();
+        // get_.mutable_rid()->set_client_id(client_id_);
+        // get_.mutable_rid()->set_client_req_id(req_id);
+        // get_.set_transaction_id(transaction_id);
+        // start_ts.serialize(get_.mutable_timestamp());
+        // get_.set_key(key);
+        // get_.set_for_update(for_update);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, dummy_get_);
+        // transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
     }
 
-    void ShardClient::HandleGetReply(const proto::GetReply &reply)
+    void ShardClient::HandleGetReply(const proto::DummyGetReply &reply)
     {
-        uint64_t req_id = reply.rid().client_req_id();
-        int status = reply.status();
+        // uint64_t req_id = reply.rid().client_req_id();
+        // int status = reply.status();
 
-        auto itr = pendingGets.find(req_id);
+        // auto itr = pendingGets.find(req_id);
+        auto itr = pendingGets.find(reply.req_id());
         if (itr == pendingGets.end())
         {
-            Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+            Panic("Didn't find pending GET request for req_id %lu!", reply.req_id());
+            // Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
 
         PendingGet *req = itr->second;
         uint64_t transaction_id = req->transaction_id;
+        Debug("Handling GET reply with req_id = %lu and transaction_id = %d", reply.req_id(), transaction_id);
         get_callback gcb = req->gcb;
-        std::string key = req->key;
+        // std::string key = req->key;
         pendingGets.erase(itr);
         delete req;
 
-        Debug("[%lu] [shard %i] Received GET reply: %s %d",
-              transaction_id, shard_idx_, key.c_str(), status);
+        // Debug("[%lu] [shard %i] Received GET reply: %s %d",
+        //       transaction_id, shard_idx_, key.c_str(), status);
 
-        std::string val;
-        Timestamp ts;
-        if (status == REPLY_OK)
-        {
-            val = reply.val();
-            ts = Timestamp(reply.timestamp());
-        }
+        // std::string val;
+        // Timestamp ts;
+        // if (status == REPLY_OK)
+        // {
+        //     val = reply.val();
+        //     ts = Timestamp(reply.timestamp());
+        // }
 
-        Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        transactions_[transaction_id].addReadSet(key, ts);
-        read_sets_[transaction_id][key] = val;
+        // Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
+        // transactions_[transaction_id].addReadSet(key, ts);
+        // read_sets_[transaction_id][key] = val;
 
-        gcb(status, key, val, ts);
+        gcb(0, "", "", dummyTimestamp);
     }
 
     void ShardClient::Put(uint64_t transaction_id, const std::string &key, const std::string &value,
@@ -497,36 +505,42 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
+        // auto search = transactions_.find(transaction_id);
+        // ASSERT(search != transactions_.end());
 
-        const auto &t = search->second;
+        // const auto &t = search->second;
 
         uint64_t req_id = last_req_id_++;
         PendingRWCoordCommit *pendingCommit = new PendingRWCoordCommit(transaction_id, req_id);
-        pendingRWCoordCommits[req_id] = pendingCommit;
+        pendingRWCoordCommits[transaction_id] = pendingCommit;
         pendingCommit->ccb = ccb;
         pendingCommit->ctcb = ctcb;
+        Debug("and added to pendingRWCoordCommits with req_id = %d and (key) transaction_id = %lu", req_id, transaction_id);
 
         // TODO: Setup timeout
-        rw_commit_c_.Clear();
-        rw_commit_c_.mutable_rid()->set_client_id(client_id_);
-        rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
-        rw_commit_c_.set_transaction_id(transaction_id);
-        t.serialize(rw_commit_c_.mutable_transaction());
-        nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
+        dummy_commit_.Clear();
+        dummy_commit_.set_req_id(transaction_id);
+        // rw_commit_c_.Clear();
+        // rw_commit_c_.mutable_rid()->set_client_id(client_id_);
+        // rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
+        // rw_commit_c_.set_transaction_id(transaction_id);
+        // t.serialize(rw_commit_c_.mutable_transaction());
+        // nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
 
-        for (int p : participants)
-        {
-            rw_commit_c_.add_participants(p);
-        }
+        // for (int p : participants)
+        // {
+        //     rw_commit_c_.add_participants(p);
+        // }
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
+        // transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, dummy_commit_);
     }
 
-    void ShardClient::HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply)
+    void ShardClient::HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply)
     {
-        uint64_t req_id = reply.rid().client_req_id();
+        // uint64_t req_id = reply.rid().client_req_id();
+        uint64_t req_id = reply.req_id();
+        Debug("Got RWCommitCoordinatorReply for req_id = %lu", req_id);
 
         auto itr = pendingRWCoordCommits.find(req_id);
         if (itr == pendingRWCoordCommits.end())
@@ -542,11 +556,12 @@ namespace strongstore
         delete req;
 
         transactions_.erase(transaction_id);
-        read_sets_.erase(transaction_id);
+        // read_sets_.erase(transaction_id);
 
-        Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
-              reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
+        // Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
+        //       reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
+        // ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
+        ccb(0, dummyTimestamp, dummyTimestamp);
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,

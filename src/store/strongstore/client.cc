@@ -96,6 +96,8 @@ namespace strongstore
 
             rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
         }
+
+        dummyTimestamp = Timestamp(0, 0);
     }
 
     Client::~Client()
@@ -435,7 +437,8 @@ namespace strongstore
      */
     void Client::Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
     {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueBegin, this, std::ref(session), bcb));
+        ContinueBegin(session, bcb);
+        // rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueBegin, this, std::ref(session), bcb));
     }
 
     void Client::ContinueBegin(Session &s, begin_callback bcb)
@@ -528,58 +531,59 @@ namespace strongstore
 
         auto tid = session.transaction_id();
 
-        Debug("GET [%lu : %s]", tid, key.c_str());
+        // Debug("GET [%lu : %s]", tid, key.c_str());
 
-        if (session.needs_aborts())
-        {
-            Debug("[%lu] Need to abort", tid);
-            gcb(REPLY_FAIL, "", "", Timestamp());
-            return;
-        }
+        // if (session.needs_aborts())
+        // {
+        //     Debug("[%lu] Need to abort", tid);
+        //     gcb(REPLY_FAIL, "", "", Timestamp());
+        //     return;
+        // }
 
         // ASSERT(session.executing());
-        ASSERT(session.executing() || session.getting());
-        session.add_parallel_get(key);
+        // ASSERT(session.executing() || session.getting());
+        // session.add_parallel_get(key);
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
 
-        session.set_getting(i);
+        // session.set_getting(i);
 
         // Add this shard to set of participants
-        session.add_participant(i);
-        session.add_get_participant(i);
+        // session.add_participant(i);
+        // session.add_get_participant(i);
 
-        auto gcb1 = [gcb, session = std::ref(session)](int s, const std::string &k, const std::string &v, Timestamp ts)
-        {
-            // check how many outstanding gets!
-            // session.get().set_executing();
-            session.get().remove_parallel_get(k);
-            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
-                session.get().set_executing();
-            }
-            if (session.get().state() == StrongSession::ABORTING) {
-                s = REPLY_FAIL;
-            }
-            gcb(s, k, v, ts);
-        };
+        // auto gcb1 = [gcb, session = std::ref(session)](int s, const std::string &k, const std::string &v, Timestamp ts)
+        // {
+        //     // check how many outstanding gets!
+        //     // session.get().set_executing();
+        //     session.get().remove_parallel_get(k);
+        //     if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+        //         session.get().set_executing();
+        //     }
+        //     if (session.get().state() == StrongSession::ABORTING) {
+        //         s = REPLY_FAIL;
+        //     }
+        //     gcb(s, k, v, ts);
+        // };
 
-        auto gtcb1 = [gtcb, session = std::ref(session)](int s, const std::string &k)
-        {
-            // check how many outstanding gets!
-            // session.get().set_executing();
-            session.get().remove_parallel_get(k);
-            if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
-                session.get().set_executing();
-            }
-            if (session.get().state() == StrongSession::ABORTING) {
-                s = REPLY_FAIL;
-            }
-            gtcb(s, k);
-        };
+        // auto gtcb1 = [gtcb, session = std::ref(session)](int s, const std::string &k)
+        // {
+        //     // check how many outstanding gets!
+        //     // session.get().set_executing();
+        //     session.get().remove_parallel_get(k);
+        //     if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
+        //         session.get().set_executing();
+        //     }
+        //     if (session.get().state() == StrongSession::ABORTING) {
+        //         s = REPLY_FAIL;
+        //     }
+        //     gtcb(s, k);
+        // };
 
         // Send the GET operation to appropriate shard.
-        sclients_[i]->Get(tid, key, gcb1, gtcb1, timeout);
+        // sclients_[i]->Get(tid, key, gcb1, gtcb1, timeout);
+        sclients_[i]->Get(tid, key, gcb, gtcb, timeout);
     }
 
     /* Returns the value corresponding to the supplied key. */
@@ -810,69 +814,76 @@ namespace strongstore
 
         Debug("[%lu] COMMIT", tid);
 
-        if (session.needs_aborts())
-        {
-            Debug("[%lu] Need to abort", tid);
-            ccb(ABORTED_SYSTEM);
-            return;
-        }
+        // if (session.needs_aborts())
+        // {
+        //     Debug("[%lu] Need to abort", tid);
+        //     ccb(ABORTED_SYSTEM);
+        //     return;
+        // }
 
-        ASSERT(session.executing());
-        session.set_committing();
+        // ASSERT(session.executing());
+        // session.set_committing();
 
-        auto &min_read_ts = session.min_read_ts();
-        Debug("[%lu] min_read_ts: %lu.%lu", tid, min_read_ts.getTimestamp(), min_read_ts.getID());
+        // auto &min_read_ts = session.min_read_ts();
+        // Debug("[%lu] min_read_ts: %lu.%lu", tid, min_read_ts.getTimestamp(), min_read_ts.getID());
 
         uint64_t req_id = last_req_id_++;
+        uint64_t shardtag = ((client_id_ << 32) | (req_id & 0xFFFFFFFF));
+        Debug("my client_id is %lu, my req_id is %lu, and my shardtag is %lu", client_id_, req_id, shardtag);
         PendingRequest *req = new PendingRequest(req_id);
-        pending_reqs_[req_id] = req;
+        pending_reqs_[shardtag] = req;
+        Debug("Created pending request with shardtag %lu", shardtag);
         req->ccb = ccb;
         req->ctcb = ctcb;
 
-        auto &participants = session.participants();
+        // auto &participants = session.participants();
 
-        stats.IncrementList("txn_groups", participants.size());
+        // stats.IncrementList("txn_groups", participants.size());
 
-        Debug("[%lu] PREPARE", tid);
-        ASSERT(participants.size() > 0);
+        // Debug("[%lu] PREPARE", tid);
+        // ASSERT(participants.size() > 0);
 
         req->outstandingPrepares = 0;
 
-        int coordinator_shard = ChooseCoordinator(session);
+        // int coordinator_shard = ChooseCoordinator(session);
 
-        Timestamp nonblock_timestamp = Timestamp();
-        if (consistency_ == Consistency::RSS)
-        {
-            nonblock_timestamp = ChooseNonBlockTimestamp(session);
-        }
+        // Timestamp nonblock_timestamp = Timestamp();
+        // if (consistency_ == Consistency::RSS)
+        // {
+        //     nonblock_timestamp = ChooseNonBlockTimestamp(session);
+        // }
 
-        auto cccb = std::bind(&Client::CommitCallback, this, std::ref(session), req->id,
+        auto cccb = std::bind(&Client::CommitCallback, this, std::ref(session), shardtag,
                               std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         auto cctcb = [](int) {};
 
-        auto pccb = [transaction_id = tid](int status)
-        {
-            Debug("[%lu] PREPARE callback status %d", transaction_id, status);
-        };
-        auto pctcb = [](int) {};
+        // auto pccb = [transaction_id = tid](int status)
+        // {
+        //     Debug("[%lu] PREPARE callback status %d", transaction_id, status);
+        // };
+        // auto pctcb = [](int) {};
 
-        for (auto p : participants)
-        {
-            if (p == coordinator_shard)
-            {
-                sclients_[p]->RWCommitCoordinator(tid, participants, nonblock_timestamp, cccb, cctcb, timeout);
-            }
-            else
-            {
-                sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
-            }
-        }
+        // for (auto p : participants)
+        // {
+        //     if (p == coordinator_shard)
+        //     {
+        //         sclients_[p]->RWCommitCoordinator(tid, participants, nonblock_timestamp, cccb, cctcb, timeout);
+        //     }
+        //     else
+        //     {
+        //         sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
+        //     }
+        // }
+        // make pariticpants an empty set
+        auto participants = set<int>();
+        sclients_[0]->RWCommitCoordinator(shardtag, participants, dummyTimestamp, cccb, cctcb, timeout);
     }
 
     void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)
     {
         auto tid = session.transaction_id();
         Debug("[%lu] COMMIT callback status %d", tid, status);
+        Debug("Searching in pending_reqs_ with req_id %lu", req_id);
 
         auto search = pending_reqs_.find(req_id);
         if (search == pending_reqs_.end())
@@ -883,36 +894,37 @@ namespace strongstore
         PendingRequest *req = search->second;
 
         transaction_status_t tstatus;
-        switch (status)
-        {
-        case REPLY_OK:
-            Debug("[%lu] COMMIT OK", tid);
-            tstatus = COMMITTED;
-            break;
-        default:
-            // abort!
-            Debug("[%lu] COMMIT ABORT", tid);
-            tstatus = ABORTED_SYSTEM;
-            break;
-        }
+        // switch (status)
+        // {
+        // case REPLY_OK:
+        //     Debug("[%lu] COMMIT OK", tid);
+        //     tstatus = COMMITTED;
+        //     break;
+        // default:
+        //     // abort!
+        //     Debug("[%lu] COMMIT ABORT", tid);
+        //     tstatus = ABORTED_SYSTEM;
+        //     break;
+        // }
 
         commit_callback ccb = req->ccb;
         pending_reqs_.erase(req_id);
         delete req;
 
-        uint64_t ms = 0;
-        if (tstatus == COMMITTED && consistency_ == Consistency::RSS)
-        {
-            ms = tt_.TimeToWaitUntilMS(nonblock_ts.getTimestamp());
-            Debug("Waiting for nonblock time: %lu ms", ms);
-            session.advance_min_read_ts(commit_ts);
-            auto &min_read_ts = session.min_read_ts();
-            Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
-        }
+        // uint64_t ms = 0;
+        // if (tstatus == COMMITTED && consistency_ == Consistency::RSS)
+        // {
+        //     ms = tt_.TimeToWaitUntilMS(nonblock_ts.getTimestamp());
+        //     Debug("Waiting for nonblock time: %lu ms", ms);
+        //     session.advance_min_read_ts(commit_ts);
+        //     auto &min_read_ts = session.min_read_ts();
+        //     Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
+        // }
 
-        rss::EndTransaction(service_name_, session);
+        // rss::EndTransaction(service_name_, session);
 
-        transport_->Timer(ms, std::bind(ccb, tstatus));
+        // transport_->Timer(ms, std::bind(ccb, tstatus));
+        transport_->Timer(0, std::bind(ccb, tstatus));
     }
 
     void Client::Abort(Session &s, abort_callback acb, abort_timeout_callback atcb, uint32_t timeout)

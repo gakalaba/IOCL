@@ -131,7 +131,7 @@ void BenchmarkClient::SendNext()
     auto &ss = session_states_.find(sid)->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, sid);
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, sid, true);
     auto btcb = []() {};
 
     Operation op = transaction->GetNextOperation(0);
@@ -213,32 +213,32 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
     auto transaction = GetNextTransaction();
     stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
-    if (switch_dist_(rand_))
-    {
-        auto cur_client_index = ss.current_client_index();
-        std::size_t next_client_index = (cur_client_index + 1) % clients_.size();
+    // if (switch_dist_(rand_))
+    // {
+    //     auto cur_client_index = ss.current_client_index();
+    //     std::size_t next_client_index = (cur_client_index + 1) % clients_.size();
 
-        auto &cur_client = *clients_[cur_client_index];
-        rss::Session rss_session = cur_client.EndSession(ss.session());
+    //     auto &cur_client = *clients_[cur_client_index];
+    //     rss::Session rss_session = cur_client.EndSession(ss.session());
 
-        auto &next_client = *clients_[next_client_index];
+    //     auto &next_client = *clients_[next_client_index];
 
-        auto &session = next_client.ContinueSession(rss_session);
-        ASSERT(session_id == session.id());
+    //     auto &session = next_client.ContinueSession(rss_session);
+    //     ASSERT(session_id == session.id());
 
-        ss.start_transaction(session, transaction, ecb, next_client_index);
-    }
-    else
-    {
-        ss.start_transaction(ss.session(), transaction, ecb, ss.current_client_index());
-    }
+    //     ss.start_transaction(session, transaction, ecb, next_client_index);
+    // }
+    // else
+    // {
+    //     ss.start_transaction(ss.session(), transaction, ecb, ss.current_client_index());
+    // }
 
     auto &session = ss.session();
     auto &client = *clients_[ss.current_client_index()];
 
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
+    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id, true);
     auto btcb = []() {};
 
     Operation op = transaction->GetNextOperation(0);
@@ -279,7 +279,7 @@ void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
     client.BeginAppRequest(session, bcb, btcb, timeout_);
 }
 
-void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
+void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id, bool getting)
 {
     Debug("[%lu] ExecuteNextOperation", session_id);
     auto search = session_states_.find(session_id);
@@ -290,12 +290,12 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    Operation op = transaction->GetNextOperation(op_index);
+    // Operation op = transaction->GetNextOperation(op_index);
     ss.incr_op_index();
-    Debug("Peeking next op");
-    Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
-    bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
-    Debug("nextOpCommit = %d", nextOpCommit);
+    // Debug("Peeking next op");
+    // Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
+    // bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
+    // Debug("nextOpCommit = %d", nextOpCommit);
 
     auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
@@ -309,51 +309,57 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
 
-    switch (op.type)
-    {
-    case GET:
-        client.Get(session, op.key, gcb, gtcb, timeout_);
-        break;
+    // switch (op.type)
+    // {
+    // case GET:
+    //     client.Get(session, op.key, gcb, gtcb, timeout_);
+    //     break;
 
-    case GET_FOR_UPDATE:
-        client.GetForUpdate(session, op.key, gcb, gtcb, timeout_);
-        break;
+    // case GET_FOR_UPDATE:
+    //     client.GetForUpdate(session, op.key, gcb, gtcb, timeout_);
+    //     break;
 
-    case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
-        break;
+    // case PUT:
+    //     client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
+    //     break;
 
-    case COMMIT:
+    // case COMMIT:
+    //     client.Commit(session, ccb, ctcb, timeout_);
+    //     break;
+
+    // case ABORT:
+    //     client.Abort(session, acb, atcb, timeout_);
+    //     break;
+
+    // case ROCOMMIT:
+    //     client.ROCommit(session, op.keys, ccb, ctcb, timeout_);
+    //     break;
+
+    // case WAIT:
+    //     break;
+
+    // default:
+    //     NOT_REACHABLE();
+    // }
+
+    if (getting) {
+        client.Get(session, "", gcb, gtcb, timeout_);
+    } else {
         client.Commit(session, ccb, ctcb, timeout_);
-        break;
-
-    case ABORT:
-        client.Abort(session, acb, atcb, timeout_);
-        break;
-
-    case ROCOMMIT:
-        client.ROCommit(session, op.keys, ccb, ctcb, timeout_);
-        break;
-
-    case WAIT:
-        break;
-
-    default:
-        NOT_REACHABLE();
     }
 
-    Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
-    if (issueConcurrent && !nextOpCommit && (op.type == GET || op.type == PUT || op.type == GET_FOR_UPDATE))
-    {
-        Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
-        // TODO ANJA should these just be added to the event queue?? or actually issued next
-        ExecuteNextOperation(session_id);
-    }
-    else
-    {
-        Debug("Not issueing next op from this fn");
-    }
-
+    // Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
+    Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, !getting, getting ? GET : COMMIT);
+    // if (issueConcurrent && !nextOpCommit && (op.type == GET || op.type == PUT || op.type == GET_FOR_UPDATE))
+    // {
+    //     Debug("we're about to issue the next operation within this TRANSACTION without having gotten a response!!!");
+    //     // TODO ANJA should these just be added to the event queue?? or actually issued next
+    //     ExecuteNextOperation(session_id);
+    // }
+    // else
+    // {
+    //     Debug("Not issueing next op from this fn");
+    // }
 }
 
 void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
@@ -381,7 +387,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
         return;
     }
 
-    Operation op = appreq->GetNextOperation(op_index);
+    // Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
     // std::string op_str;
 
@@ -443,11 +449,12 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
 
     if (status == REPLY_OK)
     {
-        if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
-        {
-            ExecuteNextOperation(session_id);
-        }
-        // ExecuteNextOperation(session_id);
+        ExecuteNextOperation(session_id, false);
+        // if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
+        // {
+        //     ExecuteNextOperation(session_id, false);
+        // }
+        // // ExecuteNextOperation(session_id);
     }
     else if (status == REPLY_FAIL)
     {
@@ -494,7 +501,7 @@ void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
     {
         if ((!issueConcurrent) || (issueConcurrent && (ss.responses() == ss.transaction()->Fanout())))
         {
-            ExecuteNextOperation(session_id);
+            ExecuteNextOperation(session_id, false);
         }
         // ExecuteNextOperation(session_id);
     }
@@ -704,7 +711,7 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
 
                 stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
 
-                auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
+                auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id, true);
                 auto btcb = []() {};
 
                 auto &client = *clients_[ss.current_client_index()];

@@ -216,7 +216,7 @@ namespace strongstore
         };
         void DelayOnEventLoop();
 
-        void HandleGet(const TransportAddress &remote, proto::Get &msg);
+        void HandleGet(const TransportAddress &remote, proto::DummyGet &msg);
 
         // void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
         void HandleSendOperation(const TransportAddress &remote, replication::DummyOperation &msg);
@@ -225,7 +225,7 @@ namespace strongstore
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
-                                       proto::RWCommitCoordinator &msg);
+                                       proto::DummyCommit &msg);
 
         void SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
                                              const Timestamp &commit_ts,
@@ -319,6 +319,9 @@ namespace strongstore
         proto::Get get_;
         replication::LinearizeableOperation op_;
         replication::DummyOperation dummy_op_;
+        proto::DummyGet dummy_get_;
+        proto::DummyCommit dummy_commit_;
+        proto::DummyGetReply dummy_get_reply_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -350,6 +353,8 @@ namespace strongstore
         bool debug_stats_;
 
         uint64_t expected_fire_us;
+
+        Timestamp dummyTimestamp;
     };
 
 } // namespace strongstore

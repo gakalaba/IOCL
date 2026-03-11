@@ -180,7 +180,7 @@ private:
     void SendNextInSession(const uint64_t session_id);
     void SendNextAppRequestInSession(const uint64_t session_id);
 
-    void ExecuteNextOperation(const uint64_t session_id);
+    void ExecuteNextOperation(const uint64_t session_id, bool getting);
     void ExecuteNextAppRequestOperation(const uint64_t session_id);
 
     void GetCallback(const uint64_t session_id,
