@@ -25,7 +25,10 @@ class IOCLCodebase:
     def get_client_cmd(self, config, i, k, run, local_exp_directory,
                        remote_exp_directory):
 
-        client = config["clients"][i]
+        if ("clients_used" not in config) or (config["clients_used"] == 0):
+            raise Exception("Config must specify clients_used > 0")
+        full_client_list = config["clients"][:config["clients_used"]]
+        client = full_client_list[i]
 
         num_instances = config["num_instances"]
         replica_configs = [config["replica_config_format_str"] %

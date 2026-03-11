@@ -23,11 +23,13 @@ def get_region(config, server):
 
 
 def get_regions(config):
-    return set([get_region(config, s) for s in config["clients"] + config["server_names"]])
+    full_client_list = config["clients"][:config["clients_used"]]
+    return set([get_region(config, s) for s in full_client_list + config["server_names"]])
 
 
 def get_num_regions(config):
-    return len(set([get_region(config, s) for s in config["clients"] + config["server_names"]]))
+    full_client_list = config["clients"][:config["clients_used"]]
+    return len(set([get_region(config, s) for s in full_client_list + config["server_names"]]))
 
 
 def ensure_plots_directory(base_directory, config):
@@ -148,6 +150,7 @@ def calculate_statistics_for_run(config, local_out_directory, run):
     stats = {}
 
     regions = get_regions(config)
+    full_client_list = config["clients"][:config["clients_used"]]
     for region in regions:
         r_op_latencies = {}
         r_op_latency_counts = {}
@@ -158,7 +161,7 @@ def calculate_statistics_for_run(config, local_out_directory, run):
         op_tputs = {}
         op_times = {}
 
-        for client in config["clients"]:
+        for client in full_client_list:
             if get_region(config, client) != region:
                 continue
 
