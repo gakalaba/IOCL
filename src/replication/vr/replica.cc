@@ -539,7 +539,6 @@ namespace replication
             reply.set_req_id(msg.req_id());
             if (iter != clientAddresses.end())
             {
-                Debug("didn't find client!");
                 transport->SendMessage(this, *iter->second, reply);
             }
             DummyCommit cm;

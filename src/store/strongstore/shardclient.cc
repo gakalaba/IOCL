@@ -364,7 +364,7 @@ namespace strongstore
         // Debug("shard client got LinearizeableReply!");
         // uint64_t req_id = reply.rid().client_req_id();
         uint64_t req_id = reply.req_id();
-        Debug("Shard client got reply for client_id = %d and req_id = lu", client_id_, req_id);
+        Debug("Shard client got reply for client_id = %d and req_id = %lu", client_id_, req_id);
         // Debug("the app_request_id = %lu", req_id);
         // int status = reply.status();
         // string retval = reply.return_value();

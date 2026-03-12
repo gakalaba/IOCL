@@ -139,3 +139,33 @@ message StartViewMessage {
     required uint64 lastCommitted = 3;
     repeated LogEntry entries = 4;
 }
+
+message DummyRequest {
+    required uint64 req_id = 1;
+}
+
+message DummyReplication {
+    required uint64 req_id = 1;
+}
+
+message DummyReplicationResponse {
+    required uint64 req_id = 1;
+    required uint64 id = 2;
+}
+
+message DummyReplicationSecond {
+    required uint64 req_id = 1;
+}
+
+message DummyReplicationSecondResponse {
+    required uint64 req_id = 1;
+    required uint64 id = 2;
+}
+
+message DummyCommit {
+    required uint64 dummyval = 1;
+}
+
+message DummyReply {
+    required uint64 req_id = 1;
+}

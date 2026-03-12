@@ -370,6 +370,7 @@ namespace replication
         void IOCL_CTReplica::StartViewChange(view_t newview)
         {
             RNotice("Starting view change for view " FMT_VIEW, newview);
+            return;
 
             view = newview;
             status = STATUS_VIEW_CHANGE;
@@ -552,6 +553,12 @@ namespace replication
                                        void *meta_data)
         {
             RequestMessage request;
+            DummyRequest dummyRequest;
+            DummyReplication dummyReplication;
+            DummyReplicationResponse dummyReplicationResponse;
+            DummyReplicationSecond dummyReplicationSecond;
+            DummyReplicationSecondResponse dummyReplicationSecondResponse;
+            DummyCommit dummyCommit;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             PrepareOKMessage prepareOK;
@@ -568,11 +575,47 @@ namespace replication
             PredecessorFinalMessage coordFinal;
 
 
-            if (type == request.GetTypeName())
+            // if (type == request.GetTypeName())
+            // {
+            //     // Request arrived -- issue unordered prepare
+            //     request.ParseFromString(data);
+            //     HandleRequest(remote, request);
+            // }
+            if (type == dummyRequest.GetTypeName())
             {
-                // Request arrived -- issue unordered prepare
-                request.ParseFromString(data);
-                HandleRequest(remote, request);
+                Debug("DummyReqeust Received");
+                dummyRequest.ParseFromString(data);
+                HandleRequestDummy(remote, dummyRequest);
+            }
+            else if (type == dummyReplication.GetTypeName())
+            {
+                Debug("DummyReplication Received");
+                dummyReplication.ParseFromString(data);
+                HandleDummyReplication(remote, dummyReplication);
+            }
+            else if (type == dummyReplicationResponse.GetTypeName())
+            {
+                Debug("DummyReplicationResponse Received");
+                dummyReplicationResponse.ParseFromString(data);
+                HandleDummyReplicationResponse(remote, dummyReplicationResponse);
+            }
+            else if (type == dummyReplicationSecond.GetTypeName())
+            {
+                Debug("DummyReplicationSecond Received");
+                dummyReplicationSecond.ParseFromString(data);
+                HandleDummySecondReplication(remote, dummyReplicationSecond);
+            }
+            else if (type == dummyReplicationSecondResponse.GetTypeName())
+            {
+                Debug("DummyReplicationSecondResponse Received");
+                dummyReplicationSecondResponse.ParseFromString(data);
+                HandleDummySecondReplicationResponse(remote, dummyReplicationSecondResponse);
+            }
+            else if (type == dummyCommit.GetTypeName())
+            {
+                Debug("DummyCommit Received");
+                dummyCommit.ParseFromString(data);
+                HandleDummyCommit(remote, dummyCommit);
             }
             else if (type == coordReq.GetTypeName())
             {
@@ -653,6 +696,101 @@ namespace replication
                 RPanic("Received unexpected message type in iocl_ct proto: %s",
                        type.c_str());
             }
+        }
+
+        void IOCL_CTReplica::HandleRequestDummy(const TransportAddress &remote,
+                                      const DummyRequest &msg)
+        {
+            Debug("Received dummy request with req_id %lu", msg.req_id());
+            DummyReplication m;
+            m.set_req_id(msg.req_id());
+
+            if (!transport->SendMessageToAll(this, m))
+            {
+                RWarning("Failed to send DummyReplication message to all replicas");
+            }
+            nullCommitTimeout->Reset();
+        }
+
+        void IOCL_CTReplica::HandleDummyReplication(const TransportAddress &remote,
+                                      const proto::DummyReplication &msg)
+        {
+            Debug("Received dummy replication with req_id %lu", msg.req_id());
+            DummyReplicationResponse m;
+            m.set_req_id(msg.req_id());
+            m.set_id(myIdx);
+
+            if (!transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), m))
+            {
+                RWarning("Failed to send DummyReplicationResponse message to all replicas");
+            }
+        }
+
+        void IOCL_CTReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
+                                      const proto::DummyReplicationResponse &msg)
+        {
+            Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
+            if (msg.id() > 1) {
+                return;
+            }
+            DummyReplicationSecond m;
+            m.set_req_id(msg.req_id());
+
+            if (!transport->SendMessageToAll(this, m))
+            {
+                RWarning("Failed to send DummyReplicationSecond message to all replicas");
+            }
+            nullCommitTimeout->Reset();
+        }
+
+        void IOCL_CTReplica::HandleDummySecondReplication(const TransportAddress &remote,
+                                      const proto::DummyReplicationSecond &msg)
+        {
+            Debug("Received dummy second replication with req_id %lu", msg.req_id());
+            DummyReplicationSecondResponse m;
+            m.set_req_id(msg.req_id());
+            m.set_id(myIdx);
+
+            if (!transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), m))
+            {
+                RWarning("Failed to send DummyReplicationSecondResponse message to all replicas");
+            }
+        }
+
+        void IOCL_CTReplica::HandleDummySecondReplicationResponse(const TransportAddress &remote,
+                                      const proto::DummyReplicationSecondResponse &msg)
+        {
+            Debug("Received dummy second replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
+            if (msg.id() > 1) {
+                return;
+            }
+            opnum_t opnum = msg.req_id();
+            const string &op = "";
+            string res;
+            ReplicaUpcall(opnum, op, res);
+
+            // Send Dummy Commit and added reply to Client
+            auto iter = clientAddresses.find(msg.req_id());
+            DummyReply reply;
+            reply.set_req_id(msg.req_id());
+            if (iter != clientAddresses.end())
+            {
+                transport->SendMessage(this, *iter->second, reply);
+            }
+            DummyCommit cm;
+            cm.set_dummyval(420);
+
+            if (!transport->SendMessageToAll(this, cm))
+            {
+                RWarning("Failed to send DummyCommit message to all replicas");
+            }
+            nullCommitTimeout->Reset();
+        }
+
+        void IOCL_CTReplica::HandleDummyCommit(const TransportAddress &remote,
+                                     const DummyCommit &msg)
+        {
+            return;
         }
 
         void IOCL_CTReplica::HandleRequest(const TransportAddress &remote,

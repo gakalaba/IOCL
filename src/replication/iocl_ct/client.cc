@@ -68,6 +68,95 @@ namespace replication
             Panic("Should never call this");
         }
 
+        void IOCL_CTClient::InvokeIOCLDummy(DummyOperation &msg, uint64_t transaction_id, continuation_t continuation,
+                        error_continuation_t error_continuation)
+        {
+            // TODO: Currently, invocations never timeout and error_continuation is
+            // never called. It may make sense to set a timeout on the invocation.
+            (void)error_continuation;
+
+            // Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
+            //       msg.shardtag(), msg.predlist().size());
+            // Debug("size of the message before: %lu", msg.ByteSizeLong());
+            // string request_str;
+            // proto::RequestMessage reqMsg;
+            // We only want to stringify the operation, not the IOCL metadata
+            // reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
+            // uint64_t theshardtag = msg.shardtag();
+            // uint64_t theintkey = msg.intkey();
+            // reqMsg.set_shardtag(msg.shardtag());
+            // reqMsg.set_intkey(msg.intkey());
+            // msg.clear_shardtag();
+            // msg.clear_predlist();
+            // msg.clear_intkey();
+            // Issue coordination requests
+            // proto::SuccessorRequestMessage coordReqMsg;
+            // coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
+            // coordReqMsg.set_shardidx(group); // who pred should return to??
+            // for (uint32_t i = 0; i < reqMsg.predlist().size(); i++)
+            // {
+            //     uint64_t sendTo = msg.shardlist(i);
+            //     // if (sendTo == group)
+            //     // {
+            //     //     Debug("Skipping sending COORD REQUEST to self for predecessor_tag %u",
+            //     //           reqMsg.predlist(i));
+            //     //     // Append this index to the same_shards field
+            //     //     reqMsg.add_same_shards(i);
+            //     //     continue;
+            //     // }
+            //     uint64_t predShardTag = reqMsg.predlist(i);
+            //     coordReqMsg.set_p(predShardTag);
+            //     coordReqMsg.set_predidx(i);
+            //     Debug("SENDING %dth COORD REQUEST for predecessor_tag %lu to shard %lu",
+            //           i, predShardTag, sendTo);
+            //     // XXX Try sending only to (what we think is) the leader first
+            //     if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
+            //     {
+            //         Warning("Could not send request to replicas.");
+            //     }
+            // }
+            // msg.clear_shardlist();
+            // Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
+
+            // msg.SerializeToString(&request_str);
+
+            // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
+            uint64_t reqId = ++lastReqId;
+            // Timeout *timer =
+            //     new Timeout(transport, 15000, [this, reqId]()
+            //                 { ResendRequest(reqId); });
+            // PendingRequest *req =
+            //     new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
+            PendingRequest *req =
+                new PendingRequest("", reqId, 0, 0, continuation);
+            pendingReqs[reqId] = req;
+
+            /*------------------ Send Request ------------------*/
+            // // req->request is the string type of LinearizeableOperation without IOCL metadata
+            // reqMsg.mutable_req()->set_op(request_str);
+            // // uint64_t pid = (reqMsg.shardtag() >> 32) & 0xFFFFFFFF;
+            // // reqMsg.mutable_req()->set_clientid(pid);
+            // reqMsg.mutable_req()->set_clientid(clientid);
+            // reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            proto::DummyRequest reqMsg;
+            reqMsg.set_req_id(transaction_id);
+
+            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
+            // XXX Try sending only to (what we think is) the leader first
+            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
+            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            {
+                // req->timer->Reset();
+            }
+            else
+            {
+                Warning("Could not send request to replicas.");
+                pendingReqs.erase(req->clientReqId);
+                delete req;
+            }
+
+        }
+
         void IOCL_CTClient::InvokeIOCL(LinearizeableOperation &msg,
                                 continuation_t continuation,
                                 error_continuation_t error_continuation)

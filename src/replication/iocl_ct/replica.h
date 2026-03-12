@@ -199,6 +199,18 @@ namespace replication
 
             void HandleRequest(const TransportAddress &remote,
                                proto::RequestMessage &msg);
+            void HandleRequestDummy(const TransportAddress &remote,
+                                      const proto::DummyRequest &msg);
+            void HandleDummyReplication(const TransportAddress &remote,
+                               const proto::DummyReplication &msg);
+            void HandleDummyReplicationResponse(const TransportAddress &remote,
+                               const proto::DummyReplicationResponse &msg);
+            void HandleDummySecondReplication(const TransportAddress &remote,
+                               const proto::DummyReplicationSecond &msg);
+            void HandleDummySecondReplicationResponse(const TransportAddress &remote,
+                               const proto::DummyReplicationSecondResponse &msg);
+            void HandleDummyCommit(const TransportAddress &remote,
+                               const proto::DummyCommit &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 

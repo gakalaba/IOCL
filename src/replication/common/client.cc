@@ -100,4 +100,10 @@ Client::InvokeDummy(const string &request, uint64_t tid, continuation_t continua
     Panic("Shouldn't be calling this if not dummy");
 }
 
+void Client::InvokeIOCLDummy(DummyOperation &msg, uint64_t transaction_id, continuation_t continuation,
+                        error_continuation_t error_continuation)
+{
+    Panic("Shouldn't be calling this if not IOCL_CT");
+}
+
 } // namespace replication

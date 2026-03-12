@@ -95,16 +95,13 @@ namespace strongstore
                     bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                         std::placeholders::_1, std::placeholders::_2));
                 break;
-            default:
+            case LinearizableProtocol::PROTO_IOCL_CT:
+                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
+                client->InvokeIOCLDummy(
+                    msg, request_id,
+                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                        std::placeholders::_1, std::placeholders::_2));
                 break;
-
-            // case LinearizableProtocol::PROTO_IOCL_CT:
-            //     Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-            //     client->InvokeIOCL(
-            //         msg,
-            //         bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-            //             std::placeholders::_1, std::placeholders::_2));
-            //     break;
         }
     }
 
