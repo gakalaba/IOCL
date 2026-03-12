@@ -729,16 +729,40 @@ namespace replication
         void IOCL_CTReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
                                       const proto::DummyReplicationResponse &msg)
         {
-            Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
+            // Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
+            // if (msg.id() > 1) {
+            //     return;
+            // }
+            // DummyReplicationSecond m;
+            // m.set_req_id(msg.req_id());
+
+            // if (!transport->SendMessageToAll(this, m))
+            // {
+            //     RWarning("Failed to send DummyReplicationSecond message to all replicas");
+            // }
+            // nullCommitTimeout->Reset();
             if (msg.id() > 1) {
                 return;
             }
-            DummyReplicationSecond m;
-            m.set_req_id(msg.req_id());
+            opnum_t opnum = msg.req_id();
+            const string &op = "";
+            string res;
+            ReplicaUpcall(opnum, op, res);
 
-            if (!transport->SendMessageToAll(this, m))
+            // Send Dummy Commit and added reply to Client
+            auto iter = clientAddresses.find(msg.req_id());
+            DummyReply reply;
+            reply.set_req_id(msg.req_id());
+            if (iter != clientAddresses.end())
             {
-                RWarning("Failed to send DummyReplicationSecond message to all replicas");
+                transport->SendMessage(this, *iter->second, reply);
+            }
+            DummyCommit cm;
+            cm.set_dummyval(420);
+
+            if (!transport->SendMessageToAll(this, cm))
+            {
+                RWarning("Failed to send DummyCommit message to all replicas");
             }
             nullCommitTimeout->Reset();
         }
