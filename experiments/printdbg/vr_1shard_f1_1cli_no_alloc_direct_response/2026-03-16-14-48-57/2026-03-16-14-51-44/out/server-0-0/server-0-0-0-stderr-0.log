@@ -1,0 +1,27 @@
+20260216-145146-4996 09270 * main            (server.cc:213):    Starting server.
+20260216-145146-5001 09270 * main            (server.cc:331):    Creating a default paritioner!
+20260216-145157-6852 09270 * main            (server.cc:490):    Done loading server.
+20260216-145229-4744 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 3] EOF, lifetime=21013.09 ms
+20260216-145229-4767 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 9] EOF, lifetime=21010.28 ms
+20260216-145229-4780 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 8] EOF, lifetime=21013.24 ms
+20260216-145229-5017 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 10] EOF, lifetime=21013.97 ms
+20260216-145229-5060 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 11] EOF, lifetime=21013.35 ms
+20260216-145229-5066 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 12] EOF, lifetime=21013.01 ms
+20260216-145229-5097 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 13] EOF, lifetime=21014.30 ms
+20260216-145229-5106 09270 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 14] EOF, lifetime=21013.85 ms
+20260216-145235-7026 09270 * Cleanup         (server.cc:548):    Gracefully exiting after signal 15.
+20260216-145235-7027 09270 * Stop            (tcptransport.cc:581): [TCP SUMMARY] outgoingCreated=3 outgoingClosed=0 incomingCreated=11 incomingClosed=8 outgoingPeak=4 incomingPeak=8
+Inserted events:
+  0x55dbb80e92f0 [fd  9] Read Persist Internal
+  0x55dbb80e4420 [fd  10] Read Persist
+  0x55dbb80e6a20 [fd  11] Read Persist
+  0x55dc0de46530 [fd  12] Read Persist
+  0x55dc0de46f10 [fd  13] Read Persist
+  0x55dc0de48700 [fd  15] Read Persist
+  0x55dc0de599d0 [fd  16] Read Persist
+  0x55dc0de47b60 [fd  17] Read Persist
+  0x55dc0de73cb0 [fd  18] Read Persist
+  0x55dc0de482b0 [fd  -1] Timeout=1773690756.498293
+Active events:
+20260216-145235-7029 09270 * Cleanup         (server.cc:552):    Exporting stats to /mnt/extra/experiments/2026-03-16-14-51-44/out/server-0-0-0-stats-0.json.
+double free or corruption (fasttop)

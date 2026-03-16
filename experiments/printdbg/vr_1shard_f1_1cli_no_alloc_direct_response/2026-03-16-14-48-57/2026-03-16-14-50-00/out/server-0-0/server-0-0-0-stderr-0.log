@@ -1,0 +1,21 @@
+20260216-145002-7635 09094 * main            (server.cc:213):    Starting server.
+20260216-145002-7639 09094 * main            (server.cc:331):    Creating a default paritioner!
+20260216-145013-7825 09094 * main            (server.cc:490):    Done loading server.
+20260216-145045-7221 09094 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 5] EOF, lifetime=21010.26 ms
+20260216-145045-7299 09094 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 3] EOF, lifetime=21019.13 ms
+20260216-145051-9237 09094 * Cleanup         (server.cc:548):    Gracefully exiting after signal 15.
+20260216-145051-9238 09094 * Stop            (tcptransport.cc:581): [TCP SUMMARY] outgoingCreated=3 outgoingClosed=0 incomingCreated=5 incomingClosed=2 outgoingPeak=4 incomingPeak=3
+Inserted events:
+  0x55643b1842f0 [fd  9] Read Persist Internal
+  0x55643b17f420 [fd  10] Read Persist
+  0x55643b181a20 [fd  11] Read Persist
+  0x556490ee1530 [fd  12] Read Persist
+  0x556490ee1f10 [fd  13] Read Persist
+  0x556490ee3700 [fd  15] Read Persist
+  0x556490ee2b60 [fd  17] Read Persist
+  0x556490f0f0c0 [fd  18] Read Persist
+  0x556490f0f2e0 [fd  19] Read Persist
+  0x556490ee28d0 [fd  -1] Timeout=1773690652.712875
+Active events:
+20260216-145051-9240 09094 * Cleanup         (server.cc:552):    Exporting stats to /mnt/extra/experiments/2026-03-16-14-50-00/out/server-0-0-0-stats-0.json.
+double free or corruption (fasttop)
