@@ -64,7 +64,7 @@ namespace strongstore
     {
     public:
         RequestID(uint64_t client_id, uint64_t client_req_id,
-                  TransportAddress *addr)
+                  const TransportAddress *addr)
             : client_id_{client_id}, client_req_id_{client_req_id}, addr_{addr} {}
         ~RequestID() {}
 
@@ -78,7 +78,7 @@ namespace strongstore
     private:
         uint64_t client_id_;
         uint64_t client_req_id_;
-        TransportAddress *addr_;
+        const TransportAddress *addr_;
     };
 
     inline bool operator==(const strongstore::RequestID &lhs,
@@ -194,7 +194,7 @@ namespace strongstore
         {
         public:
             PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
-                                TransportAddress *remote)
+                                const TransportAddress *remote)
                 : rid{client_id, client_op_id, remote} {}
             RequestID rid;
             std::string key;

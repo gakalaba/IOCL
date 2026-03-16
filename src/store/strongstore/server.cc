@@ -328,11 +328,11 @@ namespace strongstore
         Debug("Calling HandleSendOperation! with msg.req_id = %d", msg.req_id());
         uint64_t transaction_id = msg.req_id();
 
-        auto reply = new PendingOperationReply(0, msg.req_id(), remote.clone());
+        auto reply = new PendingOperationReply(0, msg.req_id(), &remote);
         // auto reply = dummypending;
         // dummypending->rid.set_client_id(0);
         // dummypending->rid.set_client_req_id(msg.req_id());
-        // dummypending->rid.set_addr(remote.clone());
+        // dummypending->rid.set_addr(&remote);
 
         // reply->key = msg.key();
         // reply->value = msg.value();
@@ -1769,7 +1769,7 @@ namespace strongstore
         // transport_->SendMessage(this, *remote, op_reply_);
         transport_->SendMessage(this, *remote, dummy_reply_);
 
-        delete remote;
+        // delete remote;
         delete reply;
     }
 
