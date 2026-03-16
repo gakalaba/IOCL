@@ -52,6 +52,7 @@ namespace strongstore
         replica_ = 0;
         seqno = 0;
         dummyTimestamp = Timestamp(0, 0);
+        dummypending = new PendingOperation(0, 0);
     }
 
     ShardClient::~ShardClient() {}
@@ -291,7 +292,10 @@ namespace strongstore
         uint64_t req_id = last_req_id_++;
         uint64_t myshardtag = CreateTag(client_id_, req_id);
         Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
-        PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
+        // PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
+        PendingOperation *pendingOp = dummypending;
+        dummypending->transaction_id = app_request_id;
+        dummypending->req_id = req_id;
         pendingOps[myshardtag] = pendingOp;
         // pendingOp->op = op;
         // pendingOp->key = key;
@@ -383,7 +387,7 @@ namespace strongstore
         std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
         // Debug("moving the pred_list of size %lu", pred_list.size());
         pendingOps.erase(itr);
-        delete op;
+        // delete op;
 
         // Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
         //       shard_idx_, app_request_id, status, retval.c_str());

@@ -498,6 +498,11 @@ namespace replication
             // Replicate
             DummyReplication p;
             p.set_req_id(msg.req_id());
+            // clientAddresses.erase(msg.req_id());
+            // clientAddresses.insert(
+            //     std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
+            //         msg.req_id(),
+            //         std::unique_ptr<TransportAddress>(remote.clone())));
             if (!(transport->SendMessageToAll(this, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
@@ -534,13 +539,16 @@ namespace replication
             ReplicaUpcall(opnum, op, res);
 
             // Send Dummy Commit and added reply to client
-            auto iter = clientAddresses.find(msg.req_id());
-            DummyReply reply;
-            reply.set_req_id(msg.req_id());
-            if (iter != clientAddresses.end())
-            {
-                transport->SendMessage(this, *iter->second, reply);
-            }
+            // auto iter = clientAddresses.find(msg.req_id());
+            // DummyReply reply;
+            // reply.set_req_id(msg.req_id());
+            // if (iter != clientAddresses.end())
+            // {
+            //     Debug("going back up stack to cliant");
+            //     transport->SendMessage(this, *iter->second, reply);
+            // } else {
+            //     Debug("not going back up stack to cliant");
+            // }
             DummyCommit cm;
             cm.set_dummyval(420);
 

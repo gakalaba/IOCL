@@ -97,6 +97,8 @@ namespace replication
             };
 
             std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
+            // DUMMY
+            PendingRequest *dummypending;
 
             void SendRequest(const PendingRequest *req, uint64_t tid);
             void ResendRequest(const uint64_t reqId);

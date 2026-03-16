@@ -71,6 +71,9 @@ namespace strongstore
         const uint64_t client_id() const { return client_id_; }
         const uint64_t client_req_id() const { return client_req_id_; }
         const TransportAddress *addr() const { return addr_; }
+        void set_addr(TransportAddress *addr) { addr_ = addr; }
+        void set_client_id(uint64_t client_id) { client_id_ = client_id; }
+        void set_client_req_id(uint64_t client_req_id) { client_req_id_ = client_req_id; }
 
     private:
         uint64_t client_id_;
@@ -354,7 +357,9 @@ namespace strongstore
 
         uint64_t expected_fire_us;
 
+        // DUMMY
         Timestamp dummyTimestamp;
+        PendingOperationReply *dummypending;
     };
 
 } // namespace strongstore

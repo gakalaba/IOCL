@@ -47,6 +47,7 @@ namespace strongstore
           linproto_{linproto}
     {
         Debug("making replica client");
+        dummypending = new PendingOperation(0);
         switch (linproto) {
             case LinearizableProtocol::PROTO_VR:
                 client = new replication::vr::VRClient(config_, transport_, shard_idx_,
@@ -78,7 +79,9 @@ namespace strongstore
 
         string request_str;
         uint64_t reqId = lastReqId++;
-        PendingOperation *pendingOperation = new PendingOperation(reqId);
+        // PendingOperation *pendingOperation = new PendingOperation(reqId);
+        auto pendingOperation = dummypending;
+        dummypending->reqId = reqId;
         pendingOperations[reqId] = pendingOperation;
         pendingOperation->ocb = ocb;
         pendingOperation->otcb = otcb;
@@ -109,6 +112,7 @@ namespace strongstore
     bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
                                             const string &reply_str)
     {
+        Debug("Here in sendOperationCallback in replicaclient");
         // LinearizeableReply reply;
 
         // reply.ParseFromString(reply_str);
@@ -120,7 +124,7 @@ namespace strongstore
         PendingOperation *pendingOperation = itr->second;
         op_callback ocb = pendingOperation->ocb;
         this->pendingOperations.erase(itr);
-        delete pendingOperation;
+        // delete pendingOperation;
         // ocb(reply.status());
         ocb(0);
 

@@ -50,6 +50,7 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
+            dummypending = new PendingRequest("", 0, nullptr);
         }
 
         VRClient::~VRClient()
@@ -71,8 +72,11 @@ namespace replication
             // Timeout *timer =
             //     new Timeout(transport, 500, [this, reqId]()
             //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request, reqId, continuation);
+            PendingRequest *req = dummypending;
+                // new PendingRequest(request, reqId, continuation);
+            dummypending->request = request;
+            dummypending->clientReqId = reqId;
+            dummypending->continuation = continuation;
 
             pendingReqs[reqId] = req;
             SendRequest(req, transaction_id);
@@ -203,6 +207,7 @@ namespace replication
         void VRClient::HandleDummyReply(const TransportAddress &remote,
                                     const proto::DummyReply &msg)
         {
+            Debug("in dummrReply!");
             uint64_t reqId = msg.req_id();
             auto it = pendingReqs.find(reqId);
             if (it == pendingReqs.end())
@@ -234,7 +239,7 @@ namespace replication
             // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
-            delete req;
+            // delete req;
         }
 
         void VRClient::HandleUnloggedReply(const TransportAddress &remote,

@@ -159,6 +159,8 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingOperation *> pendingOperations;
 
         uint64_t lastReqId;
+        //DUMMY
+        PendingOperation *dummypending;
     };
 
 } // namespace strongstore

@@ -299,6 +299,9 @@ namespace strongstore
         // IOCL Operation Metadata
         uint64_t seqno;
         Timestamp dummyTimestamp;
+
+        // FOR DUMMY
+        PendingOperation *dummypending;
     };
 
 } // namespace strongstore
