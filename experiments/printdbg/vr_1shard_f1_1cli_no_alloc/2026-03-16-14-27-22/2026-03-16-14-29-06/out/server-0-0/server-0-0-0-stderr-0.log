@@ -1,0 +1,23 @@
+20260216-142909-2638 08303 * main            (server.cc:213):    Starting server.
+20260216-142909-2643 08303 * main            (server.cc:331):    Creating a default paritioner!
+20260216-142920-2803 08303 * main            (server.cc:490):    Done loading server.
+20260216-142952-2555 08303 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 3] EOF, lifetime=21013.33 ms
+20260216-142952-2597 08303 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 8] EOF, lifetime=21013.45 ms
+20260216-142952-2627 08303 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 9] EOF, lifetime=21014.51 ms
+20260216-142952-2669 08303 ! TCPIncomingEventCallback (tcptransport.cc:928): [TCP INCOMING 10] EOF, lifetime=21014.78 ms
+20260216-142958-4509 08303 * Cleanup         (server.cc:548):    Gracefully exiting after signal 15.
+20260216-142958-4510 08303 * Stop            (tcptransport.cc:581): [TCP SUMMARY] outgoingCreated=3 outgoingClosed=0 incomingCreated=7 incomingClosed=4 outgoingPeak=4 incomingPeak=4
+Inserted events:
+  0x558bc36812f0 [fd  9] Read Persist Internal
+  0x558bc367c420 [fd  10] Read Persist
+  0x558bc367ea20 [fd  11] Read Persist
+  0x558c193de530 [fd  12] Read Persist
+  0x558c193def10 [fd  13] Read Persist
+  0x558c193e0700 [fd  15] Read Persist
+  0x558c193f19d0 [fd  16] Read Persist
+  0x558c193dfb60 [fd  17] Read Persist
+  0x558c1940bcb0 [fd  18] Read Persist
+  0x558c193df8d0 [fd  -1] Timeout=1773689399.253645
+Active events:
+20260216-142958-4512 08303 * Cleanup         (server.cc:552):    Exporting stats to /mnt/extra/experiments/2026-03-16-14-29-06/out/server-0-0-0-stats-0.json.
+double free or corruption (fasttop)

@@ -1,0 +1,49 @@
+20260216-143353-4510 09642 * main            (benchmark.cc:402): Starting benchmark.
+20260216-143358-1784 09642 * main            (benchmark.cc:621): Creating a default paritioner!
+20260216-143358-1786 09642 * Client          (client.cc:75):     Initializing StrongStore client with id [50]
+20260216-143358-1787 09642 * BenchmarkClient (bench_client.cc:81): starting benchclient, issueConcurrent: 0; fanout: 1
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20260216-143403-5934 09642 * WarmupDone      (bench_client.cc:726): Completed warmup period of 5 seconds with 1111 requests
+20260216-143414-5937 09642 * Finish          (bench_client.cc:920): Completed 2446 requests in 11.004460 seconds
+20260216-143414-5937 09642 * Finish          (bench_client.cc:921): 1 outstanding transactions.
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: , current_state: 0
+20260216-143417-5935 09642 * FlushStats      (benchmark.cc:890): Flushing stats to /mnt/extra/experiments/2026-03-16-14-33-29/out/client-0-0-50-stats-0.json.
+20260216-143417-5937 09642 * FlushStats      (benchmark.cc:902): All done!
+20260216-143419-5940 09642 * Cleanup         (bench_client.cc:748): Aborting 0 outstanding transactions.
+20260216-143419-5941 09642 * CooldownDone    (bench_client.cc:778): Finished cooldown period.
+20260216-143419-5956 09642 * CooldownDone    (bench_client.cc:785): Median latency is 4475932 ns (4475 us)
+20260216-143419-5957 09642 * CooldownDone    (bench_client.cc:794): Average latency is 4454224 ns (4454 us)
+20260216-143419-5958 09642 * CooldownDone    (bench_client.cc:798): 90th percentile latency is 5084743 ns (5084 us)
+20260216-143419-5958 09642 * CooldownDone    (bench_client.cc:802): 95th percentile latency is 5225218 ns (5225 us)
+20260216-143419-5958 09642 * CooldownDone    (bench_client.cc:806): 99th percentile latency is 5469407 ns (5469 us)
+20260216-143419-5959 09642 * LATENCY total: 755 us 4454 us/4194 us 90 ms (2447 samples, 10 s total)
+20260216-143419-5959 09642 *     524 us |          7 | 
+20260216-143419-5959 09642 *    1048 us |         11 | 
+20260216-143419-5960 09642 *    2097 us |        660 | ==================
+20260216-143419-5960 09642 *    4194 us |       1764 | ==================================================
+20260216-143419-5960 09642 *    8388 us |          3 | 
+20260216-143419-5960 09642 *      16 ms |          0 |
+20260216-143419-5961 09642 *      33 ms |          1 | 
+20260216-143419-5961 09642 *      67 ms |          1 | 
+20260216-143419-6800 09642 * Stop            (tcptransport.cc:581): [TCP SUMMARY] outgoingCreated=1 outgoingClosed=0 incomingCreated=0 incomingClosed=0 outgoingPeak=1 incomingPeak=0
+Inserted events:
+  0x5620e1e6ef60 [fd  7] Read Persist Internal
+  0x5620e1e85510 [fd  9] Read Persist
+Active events:
+20260216-143419-6801 09642 * main            (benchmark.cc:849): Cleaning up after experiment.
+20260216-143419-6801 09642 * FlushStats      (benchmark.cc:890): Flushing stats to /mnt/extra/experiments/2026-03-16-14-33-29/out/client-0-0-50-stats-0.json.
+20260216-143419-6803 09642 * FlushStats      (benchmark.cc:902): All done!
