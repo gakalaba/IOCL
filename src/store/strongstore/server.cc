@@ -2087,7 +2087,7 @@ namespace strongstore
         PendingOperationReply *pending_reply = search->second;
         pending_operation_replies_.erase(search);
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
-        transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, REPLY_OK, retval));
+        RespondToClientOperation(pending_reply, transaction_id, REPLY_OK, retval);
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)
