@@ -186,7 +186,9 @@ void BenchmarkClient::SendNextAppRequest()
 
     Debug("session id: %lu", sid);
 
-    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    auto ecb = [this, sid](auto &&arg) {
+        ExecuteCallback(sid, std::forward<decltype(arg)>(arg));
+    };
     auto appreq = GetNextAppRequest();
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
@@ -195,7 +197,9 @@ void BenchmarkClient::SendNextAppRequest()
     auto &ss = session_states_.find(sid)->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextAppRequestOperation, this, sid);
+    auto bcb = [this, sid]() {
+        ExecuteNextAppRequestOperation(sid);
+    };
     auto btcb = []() {};
 
     client.BeginAppRequest(session, bcb, btcb, timeout_);
@@ -273,7 +277,9 @@ void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
     auto &client = *clients_[ss.current_client_index()];
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextAppRequestOperation, this, sid);
+    auto bcb = [this, sid]() {
+        ExecuteNextAppRequestOperation(sid);
+    };
     auto btcb = []() {};
 
     client.BeginAppRequest(session, bcb, btcb, timeout_);
@@ -374,8 +380,12 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     auto &session = ss.session();
 
     // // Generic Operation Callback
-    auto ocb = std::bind(&BenchmarkClient::ReceiveOperationResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto otcb = std::bind(&BenchmarkClient::SendOperationTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
+    auto ocb = [this, session_id](int status, const std::string &retval, auto &&pred_list) {
+        ReceiveOperationResponse(session_id, status, retval);
+    };
+    auto otcb = [this, session_id](int status, const std::string &retval, auto &&pred_list) {
+        SendOperationTimeout(session_id, status, retval);
+    };
 
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
@@ -548,7 +558,10 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
             if (!cooldownStarted)
             {
                 Debug("next arrival in session %d us", 0);
-                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextAppRequestInSession, this, session_id));
+                // transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextAppRequestInSession, this, session_id));
+                transport_.TimerMicro(0, [this, session_id]() {
+                    SendNextAppRequestInSession(session_id);
+                });
                 OnReply(session_id, 0, false);
             }
             else
