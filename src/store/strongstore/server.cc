@@ -326,12 +326,13 @@ namespace strongstore
             Panic("Duplicate operation request for transaction_id = %lu", transaction_id);
         }
 
+        int replicaIndex = (msg.op() == GET_OPERATION) ? replica_idx_ : 0;
         replica_client_->SendOperation(
             transaction_id, msg,
             std::bind(&Server::SendOperationCallback, this,
                               transaction_id, std::placeholders::_1),
             // this thing is the ptcb
-            [](int) {}, OPERATION_TIMEOUT);
+            [](int) {}, OPERATION_TIMEOUT, replicaIndex);
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)

@@ -72,9 +72,8 @@ namespace strongstore
         void SendOperation(uint64_t request_id,
                          replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout);
-
-
+                         uint32_t timeout, int replicaIndex);
+        
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,
                      const Timestamp &prepare_ts, int coordinator,

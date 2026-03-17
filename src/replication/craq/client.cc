@@ -63,6 +63,18 @@ namespace replication
         void CRAQClient::Invoke(const string &request, continuation_t continuation,
                                 error_continuation_t error_continuation)
         {
+            InvokeHelper(request, continuation, 0, error_continuation);
+        }
+
+        void CRAQClient::Invoke(const string &request, continuation_t continuation, int replicaIndex,
+                                error_continuation_t error_continuation)
+        {
+            InvokeHelper(request, continuation, replicaIndex, error_continuation);
+        }
+
+        void CRAQClient::InvokeHelper(const string &request, continuation_t continuation, int replicaIndex,
+                                error_continuation_t error_continuation)
+        {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
@@ -72,7 +84,7 @@ namespace replication
             //     new Timeout(transport, 500, [this, reqId]()
             //                 { ResendRequest(reqId); });
             PendingRequest *req =
-                new PendingRequest(request, reqId, continuation);
+                new PendingRequest(request, reqId, continuation, replicaIndex);
 
             pendingReqs[reqId] = req;
             SendRequest(req);
@@ -120,22 +132,9 @@ namespace replication
             linRequest.mutable_rid()->set_client_id(clientid);
             linRequest.mutable_rid()->set_client_req_id(req->clientReqId);
             string op = linRequest.op();
-            int destReplica = 0;
             Notice("Sending client request with id %d", req->clientReqId);
 
-            if (op == GET_OPERATION)
-            {
-                destReplica = 1;
-                // std::random_device dev;
-                // std::mt19937 rng(dev());
-                // ASSERT(config.n >= 2);
-                // // dont send reads to tail
-                // std::uniform_int_distribution<std::mt19937::result_type> dist(0,config.n - 2);
-                // destReplica = dist(rng);
-                Debug("Get operation, destReplica is %d", destReplica);
-            }
-
-            if (transport->SendMessageToReplica(this, group, destReplica, linRequest))
+            if (transport->SendMessageToReplica(this, group, req->replicaIndex, linRequest))
             {
                 // req->timer->Reset();
             }

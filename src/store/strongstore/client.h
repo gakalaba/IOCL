@@ -253,6 +253,19 @@ namespace strongstore
                                  op_callback ocb, op_timeout_callback otcb,
                                  uint32_t timeout = OPERATION_TIMEOUT) override;
 
+        virtual void SendOperation(Session &session, const std::string op,
+                                 const std::string &key, const std::string &value,
+                                 op_callback ocb, op_timeout_callback otcb,
+                                 int replicaIndex,
+                                 uint32_t timeout = OPERATION_TIMEOUT) override;
+
+        void SendOperationHelper(Session &session, const std::string op,
+                                 const std::string &key, const std::string &value,
+                                 op_callback ocb, op_timeout_callback otcb,
+                                 int replicaIndex,
+                                 uint32_t timeout = OPERATION_TIMEOUT);
+
+
         // Commit all Get(s) and Put(s) since Begin().
         virtual void Commit(Session &session, commit_callback ccb, commit_timeout_callback ctcb,
                             uint32_t timeout) override;

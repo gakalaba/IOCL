@@ -56,6 +56,11 @@ namespace replication
             virtual ~CRAQClient();
             virtual void Invoke(const string &request, continuation_t continuation,
                                 error_continuation_t error_continuation = nullptr);
+            void Invoke(const string &request, continuation_t continuation, int replicaIndex,
+                                error_continuation_t error_continuation = nullptr);
+            void InvokeHelper(const string &request, continuation_t continuation, int replicaIndex,
+                                error_continuation_t error_continuation = nullptr);
+
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -80,11 +85,14 @@ namespace replication
                 uint64_t clientReqId;
                 continuation_t continuation;
                 Timeout *timer;
+                int replicaIndex;
+
                 inline PendingRequest(string request, uint64_t clientReqId,
-                                      continuation_t continuation)
+                                      continuation_t continuation, int replicaIndex)
                     : request(request),
                       clientReqId(clientReqId),
-                      continuation(continuation){};
+                      continuation(continuation),
+                      replicaIndex{replicaIndex}{};
                 inline ~PendingRequest() {}
             };
 
@@ -94,7 +102,7 @@ namespace replication
                 inline PendingUnloggedRequest(string request, uint64_t clientReqId,
                                               continuation_t continuation,
                                               error_continuation_t error_continuation)
-                    : PendingRequest(request, clientReqId, continuation),
+                    : PendingRequest(request, clientReqId, continuation, -1),
                       error_continuation(error_continuation){};
             };
 

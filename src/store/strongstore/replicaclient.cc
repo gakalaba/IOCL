@@ -70,7 +70,7 @@ namespace strongstore
     void ReplicaClient::SendOperation(uint64_t request_id,
                          replication::LinearizeableOperation &msg,
                          op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout)
+                         uint32_t timeout, int replicaIndex)
     {
         Debug("[shard %i] ReplicaClient SendRequest sending msg", shard_idx_);
         Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
@@ -109,10 +109,13 @@ namespace strongstore
                 msg.SerializeToString(&request_str);
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
-                client->Invoke(
-                    request_str,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                        std::placeholders::_1, std::placeholders::_2));
+                if (replication::craq::CRAQClient * craqclient = dynamic_cast<replication::craq::CRAQClient *>(client))
+                {
+                    craqclient->Invoke(
+                        request_str,
+                        bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                            std::placeholders::_1, std::placeholders::_2), replicaIndex);
+                }
                 break;
         }
     }

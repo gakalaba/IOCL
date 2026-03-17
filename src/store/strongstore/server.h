@@ -112,6 +112,8 @@ namespace strongstore
     {
         static TrueTime dummyTT; // definition outside class
     public:
+        static constexpr const char *GET_OPERATION = "get";
+
         Server(Consistency consistency,
                const transport::Configuration &shard_config,
                const transport::Configuration &replica_config, uint64_t server_id,

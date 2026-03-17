@@ -134,7 +134,7 @@ namespace strongstore
                          uint32_t timeout,
                          std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
                          std::list<uint16_t> &outstandingOperationRefCount,
-                         bool isIOCL);
+                         bool isIOCL, int replicaIndex = -1);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
                       const Timestamp &commit_timestamp,

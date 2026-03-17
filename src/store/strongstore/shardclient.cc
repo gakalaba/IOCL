@@ -275,7 +275,7 @@ namespace strongstore
                                   uint32_t timeout,
                                   std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
                                   std::list<uint16_t> &outstandingOperationRefCount,
-                                  bool isIOCL)
+                                  bool isIOCL, int replicaIndex)
     {
         // Send the operation to appropriate shard.
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
@@ -341,8 +341,9 @@ namespace strongstore
             Debug("the size of the op is %lu", op_.ByteSizeLong());
         }
 
-        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
+        int replicaToSend = (replicaIndex == -1) ? replica_ : replicaIndex;
+        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replicaToSend);
+        transport_->SendMessageToReplica(this, shard_idx_, replicaToSend, op_);
     }
 
     // IOCL receive the response

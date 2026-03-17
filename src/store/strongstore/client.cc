@@ -690,6 +690,24 @@ namespace strongstore
                              const std::string &key, const std::string &value,
                              op_callback ocb, op_timeout_callback otcb,
                              uint32_t timeout)
+
+    {
+        SendOperationHelper(s, op, key, value, ocb, otcb, -1, timeout);
+    }
+
+    void Client::SendOperation(Session &s, const std::string op,
+                             const std::string &key, const std::string &value,
+                             op_callback ocb, op_timeout_callback otcb, int replicaIndex,
+                             uint32_t timeout)
+
+    {
+        SendOperationHelper(s, op, key, value, ocb, otcb, replicaIndex, timeout);
+    }
+
+    void Client::SendOperationHelper(Session &s, const std::string op,
+                             const std::string &key, const std::string &value,
+                             op_callback ocb, op_timeout_callback otcb, int replicaIndex,
+                             uint32_t timeout)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -797,7 +815,7 @@ namespace strongstore
             otcb(s, v, p);
         };
 
-        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
+        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL(), replicaIndex);
     }
 
     /* Attempts to commit the ongoing transaction. */

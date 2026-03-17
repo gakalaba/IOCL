@@ -384,11 +384,15 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
     std::string op_str;
+    // by default, sends operations to the head node
+    int replicaIndex = 0;
 
     switch (op.type)
     {
     case GET:
         op_str = "get";
+        // some randomization/distance logic here
+        replicaIndex = 2;
         break;
 
     case PUT:
@@ -398,7 +402,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     default:
         Panic("unsupported opeartion type %d", op.type);
     }
-    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
+    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, replicaIndex, timeout_);
 
     if (issueConcurrent)
     {
