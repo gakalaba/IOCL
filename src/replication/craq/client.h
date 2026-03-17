@@ -34,7 +34,6 @@
 #define _CRAQ_CLIENT_H_
 
 #include <unordered_map>
-#include <random>
 
 #include "lib/configuration.h"
 #include "replication/common/client.h"

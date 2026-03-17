@@ -322,22 +322,6 @@ public:
             };
         }
     
-    // std::function<bool(const std::string &req,
-    //                 const std::string &reply)> getUpcall =
-    //     [this](const std::string &req,
-    //         const std::string &reply) -> bool {
-    //         return validateUpcall(req, reply, requestNum - 1);
-           
-    //     };
-
-    // std::function<bool(const std::string &req,
-    //                 const std::string &reply)> getUpcallIgnoredPendingWrite =
-    //     [this](const std::string &req,
-    //         const std::string &reply) -> bool {
-    //         return validateUpcall(req, reply, requestNum - 2);
-           
-    //     };
-
     std::function<bool(const std::string &req,
                 const std::string &reply)> putUpcall =
     [this](const std::string &req,
