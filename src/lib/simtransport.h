@@ -77,7 +77,7 @@ public:
                   int replicaIdx);
     bool IsQueueEmpty();
     bool IsBufferedQueueEmpty();
-    void SetBufferingMessage(string &bufferingMessage);
+    void SetBufferingMessage(const string &bufferingMessage);
     void ResetBufferingMessage();
     string PopEvent();
     string PopBufferedEvent();

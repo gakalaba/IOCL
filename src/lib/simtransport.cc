@@ -220,7 +220,7 @@ bool SimulatedTransport::IsBufferedQueueEmpty()
     return bufferedQueue.empty();
 }
 
-void SimulatedTransport::SetBufferingMessage(string &thatBufferingMessage)
+void SimulatedTransport::SetBufferingMessage(const string &thatBufferingMessage)
 {
     bufferingMessage = thatBufferingMessage;
 }

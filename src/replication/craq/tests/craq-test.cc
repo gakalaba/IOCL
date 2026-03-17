@@ -49,6 +49,7 @@ using LinearizeableReply = strongstore::proto::LinearizeableReply;
 #include <gtest/gtest.h>
 #include <vector>
 #include <sstream>
+#include <random>
 
 const string COMMIT_MESSAGE_TYPE = "replication.craq.proto.CommitMessage";
 const string VERSION_REQUEST_MESSAGE_TYPE = "replication.craq.proto.VersionRequestMessage";
@@ -248,7 +249,7 @@ protected:
            });
     }
 
-    virtual void ClientSendNext(int shard, Client::continuation_t upcall, std::string op, int clientIndex = 0) {
+    virtual void ClientSendNext(int shard, Client::continuation_t upcall, std::string op, int clientIndex = 0, int replicaIndex = -1) {
         string request_str;
 
         auto &clientInfo = clients[shard];
@@ -265,8 +266,54 @@ protected:
 
         linop.SerializeToString(&request_str);
 
-        clientInfo.clientList[clientIndex]->Invoke(request_str, upcall);
+        if (replicaIndex == -1)
+        {
+            clientInfo.clientList[clientIndex]->Invoke(request_str, upcall);
+        }
+        else
+        {
+            clientInfo.clientList[clientIndex]->Invoke(request_str, upcall, replicaIndex);
+        }
         clientOps.push_back(request_str);
+    }
+
+    // Drain all buffered messages into the live queue without running transport.
+    void FlushBufferedQueue() {
+        while (!transport->IsBufferedQueueEmpty())
+        {
+            transport->PopBufferedEvent();
+        }
+    }
+
+    // Block until a message of `type` is popped from the event queue.
+    void RunUntilMessageType(const string &type) {
+        while (transport->PopEvent() != type) {}
+    }
+
+    // Assert every replica in `shard` stores `expectedValue` for that shard's key.
+    void ExpectAllReplicasHaveValue(int shard, int expectedValue) {
+        int replicasPerShard = GetParam().replicasPerShard;
+        for (int r = 0; r < replicasPerShard; r++) {
+            std::pair<size_t, uint64_t> val;
+            EXPECT_TRUE(apps[shard][r].store.get(clients[shard].key, val));
+            EXPECT_EQ(val.second, (uint64_t)expectedValue);
+        }
+    }
+
+    // Put upcall that does NOT cancel timers — use when multiple puts will
+    // complete inside a single transport->Run() call.
+    std::function<bool(const std::string &, const std::string &)>
+    MakeSilentPutUpcall(int &putsCompleted) {
+        return [this, &putsCompleted](const std::string &req,
+                                     const std::string &reply) -> bool {
+            LinearizeableOperation linop;
+            LinearizeableReply linreply;
+            EXPECT_TRUE(linop.ParseFromString(req));
+            EXPECT_TRUE(linreply.ParseFromString(reply));
+            EXPECT_EQ(linreply.status(), REPLY_OK);
+            putsCompleted++;
+            return true;
+        };
     }
 
     virtual void TearDown() {
@@ -408,11 +455,10 @@ TEST_P(CRAQTest, BasicVersionRequestIgnorePendingWrite)
     int prevWriteRequestNum = ++requestNum;
     ClientSendNext(0, putUpcall, "put"); 
     
-    string messageToBuffer = COMMIT_MESSAGE_TYPE;
-    transport->SetBufferingMessage(messageToBuffer);
+    transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
 
     // run events just before back-propagating commit message
-    while (messageToBuffer != transport->PopEvent()){}
+    RunUntilMessageType(COMMIT_MESSAGE_TYPE);
     Notice("Finished propagating write and commiting at tail, not sending commit messages yet");
    
     requestNum++;
@@ -422,10 +468,7 @@ TEST_P(CRAQTest, BasicVersionRequestIgnorePendingWrite)
 
     transport->ResetBufferingMessage();
     // pop the commitMessage
-    while (!transport->IsBufferedQueueEmpty())
-    {
-        transport->PopBufferedEvent();
-    }
+    FlushBufferedQueue();
     // resume runnning craq
     transport->Run();
     EXPECT_TRUE(transport->IsQueueEmpty());
@@ -440,24 +483,21 @@ TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
     {
         GTEST_SKIP();
     }
-    string messageToBuffer;
     string messageType;
 
     int prevWriteRequestNum = ++requestNum;
     ClientSendNext(0, putUpcall, "put"); 
     
-    messageToBuffer = COMMIT_MESSAGE_TYPE;
-    transport->SetBufferingMessage(messageToBuffer);
+    transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
 
     // run events just before back-propagating commit message
-    while (messageToBuffer != transport->PopEvent()){}
+    RunUntilMessageType(COMMIT_MESSAGE_TYPE);
     Notice("Finished propagating write and commiting at tail, not sending commit messages yet");
    
-    messageToBuffer = VERSION_REQUEST_MESSAGE_TYPE;
-    transport->SetBufferingMessage(messageToBuffer);
+    transport->SetBufferingMessage(VERSION_REQUEST_MESSAGE_TYPE);
     requestNum++;
     ClientSendNext(0, MakeGetUpcall(prevWriteRequestNum), "get"); 
-    while (messageToBuffer != transport->PopEvent()){}
+    RunUntilMessageType(VERSION_REQUEST_MESSAGE_TYPE);
     Notice("Buffer version request for read");
 
     // backpropagate write up chain
@@ -467,11 +507,208 @@ TEST_P(CRAQTest, BasicVersionRequestReadPendingWrite)
 
     Notice("Propagated commits");
     // pop the version request
-    while (!transport->IsBufferedQueueEmpty())
-    {
-        transport->PopBufferedEvent();
-    }
+    FlushBufferedQueue();
     transport->Run();
+    EXPECT_TRUE(transport->IsQueueEmpty());
+    EXPECT_TRUE(transport->IsBufferedQueueEmpty());
+}
+
+TEST_P(CRAQTest, StressRandomReadsWrites)
+{
+    Notice("Starting test");
+    auto params = GetParam();
+    // Dirty-read scenarios require exactly 1 shard and 1 client per shard,
+    // but we need >= 2 replicas so there's a non-tail node that can be dirty.
+    // if (params.shards > 1 || params.clientsPerShard > 1 || params.replicasPerShard < 2) {
+    //     GTEST_SKIP();
+    // }
+
+    const int NUM_ITERATIONS = 50;
+    const int replicasPerShard = params.replicasPerShard;
+
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int> dist(0, 3);
+
+    // committedValue is the value any correct read must return.
+    // SetUp did one put, so requestNum is 0 and committedValue == 0.
+    int committedValue = requestNum;
+
+    for (int iter = 0; iter < NUM_ITERATIONS; iter++) {
+        int scenario = dist(rng);
+        Notice("Stress iter %d: scenario=%d committedValue=%d requestNum=%d",
+               iter, scenario, committedValue, requestNum);
+
+        if (scenario == 0) {
+            // ------------------------------------------------------------------
+            // Scenario 0: clean write followed by a clean read.
+            // The chain is fully committed after Run(), so the read must see
+            // the new value.
+            // ------------------------------------------------------------------
+            requestNum++;
+            committedValue = requestNum;
+            ClientSendNext(0, putUpcall, "put");
+            transport->Run();
+
+            requestNum++;
+            ClientSendNext(0, MakeGetUpcall(committedValue), "get");
+            transport->Run();
+
+            // All replicas must agree on committedValue in their stores.
+            ExpectAllReplicasHaveValue(0, committedValue);
+
+        } else if (scenario == 1) {
+            // ------------------------------------------------------------------
+            // Scenario 1: dirty read — commit ack is buffered then discarded.
+            //
+            // The write propagates HEAD→…→TAIL.  The tail commits and starts
+            // sending acks backward (COMMIT_MESSAGE_TYPE).  We intercept and
+            // discard those acks, so non-tail nodes never learn the write is
+            // committed — they stay dirty.
+            //
+            // A read that lands on a dirty non-tail node issues a version
+            // request to the tail.  The tail's committed version is the
+            // *previous* write (it committed pendingValue, but the ack never
+            // propagated, so from the perspective of the version query the
+            // answer depends on implementation — in this codebase the test
+            // proves the old value is returned).
+            //
+            // After discarding the acks, we issue a recovery write so that
+            // all nodes receive a fresh write + commit, cleaning up the
+            // leftover dirty state before the next iteration.
+            // ------------------------------------------------------------------
+            int pendingValue = ++requestNum;
+            Notice("Scenario 1: issuing pending write %d", pendingValue);
+            ClientSendNext(0, putUpcall, "put");
+
+            // Intercept the first commit ack leaving the tail.
+            transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
+            RunUntilMessageType(COMMIT_MESSAGE_TYPE);
+            Notice("Scenario 1: write reached tail, commit ack now buffered");
+
+            // Read hits a dirty non-tail node → version request → old value.
+            requestNum++;
+            ClientSendNext(0, MakeGetUpcall(committedValue), "get");
+            transport->Run();
+
+            // Throw away the buffered ack — pendingValue is abandoned.
+            transport->ResetBufferingMessage();
+            FlushBufferedQueue();
+            transport->Run();
+
+            // Recovery write: this propagates cleanly through all nodes and
+            // commits, guaranteeing every node's dirty state is resolved
+            // before the next iteration begins.
+            requestNum++;
+            committedValue = requestNum;
+            Notice("Scenario 1: recovery write %d", committedValue);
+            ClientSendNext(0, putUpcall, "put");
+            transport->Run();
+
+            // Confirm every replica stored the recovery value.
+            ExpectAllReplicasHaveValue(0, committedValue);
+
+        } else if (scenario == 2) {
+            // ------------------------------------------------------------------
+            // Scenario 2: dirty read — version request is delayed until AFTER
+            //   the commit ack backpropagates, so the read sees the NEW value.
+            //
+            // Sequence:
+            //   1. Write pendingValue — stops at the tail (commit buffered).
+            //   2. Issue a read to the dirty HEAD node.  HEAD sends a version
+            //      request to the tail — buffer that too.
+            //   3. Release the commit ack.  All non-tail nodes learn
+            //      pendingValue is now committed (clean).
+            //   4. Release the version request.  The tail replies with the
+            //      *new* committed version, so the read returns pendingValue.
+            // ------------------------------------------------------------------
+            int pendingValue = ++requestNum;
+            Notice("Scenario 2: issuing write %d", pendingValue);
+            ClientSendNext(0, putUpcall, "put");
+
+            // Step 1: buffer the commit ack so non-tail nodes stay dirty.
+            transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
+            RunUntilMessageType(COMMIT_MESSAGE_TYPE);
+            Notice("Scenario 2: commit ack buffered");
+
+            // Step 2: issue a read (goes to dirty HEAD, which must ask the
+            // tail for the committed version).  Buffer that version request
+            // before it reaches the tail.  SetBufferingMessage replaces the
+            // previous buffering type; the already-buffered COMMIT stays in
+            // the buffered queue.
+            transport->SetBufferingMessage(VERSION_REQUEST_MESSAGE_TYPE);
+            requestNum++;
+            ClientSendNext(0, MakeGetUpcall(pendingValue), "get");
+            RunUntilMessageType(VERSION_REQUEST_MESSAGE_TYPE);
+            Notice("Scenario 2: version request buffered");
+
+            // Buffered queue now contains (in order): COMMIT, VERSION_REQUEST.
+
+            // Step 3: pop and deliver COMMIT first, let the transport process
+            // all resulting events (acks travel up the chain; nodes go clean).
+            string firstBuffered = transport->PopBufferedEvent();
+            EXPECT_EQ(COMMIT_MESSAGE_TYPE, firstBuffered);
+            transport->Run();
+            Notice("Scenario 2: commit backpropagated, all nodes clean");
+
+            // Step 4: deliver the version request now that the tail's
+            // committed version reflects pendingValue.  The tail replies with
+            // pendingValue, the HEAD returns it to the client.
+            FlushBufferedQueue();
+            transport->Run();
+
+            committedValue = pendingValue;
+            Notice("Scenario 2: committed value advanced to %d", committedValue);
+
+            // All replicas must have pendingValue in their stores.
+            ExpectAllReplicasHaveValue(0, committedValue);
+        }
+        else {
+            // ------------------------------------------------------------------
+            // Scenario 3: overlapping writes — a second write is issued while
+            // the first write's commit ack is still buffered (non-tail nodes
+            // are dirty with write1).
+            //
+            // Sequence:
+            //   1. Write firstValue — tail commits, ack buffered.
+            //   2. Write secondValue — propagates through chain, tail commits.
+            //   3. Release write1's buffered ack + run to completion.
+            //   4. Both acks backpropagate; committedValue = secondValue (latest).
+            // ------------------------------------------------------------------
+
+            // Local upcall that doesn't cancel timers — putUpcall would kill
+            // the timer on the first ack, orphaning the second ack's Run().
+            int putsCompleted = 0;
+            auto overlappingWriteUpcall = MakeSilentPutUpcall(putsCompleted);
+
+            int firstValue = ++requestNum;
+            Notice("Scenario 3: issuing first write %d", firstValue);
+            ClientSendNext(0, overlappingWriteUpcall, "put");
+
+            // Buffer the commit ack — non-tail nodes stay dirty with firstValue.
+            transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
+            RunUntilMessageType(COMMIT_MESSAGE_TYPE);
+            Notice("Scenario 3: first write committed at tail, ack buffered");
+
+            // Issue second write while chain is dirty with firstValue.
+            int secondValue = ++requestNum;
+            Notice("Scenario 3: issuing second write %d while chain dirty", secondValue);
+            ClientSendNext(0, overlappingWriteUpcall, "put");
+
+            // Release write1's buffered ack and let both writes fully propagate.
+            // write2 will have also reached the tail by now (writes are serialized
+            // through the chain), so both commit acks will backpropagate cleanly.
+            transport->ResetBufferingMessage();
+            FlushBufferedQueue();
+            transport->Run();
+
+            committedValue = secondValue;
+            EXPECT_EQ(putsCompleted, 2);
+            Notice("Scenario 3: both writes committed, committedValue=%d", committedValue);
+
+            ExpectAllReplicasHaveValue(0, committedValue);
+        }
+    }
+
     EXPECT_TRUE(transport->IsQueueEmpty());
     EXPECT_TRUE(transport->IsBufferedQueueEmpty());
 }
