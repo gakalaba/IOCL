@@ -75,7 +75,7 @@ namespace replication
             // dummypending->clientReqId = reqId;
 
             // pendingReqs[reqId] = req;
-            SendRequest(msg.req_id());
+            SendRequest(msg.req_id(), msg.idx());
         }
 
         void VRClient::Invoke(const string &request, continuation_t continuation,
@@ -93,7 +93,7 @@ namespace replication
                 new PendingRequest(request, reqId, continuation);
 
             pendingReqs[reqId] = req;
-            SendRequest(0);
+            SendRequest(0, 0);
         }
 
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
@@ -131,7 +131,7 @@ namespace replication
             return;
         }
 
-        void VRClient::SendRequest(uint64_t tid)
+        void VRClient::SendRequest(uint64_t tid, uint32_t idx)
         {
             // proto::RequestMessage reqMsg;
             // reqMsg.mutable_req()->set_op(req->request);
@@ -139,6 +139,7 @@ namespace replication
             // reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
             proto::DummyRequest reqMsg;
             reqMsg.set_req_id(tid);
+            reqMsg.set_idx(idx);
 
             Debug("SENDING REQUEST TO LEADER for operation with req_id = %lu and type %s", tid, reqMsg.GetTypeName().c_str());
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
@@ -166,7 +167,7 @@ namespace replication
             }
 
             Warning("Client timeout; resending request: %lu", reqId);
-            SendRequest(0);
+            SendRequest(0, 0);
         }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,

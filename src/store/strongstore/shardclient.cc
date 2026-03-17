@@ -308,6 +308,7 @@ namespace strongstore
         // TODO: Setup timeout
         dummy_op_.Clear();
         dummy_op_.set_req_id(myshardtag);
+        dummy_op_.set_idx(0);
         // op_.Clear();
         // op_.mutable_rid()->set_client_id(client_id_);
         // op_.mutable_rid()->set_client_req_id(req_id);

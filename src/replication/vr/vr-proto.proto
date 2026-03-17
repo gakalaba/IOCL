@@ -10,15 +10,18 @@ message RequestMessage {
 
 message DummyRequest {
     required uint64 req_id = 1;
+    required uint32 idx = 2;
 }
 
 message DummyReplication {
     required uint64 req_id = 1;
+    required uint32 idx = 2;
 }
 
 message DummyReplicationResponse {
     required uint64 req_id = 1;
-    required uint64 id = 2;
+    required uint32 idx = 2;
+    required uint64 id = 3;
 }
 
 message DummyCommit {

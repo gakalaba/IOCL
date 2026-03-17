@@ -60,7 +60,7 @@ class AppReplica {
         str2 = str1;
     };
     // Invoke callback on all replicas
-    virtual void ReplicaUpcall(opnum_t opnum, const string &str1){};
+    virtual void ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &str1){};
     virtual void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                                    const string &v, string &retval){};
     // Invoke call back for unreplicated operations run on only one replica
@@ -80,7 +80,7 @@ class Replica : public TransportReceiver {
    protected:
     void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                       string &res);
-    void ReplicaUpcall(opnum_t opnum, const string &op);
+    void ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &op);
     void ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
                            const string &v, string &retval);
     template <class MSG>

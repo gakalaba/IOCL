@@ -498,6 +498,7 @@ namespace replication
             // Replicate
             DummyReplication p;
             p.set_req_id(msg.req_id());
+            p.set_idx(msg.idx());
             if (!(transport->SendMessageToAll(this, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
@@ -512,6 +513,7 @@ namespace replication
             DummyReplicationResponse reply;
             reply.set_req_id(msg.req_id());
             reply.set_id(myIdx);
+            reply.set_idx(msg.idx());
 
             if (!(transport->SendMessageToReplica(
                     this, configuration.GetLeaderIndex(view), reply)))
@@ -530,7 +532,7 @@ namespace replication
             }
             opnum_t opnum = msg.req_id();
             const string &op = "";
-            ReplicaUpcall(opnum, op);
+            ReplicaUpcall(opnum, msg.idx(), op);
 
             // Send Dummy Commit
             DummyCommit cm;

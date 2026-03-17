@@ -99,7 +99,7 @@ namespace replication
             // DUMMY
             PendingRequest *dummypending;
 
-            void SendRequest(uint64_t tid);
+            void SendRequest(uint64_t tid, uint32_t idx);
             void ResendRequest(const uint64_t reqId);
             void HandleReply(const TransportAddress &remote,
                              const proto::ReplyMessage &msg);

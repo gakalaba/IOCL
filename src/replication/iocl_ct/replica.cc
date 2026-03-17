@@ -747,7 +747,7 @@ namespace replication
             opnum_t opnum = msg.req_id();
             const string &op = "";
             // string res;
-            ReplicaUpcall(opnum, op);
+            ReplicaUpcall(opnum, 0, op);
 
             // Send Dummy Commit and added reply to Client
             auto iter = clientAddresses.find(msg.req_id());
@@ -791,7 +791,7 @@ namespace replication
             opnum_t opnum = msg.req_id();
             const string &op = "";
             // string res;
-            ReplicaUpcall(opnum, op);
+            ReplicaUpcall(opnum, 0, op);
 
             // Send Dummy Commit and added reply to Client
             auto iter = clientAddresses.find(msg.req_id());

@@ -345,7 +345,7 @@ namespace strongstore
         reply.remote = &remote;
         // reply->key = msg.key();
         // reply->value = msg.value();
-        transaction_id_to_slot_[transaction_id] = idx;
+        msg.set_idx(idx);
         replica_client_->SendOperation(msg);
     }
 
@@ -1880,14 +1880,14 @@ namespace strongstore
      * op is the request string passed by the client.
      * response is the reply which will be sent back to the client.
      */
-    void Server::ReplicaUpcall(opnum_t opnum, const string &op)
+    void Server::ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &op)
     {
         // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
         if (consistency_ == LIN)
         {
             // linreq.ParseFromString(op);
-            ReplicaUpcallAppRequest(opnum, linreq);
+            ReplicaUpcallAppRequest(opnum, idx, linreq);
             return;
         }
         Debug("Replica upcall with transaction_id = %lu", opnum);
@@ -2052,11 +2052,12 @@ namespace strongstore
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req)
+    void Server::ReplicaUpcallAppRequest(opnum_t opnum, uint32_t idx, LinearizeableOperation &req)
     {
         // Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
         // LinearizeableReply reply;
         Debug("inside ReplicaUpcall with req_id = %d", opnum);
+        if (replica_idx_ != 0) return;
 
         string retval;
         // int status = REPLY_OK;
@@ -2090,20 +2091,10 @@ namespace strongstore
         // reply.SerializeToString(&response);
         // dummy_reply.SerializeToString(&response);
 
-        auto idx = transaction_id_to_slot_.find(opnum);
-        if (idx == transaction_id_to_slot_.end())
-        {
-            ASSERT(replica_idx_ != 0); // only leader should be able to not find transaction id in map since only leader should be replying to clients
-            Debug("transaction id %lu not found in transaction_id_to_slot_ map!", opnum);
-            return;
-        } else {
-            Debug("transaction id %lu found in transaction_id_to_slot_ map!", opnum);
-        }
-        PendingOpReplySlot &pending_reply = slots_[idx->second];
+        PendingOpReplySlot &pending_reply = slots_[idx];
         ASSERT(pending_reply.in_use);
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
-        RespondToClientOperation(&pending_reply, idx->second, opnum, REPLY_OK, retval);
-        transaction_id_to_slot_.erase(idx);
+        RespondToClientOperation(&pending_reply, idx, opnum, REPLY_OK, retval);
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

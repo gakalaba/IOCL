@@ -132,7 +132,7 @@ namespace strongstore
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                           string &response) override;
-        void ReplicaUpcall(opnum_t opnum, const string &op) override;
+        void ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &op) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 
@@ -291,7 +291,7 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(opnum_t opnum, replication::LinearizeableOperation &op);
+        void ReplicaUpcallAppRequest(opnum_t opnum, uint32_t idx, replication::LinearizeableOperation &op);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
@@ -364,7 +364,6 @@ namespace strongstore
         Timestamp dummyTimestamp;
         std::vector<PendingOpReplySlot> slots_;
         std::vector<uint32_t> free_slots_;
-        std::unordered_map<uint64_t, uint32_t> transaction_id_to_slot_;
     };
 
 } // namespace strongstore
