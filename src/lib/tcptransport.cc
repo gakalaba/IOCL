@@ -839,11 +839,11 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         size_t *sz;
         unsigned char *x = evbuffer_pullup(evbuf, sizeof(*magic) + sizeof(*sz));
 
-        sz = (size_t *)(x + sizeof(*magic));
         if (x == NULL)
         {
             return;
         }
+        sz = (size_t *)(x + sizeof(*magic));
         size_t totalSize = *sz;
         ASSERT(totalSize < 1073741826);
 
@@ -855,26 +855,32 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         }
         // Debug("Receiving %ld byte message", totalSize);
 
-        char buf[totalSize];
-        size_t copied = evbuffer_remove(evbuf, buf, totalSize);
-        ASSERT(copied == totalSize);
+        // Pull up the full message contiguously, but do not copy it out.
+        unsigned char *buf = evbuffer_pullup(evbuf, totalSize);
+        if (buf == NULL)
+        {
+            return;
+        }
+        // char buf[totalSize];
+        // size_t copied = evbuffer_remove(evbuf, buf, totalSize);
+        // ASSERT(copied == totalSize);
 
         // Parse message
-        char *ptr = buf + sizeof(*sz) + sizeof(*magic);
+        char *ptr = (char *)buf + sizeof(*sz) + sizeof(*magic);
 
         size_t typeLen = *((size_t *)ptr);
         ptr += sizeof(size_t);
-        ASSERT((size_t)(ptr - buf) < totalSize);
+        ASSERT((size_t)(ptr - (char *)buf) < totalSize);
 
-        ASSERT((size_t)(ptr + typeLen - buf) < totalSize);
+        ASSERT((size_t)(ptr + typeLen - (char *)buf) < totalSize);
         string msgType(ptr, typeLen);
         ptr += typeLen;
 
         size_t msgLen = *((size_t *)ptr);
         ptr += sizeof(size_t);
-        ASSERT((size_t)(ptr - buf) < totalSize);
+        ASSERT((size_t)(ptr - (char *)buf) < totalSize);
 
-        ASSERT((size_t)(ptr + msgLen - buf) <= totalSize);
+        ASSERT((size_t)(ptr + msgLen - (char *)buf) <= totalSize);
         string msg(ptr, msgLen);
         ptr += msgLen;
 
@@ -893,6 +899,8 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
                                            nullptr);
             // Debug("Done processing large %s message", msgType.c_str());
         }
+        // Now remove the bytes we just processed.
+        evbuffer_drain(evbuf, totalSize);
     }
 }
 
