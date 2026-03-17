@@ -105,7 +105,7 @@ namespace strongstore
         /* Constructor needs path to shard config. */
         ShardClient(
             const transport::Configuration &config, Transport *transport, uint64_t client_id,
-            int shard, wound_callback wcb = [](uint64_t transaction_id) {});
+            int shard, uint64_t fanout, wound_callback wcb = [](uint64_t transaction_id) {});
 
         ~ShardClient();
 
@@ -220,16 +220,16 @@ namespace strongstore
             ro_commit_timeout_callback ctcb;
             uint64_t n_slow_replies;
         };
-        struct PendingOperation : public PendingRequest
-        {
-            PendingOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            std::string op;
-            std::string key;
-            std::string val;
-            op_callback ocb;
-            op_timeout_callback otcb;
-            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
-        };
+        // struct PendingOperation : public PendingRequest
+        // {
+        //     PendingOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
+        //     std::string op;
+        //     std::string key;
+        //     std::string val;
+        //     op_callback ocb;
+        //     op_timeout_callback otcb;
+        //     std::vector<std::pair<uint64_t, uint32_t>> pred_list;
+        // };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
 
@@ -253,7 +253,7 @@ namespace strongstore
         std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
 
         std::unordered_map<uint64_t, PendingGet *> pendingGets;
-        std::unordered_map<uint64_t, PendingOperation *> pendingOps;
+        // std::unordered_map<uint64_t, PendingOperation *> pendingOps;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -295,13 +295,21 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+        uint64_t fanout_;
 
         // IOCL Operation Metadata
         uint64_t seqno;
         Timestamp dummyTimestamp;
 
+        struct PendingReplySlot {
+            bool in_use = false;
+            op_callback ocb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
+        };
+        std::vector<PendingReplySlot> slots_;
+
         // FOR DUMMY
-        PendingOperation *dummypending;
+        // PendingOperation *dummypending;
     };
 
 } // namespace strongstore

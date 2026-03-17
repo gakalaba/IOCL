@@ -212,6 +212,7 @@ namespace strongstore
                uint64_t id, int nshards, int closestReplic, Transport *transport,
                Partitioner *part, TrueTime &tt, bool debug_stats,
                double nb_time_alpha,
+               uint64_t fanout,
                bool emulate_wan = false);
         virtual ~Client();
 
@@ -383,6 +384,8 @@ namespace strongstore
         bool debug_stats_;
 
         bool emulate_wan_;
+
+        uint64_t fanout_;
 
         // IOCL specific state
         // (shardtag, shardid) -> refcount

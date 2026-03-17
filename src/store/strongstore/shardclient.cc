@@ -37,14 +37,15 @@ namespace strongstore
     using namespace proto;
 
     ShardClient::ShardClient(const transport::Configuration &config,
-                             Transport *transport, uint64_t client_id, int shard,
+                             Transport *transport, uint64_t client_id, int shard, uint64_t fanout,
                              wound_callback wcb)
         : last_req_id_{0},
           config_{config},
           transport_{transport},
           client_id_{client_id},
           shard_idx_{shard},
-          wcb_{wcb}
+          wcb_{wcb},
+          fanout_{fanout}
     {
         transport_->Register(this, config_, -1, -1);
 
@@ -52,7 +53,7 @@ namespace strongstore
         replica_ = 0;
         seqno = 0;
         dummyTimestamp = Timestamp(0, 0);
-        dummypending = new PendingOperation(0, 0);
+        slots_.resize(fanout);
     }
 
     ShardClient::~ShardClient() {}
@@ -293,15 +294,16 @@ namespace strongstore
         uint64_t myshardtag = CreateTag(client_id_, req_id);
         Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
         // PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
-        PendingOperation *pendingOp = dummypending;
-        dummypending->transaction_id = app_request_id;
-        dummypending->req_id = req_id;
-        pendingOps[myshardtag] = pendingOp;
+        uint32_t idx = req_id % fanout_;
+        auto &pendingOp = slots_[idx];
+        ASSERT(!pendingOp.in_use);
+        pendingOp.in_use = true;
+        pendingOp.ocb = ocb;
         // pendingOp->op = op;
         // pendingOp->key = key;
         // pendingOp->val = value;
-        pendingOp->ocb = ocb;
-        pendingOp->otcb = otcb;
+        // pendingOp->ocb = ocb;
+        // pendingOp->otcb = otcb;
 
         // TODO: Setup timeout
         dummy_op_.Clear();
@@ -373,21 +375,16 @@ namespace strongstore
         // int status = reply.status();
         // string retval = reply.return_value();
 
-        auto itr = pendingOps.find(req_id);
-        if (itr == pendingOps.end())
-        {
-            Debug("[%d][%lu] SendOperationREply for opeartion not stored in PendingOps.", shard_idx_, req_id);
-            Panic("huhuhuhuhuh");
-            return; // stale request
-        }
+        uint32_t idx = (req_id & 0xFFFFFFFF) % fanout_;
+        auto &pendingOp = slots_[idx];
+        ASSERT(pendingOp.in_use);
 
-        PendingOperation *op = itr->second;
         // uint64_t app_request_id = op->transaction_id;
-        op_callback ocb = std::move(op->ocb); // wrapped in move to make efficient
-        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
+        op_callback ocb = std::move(pendingOp.ocb); // wrapped in move to make efficient
+        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(pendingOp.pred_list);
         // Debug("moving the pred_list of size %lu", pred_list.size());
-        pendingOps.erase(itr);
         // delete op;
+        pendingOp.in_use = false;
 
         // Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
         //       shard_idx_, app_request_id, status, retval.c_str());

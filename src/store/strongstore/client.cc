@@ -49,6 +49,7 @@ namespace strongstore
                    int nShards, int closestReplica, Transport *transport,
                    Partitioner *part, TrueTime &tt, bool debug_stats,
                    double nb_time_alpha,
+                   uint64_t fanout,
                    bool emulate_wan)
         : coord_choices_{},
           min_lats_{},
@@ -69,6 +70,7 @@ namespace strongstore
           replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
           debug_stats_{debug_stats},
+          fanout_{fanout},
           emulate_wan_{emulate_wan},
           last_req_id_{0}
     {
@@ -79,7 +81,7 @@ namespace strongstore
         /* Start a client for each shard. */
         for (uint64_t i = 0; i < nshards_; i++)
         {
-            ShardClient *shardclient = new ShardClient(config_, transport_, client_id_, i, wcb);
+            ShardClient *shardclient = new ShardClient(config_, transport_, client_id_, i, fanout_, wcb);
             sclients_.push_back(shardclient);
         }
 

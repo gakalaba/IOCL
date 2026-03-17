@@ -66,7 +66,7 @@ namespace strongstore
 
         for (int i = 0; i < shard_config_.g; i++)
         {
-            shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i));
+            shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i, 0)); // passing in dummy fanout for now, since not used by these shard clients
         }
 
         replica_client_ =
@@ -116,7 +116,12 @@ namespace strongstore
         {
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
-        // dummypending = new PendingOperationReply(0, 0, NULL);
+        int N = 30000;
+        slots_.resize(N);
+        free_slots_.reserve(N);
+        for (uint32_t i = 0; i < N; i++) {
+            free_slots_.push_back(N - 1 - i);
+        }
         // Debug event loop delay
         // expected_fire_us = 0;
         // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
@@ -328,19 +333,19 @@ namespace strongstore
         Debug("Calling HandleSendOperation! with msg.req_id = %d", msg.req_id());
         uint64_t transaction_id = msg.req_id();
 
-        auto reply = new PendingOperationReply(0, msg.req_id(), &remote);
-        // auto reply = dummypending;
-        // dummypending->rid.set_client_id(0);
-        // dummypending->rid.set_client_req_id(msg.req_id());
-        // dummypending->rid.set_addr(&remote);
+        // Grab an idx
+        ASSERT(!free_slots_.empty());
+        uint32_t idx = free_slots_.back();
+        free_slots_.pop_back();
 
+        // auto reply = new PendingOperationReply(0, msg.req_id(), &remote);
+        PendingOpReplySlot &reply = slots_[idx];
+        ASSERT(!reply.in_use);
+        reply.in_use = true;
+        reply.remote = &remote;
         // reply->key = msg.key();
         // reply->value = msg.value();
-        auto inserted = pending_operation_replies_.insert({transaction_id, reply});
-        if (!inserted.second) {
-            Panic("Duplicate operation request for transaction_id = %lu", transaction_id);
-        }
-
+        transaction_id_to_slot_[transaction_id] = idx;
         replica_client_->SendOperation(
             transaction_id, msg);
     }
@@ -1740,14 +1745,17 @@ namespace strongstore
         }
     }
 
-    void Server::RespondToClientOperation(PendingOperationReply *reply,
+    void Server::RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx,
                             uint64_t transaction_id, int status, string retval)
     {
         Debug("got this status %d and this retval %s for transaction_id = %d", status, retval.c_str(), transaction_id);
 
         // uint64_t client_id = reply->rid.client_id();
-        uint64_t client_req_id = reply->rid.client_req_id();
-        const TransportAddress *remote = reply->rid.addr();
+        // uint64_t client_req_id = reply->rid.client_req_id();
+        const TransportAddress *remote = reply->remote;
+        reply->in_use = false;
+        reply->remote = nullptr;
+        free_slots_.push_back(idx);
 
         // const std::string &key = reply->key;
         // const std::string &val = reply->value;
@@ -1756,9 +1764,10 @@ namespace strongstore
 
         // op_reply_.Clear();
         dummy_reply_.Clear();
+        dummy_reply_.set_req_id(transaction_id);
         // op_reply_.mutable_rid()->set_client_id(client_id);
         // op_reply_.mutable_rid()->set_client_req_id(client_req_id);
-        dummy_reply_.set_req_id(client_req_id);
+        // dummy_reply_.set_req_id(client_req_id);
         // op_reply_.set_status(status);
         // op_reply_.set_return_value(retval);
         // op_reply_.set_transaction_id(transaction_id);
@@ -1767,7 +1776,7 @@ namespace strongstore
         transport_->SendMessage(this, *remote, dummy_reply_);
 
         // delete remote;
-        delete reply;
+        // delete reply;
     }
 
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
@@ -2085,22 +2094,20 @@ namespace strongstore
         dummy_reply.set_req_id(transaction_id);
         dummy_reply.SerializeToString(&response);
 
-
-        auto search = pending_operation_replies_.find(transaction_id);
-        if (search == pending_operation_replies_.end())
+        auto idx = transaction_id_to_slot_.find(transaction_id);
+        if (idx == transaction_id_to_slot_.end())
         {
-            Debug("Didn't find it!");
-            // Must be we're not a leader, so we don't want to send duplicate responses to clients
-            ASSERT(replica_idx_ != 0);
+            ASSERT(replica_idx_ != 0); // only leader should be able to not find transaction id in map since only leader should be replying to clients
+            Debug("transaction id %lu not found in transaction_id_to_slot_ map!", transaction_id);
             return;
         } else {
-            Debug("Found it! and i'm replica = %d", replica_idx_);
+            Debug("transaction id %lu found in transaction_id_to_slot_ map!", transaction_id);
         }
-
-        PendingOperationReply *pending_reply = search->second;
-        pending_operation_replies_.erase(search);
+        PendingOpReplySlot &pending_reply = slots_[idx->second];
+        ASSERT(pending_reply.in_use);
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
-        RespondToClientOperation(pending_reply, transaction_id, REPLY_OK, retval);
+        RespondToClientOperation(&pending_reply, idx->second, transaction_id, REPLY_OK, retval);
+        transaction_id_to_slot_.erase(idx);
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

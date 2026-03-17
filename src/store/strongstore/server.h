@@ -190,15 +190,19 @@ namespace strongstore
             RequestID rid;
             std::string key;
         };
-        class PendingOperationReply
-        {
-        public:
-            PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
-                                const TransportAddress *remote)
-                : rid{client_id, client_op_id, remote} {}
-            RequestID rid;
-            std::string key;
-            std::string value;
+        // class PendingOperationReply
+        // {
+        // public:
+        //     PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
+        //                         const TransportAddress *remote)
+        //         : rid{client_id, client_op_id, remote} {}
+        //     RequestID rid;
+        //     std::string key;
+        //     std::string value;
+        // };
+        struct PendingOpReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
         };
 
         struct TimestampID
@@ -293,7 +297,7 @@ namespace strongstore
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
-        void RespondToClientOperation(PendingOperationReply *reply, uint64_t transaction_id, int status, string retval);
+        void RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, uint64_t transaction_id, int status, string retval);
 
         const TrueTime &tt_;
         TransactionStore transactions_;
@@ -317,7 +321,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
         // pending_get_replies maps to a vector of PendingGetReply*
         std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
-        std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
+        // std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
@@ -359,7 +363,9 @@ namespace strongstore
 
         // DUMMY
         Timestamp dummyTimestamp;
-        PendingOperationReply *dummypending;
+        std::vector<PendingOpReplySlot> slots_;
+        std::vector<uint32_t> free_slots_;
+        std::unordered_map<uint64_t, uint32_t> transaction_id_to_slot_;
     };
 
 } // namespace strongstore
