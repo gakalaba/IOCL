@@ -1880,7 +1880,7 @@ namespace strongstore
      * op is the request string passed by the client.
      * response is the reply which will be sent back to the client.
      */
-    void Server::ReplicaUpcall(opnum_t opnum, const string &open_wmemstream)
+    void Server::ReplicaUpcall(opnum_t opnum, const string &op)
     {
         // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
