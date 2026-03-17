@@ -52,7 +52,7 @@ namespace replication
             virtual ~VRClient();
             virtual void Invoke(const string &request, continuation_t continuation,
                                 error_continuation_t error_continuation = nullptr);
-            virtual void InvokeDummy(const string &request, uint64_t tid);
+            virtual void InvokeDummy(DummyOperation &msg);
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -99,7 +99,7 @@ namespace replication
             // DUMMY
             PendingRequest *dummypending;
 
-            void SendRequest(const PendingRequest *req, uint64_t tid);
+            void SendRequest(uint64_t tid);
             void ResendRequest(const uint64_t reqId);
             void HandleReply(const TransportAddress &remote,
                              const proto::ReplyMessage &msg);

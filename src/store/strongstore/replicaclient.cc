@@ -68,14 +68,13 @@ namespace strongstore
     //                      replication::LinearizeableOperation &msg,
     //                      op_callback ocb, op_timeout_callback otcb,
     //                      uint32_t timeout)
-    void ReplicaClient::SendOperation(uint64_t request_id,
-                         replication::DummyOperation &msg)
+    void ReplicaClient::SendOperation(replication::DummyOperation &msg)
     {
         Debug("[shard %i] ReplicaClient SendRequest sending msg with req_id = %d", shard_idx_, msg.req_id());
         // Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
         //       msg.DebugString().c_str());
 
-        string request_str;
+        // string request_str;
         // uint64_t reqId = lastReqId++;
         // PendingOperation *pendingOperation = new PendingOperation(reqId);
         // auto pendingOperation = dummypending;
@@ -88,16 +87,15 @@ namespace strongstore
             case LinearizableProtocol::PROTO_VR:
                 // create request
                 Debug("Running VR: serializing LinearizeableOperation into string");
-                msg.SerializeToString(&request_str);
-                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
+                // msg.SerializeToString(&request_str);
+                // Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
-                client->InvokeDummy(
-                    request_str, request_id);
+                client->InvokeDummy(msg);
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
                 Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
                 client->InvokeIOCLDummy(
-                    msg, request_id, nullptr, nullptr);
+                    msg, msg.req_id(), nullptr, nullptr);
                 break;
         }
     }
@@ -239,8 +237,8 @@ namespace strongstore
         //     bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
         //          std::placeholders::_1, std::placeholders::_2));
 
-        client->InvokeDummy(
-            request_str, transaction_id);
+        client->InvokeDummy(dummy_op);
+            // request_str, transaction_id);
     }
 
     void ReplicaClient::Commit(uint64_t transaction_id, Timestamp &commit_timestamp,

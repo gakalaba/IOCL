@@ -59,11 +59,11 @@ void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
     Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
 }
 
-void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res) {
+void Replica::ReplicaUpcall(opnum_t opnum, const string &op) {
     Debug("Making upcall for opnum %lu operation %s", opnum, op.c_str());
-    app->ReplicaUpcall(opnum, op, res);
+    app->ReplicaUpcall(opnum, op);
 
-    Debug("Upcall result: %s", res.c_str());
+    Debug("Upcall returned");
 }
 
 void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)

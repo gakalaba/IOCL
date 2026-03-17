@@ -61,7 +61,7 @@ namespace replication
             }
         }
 
-        void VRClient::InvokeDummy(const string &request, uint64_t transaction_id)
+        void VRClient::InvokeDummy(DummyOperation &msg)
         {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
@@ -75,7 +75,7 @@ namespace replication
             // dummypending->clientReqId = reqId;
 
             // pendingReqs[reqId] = req;
-            SendRequest(nullptr, transaction_id);
+            SendRequest(msg.req_id());
         }
 
         void VRClient::Invoke(const string &request, continuation_t continuation,
@@ -93,7 +93,7 @@ namespace replication
                 new PendingRequest(request, reqId, continuation);
 
             pendingReqs[reqId] = req;
-            SendRequest(req, 0);
+            SendRequest(0);
         }
 
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
@@ -131,7 +131,7 @@ namespace replication
             return;
         }
 
-        void VRClient::SendRequest(const PendingRequest *req, uint64_t tid)
+        void VRClient::SendRequest(uint64_t tid)
         {
             // proto::RequestMessage reqMsg;
             // reqMsg.mutable_req()->set_op(req->request);
@@ -166,7 +166,7 @@ namespace replication
             }
 
             Warning("Client timeout; resending request: %lu", reqId);
-            SendRequest(pendingReqs[reqId], 0);
+            SendRequest(0);
         }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,

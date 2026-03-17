@@ -346,8 +346,7 @@ namespace strongstore
         // reply->key = msg.key();
         // reply->value = msg.value();
         transaction_id_to_slot_[transaction_id] = idx;
-        replica_client_->SendOperation(
-            transaction_id, msg);
+        replica_client_->SendOperation(msg);
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)
@@ -1881,14 +1880,14 @@ namespace strongstore
      * op is the request string passed by the client.
      * response is the reply which will be sent back to the client.
      */
-    void Server::ReplicaUpcall(opnum_t opnum, const string &op, string &response)
+    void Server::ReplicaUpcall(opnum_t opnum, const string &open_wmemstream)
     {
         // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         LinearizeableOperation linreq;
         if (consistency_ == LIN)
         {
             // linreq.ParseFromString(op);
-            ReplicaUpcallAppRequest(opnum, linreq, response);
+            ReplicaUpcallAppRequest(opnum, linreq);
             return;
         }
         Debug("Replica upcall with transaction_id = %lu", opnum);
@@ -2053,12 +2052,11 @@ namespace strongstore
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req, string &response)
+    void Server::ReplicaUpcallAppRequest(opnum_t opnum, LinearizeableOperation &req)
     {
         // Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
         // LinearizeableReply reply;
         Debug("inside ReplicaUpcall with req_id = %d", opnum);
-        DummyReply dummy_reply;
 
         string retval;
         // int status = REPLY_OK;
@@ -2086,27 +2084,25 @@ namespace strongstore
         // reply.set_status(status);
         // reply.set_return_value(retval);
         // uint64_t transaction_id = req.transaction_id();
-        uint64_t transaction_id = opnum;
         // reply.set_transaction_id(transaction_id);
         // reply.mutable_rid()->set_client_id(req.rid().client_id());
         // reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         // reply.SerializeToString(&response);
-        dummy_reply.set_req_id(transaction_id);
-        dummy_reply.SerializeToString(&response);
+        // dummy_reply.SerializeToString(&response);
 
-        auto idx = transaction_id_to_slot_.find(transaction_id);
+        auto idx = transaction_id_to_slot_.find(opnum);
         if (idx == transaction_id_to_slot_.end())
         {
             ASSERT(replica_idx_ != 0); // only leader should be able to not find transaction id in map since only leader should be replying to clients
-            Debug("transaction id %lu not found in transaction_id_to_slot_ map!", transaction_id);
+            Debug("transaction id %lu not found in transaction_id_to_slot_ map!", opnum);
             return;
         } else {
-            Debug("transaction id %lu found in transaction_id_to_slot_ map!", transaction_id);
+            Debug("transaction id %lu found in transaction_id_to_slot_ map!", opnum);
         }
         PendingOpReplySlot &pending_reply = slots_[idx->second];
         ASSERT(pending_reply.in_use);
         // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
-        RespondToClientOperation(&pending_reply, idx->second, transaction_id, REPLY_OK, retval);
+        RespondToClientOperation(&pending_reply, idx->second, opnum, REPLY_OK, retval);
         transaction_id_to_slot_.erase(idx);
     }
 

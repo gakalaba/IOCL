@@ -530,8 +530,7 @@ namespace replication
             }
             opnum_t opnum = msg.req_id();
             const string &op = "";
-            string res;
-            ReplicaUpcall(opnum, op, res);
+            ReplicaUpcall(opnum, op);
 
             // Send Dummy Commit
             DummyCommit cm;

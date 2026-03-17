@@ -33,10 +33,9 @@
 
 template <class MSG>
 void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply) {
-    string res;
-    ReplicaUpcall(opnum, msg.op(), res);
+    ReplicaUpcall(opnum, msg.op());
 
-    reply.set_reply(res);
+    // reply.set_reply(res);
 }
 
 template <class MSG>
