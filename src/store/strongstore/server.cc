@@ -1281,6 +1281,7 @@ namespace strongstore
 
     void Server::PrepareCallback(uint64_t transaction_id, int status, Timestamp timestamp)
     {
+        // Only ever run on leader!!! Replicas don't have a back path to the callback
         TransactionState s = transactions_.FinishParticipantPrepare(transaction_id);
         if (s == PREPARED)
         {
@@ -1901,9 +1902,11 @@ namespace strongstore
         //     {
         //         // Debug("[%lu] Already aborted", transaction_id);
         //         status = REPLY_FAIL;
+        //         // SendRWCommmitParticipantReplyFail(transaction_id);
         //     }
         //     else if (s == NOT_FOUND)
-        //     { // Replica prepare
+        //     { // Participant Shard Replica Upcall for Prepare
+        //         // should these values come from the message itself because already picked by leader?
         //         const Timestamp prepare_ts{request.prepare().timestamp()};
         //         int coordinator = request.prepare().coordinator();
         //         const Transaction transaction{request.prepare().txn()};
@@ -1926,11 +1929,25 @@ namespace strongstore
         //     else if (s == PREPARING || s == PREPARED)
         //     {
         //         // Debug("[%lu] Already prepared", transaction_id);
+        //         // should this just run for PREPARED and not PREPARING like OG callback?
+        //         // int coordinator = transactions_.GetCoordinator(transaction_id);
+        //         // const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
+        //         // const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        //         // // TODO: Handle timeout
+        //         // shard_clients_[coordinator]->PrepareOK(
+        //         //     transaction_id, shard_idx_, prepare_ts, nonblock_ts,
+        //         //     std::bind(&Server::PrepareOKCallback, this, transaction_id,
+        //         //             placeholders::_1, placeholders::_2),
+        //         //     [](int, Timestamp) {}, PREPARE_TIMEOUT);
+
+        //         // // Reply to client
+        //         // SendRWCommmitParticipantReplyOK(transaction_id);
         //     }
         //     else
         //     {
         //         NOT_REACHABLE();
         //     }
+
         // }
         // else if (request.op() == strongstore::proto::Request::COMMIT)
         // {
