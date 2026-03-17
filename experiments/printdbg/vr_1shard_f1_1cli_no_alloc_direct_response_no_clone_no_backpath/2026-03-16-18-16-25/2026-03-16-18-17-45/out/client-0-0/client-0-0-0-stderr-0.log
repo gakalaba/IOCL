@@ -1,0 +1,29 @@
+20260216-181809-4543 30985 * main            (benchmark.cc:402): Starting benchmark.
+20260216-181810-0185 30985 * main            (benchmark.cc:621): Creating a default paritioner!
+20260216-181810-0187 30985 * Client          (client.cc:75):     Initializing StrongStore client with id [0]
+20260216-181810-0188 30985 * BenchmarkClient (bench_client.cc:81): starting benchclient, issueConcurrent: 0; fanout: 1
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20260216-181815-0638 30985 * WarmupDone      (bench_client.cc:738): Completed warmup period of 5 seconds with 15053 requests
+20260216-181843-5029 30985 PANIC GetNextAppRequest (micro_client.cc:105): Exceeded max txns per client!
+20260216-181843-5031 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x10d3dc) [0x560246eb53dc]
+20260216-181843-5032 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x5b4c0) [0x560246e034c0]
+20260216-181843-5032 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x17540) [0x560246dbf540]
+20260216-181843-5032 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x288c8) [0x560246dd08c8]
+20260216-181843-5033 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x26f3e) [0x560246dcef3e]
+20260216-181843-5033 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x254d0) [0x560246dcd4d0]
+20260216-181843-5033 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x22ea3) [0x560246dcaea3]
+20260216-181843-5034 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x20b56) [0x560246dc8b56]
+20260216-181843-5034 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x1fa24) [0x560246dc7a24]
+20260216-181843-5034 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x11096f) [0x560246eb896f]
+20260216-181843-5035 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x110a3a) [0x560246eb8a3a]
+20260216-181843-5035 30985 ! _Panic          (message.cc:173):   /usr/lib/x86_64-linux-gnu/libevent-2.1.so.6(+0x1ea11) [0x7f4382d9fa11]
+20260216-181843-5035 30985 ! _Panic          (message.cc:173):   /usr/lib/x86_64-linux-gnu/libevent-2.1.so.6(event_base_loop+0x53f) [0x7f4382da033f]
+20260216-181843-5035 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x110181) [0x560246eb8181]
+20260216-181843-5036 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x2c9e9) [0x560246dd49e9]
+20260216-181843-5036 30985 ! _Panic          (message.cc:173):   /lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0xe7) [0x7f4381e6fbf7]
+20260216-181843-5036 30985 ! _Panic          (message.cc:173):   /users/akalaba/IOCL/bin/benchmark(+0x1554a) [0x560246dbd54a]
