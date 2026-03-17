@@ -113,7 +113,8 @@ namespace replication
             [[nodiscard]] inline bool AmHead() const {return myIdx == 0;}
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
-            [[nodiscard]] bool BackwardsPropagateMessageInChain(const Message &m);
+            [[unused]] bool BackwardsPropagateMessageInChain(const Message &m);
+            [[nodiscard]] bool SendMessageToAllPreviousReplicasInChain(const Message &m);
             Request ToRequest(const replication::LinearizeableOperation &linRequest);
             replication::LinearizeableOperation ToLinearizableRequest(const Request &request);
             void ExecuteWriteOperation(const replication::LinearizeableOperation &linRequest);

@@ -123,6 +123,24 @@ namespace replication
         return transport->SendMessageToReplica(this, myIdx - 1, m);
        } 
        
+       bool CRAQReplica::SendMessageToAllPreviousReplicasInChain(const Message &m)
+       {
+        if (!AmTail())
+        {
+            Panic("Shouldn't call from a non-tail replica");
+        }
+
+        bool success = true;
+        for (int replicaIndex = 0; replicaIndex < myIdx; ++replicaIndex)
+        {
+            if (!transport->SendMessageToReplica(this, replicaIndex, m))
+            {
+               success = false; 
+            }
+        }
+        return success;
+       }
+       
         Request CRAQReplica::ToRequest(const replication::LinearizeableOperation &linRequest)
         {
             Request request;
@@ -158,7 +176,7 @@ namespace replication
             Request request = ToRequest(linRequest);
 
             Execute(Timestamp{lastCommitted}, request, reply);
-            if (AmHead())
+            if (AmTail())
             {
                 SendReplyToClient(linRequest, reply);
             }
@@ -629,7 +647,7 @@ namespace replication
                     cm.set_key("");
                 }
 
-                if (!BackwardsPropagateMessageInChain(cm))
+                if (!SendMessageToAllPreviousReplicasInChain(cm))
                 {
                     RWarning("Failed to backward propagate COMMIT message from tail");
                 }
@@ -666,15 +684,6 @@ namespace replication
             }
 
             CommitUpTo(msg.opnum());
-
-            if (!AmHead())
-            {
-                if (!BackwardsPropagateMessageInChain(msg))
-                {
-                    RWarning("Failed to back propagate COMMIT message from tail");
-                }
-                Debug("Backwards propagating commit");
-            }
         }
 
         void CRAQReplica::HandleVersionRequest(const TransportAddress &remote, const VersionRequestMessage &msg)

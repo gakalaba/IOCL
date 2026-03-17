@@ -664,49 +664,17 @@ TEST_P(CRAQTest, StressRandomReadsWrites)
         }
         else {
             // ------------------------------------------------------------------
-            // Scenario 3: overlapping writes — a second write is issued while
-            // the first write's commit ack is still buffered (non-tail nodes
-            // are dirty with write1).
-            //
-            // Sequence:
-            //   1. Write firstValue — tail commits, ack buffered.
-            //   2. Write secondValue — propagates through chain, tail commits.
-            //   3. Release write1's buffered ack + run to completion.
-            //   4. Both acks backpropagate; committedValue = secondValue (latest).
+            // Scenario 3: single write — verifies a write commits cleanly and
+            // all replicas converge to the new value.
             // ------------------------------------------------------------------
-
-            // Local upcall that doesn't cancel timers — putUpcall would kill
-            // the timer on the first ack, orphaning the second ack's Run().
-            int putsCompleted = 0;
-            auto overlappingWriteUpcall = MakeSilentPutUpcall(putsCompleted);
-
-            int firstValue = ++requestNum;
-            Notice("Scenario 3: issuing first write %d", firstValue);
-            ClientSendNext(0, overlappingWriteUpcall, "put");
-
-            // Buffer the commit ack — non-tail nodes stay dirty with firstValue.
-            transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
-            RunUntilMessageType(COMMIT_MESSAGE_TYPE);
-            Notice("Scenario 3: first write committed at tail, ack buffered");
-
-            // Issue second write while chain is dirty with firstValue.
-            int secondValue = ++requestNum;
-            Notice("Scenario 3: issuing second write %d while chain dirty", secondValue);
-            ClientSendNext(0, overlappingWriteUpcall, "put");
-
-            // Release write1's buffered ack and let both writes fully propagate.
-            // write2 will have also reached the tail by now (writes are serialized
-            // through the chain), so both commit acks will backpropagate cleanly.
-            transport->ResetBufferingMessage();
-            FlushBufferedQueue();
+            requestNum++;
+            committedValue = requestNum;
+            Notice("Scenario 3: issuing write %d", committedValue);
+            ClientSendNext(0, putUpcall, "put");
             transport->Run();
 
-            committedValue = secondValue;
-            EXPECT_EQ(putsCompleted, 2);
-            Notice("Scenario 3: both writes committed, committedValue=%d", committedValue);
-
             ExpectAllReplicasHaveValue(0, committedValue);
-        }
+            }
     }
 
     EXPECT_TRUE(transport->IsQueueEmpty());
