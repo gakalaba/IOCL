@@ -94,8 +94,7 @@ Client::InvokeIOCL(LinearizeableOperation &msg,
 }
 
 void
-Client::InvokeDummy(const string &request, uint64_t tid, continuation_t continuation,
-                        error_continuation_t error_continuation)
+Client::InvokeDummy(const string &request, uint64_t tid)
 {
     Panic("Shouldn't be calling this if not dummy");
 }

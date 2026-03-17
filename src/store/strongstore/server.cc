@@ -342,11 +342,7 @@ namespace strongstore
         }
 
         replica_client_->SendOperation(
-            transaction_id, msg,
-            std::bind(&Server::SendOperationCallback, this,
-                              transaction_id, std::placeholders::_1),
-            // this thing is the ptcb
-            [](int) {}, OPERATION_TIMEOUT);
+            transaction_id, msg);
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)
@@ -1312,11 +1308,11 @@ namespace strongstore
         }
     }
 
-    void Server::SendOperationCallback(uint64_t transaction_id, int status)
-    {
-        ASSERT(status == REPLY_OK);
-        // Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
-    }
+    // void Server::SendOperationCallback(uint64_t transaction_id, int status)
+    // {
+    //     ASSERT(status == REPLY_OK);
+    //     // Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
+    // }
 
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {

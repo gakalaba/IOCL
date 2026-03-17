@@ -69,22 +69,20 @@ namespace strongstore
     //                      op_callback ocb, op_timeout_callback otcb,
     //                      uint32_t timeout)
     void ReplicaClient::SendOperation(uint64_t request_id,
-                         replication::DummyOperation &msg,
-                         op_callback ocb, op_timeout_callback otcb,
-                         uint32_t timeout)
+                         replication::DummyOperation &msg)
     {
         Debug("[shard %i] ReplicaClient SendRequest sending msg with req_id = %d", shard_idx_, msg.req_id());
         // Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
         //       msg.DebugString().c_str());
 
         string request_str;
-        uint64_t reqId = lastReqId++;
+        // uint64_t reqId = lastReqId++;
         // PendingOperation *pendingOperation = new PendingOperation(reqId);
-        auto pendingOperation = dummypending;
-        dummypending->reqId = reqId;
-        pendingOperations[reqId] = pendingOperation;
-        pendingOperation->ocb = ocb;
-        pendingOperation->otcb = otcb;
+        // auto pendingOperation = dummypending;
+        // dummypending->reqId = reqId;
+        // pendingOperations[reqId] = pendingOperation;
+        // pendingOperation->ocb = ocb;
+        // pendingOperation->otcb = otcb;
 
         switch (linproto_) {
             case LinearizableProtocol::PROTO_VR:
@@ -94,42 +92,38 @@ namespace strongstore
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
                 client->InvokeDummy(
-                    request_str, request_id,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                        std::placeholders::_1, std::placeholders::_2));
+                    request_str, request_id);
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
                 Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
                 client->InvokeIOCLDummy(
-                    msg, request_id,
-                    bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
-                        std::placeholders::_1, std::placeholders::_2));
+                    msg, request_id, nullptr, nullptr);
                 break;
         }
     }
 
-    /* Callback from a shard replica on sendrequest operation completion. */
-    bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
-                                            const string &reply_str)
-    {
-        Debug("Here in sendOperationCallback in replicaclient");
-        // LinearizeableReply reply;
+    // /* Callback from a shard replica on sendrequest operation completion. */
+    // bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
+    //                                         const string &reply_str)
+    // {
+    //     Debug("Here in sendOperationCallback in replicaclient");
+    //     // LinearizeableReply reply;
 
-        // reply.ParseFromString(reply_str);
+    //     // reply.ParseFromString(reply_str);
 
-        // Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
-        //       reply.status());
-        auto itr = this->pendingOperations.find(reqId);
-        ASSERT(itr != this->pendingOperations.end());
-        PendingOperation *pendingOperation = itr->second;
-        op_callback ocb = pendingOperation->ocb;
-        this->pendingOperations.erase(itr);
-        // delete pendingOperation;
-        // ocb(reply.status());
-        ocb(0);
+    //     // Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
+    //     //       reply.status());
+    //     auto itr = this->pendingOperations.find(reqId);
+    //     ASSERT(itr != this->pendingOperations.end());
+    //     PendingOperation *pendingOperation = itr->second;
+    //     op_callback ocb = pendingOperation->ocb;
+    //     this->pendingOperations.erase(itr);
+    //     // delete pendingOperation;
+    //     // ocb(reply.status());
+    //     ocb(0);
 
-        return true;
-    }
+    //     return true;
+    // }
 
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
@@ -246,9 +240,7 @@ namespace strongstore
         //          std::placeholders::_1, std::placeholders::_2));
 
         client->InvokeDummy(
-            request_str, transaction_id,
-            bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
+            request_str, transaction_id);
     }
 
     void ReplicaClient::Commit(uint64_t transaction_id, Timestamp &commit_timestamp,

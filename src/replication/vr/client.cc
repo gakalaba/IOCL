@@ -61,25 +61,21 @@ namespace replication
             }
         }
 
-        void VRClient::InvokeDummy(const string &request, uint64_t transaction_id, continuation_t continuation,
-                              error_continuation_t error_continuation)
+        void VRClient::InvokeDummy(const string &request, uint64_t transaction_id)
         {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
-            (void)error_continuation;
+            // uint64_t reqId = ++lastReqId;
+            // // Timeout *timer =
+            // //     new Timeout(transport, 500, [this, reqId]()
+            // //                 { ResendRequest(reqId); });
+            // PendingRequest *req = dummypending;
+            //     // new PendingRequest(request, reqId, continuation);
+            // dummypending->request = request;
+            // dummypending->clientReqId = reqId;
 
-            uint64_t reqId = ++lastReqId;
-            // Timeout *timer =
-            //     new Timeout(transport, 500, [this, reqId]()
-            //                 { ResendRequest(reqId); });
-            PendingRequest *req = dummypending;
-                // new PendingRequest(request, reqId, continuation);
-            dummypending->request = request;
-            dummypending->clientReqId = reqId;
-            dummypending->continuation = continuation;
-
-            pendingReqs[reqId] = req;
-            SendRequest(req, transaction_id);
+            // pendingReqs[reqId] = req;
+            SendRequest(nullptr, transaction_id);
         }
 
         void VRClient::Invoke(const string &request, continuation_t continuation,
@@ -155,8 +151,8 @@ namespace replication
             else
             {
                 Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
+                // pendingReqs.erase(req->clientReqId);
+                // delete req;
             }
         }
 
@@ -177,31 +173,32 @@ namespace replication
                                       const string &type, const string &data,
                                       void *meta_data)
         {
-            proto::ReplyMessage reply;
-            proto::UnloggedReplyMessage unloggedReply;
-            proto::DummyReply dummyReply;
+            Panic("shoud have no responses from replicas, all traffic should go through upcall mechanism");
+            // proto::ReplyMessage reply;
+            // proto::UnloggedReplyMessage unloggedReply;
+            // proto::DummyReply dummyReply;
 
-            if (type == reply.GetTypeName())
-            {
-                reply.ParseFromString(data);
-                HandleReply(remote, reply);
-            }
-            else if (type == dummyReply.GetTypeName())
-            {
-                // This is a reply to an unlogged request, but we don't care about
-                // the contents. Just stop the timer and remove the pending request.
-                dummyReply.ParseFromString(data);
-                HandleDummyReply(remote, dummyReply);
-            }
-            else if (type == unloggedReply.GetTypeName())
-            {
-                unloggedReply.ParseFromString(data);
-                HandleUnloggedReply(remote, unloggedReply);
-            }
-            else
-            {
-                Client::ReceiveMessage(remote, type, data, meta_data);
-            }
+            // if (type == reply.GetTypeName())
+            // {
+            //     reply.ParseFromString(data);
+            //     HandleReply(remote, reply);
+            // }
+            // else if (type == dummyReply.GetTypeName())
+            // {
+            //     // This is a reply to an unlogged request, but we don't care about
+            //     // the contents. Just stop the timer and remove the pending request.
+            //     dummyReply.ParseFromString(data);
+            //     HandleDummyReply(remote, dummyReply);
+            // }
+            // else if (type == unloggedReply.GetTypeName())
+            // {
+            //     unloggedReply.ParseFromString(data);
+            //     HandleUnloggedReply(remote, unloggedReply);
+            // }
+            // else
+            // {
+            //     Client::ReceiveMessage(remote, type, data, meta_data);
+            // }
         }
 
         void VRClient::HandleDummyReply(const TransportAddress &remote,
