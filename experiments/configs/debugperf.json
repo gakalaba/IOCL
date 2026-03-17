@@ -13,14 +13,10 @@
     ]
   ],
   "replication_protocol": [
-    "iocl_ct",
-    "vr",
-    "strong"
+    "vr"
   ],
   "client_protocol_mode": [
-    "iocl_ct",
-    "vr",
-    "span-lock"
+    "vr"
   ],
   "server_names": [
     "us-east-1-0",
@@ -28,9 +24,7 @@
     "us-east-1-2"
   ],
   "consistency": [
-    "lin",
-    "lin",
-    "ss"
+    "lin"
   ],
   "num_instances": 1,
   "shard_config": "shard.config",
@@ -47,50 +41,31 @@
       "us-east-1-2"
     ]
   ],
+  "clients_used": 1,
   "client_total": [
     [
-      5, 10, 20, 40, 80, 160, 320, 640
-    ],
-    [
-      5, 10, 20, 40, 80, 160, 320, 640
-    ],
-    [
-      5, 10, 20, 40, 80, 160, 320, 640
+      1, 2, 3, 4, 5, 8, 16, 32, 48, 64, 128
     ]
   ],
   "client_processes_per_client_node": [
     [
-      1, 2, 4, 8, 16, 32, 64, 128
-    ],
-    [
-      1, 2, 4, 8, 16, 32, 64, 128
-    ],
-    [
-      1, 2, 4, 8, 16, 32, 64, 128
+      1, 2, 3, 4, 5, 8, 16, 32, 48, 64, 128
     ]
   ],
   "client_threads_per_process": 1,
   "clients": [
-    "client-0-0",
-    "client-0-1",
-    "client-0-2",
-    "client-1-0",
-    "client-1-1"
+    "client-0-0"
   ],
   "server_regions": {
     "ca": [
       "us-east-1-0",
-      "client-0-0",
-      "client-1-0"
+      "client-0-0"
     ],
     "va": [
-      "us-east-1-1",
-      "client-0-1",
-      "client-1-1"
+      "us-east-1-1"
     ],
     "ir": [
-      "us-east-1-2",
-      "client-0-2"
+      "us-east-1-2"
     ]
   },
   "server_port": 7087,
@@ -161,7 +136,7 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 20,
+  "client_experiment_length": 40,
   "client_rand_sleep": 0,
   "client_ramp_down": 5,
   "client_ramp_up": 5,
@@ -201,8 +176,8 @@
       "width": 800,
       "series_indep_vars_idx": 0,
       "series_titles": [
+        "Dummy View-Stamped Replication - no alloc",
         "IOCL_CT",
-        "View-Stamped Replication",
         "Spanner"
       ],
       "x_var_is_config": false,
