@@ -681,6 +681,225 @@ TEST_P(CRAQTest, StressRandomReadsWrites)
     EXPECT_TRUE(transport->IsBufferedQueueEmpty());
 }
 
+TEST_P(CRAQTest, CommitLogOrdering)
+{
+    auto params = GetParam();
+    if (params.clientsPerShard > 1 || params.shards > 1)
+    {
+        GTEST_SKIP();
+    }
+
+    int replicasPerShard = params.replicasPerShard;
+
+    auto parseEntry = [](const LogEntry *entry) -> LinearizeableOperation {
+        LinearizeableOperation linop;
+        linop.ParseFromString(entry->request.op());
+        linop.mutable_rid()->set_client_id(entry->request.clientid());
+        linop.mutable_rid()->set_client_req_id(entry->request.clientreqid());
+        return linop;
+    };
+
+    // Check commitLog entry at pos on replica r has expectedOp.
+    auto expectCommitLogEntry = [&](int r, opnum_t pos, const string &expectedOp) {
+        const Log &clog = replicas[0][r]->GetCommitLog();
+
+        EXPECT_FALSE(clog.Empty())
+            << "commitLog is empty on replica " << r;
+        if (clog.Empty()) return;
+
+        EXPECT_GE(clog.LastOpnum(), pos)
+            << "commitLog too short on replica " << r
+            << " (last=" << clog.LastOpnum() << " want pos=" << pos << ")";
+        if (clog.LastOpnum() < pos) return;
+
+        const LogEntry *entry = clog.Find(pos);
+        EXPECT_NE(entry, nullptr)
+            << "commitLog entry " << pos << " missing on replica " << r;
+        if (entry == nullptr) return;
+
+        EXPECT_EQ(entry->state, LOG_STATE_CLEAN)
+            << "commitLog entry " << pos << " not clean on replica " << r;
+
+        LinearizeableOperation linop = parseEntry(entry);
+        EXPECT_EQ(linop.op(), expectedOp)
+            << "commitLog entry " << pos << " op mismatch on replica " << r
+            << " (got=" << linop.op() << " want=" << expectedOp << ")";
+    };
+
+    // -----------------------------------------------------------------------
+    // Phase 1: clean write.
+    // SetUp did one put → commitLog[1]. This write is commitLog[2].
+    // -----------------------------------------------------------------------
+    int writeValue = ++requestNum;
+    Notice("CommitLogOrdering: clean write %d", writeValue);
+    ClientSendNext(0, putUpcall, "put");
+    transport->Run();
+
+    for (int r = 0; r < replicasPerShard; r++)
+    {
+        expectCommitLogEntry(r, 1, "put");
+        expectCommitLogEntry(r, 2, "put");
+        EXPECT_EQ(replicas[0][r]->GetCommitLog().LastOpnum(), (opnum_t)2)
+            << "commitLog should have exactly 2 entries on replica " << r;
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 2: clean read.
+    // Chain is clean so read executes immediately → commitLog[3] on head only.
+    // Non-head replicas never see reads directly so their log stays at [2].
+    // -----------------------------------------------------------------------
+    requestNum++;
+    Notice("CommitLogOrdering: clean read");
+    ClientSendNext(0, MakeGetUpcall(writeValue), "get");
+    transport->Run();
+
+    // Head (replica 0) handles the read directly and logs it.
+    expectCommitLogEntry(0, 3, "get");
+    EXPECT_EQ(replicas[0][0]->GetCommitLog().LastOpnum(), (opnum_t)3)
+        << "head commitLog should have 3 entries after 2 writes + 1 read";
+
+    // Non-head replicas do not see reads — their commitLog stays at 2.
+    for (int r = 1; r < replicasPerShard; r++)
+    {
+        EXPECT_EQ(replicas[0][r]->GetCommitLog().LastOpnum(), (opnum_t)2)
+            << "non-head replica " << r << " should not log reads it didn't serve";
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 3: dirty read — commit ack buffered then discarded.
+    // -----------------------------------------------------------------------
+    int dirtyWriteValue = ++requestNum;
+    Notice("CommitLogOrdering: dirty write %d (ack will be discarded)", dirtyWriteValue);
+    ClientSendNext(0, putUpcall, "put");
+
+    transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
+    RunUntilMessageType(COMMIT_MESSAGE_TYPE);
+    Notice("CommitLogOrdering: commit ack buffered, chain dirty");
+
+    requestNum++;
+    ClientSendNext(0, MakeGetUpcall(writeValue), "get");
+    transport->Run();
+
+    transport->ResetBufferingMessage();
+    FlushBufferedQueue();
+    transport->Run();
+
+    // HEAD: FlushWritesUpTo in HandleVersionResponse flushed the dirty write
+    // before the read — so [4]=dirty write, [5]=read.
+    expectCommitLogEntry(0, 4, "put");
+    expectCommitLogEntry(0, 5, "get");
+    EXPECT_EQ(replicas[0][0]->GetCommitLog().LastOpnum(), (opnum_t)5)
+        << "head should have 5 entries: 2 writes + 1 clean read + 1 dirty write + 1 dirty read";
+
+    // Mid replicas: FlushBufferedQueue released the commit ack, CommitUpTo
+    // ran, dirty write was flushed. They never log reads.
+    for (int r = 1; r < replicasPerShard - 1; r++)
+    {
+        expectCommitLogEntry(r, 3, "put");
+        EXPECT_EQ(replicas[0][r]->GetCommitLog().LastOpnum(), (opnum_t)3)
+            << "mid replica " << r << " should have 3 entries after dirty write committed";
+    }
+
+    // Tail: committed the dirty write in HandlePrepare, flushed it immediately.
+    // Never logs reads.
+    int tail = replicasPerShard - 1;
+    expectCommitLogEntry(tail, 3, "put");
+    EXPECT_EQ(replicas[0][tail]->GetCommitLog().LastOpnum(), (opnum_t)3)
+        << "tail should have 3 entries after dirty write committed";
+
+    // Recovery write.
+    requestNum++;
+    ClientSendNext(0, putUpcall, "put");
+    transport->Run();
+
+    ExpectAllReplicasHaveValue(0, requestNum);
+
+    // HEAD: recovery write flushed -> [6]=put
+    expectCommitLogEntry(0, 6, "put");
+    EXPECT_EQ(replicas[0][0]->GetCommitLog().LastOpnum(), (opnum_t)6)
+        << "head should have 6 entries after recovery write";
+
+    // Non-head: recovery write flushed -> [4]=put
+    for (int r = 1; r < replicasPerShard; r++)
+    {
+        expectCommitLogEntry(r, 4, "put");
+        EXPECT_EQ(replicas[0][r]->GetCommitLog().LastOpnum(), (opnum_t)4)
+            << "replica " << r << " should have 4 entries after recovery write";
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 4: dirty read — commit backpropagates BEFORE version request,
+    // so the read sees the new value and the write precedes the read in
+    // commitLog on HEAD.
+    // -----------------------------------------------------------------------
+    int pendingValue = ++requestNum;
+    Notice("CommitLogOrdering: write %d (dirty read will see this)", pendingValue);
+    ClientSendNext(0, putUpcall, "put");
+
+    transport->SetBufferingMessage(COMMIT_MESSAGE_TYPE);
+    RunUntilMessageType(COMMIT_MESSAGE_TYPE);
+    Notice("CommitLogOrdering: commit ack buffered");
+
+    transport->SetBufferingMessage(VERSION_REQUEST_MESSAGE_TYPE);
+    requestNum++;
+    ClientSendNext(0, MakeGetUpcall(pendingValue), "get");
+    RunUntilMessageType(VERSION_REQUEST_MESSAGE_TYPE);
+    Notice("CommitLogOrdering: version request buffered");
+
+    string first = transport->PopBufferedEvent();
+    EXPECT_EQ(COMMIT_MESSAGE_TYPE, first);
+    transport->Run();
+    Notice("CommitLogOrdering: commits backpropagated");
+
+    FlushBufferedQueue();
+    transport->Run();
+
+    // HEAD: commit flushed pendingWrite[5] -> [7]=put, then version response
+    // appended read -> [8]=get. Write must precede read.
+    {
+        const Log &clog = replicas[0][0]->GetCommitLog();
+        opnum_t last = clog.LastOpnum();
+
+        EXPECT_GE(last, (opnum_t)2)
+            << "head commitLog too short for phase 4 check";
+        if (last >= 2)
+        {
+            const LogEntry *writeEntry = clog.Find(last - 1);
+            const LogEntry *readEntry  = clog.Find(last);
+
+            EXPECT_NE(writeEntry, nullptr) << "write entry missing on head";
+            EXPECT_NE(readEntry,  nullptr) << "read entry missing on head";
+            if (writeEntry != nullptr && readEntry != nullptr)
+            {
+                EXPECT_EQ(parseEntry(writeEntry).op(), string("put"))
+                    << "expected write before read on head";
+                EXPECT_EQ(parseEntry(readEntry).op(), string("get"))
+                    << "expected read as last entry on head";
+                EXPECT_LT(writeEntry->viewstamp.opnum, readEntry->viewstamp.opnum)
+                    << "write opnum must be less than read opnum on head";
+            }
+        }
+    }
+
+    // Non-HEAD replicas never log reads — their last entry is the write.
+    for (int r = 1; r < replicasPerShard; r++)
+    {
+        const Log &clog = replicas[0][r]->GetCommitLog();
+        opnum_t last = clog.LastOpnum();
+
+        EXPECT_GE(last, (opnum_t)1)
+            << "commitLog unexpectedly empty on replica " << r;
+        if (last < 1) continue;
+
+        const LogEntry *lastEntry = clog.Find(last);
+        EXPECT_NE(lastEntry, nullptr) << "last entry null on replica " << r;
+        if (lastEntry == nullptr) continue;
+
+        EXPECT_EQ(parseEntry(lastEntry).op(), string("put"))
+            << "non-head replica " << r << " last entry should be a write (reads not logged here)";
+    }
+}
+
 INSTANTIATE_TEST_CASE_P(test,
                         CRAQTest,
                         ::testing::Values(

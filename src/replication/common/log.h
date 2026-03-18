@@ -87,6 +87,7 @@ class Log {
     Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
     LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
     LogEntry *Find(opnum_t opnum);
+    const LogEntry *Find(opnum_t opnum) const;
     bool SetStatus(opnum_t opnum, LogEntryState state);
     bool SetRequest(opnum_t op, const Request &req);
     void RemoveAfter(opnum_t opnum);

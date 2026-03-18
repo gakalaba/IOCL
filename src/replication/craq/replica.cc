@@ -61,6 +61,8 @@ namespace replication
               Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
+              commitLog(false),
+              commitLogOpnum(0),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
@@ -220,7 +222,23 @@ namespace replication
             }
         }
 
-        // TODO: right now, just commiting writes. Also add reads to log
+        void CRAQReplica::FlushWritesUpTo(opnum_t upto)
+        {
+            auto it = pendingWrites.begin();
+            while (it != pendingWrites.end() && it->first <= upto)
+            {
+                // Monotonicity: commitLogOpnum must strictly increase on every
+                // append, and must never be less than what is already in commitLog.
+                ASSERT(++commitLogOpnum > 0);
+                ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                commitLog.Append(
+                    viewstamp_t(view, commitLogOpnum),
+                    it->second,
+                    LOG_STATE_CLEAN);
+                it = pendingWrites.erase(it);
+            }
+        }
+
         void CRAQReplica::CommitUpTo(opnum_t upto)
         {
             while (lastCommitted < upto)
@@ -249,6 +267,10 @@ namespace replication
                 if (op == PUT_OPERATION)
                 {
                     ExecuteWriteOperation(linRequest);
+
+                    // Commit ack received — flush this write from pendingWrites
+                    // into commitLog now that it is known to be committed.
+                    FlushWritesUpTo(lastCommitted);
                 }
             }
         }
@@ -475,6 +497,16 @@ namespace replication
             }
 
             ExecuteReadOperation(linRequest);
+
+            // Clean read (chain is clean or we are the tail) — append to
+            // commitLog immediately since all writes up to lastCommitted
+            // are already flushed.
+            ASSERT(++commitLogOpnum > 0);
+            ASSERT(commitLogOpnum > commitLog.LastOpnum());
+            commitLog.Append(
+                viewstamp_t(view, commitLogOpnum),
+                ToRequest(linRequest),
+                LOG_STATE_CLEAN);
         }
 
         void CRAQReplica::HandleWriteRequest(const TransportAddress &remote,
@@ -531,6 +563,13 @@ namespace replication
 
             /* Add the request to my log */
             log.Append(v, request, LOG_STATE_DIRTY);
+
+            // Buffer write in pendingWrites — will be flushed to commitLog
+            // when the commit ack arrives. Invariant: new opnum must be
+            // strictly greater than anything already buffered since lastOp
+            // is monotonically increasing.
+            ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
+            pendingWrites[this->lastOp] = request;
 
             if (lastOp - lastBatchEnd + 1 > batchSize)
             {
@@ -616,6 +655,12 @@ namespace replication
                 this->lastOp++;
                 // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
+
+                // Buffer write in pendingWrites on receipt of prepare —
+                // non-head replicas buffer here since they receive writes
+                // via prepare rather than directly from the client.
+                ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
+                pendingWrites[this->lastOp] = req;
 
                 LinearizeableOperation linRequest = ToLinearizableRequest(req);
 
@@ -718,7 +763,22 @@ namespace replication
 
             keyToVersionNumber[linRequest.key()] = std::max(keyToVersionNumber[linRequest.key()], msg.opnum());
 
+            // The version response tells us the tail has committed up to
+            // msg.opnum(). Flush any buffered writes up to that point into
+            // commitLog before appending the read — this preserves execution
+            // order: all writes the dirty read observed appear before it.
+            FlushWritesUpTo(msg.opnum());
+
             ExecuteReadOperation(linRequest);
+
+            // Dirty read — append to commitLog after writes are flushed so
+            // the log reflects the order in which operations were observed.
+            ASSERT(++commitLogOpnum > 0);
+            ASSERT(commitLogOpnum > commitLog.LastOpnum());
+            commitLog.Append(
+                viewstamp_t(view, commitLogOpnum),
+                ToRequest(linRequest),
+                LOG_STATE_CLEAN);
 
             pendingReads.erase({msg.clientid(), msg.clientreqid()});
         }

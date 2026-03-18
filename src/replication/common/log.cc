@@ -70,9 +70,9 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     return *Find(vs.opnum);
 }
 
-// This really ought to be const
-LogEntry *
-Log::Find(opnum_t opnum)
+// const version — real implementation
+const LogEntry *
+Log::Find(opnum_t opnum) const
 {
     if (entries.empty()) {
         return NULL;
@@ -86,11 +86,17 @@ Log::Find(opnum_t opnum)
         return NULL;
     }
 
-    LogEntry *entry = &entries[opnum-start];
+    const LogEntry *entry = &entries[opnum-start];
     ASSERT(entry->viewstamp.opnum == opnum);
     return entry;
 }
 
+// non-const version — delegates to const
+LogEntry *
+Log::Find(opnum_t opnum)
+{
+    return const_cast<LogEntry *>(static_cast<const Log *>(this)->Find(opnum));
+}
 
 bool
 Log::SetStatus(opnum_t op, LogEntryState state)

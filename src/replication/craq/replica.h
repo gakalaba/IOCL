@@ -64,6 +64,8 @@ namespace replication
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
 
+            const Log &GetCommitLog() const { return commitLog; }
+
         private:
             view_t view;
             int myIdx;
@@ -77,6 +79,20 @@ namespace replication
             std::unordered_map<std::string, opnum_t> keyToVersionNumber;
 
             Log log;
+
+            // commitLog records all operations in execution order — writes
+            // are flushed from pendingWrites when their commit ack arrives,
+            // reads are appended at execution time. Uses its own sequential
+            // counter independent of lastOp/lastCommitted.
+            Log commitLog;
+            opnum_t commitLogOpnum;
+
+            // Writes buffered on arrival, keyed by lastOp at the time of
+            // receipt. Flushed into commitLog when the commit ack arrives
+            // (CommitUpTo) or when a version response reveals the tail has
+            // committed past them (HandleVersionResponse).
+            std::map<opnum_t, Request> pendingWrites;
+
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry
             {
@@ -121,6 +137,7 @@ namespace replication
             void ExecuteReadOperation(const replication::LinearizeableOperation &linRequest);
             void SendReplyToClient(const replication::LinearizeableOperation &entry, proto::ReplyMessage &reply);
             void CommitUpTo(opnum_t upto);
+            void FlushWritesUpTo(opnum_t upto);
             void SendVersionRequest(const replication::LinearizeableOperation &linRequest);
             void UpdateClientTable(const replication::LinearizeableOperation &linRequest);
             [[nodiscard]] bool IsDuplicateRequest(const TransportAddress &remote,
