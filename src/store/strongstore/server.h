@@ -36,9 +36,10 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <arpa/inet.h>
 
 #include "lib/latency.h"
-#include "lib/transport.h"
+#include "lib/tcptransport.h"
 #include "replication/craq/client.h"
 #include "replication/craq/replica.h"
 #include "replication/vr/client.h"
@@ -254,6 +255,9 @@ namespace strongstore
         void HandleAbort(const TransportAddress &remote, proto::Abort &msg);
         void HandleWound(const TransportAddress &remote, proto::Wound &msg);
 
+        void HandleRegisterClient(const TransportAddress &remote,
+                          const proto::RegisterClient &msg);
+
         void SendAbortParticipants(uint64_t transaction_id,
                                    const std::unordered_set<int> &participants);
 
@@ -319,6 +323,8 @@ namespace strongstore
         // pending_get_replies maps to a vector of PendingGetReply*
         std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
         std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
+        std::unordered_map<uint64_t, TransportAddress *> registered_client_addrs_;
+
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
@@ -340,6 +346,8 @@ namespace strongstore
         proto::AbortReply abort_reply_;
         PingMessage ping_;
         proto::Wound wound_;
+        proto::RegisterClient register_client_;
+
 
         Stats stats_;
 

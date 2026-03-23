@@ -126,6 +126,10 @@ namespace strongstore
             delete s;
         }
 
+        for (auto &kv : registered_client_addrs_) {
+            delete kv.second;
+        }
+
         delete replica_client_;
 
         if (debug_stats_)
@@ -219,6 +223,11 @@ namespace strongstore
         {
             ping_.ParseFromString(data);
             HandlePingMessage(this, remote, ping_);
+        }
+        else if (type == register_client_.GetTypeName())
+        {
+            register_client_.ParseFromString(data);
+            HandleRegisterClient(remote, register_client_);
         }
         else
         {
@@ -1690,6 +1699,19 @@ namespace strongstore
         NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
     }
 
+    void Server::HandleRegisterClient(const TransportAddress &remote,
+                                  const proto::RegisterClient &msg)
+    {
+        uint64_t client_id = msg.client_id();
+        Debug("Registering client %lu at shard %d replica %d",
+            client_id, shard_idx_, replica_idx_);
+        auto it = registered_client_addrs_.find(client_id);
+        if (it != registered_client_addrs_.end()) {
+            delete it->second;
+        }
+        registered_client_addrs_[client_id] = remote.clone();
+    }
+
     void Server::SendAbortParticipants(uint64_t transaction_id, const std::unordered_set<int> &participants)
     {
         for (int p : participants)
@@ -2031,6 +2053,35 @@ namespace strongstore
         reply.mutable_rid()->set_client_id(req.rid().client_id());
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         reply.SerializeToString(&response);
+
+        if (linproto_ == PROTO_CRAQ)
+        {
+            bool is_tail = (replica_idx_ == replica_config_.n - 1);
+            if (is_tail && req.op() == "put") {
+                auto client_it = registered_client_addrs_.find(req.origin_client_id());
+
+                if (client_it != registered_client_addrs_.end()) {
+                    Notice("CRAQ tail responding directly to client %lu", req.rid().client_id());
+                    op_reply_.Clear();
+                    op_reply_.mutable_rid()->set_client_id(req.origin_client_id());
+                    op_reply_.mutable_rid()->set_client_req_id(req.origin_client_req_id());
+                    op_reply_.set_status(status);
+                    op_reply_.set_return_value(retval);
+                    op_reply_.set_transaction_id(transaction_id);
+                    transport_->SendMessage(this, *client_it->second, op_reply_);
+                } else {
+                    Warning("CRAQ tail: no registered address for client %lu", req.rid().client_id());
+                }
+                // Clean up pending entry on head; non-tail replicas won't have one.
+                auto search = pending_operation_replies_.find(transaction_id);
+                if (search != pending_operation_replies_.end()) {
+                    delete search->second->rid.addr();
+                    delete search->second;
+                    pending_operation_replies_.erase(search);
+                }
+            }
+            return;
+        }
 
         auto search = pending_operation_replies_.find(transaction_id);
         if (search == pending_operation_replies_.end())

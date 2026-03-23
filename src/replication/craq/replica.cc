@@ -385,11 +385,10 @@ namespace replication
             if (!ForwardPropagateMessageInChain(p))
             {
                 RWarning("Failed to send prepare message to next replica from head");
-                Notice("Failed to send prepare message to next replica from head");
             }
             else
             {
-                Notice("Sent message from idx %d to idx %d", myIdx, myIdx + 1);
+                Debug("Sent message from idx %d to idx %d", myIdx, myIdx + 1);
             }
             Debug("Propagated prepare message (write batch) from idx %d", myIdx);
             lastBatchEnd = lastOp;
@@ -670,7 +669,7 @@ namespace replication
 
             if (!AmTail())
             {
-                CloseBatch();
+                ForwardPropagateMessageInChain(msg);
             }
             else
             {

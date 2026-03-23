@@ -279,6 +279,7 @@ namespace strongstore
         proto::ROCommitReply ro_commit_reply_;
         proto::ROCommitSlowReply ro_commit_slow_reply_;
         proto::AbortReply abort_reply_;
+        proto::RegisterClient register_client_;
 
         uint64_t last_req_id_;
 

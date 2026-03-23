@@ -129,6 +129,8 @@ namespace replication
         {
             LinearizeableOperation linRequest;
             linRequest.ParseFromString(req->request);
+            linRequest.set_origin_client_id(linRequest.rid().client_id());
+            linRequest.set_origin_client_req_id(linRequest.rid().client_req_id());
             linRequest.mutable_rid()->set_client_id(clientid);
             linRequest.mutable_rid()->set_client_req_id(req->clientReqId);
             string op = linRequest.op();

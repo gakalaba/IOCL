@@ -29,4 +29,6 @@ message LinearizeableOperation {
     optional uint64 intkey = 7;
     repeated uint64 predlist = 8;
     repeated uint32 shardlist = 9;
+    optional uint64 origin_client_id = 10;
+    optional uint64 origin_client_req_id = 11;
 }

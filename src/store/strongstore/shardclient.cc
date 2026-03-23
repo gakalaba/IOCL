@@ -51,6 +51,13 @@ namespace strongstore
         // TODO: Remove hardcoding
         replica_ = 0;
         seqno = 0;
+
+        register_client_.set_client_id(client_id_);
+        for (int i = 0; i < config_.n; i++) {
+            bool success = transport_->SendMessageToReplica(this, shard_idx_, i, register_client_);
+            Notice("success in sending register client: for client id %d %d", client_id_, success);
+        }
+
     }
 
     ShardClient::~ShardClient() {}

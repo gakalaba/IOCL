@@ -392,7 +392,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     case GET:
         op_str = "get";
         // some randomization/distance logic here
-        replicaIndex = 2;
+        replicaIndex = 1;
         break;
 
     case PUT:
