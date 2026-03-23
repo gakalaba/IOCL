@@ -94,8 +94,7 @@ namespace strongstore
                 break;
             case LinearizableProtocol::PROTO_IOCL_CT:
                 Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-                client->InvokeIOCLDummy(
-                    msg, msg.req_id(), nullptr, nullptr);
+                client->InvokeIOCLDummy(msg);
                 break;
         }
     }

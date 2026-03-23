@@ -68,12 +68,11 @@ namespace replication
             Panic("Should never call this");
         }
 
-        void IOCL_CTClient::InvokeIOCLDummy(DummyOperation &msg, uint64_t transaction_id, continuation_t continuation,
-                        error_continuation_t error_continuation)
+        void IOCL_CTClient::InvokeIOCLDummy(DummyOperation &msg)
         {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
-            (void)error_continuation;
+            // (void)error_continuation;
 
             // Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
             //       msg.shardtag(), msg.predlist().size());
@@ -121,15 +120,15 @@ namespace replication
             // msg.SerializeToString(&request_str);
 
             // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
-            uint64_t reqId = ++lastReqId;
+            // uint64_t reqId = ++lastReqId;
             // Timeout *timer =
             //     new Timeout(transport, 15000, [this, reqId]()
             //                 { ResendRequest(reqId); });
             // PendingRequest *req =
             //     new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
-            PendingRequest *req =
-                new PendingRequest("", reqId, 0, 0, continuation);
-            pendingReqs[reqId] = req;
+            // PendingRequest *req =
+            //     new PendingRequest("", reqId, 0, 0, continuation);
+            // pendingReqs[reqId] = req;
 
             /*------------------ Send Request ------------------*/
             // // req->request is the string type of LinearizeableOperation without IOCL metadata
@@ -139,7 +138,8 @@ namespace replication
             // reqMsg.mutable_req()->set_clientid(clientid);
             // reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
             proto::DummyRequest reqMsg;
-            reqMsg.set_req_id(transaction_id);
+            reqMsg.set_req_id(msg.req_id());
+            reqMsg.set_idx(msg.idx());
 
             // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
             // XXX Try sending only to (what we think is) the leader first
@@ -151,8 +151,8 @@ namespace replication
             else
             {
                 Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
+                // pendingReqs.erase(req->clientReqId);
+                // delete req;
             }
 
         }
@@ -322,23 +322,24 @@ namespace replication
                                       const string &type, const string &data,
                                       void *meta_data)
         {
-            proto::ReplyMessage reply;
-            proto::UnloggedReplyMessage unloggedReply;
+            Panic("shoud have no responses from replicas, all traffic should go through upcall mechanism");
+            // proto::ReplyMessage reply;
+            // proto::UnloggedReplyMessage unloggedReply;
 
-            if (type == reply.GetTypeName())
-            {
-                reply.ParseFromString(data);
-                HandleReply(remote, reply);
-            }
-            else if (type == unloggedReply.GetTypeName())
-            {
-                unloggedReply.ParseFromString(data);
-                HandleUnloggedReply(remote, unloggedReply);
-            }
-            else
-            {
-                Client::ReceiveMessage(remote, type, data, meta_data);
-            }
+            // if (type == reply.GetTypeName())
+            // {
+            //     reply.ParseFromString(data);
+            //     HandleReply(remote, reply);
+            // }
+            // else if (type == unloggedReply.GetTypeName())
+            // {
+            //     unloggedReply.ParseFromString(data);
+            //     HandleUnloggedReply(remote, unloggedReply);
+            // }
+            // else
+            // {
+            //     Client::ReceiveMessage(remote, type, data, meta_data);
+            // }
         }
 
         void IOCL_CTClient::HandleReply(const TransportAddress &remote,

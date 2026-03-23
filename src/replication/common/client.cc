@@ -99,8 +99,7 @@ Client::InvokeDummy(DummyOperation &msg)
     Panic("Shouldn't be calling this if not dummy");
 }
 
-void Client::InvokeIOCLDummy(DummyOperation &msg, uint64_t transaction_id, continuation_t continuation,
-                        error_continuation_t error_continuation)
+void Client::InvokeIOCLDummy(DummyOperation &msg)
 {
     Panic("Shouldn't be calling this if not IOCL_CT");
 }
