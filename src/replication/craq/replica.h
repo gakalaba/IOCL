@@ -91,7 +91,8 @@ namespace replication
             // receipt. Flushed into commitLog when the commit ack arrives
             // (CommitUpTo) or when a version response reveals the tail has
             // committed past them (HandleVersionResponse).
-            std::map<opnum_t, Request> pendingWrites;
+            std::map<opnum_t, LinearizeableOperation> pendingWrites;
+            std::unordered_map<opnum_t, LinearizeableOperation> linOpCache_;
 
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             struct ClientTableEntry

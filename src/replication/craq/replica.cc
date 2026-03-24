@@ -231,9 +231,10 @@ namespace replication
                 // append, and must never be less than what is already in commitLog.
                 ASSERT(++commitLogOpnum > 0);
                 ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                // pendingWrites now stores LinearizeableOperation; convert once here.
                 commitLog.Append(
                     viewstamp_t(view, commitLogOpnum),
-                    it->second,
+                    ToRequest(it->second),
                     LOG_STATE_CLEAN);
                 it = pendingWrites.erase(it);
             }
@@ -253,14 +254,15 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request request = entry->request;
-
                 /* Mark it as committed */
                 bool status = log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
                 Debug("Status is %d", status);
 
-                replication::LinearizeableOperation linRequest = ToLinearizableRequest(request);
-                const string op = linRequest.op();
+                // Use cached LinearizeableOperation — avoids deserialization.
+                auto cacheIt = linOpCache_.find(lastCommitted);
+                ASSERT(cacheIt != linOpCache_.end());
+                const LinearizeableOperation &linRequest = cacheIt->second;
+                const string &op = linRequest.op();
 
                 Debug("Commiting entry with op %s", op.c_str());
 
@@ -272,6 +274,9 @@ namespace replication
                     // into commitLog now that it is known to be committed.
                     FlushWritesUpTo(lastCommitted);
                 }
+
+                // Remove from cache once committed and executed.
+                linOpCache_.erase(cacheIt);
             }
         }
 
@@ -561,12 +566,16 @@ namespace replication
             /* Add the request to my log */
             log.Append(v, request, LOG_STATE_DIRTY);
 
-            // Buffer write in pendingWrites — will be flushed to commitLog
-            // when the commit ack arrives. Invariant: new opnum must be
-            // strictly greater than anything already buffered since lastOp
-            // is monotonically increasing.
+            // Cache the already-deserialized form — avoids ToLinearizableRequest
+            // in CommitUpTo later.
+            linOpCache_[this->lastOp] = linRequest;
+
+            // Buffer write in pendingWrites (stores LinearizeableOperation directly)
+            // — will be flushed to commitLog when the commit ack arrives. Invariant:
+            // new opnum must be strictly greater than anything already buffered since
+            // lastOp is monotonically increasing.
             ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
-            pendingWrites[this->lastOp] = request;
+            pendingWrites[this->lastOp] = linRequest;
 
             if (lastOp - lastBatchEnd + 1 > batchSize)
             {
@@ -653,13 +662,15 @@ namespace replication
                 // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
 
-                // Buffer write in pendingWrites on receipt of prepare —
-                // non-head replicas buffer here since they receive writes
-                // via prepare rather than directly from the client.
-                ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
-                pendingWrites[this->lastOp] = req;
-
+                // Deserialize once here and cache — avoids repeated ToLinearizableRequest
+                // calls in CommitUpTo.
                 LinearizeableOperation linRequest = ToLinearizableRequest(req);
+                linOpCache_[this->lastOp] = linRequest;
+
+                // Buffer write in pendingWrites (stores LinearizeableOperation directly)
+                // — non-head replicas buffer here since they receive writes via prepare.
+                ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
+                pendingWrites[this->lastOp] = linRequest;
 
                 UpdateClientTable(linRequest);
             }
@@ -668,26 +679,28 @@ namespace replication
             if (!AmTail())
             {
                 ForwardPropagateMessageInChain(msg);
+                // CloseBatch();
             }
             else
             {
+                // Save the key before CommitUpTo erases linOpCache_ entries.
+                string lastKey = "";
+                auto requestCount = msg.request_size();
+                if (requestCount > 0)
+                {
+                    auto keyIt = linOpCache_.find(this->lastOp);
+                    if (keyIt != linOpCache_.end())
+                    {
+                        lastKey = keyIt->second.key();
+                    }
+                }
+
                 CommitUpTo(lastOp);
 
                 CommitMessage cm;
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
-
-                auto requests = msg.request();
-                auto requestCount = requests.size();
-                if (requestCount > 0)
-                {
-                    LinearizeableOperation linRequest = ToLinearizableRequest(msg.request(requestCount - 1));
-                    cm.set_key(linRequest.key());
-                }
-                else
-                {
-                    cm.set_key("");
-                }
+                cm.set_key(lastKey);
 
                 if (!SendMessageToAllPreviousReplicasInChain(cm))
                 {
