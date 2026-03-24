@@ -224,9 +224,7 @@ namespace strongstore
 
         void HandleGet(const TransportAddress &remote, proto::DummyGet &msg);
 
-        // void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
-        void HandleSendOperation(const TransportAddress &remote, replication::DummyOperation &msg);
-
+        void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -318,9 +316,7 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingRWCommitParticipantReply *> pending_rw_commit_p_replies_;
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
-        // pending_get_replies maps to a vector of PendingGetReply*
         std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
-        // std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
@@ -337,7 +333,6 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::DummyReply dummy_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;

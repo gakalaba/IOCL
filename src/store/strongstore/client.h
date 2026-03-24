@@ -389,8 +389,7 @@ namespace strongstore
 
         // IOCL specific state
         // (shardtag, shardid) -> refcount
-        std::list<std::pair<uint64_t, uint32_t>> outstandingOperationList_;
-        std::list<uint16_t> outstandingOperationRefCount_;
+        std::vector<OutstandingPred> outstanding_;
 
         Timestamp dummyTimestamp;
 

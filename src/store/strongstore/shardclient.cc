@@ -54,6 +54,10 @@ namespace strongstore
         seqno = 0;
         dummyTimestamp = Timestamp(0, 0);
         slots_.resize(fanout);
+        // set all the objects in slots pred_list to size fanout
+        for (auto &slot : slots_) {
+            slot.pred_list.reserve(fanout);
+        }
         get_slots_.resize(fanout);
     }
 
@@ -72,10 +76,10 @@ namespace strongstore
             dummy_get_reply_.ParseFromString(data);
             HandleGetReply(dummy_get_reply_);
         }
-        else if (type == dummy_reply_.GetTypeName())
+        else if (type == op_reply_.GetTypeName())
         {
-            dummy_reply_.ParseFromString(data);
-            HandleSendOperationReply(dummy_reply_);
+            op_reply_.ParseFromString(data);
+            HandleSendOperationReply(op_reply_);
         }
         else if (type == dummy_commit_reply_.GetTypeName())
         {
@@ -293,116 +297,73 @@ namespace strongstore
                                   const std::string &key, const std::string &value,
                                   op_callback ocb, op_timeout_callback otcb,
                                   uint32_t timeout,
-                                  std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
-                                  std::list<uint16_t> &outstandingOperationRefCount,
+                                  std::vector<OutstandingPred> &outstandingOperationVec,
                                   bool isIOCL)
     {
         // Send the operation to appropriate shard.
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
-        uint64_t myshardtag = CreateTag(client_id_, req_id);
-        Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
-        // PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
         uint32_t idx = req_id % fanout_;
         auto &pendingOp = slots_[idx];
-        ASSERT(!pendingOp.in_use);
+        ASSERT((!pendingOp.in_use) && pendingOp.pred_list.empty());
         pendingOp.in_use = true;
         pendingOp.ocb = ocb;
-        // pendingOp->op = op;
-        // pendingOp->key = key;
-        // pendingOp->val = value;
-        // pendingOp->ocb = ocb;
-        // pendingOp->otcb = otcb;
 
-        // TODO: Setup timeout
-        dummy_op_.Clear();
-        dummy_op_.set_req_id(myshardtag);
-        dummy_op_.set_idx(0);
-        // op_.Clear();
-        // op_.mutable_rid()->set_client_id(client_id_);
+        // REMOVE
+        uint64_t myshardtag = CreateTag(client_id_, req_id);
+        // REMOVE
+        op_.Clear();
+        op_.mutable_rid()->set_client_id(client_id_);
         // op_.mutable_rid()->set_client_req_id(req_id);
-        // op_.set_transaction_id(app_request_id);
-        // op_.set_key(key);
-        // op_.set_value(value);
-        // op_.set_op(op);
+        op_.mutable_rid()->set_client_req_id(myshardtag);
+        op_.set_transaction_id(app_request_id);
+        op_.set_key(key);
+        op_.set_value(value);
+        op_.set_op(op);
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
-        // if (isIOCL)
-        // {
-        //     Debug("IT IS IOCL!!! Setting myshardtag and pred_list");
-        //     uint64_t myshardtag = CreateTag(client_id_, seqno);
-        //     Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
-        //     seqno++;
-        //     op_.set_shardtag(myshardtag);
-        //     op_.set_intkey(std::stoull(key)); // for iocl optimization
+        if (isIOCL)
+        {
+            uint64_t myshardtag = CreateTag(client_id_, seqno);
+            seqno++;
+            op_.set_shardtag(myshardtag);
+            op_.set_intkey(std::stoull(key)); // for iocl optimization
 
-        //     // Construct predecessor list
-        //     auto it1 = outstandingOperationList.begin();
-        //     auto it2 = outstandingOperationRefCount.begin();
-        //     pendingOp->pred_list.reserve(outstandingOperationList.size());
-        //     while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
-        //         // increment refcount entry
-        //         (*it2)++;
-        //         // Add this entry to predecessor list and the RPC message
-        //         op_.add_predlist((*it1).first);
-        //         op_.add_shardlist((*it1).second);
-        //         pendingOp->pred_list.push_back(*it1);
-        //         Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
-        //         ++it1;
-        //         ++it2;
-        //     }
-        //     // Add self to outstanding operations and refcount lists
-        //     outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
-        //     outstandingOperationRefCount.push_back(1);
-        //     // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
-        //     auto itl = outstandingOperationList.begin();
-        //     auto itr = outstandingOperationRefCount.begin();
-        //     for (;
-        //          itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
-        //          ++itl, ++itr) {
-        //         Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
-        //     }
-        //     Debug("the size of the op is %lu", op_.ByteSizeLong());
-        // } else {
-        //     Debug("Not IOCL, so not setting myshardtag and pred_list");
-        //     Debug("the size of the op is %lu", op_.ByteSizeLong());
-        // }
+            // Construct predecessor list
+            for (auto &entry : outstandingOperationVec) {
+                // increment refcount entry
+                entry.refcount++;
+                // Add this entry to predecessor list and the RPC message
+                op_.add_predlist(entry.tag);
+                op_.add_shardlist(entry.shardid);
+                pendingOp.pred_list.push_back(std::make_pair(entry.tag, entry.shardid));
+            }
+            // Add self to outstanding operations and refcount lists
+            outstandingOperationVec.push_back(OutstandingPred{myshardtag, (uint32_t)shard_idx_, 1});
+        }
 
-        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
-        // transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, dummy_op_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
     }
 
     // IOCL receive the response
-    // void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
-    void ShardClient::HandleSendOperationReply(const proto::DummyReply &reply)
+    void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
-        // Debug("shard client got LinearizeableReply!");
-        // uint64_t req_id = reply.rid().client_req_id();
-        uint64_t req_id = reply.req_id();
-        Debug("Shard client got reply for client_id = %d and req_id = %lu", client_id_, req_id);
-        // Debug("the app_request_id = %lu", req_id);
+        uint64_t req_id = reply.rid().client_req_id();
         // int status = reply.status();
         // string retval = reply.return_value();
 
+        // uint32_t idx = req_id % fanout_;
         uint32_t idx = (req_id & 0xFFFFFFFF) % fanout_;
         auto &pendingOp = slots_[idx];
         ASSERT(pendingOp.in_use);
 
-        // uint64_t app_request_id = op->transaction_id;
         op_callback ocb = std::move(pendingOp.ocb); // wrapped in move to make efficient
-        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(pendingOp.pred_list);
-        // Debug("moving the pred_list of size %lu", pred_list.size());
-        // delete op;
+
+        ocb(0, "", pendingOp.pred_list);
+        // ocb(status, retval, pred_list);
         pendingOp.in_use = false;
-
-        // Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
-        //       shard_idx_, app_request_id, status, retval.c_str());
-
-        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-
-        ocb(0, "", pred_list);
+        pendingOp.pred_list.clear();
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,

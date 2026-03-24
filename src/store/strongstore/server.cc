@@ -190,10 +190,10 @@ namespace strongstore
             dummy_get_.ParseFromString(data);
             HandleGet(remote, dummy_get_);
         }
-        else if (type == dummy_op_.GetTypeName())
+        else if (type == op_.GetTypeName())
         {
-            dummy_op_.ParseFromString(data);
-            HandleSendOperation(remote, dummy_op_);
+            op_.ParseFromString(data);
+            HandleSendOperation(remote, op_);
         }
         else if (type == dummy_commit_.GetTypeName())
         {
@@ -332,12 +332,10 @@ namespace strongstore
         // }
     }
 
-    // void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
-    void Server::HandleSendOperation(const TransportAddress &remote, replication::DummyOperation &msg)
+    void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
         // Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
-        Debug("Calling HandleSendOperation! with msg.req_id = %d", msg.req_id());
-        uint64_t transaction_id = msg.req_id();
+        Debug("Calling HandleSendOperation! with msg.req_id = %d", msg.rid().client_req_id());
 
         // Grab an idx
         ASSERT(!free_slots_.empty());
@@ -351,8 +349,10 @@ namespace strongstore
         reply.remote = &remote;
         // reply->key = msg.key();
         // reply->value = msg.value();
-        msg.set_idx(idx);
-        replica_client_->SendOperation(msg);
+        dummy_op_.Clear();
+        dummy_op_.set_idx(idx);
+        dummy_op_.set_req_id(msg.rid().client_req_id());
+        replica_client_->SendOperation(dummy_op_);
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)
@@ -1776,18 +1776,16 @@ namespace strongstore
 
         // Debug("[%lu] SendOperationCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
 
-        // op_reply_.Clear();
-        dummy_reply_.Clear();
-        dummy_reply_.set_req_id(transaction_id);
+        op_reply_.Clear();
         // op_reply_.mutable_rid()->set_client_id(client_id);
-        // op_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        op_reply_.mutable_rid()->set_client_req_id(transaction_id);
         // dummy_reply_.set_req_id(client_req_id);
         // op_reply_.set_status(status);
         // op_reply_.set_return_value(retval);
         // op_reply_.set_transaction_id(transaction_id);
 
         // transport_->SendMessage(this, *remote, op_reply_);
-        transport_->SendMessage(this, *remote, dummy_reply_);
+        transport_->SendMessage(this, *remote, op_reply_);
         reply->in_use = false;
         reply->remote = nullptr;
         free_slots_.push_back(idx);

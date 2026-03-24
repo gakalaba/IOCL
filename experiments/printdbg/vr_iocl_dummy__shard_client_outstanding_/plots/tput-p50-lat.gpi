@@ -1,0 +1,20 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-03-24-14-26-00/plots/tput-p50-lat.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-03-24-14-26-00/2026-03-24-14-26-00/plots/tput-p50-lat.csv' title 'Dummy IOCL\_CT + shard\_client' ls 1 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/vr_iocl_dummy__client/2026-03-24-10-54-42/plots/tput-p50-lat.csv' title 'Dummy IOCL\_CT + client' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/vr_iocl_dummy__bench_client/2026-03-24-10-40-35/plots/tput-p50-lat.csv' title 'Dummy IOCL\_CT + bench\_client' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/iocl_vr_spanner_final_dummy/2026-03-23-21-43-47/plots/tput-p50-lat.csv' title 'Dummy IOCL\_CT' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-03-24-14-26-00/2026-03-24-14-31-36/plots/tput-p50-lat.csv' title 'Dummy VR + shard\_client' ls 5 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/vr_iocl_dummy__client/2026-03-24-11-00-18/plots/tput-p50-lat.csv' title 'Dummy VR + client' ls 6 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/vr_iocl_dummy__bench_client/2026-03-24-10-46-08/plots/tput-p50-lat.csv' title 'Dummy VR + bench\_client' ls 7 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/iocl_vr_spanner_final_dummy/2026-03-23-21-57-38/plots/tput-p50-lat.csv' title 'Dummy VR' ls 8 with linespoint

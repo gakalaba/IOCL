@@ -71,6 +71,11 @@ namespace strongstore
         MODE_SPAN_LOCK,
         MODE_MVTSO
     };
+    struct OutstandingPred {
+        uint64_t tag;
+        uint32_t shardid;
+        uint16_t refcount;
+    };
 
     typedef std::function<void(int, const std::string &, const std::string &, Timestamp)> get_callback;
     typedef std::function<void(int, const std::string &)> get_timeout_callback;
@@ -131,8 +136,7 @@ namespace strongstore
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout,
-                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
-                         std::list<uint16_t> &outstandingOperationRefCount,
+                         std::vector<OutstandingPred> &outstandingOperationVec,
                          bool isIOCL);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
@@ -239,7 +243,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::DummyGetReply &reply);
         // void HandleSendOperationReply(const proto::LinearizeableReply &reply);
-        void HandleSendOperationReply(const proto::DummyReply &reply);
+        void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
@@ -263,7 +267,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        replication::DummyOperation dummy_op_;
         proto::DummyGet dummy_get_;
         proto::DummyCommit dummy_commit_;
         proto::RWCommitCoordinator rw_commit_c_;
@@ -276,7 +279,6 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::DummyReply dummy_reply_;
         proto::DummyGetReply dummy_get_reply_;
         proto::DummyCommitReply dummy_commit_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
@@ -319,9 +321,6 @@ namespace strongstore
             rw_coord_commit_callback ccb;
         };
         PendingCommitSlot pending_commit_slot_;
-
-        // FOR DUMMY
-        // PendingOperation *dummypending;
     };
 
 } // namespace strongstore
