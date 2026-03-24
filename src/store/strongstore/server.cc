@@ -2055,7 +2055,7 @@ namespace strongstore
         if (linproto_ == PROTO_CRAQ)
         {
             bool is_tail = (replica_idx_ == replica_config_.n - 1);
-            if (is_tail && req.op() == "put") {
+            if (req.op() == "get" || is_tail && req.op() == "put") {
                 auto client_it = registered_client_addrs_.find(req.origin_client_id());
 
                 if (client_it != registered_client_addrs_.end()) {
