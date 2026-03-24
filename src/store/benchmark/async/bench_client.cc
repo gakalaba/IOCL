@@ -422,24 +422,24 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
         return;
     }
 
-    // Operation op = appreq->GetNextOperation(op_index);
+    Operation op = appreq->GetNextOperation(op_index);
     ss.incr_op_index();
-    // std::string op_str;
+    std::string op_str;
 
-    // switch (op.type)
-    // {
-    // case GET:
-    //     op_str = "get";
-    //     break;
+    switch (op.type)
+    {
+    case GET:
+        op_str = "get";
+        break;
 
-    // case PUT:
-    //     op_str = "put";
-    //     break;
+    case PUT:
+        op_str = "put";
+        break;
 
-    // default:
-    //     Panic("unsupported opeartion type %d", op.type);
-    // }
-    client.SendOperation(session, "", "", "", ocb, otcb, 0);
+    default:
+        Panic("unsupported opeartion type %d", op.type);
+    }
+    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
 
     if (issueConcurrent)
     {
