@@ -1,0 +1,30 @@
+20260223-195812-4641 40322 * main            (server.cc:213):    Starting server.
+20260223-195812-4645 40322 * main            (server.cc:331):    Creating a default paritioner!
+20260223-195823-2899 40322 * main            (server.cc:490):    Done loading server.
+20260223-195824-2916 40322 ! TCPOutgoingEventCallback (tcptransport.cc:1016): [TCP OUTGOING 1] ERROR to 10.10.1.3:7087 (receiver=0x55e835823a30): errno=111 (Connection refused), events={ERROR }, lifetime=1.01 ms
+20260223-195824-2916 40322 ! TCPOutgoingEventCallback (tcptransport.cc:1018): Outgoing TCP event (EOF/ERROR). outq=71 bytes
+20260223-195915-5602 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 4] EOF, lifetime=41028.03 ms
+20260223-195915-6170 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 9] EOF, lifetime=41027.64 ms
+20260223-195915-6271 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 12] EOF, lifetime=41027.86 ms
+20260223-195915-6290 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 11] EOF, lifetime=41029.79 ms
+20260223-195915-6303 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 13] EOF, lifetime=41029.18 ms
+20260223-195915-6304 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 10] EOF, lifetime=41033.93 ms
+20260223-195915-6315 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 15] EOF, lifetime=41027.98 ms
+20260223-195915-6316 40322 ! TCPIncomingEventCallback (tcptransport.cc:936): [TCP INCOMING 14] EOF, lifetime=41028.61 ms
+20260223-195921-8636 40322 * Cleanup         (server.cc:548):    Gracefully exiting after signal 15.
+20260223-195921-8637 40322 * Stop            (tcptransport.cc:581): [TCP SUMMARY] outgoingCreated=4 outgoingClosed=1 incomingCreated=11 incomingClosed=8 outgoingPeak=4 incomingPeak=8
+Inserted events:
+  0x55e7dfaa8a70 [fd  9] Read Persist Internal
+  0x55e7dfaa7420 [fd  10] Read Persist
+  0x55e7dfaa9a20 [fd  11] Read Persist
+  0x55e8365b5e60 [fd  12] Read Persist
+  0x55e8365b59c0 [fd  13] Read Persist
+  0x55e8365e6c10 [fd  15] Read Persist
+  0x55e8365e7240 [fd  16] Read Persist
+  0x55e8365e7870 [fd  17] Read Persist
+  0x55e8365e7a90 [fd  18] Read Persist
+  0x55e8365b4a90 [fd  -1] Timeout=1774313962.605434
+Active events:
+20260223-195921-8639 40322 * Cleanup         (server.cc:552):    Exporting stats to /mnt/extra/experiments/2026-03-23-19-58-10/out/server-0-0-0-stats-0.json.
+==== IOCL Per-Key Queue Length Dump ====
+==== End of Dump ====
