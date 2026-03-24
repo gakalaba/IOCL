@@ -1,0 +1,18 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (txn/s)'
+set ylabel 'p50 Latency (ms)'
+set terminal pngcairo size 800,600 enhanced font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/combined.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 2 linecolor "green" linewidth 2
+set style line 3 linetype 3 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 6 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_all_writes_vs_vr/2026-03-24-12-19-39/plots/tput-p50.csv' title 'vr' ls 1 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_all_writes_vs_vr/2026-03-24-12-10-27/plots/tput-p50.csv' title 'craq-0%-reads' ls 2 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_25%_reads/2026-03-24-14-04-33/plots/tput-p50.csv' title 'craq-25%-reads' ls 3 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_50%_reads/2026-03-24-11-44-15/plots/tput-p50.csv' title 'craq-50%-reads' ls 4 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_75%_reads/2026-03-24-13-38-49/plots/tput-p50.csv' title 'craq-75%-reads' ls 5 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/craq_graphs/craq_100%_reads/2026-03-24-11-32-42/plots/tput-p50.csv' title 'craq-100%-reads' ls 6 with linespoint

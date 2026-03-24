@@ -50,10 +50,11 @@
     ]
   ],
   "client_total": [
-   1 
+ 64 
   ],
-  "client_processes_per_client_node": [
-   1
+  "client_processes_per_client_node": 
+  [
+   64 
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -69,7 +70,7 @@
   },
   "server_port": 7087,
   "truetime_error": 0,
-  "client_num_keys": 10,
+  "client_num_keys": 10000000,
   "benchmark_name": "micro",
   "bench_mode": "closed",
   "mpl": 1,
@@ -78,7 +79,7 @@
   "client_issue_concurrent": true,
   "client_zipf_coefficient": 0.7,
   "rw_num_ops_txn": 1,
-  "server_load_time": 15,
+  "server_load_time": 20,
   "server_preload_keys": true,
   "client_abort_backoff": 1,
   "client_retry_aborted": true,
@@ -131,17 +132,17 @@
     14,
     15
   ],
-  "client_debug_output": true,
-  "server_debug_output": true,
-  "client_debug_stats": true,
-  "server_debug_stats": true,
-  "client_experiment_length": 14,
+  "client_debug_output": false,
+  "server_debug_output": false,
+  "client_debug_stats": false,
+  "server_debug_stats": false,
+  "client_experiment_length": 30,
   "client_rand_sleep": 0,
   "client_ramp_down": 4,
   "client_ramp_up": 4,
   "default_remote_shell": "bash",
-  "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
-  "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+  "server_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
+  "client_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
   "project_name": "praxis-pg0",
   "region_rtt_latencies": {
     "us-east-1": {
@@ -193,7 +194,7 @@
       "ap-southeast-2": 0
     }
   },
-  "server_emulate_wan": false,
+  "server_emulate_wan": true,
   "plots": [
     {
       "name": "tput-p50",
@@ -277,8 +278,8 @@
   "make_env": {},
   "server_rdma_port": 9087,
   "rxe_cfg_path": "",
-  "client_read_percentage": 1000,
-  "client_write_percentage": 0,
+  "client_read_percentage": 0,
+  "client_write_percentage": 1000,
   "client_conflict_percentage": 2,
   "client_max_processors": 2,
   "client_random_coordinator": false,
