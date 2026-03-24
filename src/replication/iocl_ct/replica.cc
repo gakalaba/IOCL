@@ -602,19 +602,20 @@ namespace replication
                 dummyReplicationResponse.ParseFromString(data);
                 HandleDummyReplicationResponse(remote, dummyReplicationResponse);
             }
-            /*
-            else if (type == dummyReplicationSecond.GetTypeName())
+            else if (type == dummy_rep_second_str)
             {
                 Debug("DummyReplicationSecond Received");
+                DummyReplicationSecond dummyReplicationSecond;
                 dummyReplicationSecond.ParseFromString(data);
                 HandleDummySecondReplication(remote, dummyReplicationSecond);
             }
-            else if (type == dummyReplicationSecondResponse.GetTypeName())
+            else if (type == dummy_rep_second_resp_str)
             {
                 Debug("DummyReplicationSecondResponse Received");
+                DummyReplicationSecondResponse dummyReplicationSecondResponse;
                 dummyReplicationSecondResponse.ParseFromString(data);
                 HandleDummySecondReplicationResponse(remote, dummyReplicationSecondResponse);
-            }*/
+            }
             else if (type == dummy_commit_str)
             {
                 Debug("DummyCommit Received");
@@ -738,36 +739,36 @@ namespace replication
         void IOCL_CTReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
                                       const proto::DummyReplicationResponse &msg)
         {
-            // Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
-            // if (msg.id() > 1) {
-            //     return;
-            // }
-            // DummyReplicationSecond m;
-            // m.set_req_id(msg.req_id());
-            // m.set_idx(msg.idx());
-
-            // if (!transport->SendMessageToAll(this, m))
-            // {
-            //     RWarning("Failed to send DummyReplicationSecond message to all replicas");
-            // }
-            // nullCommitTimeout->Reset();
+            Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
             if (msg.id() > 1) {
                 return;
             }
-            opnum_t opnum = msg.req_id();
-            const string &op = "";
-            // string res;
-            ReplicaUpcall(opnum, msg.idx(), op);
+            DummyReplicationSecond m;
+            m.set_req_id(msg.req_id());
+            m.set_idx(msg.idx());
 
-            // Send Dummy Commit
-            DummyCommit cm;
-            cm.set_dummyval(420);
-
-            if (!transport->SendMessageToAll(this, cm))
+            if (!transport->SendMessageToAll(this, m))
             {
-                RWarning("Failed to send DummyCommit message to all replicas");
+                RWarning("Failed to send DummyReplicationSecond message to all replicas");
             }
             nullCommitTimeout->Reset();
+            // if (msg.id() > 1) {
+            //     return;
+            // }
+            // opnum_t opnum = msg.req_id();
+            // const string &op = "";
+            // // string res;
+            // ReplicaUpcall(opnum, msg.idx(), op);
+
+            // // Send Dummy Commit
+            // DummyCommit cm;
+            // cm.set_dummyval(420);
+
+            // if (!transport->SendMessageToAll(this, cm))
+            // {
+            //     RWarning("Failed to send DummyCommit message to all replicas");
+            // }
+            // nullCommitTimeout->Reset();
         }
 
         void IOCL_CTReplica::HandleDummySecondReplication(const TransportAddress &remote,

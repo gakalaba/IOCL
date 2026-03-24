@@ -181,6 +181,8 @@ namespace replication
             std::string dummy_req_str = "replication.iocl_ct.proto.DummyRequest";
             std::string dummy_rep_str = "replication.iocl_ct.proto.DummyReplication";
             std::string dummy_rep_resp_str = "replication.iocl_ct.proto.DummyReplicationResponse";
+            std::string dummy_rep_second_str = "replication.iocl_ct.proto.DummyReplicationSecond";
+            std::string dummy_rep_second_resp_str = "replication.iocl_ct.proto.DummyReplicationSecondResponse";
             std::string dummy_commit_str = "replication.iocl_ct.proto.DummyCommit";
             std::string commit_str = "replication.iocl_ct.proto.CommitMessage";
 
