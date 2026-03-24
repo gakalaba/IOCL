@@ -378,8 +378,6 @@ namespace replication
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
-
-                LinearizeableOperation linRequest = ToLinearizableRequest(entry->request);
             }
 
             if (!ForwardPropagateMessageInChain(p))

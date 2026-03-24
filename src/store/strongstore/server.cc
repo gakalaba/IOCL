@@ -1826,7 +1826,6 @@ namespace strongstore
         Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
 
         Request request;
-        LinearizeableOperation linreq;
         if (consistency_ != LIN)
         {
             request.ParseFromString(op);
@@ -1843,7 +1842,6 @@ namespace strongstore
             }
         } else {
             // TODO: edit with enum
-            linreq.ParseFromString(op);
             replicate = true;
             response = op;
             Debug("was able to parse LinearizeableOperation!");
