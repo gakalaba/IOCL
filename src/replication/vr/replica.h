@@ -96,6 +96,12 @@ namespace replication
             Latency_t upcall_to_exec_lat_;
             Latency_t exec_to_sent_lat_;
 
+            std::string dummy_req_str = "replication.vr.proto.DummyRequest";
+            std::string dummy_rep_str = "replication.vr.proto.DummyReplication";
+            std::string dummy_rep_resp_str = "replication.vr.proto.DummyReplicationResponse";
+            std::string dummy_commit_str = "replication.vr.proto.DummyCommit";
+            std::string commit_str = "replication.vr.proto.CommitMessage";
+
             bool debug_stats_;
 
             bool AmLeader() const;

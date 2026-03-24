@@ -552,27 +552,27 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            RequestMessage request;
-            DummyRequest dummyRequest;
-            DummyReplication dummyReplication;
-            DummyReplicationResponse dummyReplicationResponse;
-            DummyReplicationSecond dummyReplicationSecond;
-            DummyReplicationSecondResponse dummyReplicationSecondResponse;
-            DummyCommit dummyCommit;
-            UnloggedRequestMessage unloggedRequest;
-            PrepareMessage prepare;
-            PrepareOKMessage prepareOK;
-            UnorderedPrepareMessage unorderedPrepare;
-            UnorderedPrepareOKMessage unorderedPrepareOK;
-            CommitMessage commit;
-            RequestStateTransferMessage requestStateTransfer;
-            StateTransferMessage stateTransfer;
-            StartViewChangeMessage startViewChange;
-            DoViewChangeMessage doViewChange;
-            StartViewMessage startView;
-            SuccessorRequestMessage coordReq;
-            PredecessorReplyMessage coordResp;
-            PredecessorFinalMessage coordFinal;
+            // RequestMessage request;
+            // DummyRequest dummyRequest;
+            // DummyReplication dummyReplication;
+            // DummyReplicationResponse dummyReplicationResponse;
+            // DummyReplicationSecond dummyReplicationSecond;
+            // DummyReplicationSecondResponse dummyReplicationSecondResponse;
+            // DummyCommit dummyCommit;
+            // UnloggedRequestMessage unloggedRequest;
+            // PrepareMessage prepare;
+            // PrepareOKMessage prepareOK;
+            // UnorderedPrepareMessage unorderedPrepare;
+            // UnorderedPrepareOKMessage unorderedPrepareOK;
+            // CommitMessage commit;
+            // RequestStateTransferMessage requestStateTransfer;
+            // StateTransferMessage stateTransfer;
+            // StartViewChangeMessage startViewChange;
+            // DoViewChangeMessage doViewChange;
+            // StartViewMessage startView;
+            // SuccessorRequestMessage coordReq;
+            // PredecessorReplyMessage coordResp;
+            // PredecessorFinalMessage coordFinal;
 
 
             // if (type == request.GetTypeName())
@@ -581,24 +581,28 @@ namespace replication
             //     request.ParseFromString(data);
             //     HandleRequest(remote, request);
             // }
-            if (type == dummyRequest.GetTypeName())
+            if (type == dummy_req_str)
             {
                 Debug("DummyReqeust Received");
+                DummyRequest dummyRequest;
                 dummyRequest.ParseFromString(data);
                 HandleRequestDummy(remote, dummyRequest);
             }
-            else if (type == dummyReplication.GetTypeName())
+            else if (type == dummy_rep_str)
             {
                 Debug("DummyReplication Received");
+                DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
                 HandleDummyReplication(remote, dummyReplication);
             }
-            else if (type == dummyReplicationResponse.GetTypeName())
+            else if (type == dummy_rep_resp_str)
             {
                 Debug("DummyReplicationResponse Received");
+                DummyReplicationResponse dummyReplicationResponse;
                 dummyReplicationResponse.ParseFromString(data);
                 HandleDummyReplicationResponse(remote, dummyReplicationResponse);
             }
+            /*
             else if (type == dummyReplicationSecond.GetTypeName())
             {
                 Debug("DummyReplicationSecond Received");
@@ -610,13 +614,15 @@ namespace replication
                 Debug("DummyReplicationSecondResponse Received");
                 dummyReplicationSecondResponse.ParseFromString(data);
                 HandleDummySecondReplicationResponse(remote, dummyReplicationSecondResponse);
-            }
-            else if (type == dummyCommit.GetTypeName())
+            }*/
+            else if (type == dummy_commit_str)
             {
                 Debug("DummyCommit Received");
+                DummyCommit dummyCommit;
                 dummyCommit.ParseFromString(data);
                 HandleDummyCommit(remote, dummyCommit);
             }
+            /*
             else if (type == coordReq.GetTypeName())
             {
                 // Successor request arrived
@@ -660,12 +666,13 @@ namespace replication
             {
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
-            }
-            else if (type == commit.GetTypeName())
+            }*/
+            else if (type == commit_str)
             {
+                CommitMessage commit;
                 commit.ParseFromString(data);
                 HandleCommit(remote, commit);
-            }
+            }/*
             else if (type == requestStateTransfer.GetTypeName())
             {
                 requestStateTransfer.ParseFromString(data);
@@ -691,6 +698,7 @@ namespace replication
                 startView.ParseFromString(data);
                 HandleStartView(remote, startView);
             }
+            */
             else
             {
                 RPanic("Received unexpected message type in iocl_ct proto: %s",

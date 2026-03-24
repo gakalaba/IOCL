@@ -178,6 +178,12 @@ namespace replication
 
             bool debug_stats_;
 
+            std::string dummy_req_str = "replication.iocl_ct.proto.DummyRequest";
+            std::string dummy_rep_str = "replication.iocl_ct.proto.DummyReplication";
+            std::string dummy_rep_resp_str = "replication.iocl_ct.proto.DummyReplicationResponse";
+            std::string dummy_commit_str = "replication.iocl_ct.proto.DummyCommit";
+            std::string commit_str = "replication.iocl_ct.proto.CommitMessage";
+
             bool AmLeader() const;
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
