@@ -812,9 +812,9 @@ namespace strongstore
     {
         auto &session = static_cast<StrongSession &>(s);
 
-        auto tid = session.transaction_id();
+        // auto tid = session.transaction_id();
 
-        Debug("[%lu] COMMIT", tid);
+        // Debug("[%lu] COMMIT", tid);
 
         // if (session.needs_aborts())
         // {
@@ -832,11 +832,14 @@ namespace strongstore
         uint64_t req_id = last_req_id_++;
         uint64_t shardtag = ((client_id_ << 32) | (req_id & 0xFFFFFFFF));
         Debug("my client_id is %lu, my req_id is %lu, and my shardtag is %lu", client_id_, req_id, shardtag);
-        PendingRequest *req = new PendingRequest(req_id);
-        pending_reqs_[shardtag] = req;
-        Debug("Created pending request with shardtag %lu", shardtag);
-        req->ccb = ccb;
-        req->ctcb = ctcb;
+        // PendingRequest *req = new PendingRequest(req_id);
+        // pending_reqs_[shardtag] = req;
+        // Debug("Created pending request with shardtag %lu", shardtag);
+        ASSERT(!pending_commit_slot_.in_use);
+        pending_commit_slot_.ccb = ccb;
+        pending_commit_slot_.in_use = true;
+        // req->ccb = ccb;
+        // req->ctcb = ctcb;
 
         // auto &participants = session.participants();
 
@@ -845,7 +848,7 @@ namespace strongstore
         // Debug("[%lu] PREPARE", tid);
         // ASSERT(participants.size() > 0);
 
-        req->outstandingPrepares = 0;
+        // req->outstandingPrepares = 0;
 
         // int coordinator_shard = ChooseCoordinator(session);
 
@@ -887,15 +890,16 @@ namespace strongstore
         Debug("[%lu] COMMIT callback status %d", tid, status);
         Debug("Searching in pending_reqs_ with req_id %lu", req_id);
 
-        auto search = pending_reqs_.find(req_id);
-        if (search == pending_reqs_.end())
-        {
-            Debug("[%lu] Transaction already finished", tid);
-            return;
-        }
-        PendingRequest *req = search->second;
+        // auto search = pending_reqs_.find(req_id);
+        // if (search == pending_reqs_.end())
+        // {
+        //     Debug("[%lu] Transaction already finished", tid);
+        //     return;
+        // }
+        // PendingRequest *req = search->second;
+        ASSERT(pending_commit_slot_.in_use);
 
-        transaction_status_t tstatus;
+        // transaction_status_t tstatus;
         // switch (status)
         // {
         // case REPLY_OK:
@@ -909,9 +913,11 @@ namespace strongstore
         //     break;
         // }
 
-        commit_callback ccb = req->ccb;
-        pending_reqs_.erase(req_id);
-        delete req;
+        // commit_callback ccb = req->ccb;
+        commit_callback ccb = pending_commit_slot_.ccb;
+        pending_commit_slot_.in_use = false;
+        // pending_reqs_.erase(req_id);
+        // delete req;
 
         // uint64_t ms = 0;
         // if (tstatus == COMMITTED && consistency_ == Consistency::RSS)
@@ -926,7 +932,8 @@ namespace strongstore
         // rss::EndTransaction(service_name_, session);
 
         // transport_->Timer(ms, std::bind(ccb, tstatus));
-        transport_->Timer(0, std::bind(ccb, tstatus));
+        ccb(COMMITTED);
+        // transport_->Timer(0, std::bind(ccb, tstatus));
     }
 
     void Client::Abort(Session &s, abort_callback acb, abort_timeout_callback atcb, uint32_t timeout)

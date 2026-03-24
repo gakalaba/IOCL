@@ -54,6 +54,7 @@ namespace strongstore
         seqno = 0;
         dummyTimestamp = Timestamp(0, 0);
         slots_.resize(fanout);
+        get_slots_.resize(fanout);
     }
 
     ShardClient::~ShardClient() {}
@@ -199,11 +200,16 @@ namespace strongstore
 
         uint64_t req_id = last_req_id_++;
         uint64_t shardtag = CreateTag(client_id_, req_id);
-        PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
-        pendingGets[shardtag] = pendingGet;
+        uint32_t idx = req_id % fanout_;
+        auto &pendingGet = get_slots_[idx];
+        ASSERT(!pendingGet.in_use);
+        pendingGet.in_use = true;
+
+        // PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
+        // pendingGets[shardtag] = pendingGet;
         // pendingGet->key = key;
-        pendingGet->gcb = gcb;
-        pendingGet->gtcb = gtcb;
+        pendingGet.gcb = gcb;
+        // pendingGet->gtcb = gtcb;
 
         // auto search = transactions_.find(transaction_id);
         // ASSERT(search != transactions_.end());
@@ -231,21 +237,24 @@ namespace strongstore
         // int status = reply.status();
 
         // auto itr = pendingGets.find(req_id);
-        auto itr = pendingGets.find(reply.req_id());
-        if (itr == pendingGets.end())
-        {
-            Panic("Didn't find pending GET request for req_id %lu!", reply.req_id());
-            // Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
-            return; // stale request
-        }
+        // auto itr = pendingGets.find(reply.req_id());
+        // if (itr == pendingGets.end())
+        // {
+        //     Panic("Didn't find pending GET request for req_id %lu!", reply.req_id());
+        //     // Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+        //     return; // stale request
+        // }
 
-        PendingGet *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        Debug("Handling GET reply with req_id = %lu and transaction_id = %d", reply.req_id(), transaction_id);
-        get_callback gcb = req->gcb;
+        uint64_t req_id = reply.req_id();
+        uint32_t idx = (req_id & 0xFFFFFFFF) % fanout_;
+        auto &pendingGet = get_slots_[idx];
+        ASSERT(pendingGet.in_use);
+        // PendingGet *req = itr->second;
+        Debug("Handling GET reply with req_id = %lu", reply.req_id());
+        get_callback gcb = pendingGet.gcb;
         // std::string key = req->key;
-        pendingGets.erase(itr);
-        delete req;
+        // pendingGets.erase(itr);
+        // delete req;
 
         // Debug("[%lu] [shard %i] Received GET reply: %s %d",
         //       transaction_id, shard_idx_, key.c_str(), status);
@@ -262,6 +271,7 @@ namespace strongstore
         // transactions_[transaction_id].addReadSet(key, ts);
         // read_sets_[transaction_id][key] = val;
 
+        pendingGet.in_use = false;
         gcb(0, "", "", dummyTimestamp);
     }
 
@@ -513,15 +523,19 @@ namespace strongstore
         // const auto &t = search->second;
 
         uint64_t req_id = last_req_id_++;
-        PendingRWCoordCommit *pendingCommit = new PendingRWCoordCommit(transaction_id, req_id);
-        pendingRWCoordCommits[transaction_id] = pendingCommit;
-        pendingCommit->ccb = ccb;
-        pendingCommit->ctcb = ctcb;
+        // PendingRWCoordCommit *pendingCommit = new PendingRWCoordCommit(transaction_id, req_id);
+        // pendingRWCoordCommits[transaction_id] = pendingCommit;
+        ASSERT(pending_commit_slot_.in_use == false);
+        pending_commit_slot_.ccb = ccb;
+        pending_commit_slot_.in_use = true;
+        // pendingCommit->ccb = ccb;
+        // pendingCommit->ctcb = ctcb;
         Debug("and added to pendingRWCoordCommits with req_id = %d and (key) transaction_id = %lu", req_id, transaction_id);
 
         // TODO: Setup timeout
         dummy_commit_.Clear();
         dummy_commit_.set_req_id(transaction_id);
+        dummy_commit_.set_idx(0);
         // rw_commit_c_.Clear();
         // rw_commit_c_.mutable_rid()->set_client_id(client_id_);
         // rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
@@ -544,20 +558,23 @@ namespace strongstore
         uint64_t req_id = reply.req_id();
         Debug("Got RWCommitCoordinatorReply for req_id = %lu", req_id);
 
-        auto itr = pendingRWCoordCommits.find(req_id);
-        if (itr == pendingRWCoordCommits.end())
-        {
-            Debug("[%d][%lu] RWCommitCoordinatorReply for stale request.", shard_idx_, req_id);
-            return; // stale request
-        }
+        // auto itr = pendingRWCoordCommits.find(req_id);
+        // if (itr == pendingRWCoordCommits.end())
+        // {
+        //     Debug("[%d][%lu] RWCommitCoordinatorReply for stale request.", shard_idx_, req_id);
+        //     return; // stale request
+        // }
 
-        PendingRWCoordCommit *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        rw_coord_commit_callback ccb = req->ccb;
-        pendingRWCoordCommits.erase(itr);
-        delete req;
+        // PendingRWCoordCommit *req = itr->second;
+        // uint64_t transaction_id = req->transaction_id;
+        // rw_coord_commit_callback ccb = req->ccb;
+        ASSERT(pending_commit_slot_.in_use);
+        rw_coord_commit_callback ccb = pending_commit_slot_.ccb;
+        // pendingRWCoordCommits.erase(itr);
+        // delete req;
+        pending_commit_slot_.in_use = false;
 
-        transactions_.erase(transaction_id);
+        // transactions_.erase(transaction_id);
         // read_sets_.erase(transaction_id);
 
         // Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,

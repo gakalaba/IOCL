@@ -234,7 +234,7 @@ namespace strongstore
                                        proto::DummyCommit &msg);
 
         void SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
-                                             const Timestamp &commit_ts,
+                                             uint32_t idx,
                                              const Timestamp &nonblock_ts);
         void SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
                                                uint64_t client_id,
@@ -294,7 +294,7 @@ namespace strongstore
         void ReplicaUpcallAppRequest(opnum_t opnum, uint32_t idx, replication::LinearizeableOperation &op);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
-        void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
+        void CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, uint64_t transaction_id, int status, string retval);
 

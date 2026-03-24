@@ -393,6 +393,12 @@ namespace strongstore
         std::list<uint16_t> outstandingOperationRefCount_;
 
         Timestamp dummyTimestamp;
+
+        struct PendingCommitSlot {
+            bool in_use = false;
+            commit_callback ccb;
+        };
+        PendingCommitSlot pending_commit_slot_;
     };
 
 } // namespace strongstore

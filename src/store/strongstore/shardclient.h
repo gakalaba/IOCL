@@ -308,6 +308,18 @@ namespace strongstore
         };
         std::vector<PendingReplySlot> slots_;
 
+        struct PendingGetSlot {
+            bool in_use = false;
+            get_callback gcb;
+        };
+        std::vector<PendingGetSlot> get_slots_;
+
+        struct PendingCommitSlot {
+            bool in_use = false;
+            rw_coord_commit_callback ccb;
+        };
+        PendingCommitSlot pending_commit_slot_;
+
         // FOR DUMMY
         // PendingOperation *dummypending;
     };

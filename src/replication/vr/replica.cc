@@ -526,7 +526,7 @@ namespace replication
                             const proto::DummyReplicationResponse &msg)
         {
             // opnum_t opnum, const std::__cxx11::string &op, std::__cxx11::string &res
-            Debug("Receiving HandleDummyReplicationResponse with req_id = %d", msg.req_id());
+            Debug("Receiving HandleDummyReplicationResponse with req_id = %d and idx = %d", msg.req_id(), msg.idx());
             if (msg.id() > 1) {
                 return;
             }

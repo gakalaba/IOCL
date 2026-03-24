@@ -189,6 +189,7 @@ message DummyGet {
 
 message DummyCommit {
     required uint64 req_id = 1;
+    required uint32 idx = 2;
 }
 
 message DummyGetReply {

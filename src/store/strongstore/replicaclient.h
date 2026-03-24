@@ -81,15 +81,7 @@ namespace strongstore
                      prepare_callback pcb, prepare_timeout_callback ptcb,
                      uint32_t timeout);
 
-        void CoordinatorCommit(uint64_t transaction_id,
-                               const Timestamp &start_ts, int coordinator,
-                               const std::unordered_set<int> participants,
-                               const Transaction &transaction,
-                               const Timestamp &nonblock_ts,
-                               const Timestamp &commit_ts,
-                               commit_callback ccb,
-                               commit_timeout_callback ctcb,
-                               uint32_t timeout);
+        void CoordinatorCommit(strongstore::proto::DummyCommit &msg);
 
         void Commit(uint64_t transaction_id, Timestamp &commit_timestamp,
                     commit_callback ccb, commit_timeout_callback ctcb,
@@ -135,8 +127,8 @@ namespace strongstore
         bool SendOperationCallback(uint64_t opId, const std::string &,
                                  const std::string &);
 
-        bool CommitCallback(uint64_t reqId, const std::string &,
-                            const std::string &);
+        // bool CommitCallback(uint64_t reqId, const std::string &,
+        //                     const std::string &);
 
         bool AbortCallback(uint64_t reqId, const std::string &,
                            const std::string &);

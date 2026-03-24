@@ -77,6 +77,12 @@ namespace strongstore
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
         dummyTimestamp = Timestamp(0, 0);
+        int N = 30000;
+        slots_.resize(N);
+        free_slots_.reserve(N);
+        for (uint32_t i = 0; i < N; i++) {
+            free_slots_.push_back(N - 1 - i);
+        }
         // dummypending = new PendingOperationReply(0, 0, NULL);
 
         // Debug event loop delay
@@ -840,23 +846,29 @@ namespace strongstore
         //     NOT_REACHABLE();
         // }
         
-        auto *reply = new PendingRWCommitCoordinatorReply(0, 0, remote.clone());
-        auto inserted = pending_rw_commit_c_replies_.insert({req_id, reply});
-        if (!inserted.second) {
-            Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", req_id);
-        }
+        // Grab an idx
+        ASSERT(!free_slots_.empty());
+        uint32_t idx = free_slots_.back();
+        free_slots_.pop_back();
+
+        // auto *reply = new PendingRWCommitCoordinatorReply(0, 0, remote.clone());
+        // auto inserted = pending_rw_commit_c_replies_.insert({req_id, reply});
+        // if (!inserted.second) {
+        //     Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", req_id);
+        // }
         // pending_rw_commit_c_replies_[transaction_id] = reply;
+        PendingOpReplySlot &reply = slots_[idx];
+        ASSERT(!reply.in_use);
+        reply.in_use = true;
+        reply.remote = &remote;
+
+        msg.set_idx(idx);
 
         // TODO: Handle timeout
         auto participants = std::unordered_set<int>();
         Transaction transaction = {};
-        Debug("sending commit with req_id = %d to replica_client", req_id);
-        replica_client_->CoordinatorCommit(
-            req_id, dummyTimestamp, shard_idx_,
-            participants, transaction, dummyTimestamp, dummyTimestamp,
-            std::bind(&Server::CommitCoordinatorCallback, this,
-                        req_id, std::placeholders::_1),
-            []() {}, COMMIT_TIMEOUT);
+        Debug("sending commit with req_id = %d to replica_client and it was put in slot idx = %u", req_id, idx);
+        replica_client_->CoordinatorCommit(msg);
     }
 
     void Server::ContinueCoordinatorPrepare(uint64_t transaction_id)
@@ -891,12 +903,12 @@ namespace strongstore
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 // TODO: Handle timeout
-                replica_client_->CoordinatorCommit(
-                    transaction_id, start_ts, shard_idx_,
-                    participants, transaction, nonblock_ts, commit_ts,
-                    std::bind(&Server::CommitCoordinatorCallback, this,
-                              transaction_id, std::placeholders::_1),
-                    []() {}, COMMIT_TIMEOUT);
+                // replica_client_->CoordinatorCommit(
+                //     transaction_id, start_ts, shard_idx_,
+                //     participants, transaction, nonblock_ts, commit_ts,
+                //     std::bind(&Server::CommitCoordinatorCallback, this,
+                //               transaction_id, std::placeholders::_1),
+                //     []() {}, COMMIT_TIMEOUT);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -942,21 +954,24 @@ namespace strongstore
     }
 
     void Server::SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
-                                                 const Timestamp &commit_ts,
+                                                 uint32_t idx,
                                                  const Timestamp &nonblock_ts)
     {
-        auto search = pending_rw_commit_c_replies_.find(transaction_id);
-        if (search == pending_rw_commit_c_replies_.end())
-        {
-            Debug("[%lu] No pending commit coordinator reply found!!!!", transaction_id);
-            return;
-        }
+        // auto search = pending_rw_commit_c_replies_.find(transaction_id);
+        // if (search == pending_rw_commit_c_replies_.end())
+        // {
+        //     Debug("[%lu] No pending commit coordinator reply found!!!!", transaction_id);
+        //     return;
+        // }
 
-        PendingRWCommitCoordinatorReply *reply = search->second;
+        // PendingRWCommitCoordinatorReply *reply = search->second;
 
         // uint64_t client_id = reply->rid.client_id();
         // uint64_t client_req_id = reply->rid.client_req_id();
-        const TransportAddress *remote = reply->rid.addr();
+        Debug("The slot idx for transaction_id = %lu is %d", transaction_id, idx);
+        PendingOpReplySlot &pending_reply = slots_[idx];
+        ASSERT(pending_reply.in_use);
+        const TransportAddress *remote = pending_reply.remote;
 
         // rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
         // rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
@@ -970,10 +985,13 @@ namespace strongstore
         Debug("Sending commit reply to client with req_id = %d", transaction_id);
         // transport_->SendMessage(this, *remote, rw_commit_c_reply_);
         transport_->SendMessage(this, *remote, dummy_reply);
+        pending_reply.in_use = false;
+        pending_reply.remote = nullptr;
+        free_slots_.push_back(idx);
 
-        delete remote;
-        delete reply;
-        pending_rw_commit_c_replies_.erase(search);
+        // delete remote;
+        // delete reply;
+        // pending_rw_commit_c_replies_.erase(search);
     }
 
     void Server::SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
@@ -1440,12 +1458,12 @@ namespace strongstore
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 // TODO: Handle timeout
-                replica_client_->CoordinatorCommit(
-                    transaction_id, start_ts, shard_idx_,
-                    participants, transaction, nonblock_ts, commit_ts,
-                    std::bind(&Server::CommitCoordinatorCallback, this,
-                              transaction_id, std::placeholders::_1),
-                    []() {}, COMMIT_TIMEOUT);
+                // replica_client_->CoordinatorCommit(
+                //     transaction_id, start_ts, shard_idx_,
+                //     participants, transaction, nonblock_ts, commit_ts,
+                //     std::bind(&Server::CommitCoordinatorCallback, this,
+                //               transaction_id, std::placeholders::_1),
+                //     []() {}, COMMIT_TIMEOUT);
             }
             else if (ar.status == FAIL)
             {
@@ -1752,9 +1770,6 @@ namespace strongstore
         // uint64_t client_id = reply->rid.client_id();
         // uint64_t client_req_id = reply->rid.client_req_id();
         const TransportAddress *remote = reply->remote;
-        reply->in_use = false;
-        reply->remote = nullptr;
-        free_slots_.push_back(idx);
 
         // const std::string &key = reply->key;
         // const std::string &val = reply->value;
@@ -1773,12 +1788,15 @@ namespace strongstore
 
         // transport_->SendMessage(this, *remote, op_reply_);
         transport_->SendMessage(this, *remote, dummy_reply_);
+        reply->in_use = false;
+        reply->remote = nullptr;
+        free_slots_.push_back(idx);
 
         // delete remote;
         // delete reply;
     }
 
-    void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
+    void Server::CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx)
     {
         // Debug("[%lu] Commiting", transaction_id);
 
@@ -1803,7 +1821,7 @@ namespace strongstore
 
         // Reply to client
         // SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
-        SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, dummyTimestamp);
+        SendRWCommmitCoordinatorReplyOK(transaction_id, idx, dummyTimestamp);
 
         // Reply to participants
         // SendPrepareOKRepliesOK(transaction_id, commit_ts);
@@ -1890,8 +1908,9 @@ namespace strongstore
             ReplicaUpcallAppRequest(opnum, idx, linreq);
             return;
         }
-        Debug("Replica upcall with transaction_id = %lu", opnum);
-        CoordinatorCommitTransaction(opnum, dummyTimestamp);
+        Debug("Replica upcall with transaction_id = %lu and idx = %lu", opnum, idx);
+        if (replica_idx_ != 0) return;
+        CoordinatorCommitTransaction(opnum, idx);
 
         // Request request;
         // Reply reply;
