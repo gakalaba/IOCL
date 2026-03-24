@@ -736,6 +736,7 @@ namespace replication
             // }
             // DummyReplicationSecond m;
             // m.set_req_id(msg.req_id());
+            // m.set_idx(msg.idx());
 
             // if (!transport->SendMessageToAll(this, m))
             // {
@@ -768,6 +769,7 @@ namespace replication
             DummyReplicationSecondResponse m;
             m.set_req_id(msg.req_id());
             m.set_id(myIdx);
+            m.set_idx(msg.idx());
 
             if (!transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), m))
             {
@@ -785,16 +787,9 @@ namespace replication
             opnum_t opnum = msg.req_id();
             const string &op = "";
             // string res;
-            ReplicaUpcall(opnum, 0, op);
+            ReplicaUpcall(opnum, msg.idx(), op);
 
-            // Send Dummy Commit and added reply to Client
-            auto iter = clientAddresses.find(msg.req_id());
-            DummyReply reply;
-            reply.set_req_id(msg.req_id());
-            if (iter != clientAddresses.end())
-            {
-                transport->SendMessage(this, *iter->second, reply);
-            }
+            // Send Dummy Commit
             DummyCommit cm;
             cm.set_dummyval(420);
 
