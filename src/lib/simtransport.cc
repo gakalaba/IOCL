@@ -310,6 +310,14 @@ bool SimulatedTransport::SendMessageInternal(TransportReceiver *src,
     return true;
 }
 
+bool SimulatedTransport::SendMessageInternal(TransportReceiver *src,
+                                             const SimulatedTransportAddress &dstAddr,
+                                                MsgType type,
+                                             const Message &m)
+{
+    return true;
+}
+
 bool SimulatedTransport::SendMessageToReplica(TransportReceiver *src,
                                               int groupIdx,
                                               int replicaIdx,

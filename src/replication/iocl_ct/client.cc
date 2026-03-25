@@ -114,6 +114,13 @@ namespace replication
         }
 
         void IOCL_CTClient::ReceiveMessage(const TransportAddress &remote,
+                                      MsgType type, const string &data,
+                                      void *meta_data)
+        {
+            Panic("Unimplemented");
+        }
+
+        void IOCL_CTClient::ReceiveMessage(const TransportAddress &remote,
                                       const string &type, const string &data,
                                       void *meta_data)
         {

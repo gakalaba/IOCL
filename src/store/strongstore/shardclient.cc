@@ -70,21 +70,28 @@ namespace strongstore
                                      const std::string &type,
                                      const std::string &data, void *meta_data)
     {
+        Panic("Shouldn't be calling this ReceiveMessage");
+    }
+    void ShardClient::ReceiveMessage(const TransportAddress &remote,
+                                     MsgType type,
+                                     const std::string &data, void *meta_data)
+    {
         Debug("Got message wahoo");
-        if (type == DUMMY_GET_REPLY_STR)
-        {
+        switch (type) {
+        case MsgType::DUMMY_GET_REPLY_TYPE: {
             dummy_get_reply_.ParseFromString(data);
             HandleGetReply(dummy_get_reply_);
+            break;
         }
-        else if (type == OP_REPLY_STR)
-        {
+        case MsgType::LIN_REPLY_TYPE: {
             op_reply_.ParseFromString(data);
             HandleSendOperationReply(op_reply_);
+            break;
         }
-        else if (type == DUMMY_COMMIT_REPLY_STR)
-        {
+        case MsgType::DUMMY_COMMIT_REPLY_TYPE: {
             dummy_commit_reply_.ParseFromString(data);
             HandleRWCommitCoordinatorReply(dummy_commit_reply_);
+            break;
         }
         /*
         else if (type == rw_commit_p_reply_.GetTypeName())
@@ -123,9 +130,8 @@ namespace strongstore
             HandleWound(wound_);
         }
         */
-        else
-        {
-            Panic("Received unexpected message type: %s", type.c_str());
+        default:
+            Panic("Received unexpected message type: %u", type);
         }
     }
 
@@ -347,7 +353,7 @@ namespace strongstore
                 // Send message to predecessor shard
                 coordReqMsg.set_p(entry.tag);
                 coordReqMsg.set_predidx(i);
-                if (!transport_->SendMessageToReplica(this, entry.shardid, 0, coordReqMsg))
+                if (!transport_->SendMessageToReplica(this, entry.shardid, 0, MsgType::CLIENT_COORD_TYPE, coordReqMsg))
                 {
                     Warning("Could not send request to replicas.");
                 }
@@ -357,7 +363,7 @@ namespace strongstore
             outstandingOperationVec.push_back(OutstandingPred{myshardtag, (uint32_t)shard_idx_, 1});
         }
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::LIN_OP_TYPE, op_);
     }
 
     // IOCL receive the response

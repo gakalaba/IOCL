@@ -189,28 +189,35 @@ namespace strongstore
                                 const std::string &type, const std::string &data,
                                 void *meta_data)
     {
-        Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %s", type.c_str());
-        if (type == DUMMY_GET_STR)
-        {
+        Panic("Don't use this version of ReceiveMessage");
+    }
+    void Server::ReceiveMessage(const TransportAddress &remote,
+                                MsgType type, const std::string &data,
+                                void *meta_data)
+    {
+        Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %u", type);
+        switch (type) {
+        case MsgType::DUMMY_GET_TYPE: {
             dummy_get_.ParseFromString(data);
             HandleGet(remote, dummy_get_);
+            break;
         }
-        else if (type == REQ_STR)
-        {
+        case MsgType::LIN_OP_TYPE: {
             op_.ParseFromString(data);
             HandleSendOperation(remote, op_);
+            break;
         }
-        else if (type == CLIENT_COORD_STR)
-        {
+        case MsgType::CLIENT_COORD_TYPE: {
             SuccessorRequestMessage succ;
             succ.ParseFromString(data);
             HandleClientCoordination(succ);
+            break;
         }
-        else if (type == DUMMY_COMMIT_STR)
-        {
+        case MsgType::DUMMY_COMMIT_TYPE: {
             Debug("Server got commit");
             dummy_commit_.ParseFromString(data);
             HandleRWCommitCoordinator(remote, dummy_commit_);
+            break;
         }
         /*
         else if (type == rw_commit_p_.GetTypeName())
@@ -249,9 +256,8 @@ namespace strongstore
             HandlePingMessage(this, remote, ping_);
         }
         */
-        else
-        {
-            Panic("Received unexpected message type: %s", type.c_str());
+        default:
+            Panic("Received unexpected message type: %u", type);
         }
     }
 
@@ -1800,7 +1806,7 @@ namespace strongstore
         op_reply_.set_return_value(retval);
         op_reply_.set_transaction_id(transaction_id);
 
-        transport_->SendMessage(this, *remote, op_reply_);
+        transport_->SendMessage(this, *remote, MsgType::LIN_REPLY_TYPE, op_reply_);
         reply->in_use = false;
         reply->remote = nullptr;
         free_slots_.push_back(idx);

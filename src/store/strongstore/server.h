@@ -127,6 +127,8 @@ namespace strongstore
         // Override TransportReceiver
         void ReceiveMessage(const TransportAddress &remote, const std::string &type,
                             const std::string &data, void *meta_data) override;
+        void ReceiveMessage(const TransportAddress &remote, MsgType type,
+                            const std::string &data, void *meta_data) override;
         void Close() override;
         void SetReplica(replication::Replica *replica) override;
 
@@ -145,10 +147,6 @@ namespace strongstore
         void SeeAllTxns() override;
 
     private:
-        static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
-        static constexpr const char *CLIENT_COORD_STR = "replication.SuccessorRequestMessage";
-        static constexpr const char *DUMMY_GET_STR = "strongstore.proto.DummyGet";
-        static constexpr const char *DUMMY_COMMIT_STR = "strongstore.proto.DummyCommit";
         class PendingRWCommitCoordinatorReply
         {
         public:

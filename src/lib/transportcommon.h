@@ -67,6 +67,15 @@ public:
     }
 
     virtual bool
+    SendMessage(TransportReceiver *src, const TransportAddress &dst,
+                MsgType type,
+                const Message &m) override
+    {
+        const ADDR &dstAddr = dynamic_cast<const ADDR &>(dst);
+        return SendMessageInternal(src, dstAddr, type, m);
+    }
+
+    virtual bool
     SendMessageToReplica(TransportReceiver *src,
                          int replicaIdx,
                          const Message &m) override
@@ -75,6 +84,18 @@ public:
         Debug("this->replicaGroups[src]: %d", this->replicaGroups[src]);
         int groupIdx = this->replicaGroups[src] == -1 ? 0 : this->replicaGroups[src];
         return SendMessageToReplica(src, groupIdx, replicaIdx, m);
+    }
+
+    virtual bool
+    SendMessageToReplica(TransportReceiver *src,
+                         int replicaIdx,
+                            MsgType type,
+                         const Message &m) override
+    {
+        ASSERT(this->replicaGroups.find(src) != this->replicaGroups.end());
+        Debug("this->replicaGroups[src]: %d", this->replicaGroups[src]);
+        int groupIdx = this->replicaGroups[src] == -1 ? 0 : this->replicaGroups[src];
+        return SendMessageToReplica(src, groupIdx, replicaIdx, type, m);
     }
 
     virtual bool
@@ -96,6 +117,28 @@ public:
 
         Debug("groupIdx: %d replicaIdx: %d", groupIdx, replicaIdx);
         return SendMessageInternal(src, kv->second, m);
+    }
+
+    virtual bool
+    SendMessageToReplica(TransportReceiver *src,
+                         int groupIdx,
+                         int replicaIdx,
+                            MsgType type,
+                         const Message &m) override
+    {
+        const transport::Configuration *cfg = configurations[src];
+        ASSERT(cfg != NULL);
+
+        if (!replicaAddressesInitialized)
+        {
+            LookupAddresses();
+        }
+
+        auto kv = replicaAddresses[cfg][groupIdx].find(replicaIdx);
+        ASSERT(kv != replicaAddresses[cfg][groupIdx].end());
+
+        Debug("groupIdx: %d replicaIdx: %d", groupIdx, replicaIdx);
+        return SendMessageInternal(src, kv->second, type, m);
     }
 
     virtual bool SendMessageToFC(TransportReceiver *src, const Message &m) override
@@ -132,6 +175,24 @@ public:
         }
 
         return SendMessageToGroup(src, groupIdx, m);
+    }
+    
+    virtual bool
+    SendMessageToAll(TransportReceiver *src,
+                        MsgType type,
+                     const Message &m)
+    {
+        ASSERT(this->replicaGroups.find(src) != this->replicaGroups.end());
+        int groupIdx = this->replicaGroups[src] == -1 ? 0 : this->replicaGroups[src];
+        const transport::Configuration *cfg = configurations[src];
+        ASSERT(cfg != NULL);
+
+        if (!replicaAddressesInitialized)
+        {
+            LookupAddresses();
+        }
+
+        return SendMessageToGroup(src, groupIdx, type, m);
     }
 
     virtual bool
@@ -170,6 +231,15 @@ public:
                        const Message &m) override
     {
         return SendMessageToGroups(src, std::vector<int>{groupIdx}, m);
+    }
+
+    virtual bool
+    SendMessageToGroup(TransportReceiver *src,
+                       int groupIdx,
+                          MsgType type,
+                       const Message &m) override
+    {
+        return SendMessageToGroups(src, std::vector<int>{groupIdx}, type, m);
     }
 
     virtual bool
@@ -217,9 +287,59 @@ public:
         return true;
     }
 
+    virtual bool
+    SendMessageToGroups(TransportReceiver *src,
+                        const std::vector<int> &groups,
+                            MsgType type,
+                        const Message &m) override
+    {
+        const transport::Configuration *cfg = configurations[src];
+        ASSERT(cfg != NULL);
+
+        if (!replicaAddressesInitialized)
+        {
+            LookupAddresses();
+        }
+
+        int srcGroup = -1;
+        auto replicaGroupsItr = replicaGroups.find(src);
+        if (replicaGroupsItr != replicaGroups.end())
+        {
+            srcGroup = replicaGroupsItr->second;
+        }
+
+        const ADDR *srcAddr;
+        if (srcGroup != -1)
+        {
+            srcAddr = dynamic_cast<const ADDR *>(src->GetAddress());
+        }
+
+        for (int groupIdx : groups)
+        {
+            for (auto &kv : replicaAddresses[cfg][groupIdx])
+            {
+                if (srcGroup != -1 && *srcAddr == kv.second)
+                {
+                    Debug("skipping");
+                    continue;
+                }
+                Debug("sending");
+                if (!SendMessageInternal(src, kv.second, type, m))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
 protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ADDR &dst,
+                                     const Message &m) = 0;
+    virtual bool SendMessageInternal(TransportReceiver *src,
+                                     const ADDR &dst,
+                                     MsgType type,
                                      const Message &m) = 0;
     virtual ADDR LookupAddress(const transport::Configuration &cfg,
                                int groupIdx,

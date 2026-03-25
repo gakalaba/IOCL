@@ -641,6 +641,15 @@ bool UDPTransport::SendMessageInternal(TransportReceiver *src,
     return _SendMessageInternal(src, dst, m, 0, NULL);
 }
 
+bool UDPTransport::SendMessageInternal(TransportReceiver *src,
+                                       const UDPTransportAddress &dst,
+                                            MsgType type,
+                                       const Message &m)
+{
+    (void)type;
+    return _SendMessageInternal(src, dst, m, 0, NULL);
+}
+
 void UDPTransport::Run()
 {
     event_base_dispatch(libeventBase);

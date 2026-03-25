@@ -461,6 +461,91 @@ void TCPTransport::Register(TransportReceiver *receiver,
 
 bool TCPTransport::SendMessageInternal(TransportReceiver *src,
                                        const TCPTransportAddress &dst,
+                                            MsgType type,
+                                       const Message &m)
+{
+    Debug("Sending %s message over TCP to %s:%d",
+          m.GetTypeName().c_str(), inet_ntoa(dst.addr.sin_addr),
+          htons(dst.addr.sin_port));
+    auto dstSrc = std::make_pair(dst, src);
+    auto kv = tcpOutgoing.find(dstSrc);
+    // See if we have a connection open
+    if (kv == tcpOutgoing.end())
+    {
+        ConnectTCP(dstSrc);
+        kv = tcpOutgoing.find(dstSrc);
+    }
+
+    struct bufferevent *ev = kv->second;
+    ASSERT(ev != NULL);
+
+    // // --- Debug before write ---
+    // struct evbuffer *outbuf = bufferevent_get_output(ev);
+    // size_t outq_before = evbuffer_get_length(outbuf);
+    // Debug("TCP OUTQ before write to %s:%d = %zu bytes",
+    //       inet_ntoa(dst.addr.sin_addr),
+    //       htons(dst.addr.sin_port),
+    //       outq_before);
+
+    // Serialize message
+    string data;
+    ASSERT(m.SerializeToString(&data));
+
+    // string type = m.GetTypeName();
+    // size_t typeLen = type.length();
+    using MsgTypeWire = std::underlying_type<MsgType>::type;
+    MsgTypeWire wire_type = static_cast<MsgTypeWire>(type);
+
+    size_t dataLen = data.length();
+    size_t totalLen = sizeof(uint32_t) +          // MAGIC
+                      sizeof(size_t) +            // totalLen
+                      sizeof(MsgTypeWire) +       // type
+                      sizeof(size_t) +            // dataLen
+                      dataLen;                    // data
+
+    // Debug("Message is %lu total bytes", totalLen);
+
+    char buf[totalLen];
+    char *ptr = buf;
+
+    *((uint32_t *)ptr) = MAGIC;
+    ptr += sizeof(uint32_t);
+    ASSERT((size_t)(ptr - buf) < totalLen);
+
+    *((size_t *)ptr) = totalLen;
+    ptr += sizeof(size_t);
+    ASSERT((size_t)(ptr - buf) < totalLen);
+
+    *((MsgTypeWire *)ptr) = wire_type;
+    ptr += sizeof(MsgTypeWire);
+    ASSERT((size_t)(ptr - buf) < totalLen);
+
+    *((size_t *)ptr) = dataLen;
+    ptr += sizeof(size_t);
+    ASSERT((size_t)(ptr - buf) < totalLen);
+
+    ASSERT((size_t)(ptr + dataLen - buf) == totalLen);
+    memcpy(ptr, data.data(), dataLen);
+    ptr += dataLen;
+
+    if (bufferevent_write(ev, buf, totalLen) < 0)
+    {
+        Warning("Failed to write to TCP buffer");
+        fprintf(stderr, "tcp write failed\n");
+        return false;
+    }
+    // // --- Debug after write ---
+    // size_t outq_after = evbuffer_get_length(outbuf);
+    // Debug("TCP OUTQ after write to %s:%d = %zu bytes (added %zu)",
+    //       inet_ntoa(dst.addr.sin_addr),
+    //       htons(dst.addr.sin_port),
+    //       outq_after,
+    //       outq_after - outq_before);
+    return true;
+}
+
+bool TCPTransport::SendMessageInternal(TransportReceiver *src,
+                                       const TCPTransportAddress &dst,
                                        const Message &m)
 {
     Debug("Sending %s message over TCP to %s:%d",
@@ -826,34 +911,31 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
     TCPTransport *transport = info->transport;
     struct evbuffer *evbuf = bufferevent_get_input(bev);
 
+    using MsgTypeWire = std::underlying_type<MsgType>::type;
+
     while (evbuffer_get_length(evbuf) > 0)
     {
-        uint32_t *magic;
-        magic = (uint32_t *)evbuffer_pullup(evbuf, sizeof(*magic));
+        uint32_t *magic = (uint32_t *)evbuffer_pullup(evbuf, sizeof(uint32_t));
         if (magic == NULL)
         {
             return;
         }
         ASSERT(*magic == MAGIC);
 
-        size_t *sz;
-        unsigned char *x = evbuffer_pullup(evbuf, sizeof(*magic) + sizeof(*sz));
+        unsigned char *x = evbuffer_pullup(evbuf, sizeof(uint32_t) + sizeof(size_t)); // magic + sz
 
         if (x == NULL)
         {
             return;
         }
-        sz = (size_t *)(x + sizeof(*magic));
+        size_t *sz = (size_t *)(x + sizeof(uint32_t)); // magic
         size_t totalSize = *sz;
         ASSERT(totalSize < 1073741826);
 
         if (evbuffer_get_length(evbuf) < totalSize)
         {
-            // Debug("Don't have %ld bytes for a message yet, only %ld",
-            //       totalSize, evbuffer_get_length(evbuf));
             return;
         }
-        // Debug("Receiving %ld byte message", totalSize);
 
         // Pull up the full message contiguously, but do not copy it out.
         unsigned char *buf = evbuffer_pullup(evbuf, totalSize);
@@ -861,28 +943,26 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         {
             return;
         }
-        // char buf[totalSize];
-        // size_t copied = evbuffer_remove(evbuf, buf, totalSize);
-        // ASSERT(copied == totalSize);
 
         // Parse message
-        char *ptr = (char *)buf + sizeof(*sz) + sizeof(*magic);
+        char *ptr = (char *)buf + sizeof(size_t) + sizeof(uint32_t); // skip magic and total size
 
-        size_t typeLen = *((size_t *)ptr);
+        MsgTypeWire wire_type = *((MsgTypeWire *)ptr);
+        MsgType msgType = static_cast<MsgType>(wire_type);
+        ptr += sizeof(MsgTypeWire);
+        ASSERT((size_t)(ptr - (char *)buf) < totalSize);
+        // size_t typeLen = *((size_t *)ptr);
+        // ptr += sizeof(size_t);
+        // ASSERT((size_t)(ptr - (char *)buf) < totalSize);
+
+        size_t dataLen = *((size_t *)ptr);
         ptr += sizeof(size_t);
         ASSERT((size_t)(ptr - (char *)buf) < totalSize);
 
-        ASSERT((size_t)(ptr + typeLen - (char *)buf) < totalSize);
-        string msgType(ptr, typeLen);
-        ptr += typeLen;
 
-        size_t msgLen = *((size_t *)ptr);
-        ptr += sizeof(size_t);
-        ASSERT((size_t)(ptr - (char *)buf) < totalSize);
-
-        ASSERT((size_t)(ptr + msgLen - (char *)buf) <= totalSize);
-        string msg(ptr, msgLen);
-        ptr += msgLen;
+        ASSERT((size_t)(ptr + dataLen - (char *)buf) <= totalSize);
+        string msg(ptr, dataLen);
+        ptr += dataLen;
 
         // transport->mtx.lock();
         auto addr = transport->tcpAddresses.find(bev);
@@ -894,10 +974,9 @@ void TCPTransport::TCPReadableCallback(struct bufferevent *bev, void *arg)
         else
         {
             // Dispatch
-            Debug("Received %lu bytes %s message.", totalSize, msgType.c_str());
+            Debug("Received %lu bytes of message type %u.", totalSize, static_cast<unsigned>(msgType));
             info->receiver->ReceiveMessage(addr->second.first, msgType, msg,
                                            nullptr);
-            // Debug("Done processing large %s message", msgType.c_str());
         }
         // Now remove the bytes we just processed.
         evbuffer_drain(evbuf, totalSize);

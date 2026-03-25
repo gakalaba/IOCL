@@ -46,6 +46,21 @@ public:
     virtual TransportAddress *clone() const = 0;
 };
 
+enum class MsgType : uint8_t {
+    LIN_OP_TYPE,
+    LIN_REPLY_TYPE,
+    CLIENT_COORD_TYPE,
+    DUMMY_REP_TYPE,
+    DUMMY_REP_RESP_TYPE,
+    DUMMY_REP_SECOND_TYPE,
+    DUMMY_REP_SECOND_RESP_TYPE,
+    DUMMY_GET_TYPE,
+    DUMMY_GET_REPLY_TYPE,
+    DUMMY_COMMIT_TYPE,
+    DUMMY_COMMIT_REPLY_TYPE,
+    COMMIT_TYPE,
+};
+
 class TransportReceiver
 {
 protected:
@@ -61,6 +76,10 @@ public:
                                 const string &type,
                                 const string &data,
                                 void *meta_data) = 0;
+    virtual void ReceiveMessage(const TransportAddress &remote,
+                            MsgType type,
+                            const std::string &data,
+                            void *meta_data) = 0;
     virtual void Close() = 0;
 
 protected:
@@ -84,17 +103,33 @@ public:
     virtual bool SendMessage(TransportReceiver *src,
                              const TransportAddress &dst,
                              const Message &m) = 0;
+    virtual bool SendMessage(TransportReceiver *src,
+                             const TransportAddress &dst,
+                             MsgType type,
+                             const Message &m) = 0;
     /* Send message to a replica in the local/default(0) group */
     virtual bool SendMessageToReplica(TransportReceiver *src,
                                       int replicaIdx,
+                                      const Message &m) = 0;
+    virtual bool SendMessageToReplica(TransportReceiver *src,
+                                      int replicaIdx,
+                                        MsgType type,
                                       const Message &m) = 0;
     /* Send message to a replica in a specific group */
     virtual bool SendMessageToReplica(TransportReceiver *src,
                                       int groupIdx,
                                       int replicaIdx,
                                       const Message &m) = 0;
+    virtual bool SendMessageToReplica(TransportReceiver *src,
+                                      int groupIdx,
+                                      int replicaIdx,
+                                      MsgType type,
+                                      const Message &m) = 0;
     /* Send message to all replicas in the local/default(0) group */
     virtual bool SendMessageToAll(TransportReceiver *src,
+                                  const Message &m) = 0;
+    virtual bool SendMessageToAll(TransportReceiver *src,
+                                    MsgType type,
                                   const Message &m) = 0;
     /* Send message to all replicas in all groups in the configuration */
     virtual bool SendMessageToAllGroups(TransportReceiver *src,
@@ -103,9 +138,17 @@ public:
     virtual bool SendMessageToGroups(TransportReceiver *src,
                                      const std::vector<int> &groups,
                                      const Message &m) = 0;
+    virtual bool SendMessageToGroups(TransportReceiver *src,
+                                     const std::vector<int> &groups,
+                                        MsgType type,
+                                     const Message &m) = 0;
     /* Send message to all replicas in a single group */
     virtual bool SendMessageToGroup(TransportReceiver *src,
                                     int groupIdx,
+                                    const Message &m) = 0;
+    virtual bool SendMessageToGroup(TransportReceiver *src,
+                                    int groupIdx,
+                                    MsgType type,
                                     const Message &m) = 0;
     /* Send message to failure coordinator
      */

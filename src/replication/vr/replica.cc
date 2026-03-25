@@ -314,7 +314,7 @@ namespace replication
 
             ASSERT(AmLeader());
 
-            if (!(transport->SendMessageToAll(this, cm)))
+            if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
             {
                 RWarning("Failed to send null COMMIT message to all replicas");
             }
@@ -394,23 +394,31 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            if (type == DUMMY_REP_STR)
-            {
+            Panic("don't call this version of ReceiveMessage");
+        }
+
+        void VRReplica::ReceiveMessage(const TransportAddress &remote,
+                                       MsgType type, const string &data,
+                                       void *meta_data)
+        {
+            switch (type) {
+            case MsgType::DUMMY_REP_TYPE: {
                 DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
                 HandleDummyReplication(remote, dummyReplication);
+                break;
             }
-            else if (type == DUMMY_REP_RESP_STR)
-            {
+            case MsgType::DUMMY_REP_RESP_TYPE: {
                 DummyReplicationResponse dummyReplicationResponse;
                 dummyReplicationResponse.ParseFromString(data);
                 HandleDummyReplicationResponse(remote, dummyReplicationResponse);
+                break;
             }
-            else if (type == DUMMY_COMMIT_STR)
-            {
+            case MsgType::DUMMY_COMMIT_TYPE: {
                 DummyCommit dummyCommit;
                 dummyCommit.ParseFromString(data);
                 HandleDummyCommit(remote, dummyCommit);
+                break;
             }
             /*
             else if (type == unloggedRequest.GetTypeName())
@@ -428,11 +436,11 @@ namespace replication
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
             }*/
-            else if (type == COMMIT_STR)
-            {
+            case MsgType::COMMIT_TYPE: {
                 CommitMessage commit;
                 commit.ParseFromString(data);
                 HandleCommit(remote, commit);
+                break;
             }/*
             else if (type == requestStateTransfer.GetTypeName())
             {
@@ -459,10 +467,9 @@ namespace replication
                 startView.ParseFromString(data);
                 HandleStartView(remote, startView);
             }*/
-            else
-            {
-                RPanic("Received unexpected message type in VR proto: %s",
-                       type.c_str());
+            default:
+                RPanic("Received unexpected message type in VR proto: %u",
+                       type);
             }
         }
 
@@ -476,7 +483,7 @@ namespace replication
             reply.set_idx(msg.idx());
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+                    this, configuration.GetLeaderIndex(view), MsgType::DUMMY_REP_RESP_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -498,7 +505,7 @@ namespace replication
             DummyCommit cm;
             cm.set_dummyval(420);
 
-            if (!(transport->SendMessageToAll(this, cm)))
+            if (!(transport->SendMessageToAll(this, MsgType::DUMMY_COMMIT_TYPE, cm)))
             {
                 RWarning("Failed to send COMMIT message to all replicas");
             }
@@ -517,7 +524,7 @@ namespace replication
             DummyReplication p;
             p.set_req_id(msg.rid().client_req_id());
             p.set_idx(msg.idx());
-            if (!(transport->SendMessageToAll(this, p)))
+            if (!(transport->SendMessageToAll(this, MsgType::DUMMY_REP_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }

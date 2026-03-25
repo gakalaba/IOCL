@@ -137,6 +137,10 @@ private:
     bool SendMessageInternal(TransportReceiver *src,
                              const UDPTransportAddress &dst,
                              const Message &m) override;
+    bool SendMessageInternal(TransportReceiver *src,
+                             const UDPTransportAddress &dst,
+                                MsgType type,
+                             const Message &m) override;
 
     UDPTransportAddress
     LookupAddress(const transport::ReplicaAddress &addr);

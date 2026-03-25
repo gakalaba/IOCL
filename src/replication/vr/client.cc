@@ -102,6 +102,12 @@ namespace replication
                 Panic("Could not send request to replicas.");
             }
         }
+        void VRClient::ReceiveMessage(const TransportAddress &remote,
+                                      MsgType type, const string &data,
+                                      void *meta_data)
+        {
+            Panic("Not yet Implemented");
+        }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,
                                       const string &type, const string &data,

@@ -252,6 +252,9 @@ public:
 protected:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const ReplTransportAddress &dst, const Message &m) override;
+    virtual bool SendMessageInternal(TransportReceiver *src,
+                                        const ReplTransportAddress &dst, MsgType type,
+                                        const Message &m) override;
     virtual ReplTransportAddress
     LookupAddress(const transport::Configuration &cfg,
                   int groupIdx,

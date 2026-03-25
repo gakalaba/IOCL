@@ -59,14 +59,12 @@ namespace replication
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            void ReceiveMessage(const TransportAddress &remote, MsgType type,
+                                const string &data, void *meta_data);
             virtual void HandleRequest(const LinearizeableOperation &msg);
             virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:
-            static constexpr const char *DUMMY_REP_STR = "replication.vr.proto.DummyReplication";
-            static constexpr const char *DUMMY_REP_RESP_STR = "replication.vr.proto.DummyReplicationResponse";
-            static constexpr const char *DUMMY_COMMIT_STR = "replication.vr.proto.DummyCommit";
-            static constexpr const char *COMMIT_STR = "replication.vr.proto.CommitMessage";
             view_t view;
             opnum_t lastCommitted;
             opnum_t lastOp;
