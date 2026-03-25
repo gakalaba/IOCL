@@ -394,50 +394,26 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            // RequestMessage request;
-            // DummyRequest dummyRequest;
-            // DummyReplication dummyReplication;
-            // DummyReplicationResponse dummyReplicationResponse;
-            // DummyCommit dummyCommit;
-            // UnloggedRequestMessage unloggedRequest;
-            // PrepareMessage prepare;
-            // PrepareOKMessage prepareOK;
-            // CommitMessage commit;
-            // RequestStateTransferMessage requestStateTransfer;
-            // StateTransferMessage stateTransfer;
-            // StartViewChangeMessage startViewChange;
-            // DoViewChangeMessage doViewChange;
-            // StartViewMessage startView;
-
-            // if (type == request.GetTypeName())
-            // {
-            //     request.ParseFromString(data);
-            //     HandleRequest(remote, request);
-            // }
-            if (type == dummy_req_str)
+            if (type == REQ_STR)
             {
-                Debug("DummyRequest Received");
-                DummyRequest dummyRequest;
-                dummyRequest.ParseFromString(data);
-                HandleRequestDummy(remote, dummyRequest);
+                LinearizeableOperation request;
+                request.ParseFromString(data);
+                HandleRequest(remote, request);
             }
-            else if (type == dummy_rep_str)
+            else if (type == DUMMY_REP_STR)
             {
-                Debug("DummyReplication Received");
                 DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
                 HandleDummyReplication(remote, dummyReplication);
             }
-            else if (type == dummy_rep_resp_str)
+            else if (type == DUMMY_REP_RESP_STR)
             {
-                Debug("DummyReplicationResponse Received");
                 DummyReplicationResponse dummyReplicationResponse;
                 dummyReplicationResponse.ParseFromString(data);
                 HandleDummyReplicationResponse(remote, dummyReplicationResponse);
             }
-            else if (type == dummy_commit_str)
+            else if (type == DUMMY_COMMIT_STR)
             {
-                Debug("DummyCommit Received");
                 DummyCommit dummyCommit;
                 dummyCommit.ParseFromString(data);
                 HandleDummyCommit(remote, dummyCommit);
@@ -458,7 +434,7 @@ namespace replication
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
             }*/
-            else if (type == commit_str)
+            else if (type == COMMIT_STR)
             {
                 CommitMessage commit;
                 commit.ParseFromString(data);
@@ -494,21 +470,6 @@ namespace replication
                 RPanic("Received unexpected message type in VR proto: %s",
                        type.c_str());
             }
-        }
-
-        void VRReplica::HandleRequestDummy(const TransportAddress &remote,
-                                      const DummyRequest &msg)
-        {
-            RDebug("Received dummy request with req_id = %d", msg.req_id());
-            // Replicate
-            DummyReplication p;
-            p.set_req_id(msg.req_id());
-            p.set_idx(msg.idx());
-            if (!(transport->SendMessageToAll(this, p)))
-            {
-                RWarning("Failed to send prepare message to all replicas");
-            }
-            nullCommitTimeout->Reset();
         }
 
         void VRReplica::HandleDummyReplication(const TransportAddress &remote,
@@ -551,8 +512,20 @@ namespace replication
         }
 
         void VRReplica::HandleRequest(const TransportAddress &remote,
-                                      const RequestMessage &msg)
+                                      const LinearizeableOperation &msg)
         {
+            RDebug("Received dummy request with req_id = %d", msg.rid().client_req_id());
+            // Replicate
+            DummyReplication p;
+            p.set_req_id(msg.rid().client_req_id());
+            p.set_idx(msg.idx());
+            if (!(transport->SendMessageToAll(this, p)))
+            {
+                RWarning("Failed to send prepare message to all replicas");
+            }
+            nullCommitTimeout->Reset();
+
+            /*
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -639,14 +612,14 @@ namespace replication
                 request.set_clientid(msg.req().clientid());
                 request.set_clientreqid(msg.req().clientreqid());
 
-                /* Assign it an opnum */
+                // Assign it an opnum
                 ++this->lastOp;
                 v.view = this->view;
                 v.opnum = this->lastOp;
 
                 RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
-                /* Add the request to my log */
+                // Add the request to my log
                 log.Append(v, request, LOG_STATE_PREPARED);
 
                 if (lastOp - lastBatchEnd + 1 > batchSize)
@@ -664,6 +637,7 @@ namespace replication
 
                 nullCommitTimeout->Reset();
             }
+            */
         }
 
         void VRReplica::HandleUnloggedRequest(const TransportAddress &remote,

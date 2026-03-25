@@ -72,7 +72,7 @@ namespace strongstore
         //                  replication::LinearizeableOperation &msg,
         //                  op_callback ocb, op_timeout_callback otcb,
         //                  uint32_t timeout);
-        void SendOperation(replication::DummyOperation &msg);
+        void SendOperation(replication::LinearizeableOperation &msg);
 
         void Prepare(uint64_t transaction_id,
                      const Transaction &transaction,

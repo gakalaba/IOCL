@@ -50,50 +50,19 @@ namespace replication
             : Client(config, transport, group, clientid)
         {
             lastReqId = 0;
-            dummypending = new PendingRequest("", 0, nullptr);
         }
 
         VRClient::~VRClient()
         {
-            for (auto kv : pendingReqs)
+        }
+
+        void VRClient::Invoke(LinearizeableOperation &msg)
+        {
+            // XXX Try sending only to (what we think is) the leader first
+            if (!(transport->SendMessageToReplica(this, group, 0, msg)))
             {
-                delete kv.second;
+                Warning("Could not send request to replicas.");
             }
-        }
-
-        void VRClient::InvokeDummy(DummyOperation &msg)
-        {
-            // TODO: Currently, invocations never timeout and error_continuation is
-            // never called. It may make sense to set a timeout on the invocation.
-            // uint64_t reqId = ++lastReqId;
-            // // Timeout *timer =
-            // //     new Timeout(transport, 500, [this, reqId]()
-            // //                 { ResendRequest(reqId); });
-            // PendingRequest *req = dummypending;
-            //     // new PendingRequest(request, reqId, continuation);
-            // dummypending->request = request;
-            // dummypending->clientReqId = reqId;
-
-            // pendingReqs[reqId] = req;
-            SendRequest(msg.req_id(), msg.idx());
-        }
-
-        void VRClient::Invoke(const string &request, continuation_t continuation,
-                              error_continuation_t error_continuation)
-        {
-            // TODO: Currently, invocations never timeout and error_continuation is
-            // never called. It may make sense to set a timeout on the invocation.
-            (void)error_continuation;
-
-            uint64_t reqId = ++lastReqId;
-            // Timeout *timer =
-            //     new Timeout(transport, 500, [this, reqId]()
-            //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request, reqId, continuation);
-
-            pendingReqs[reqId] = req;
-            SendRequest(0, 0);
         }
 
         void VRClient::InvokeUnlogged(int replicaIdx, const string &request,
@@ -107,18 +76,9 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(reqId);
 
-            if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
+            if (!(transport->SendMessageToReplica(this, group, replicaIdx, reqMsg)))
             {
-                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                //                              { UnloggedRequestTimeoutCallback(reqId); });
-                PendingUnloggedRequest *req = new PendingUnloggedRequest(
-                    request, reqId, continuation, error_continuation);
-                pendingReqs[reqId] = req;
-                // req->timer->Start();
-            }
-            else
-            {
-                Warning("Could not send unlogged request to replica %u.", replicaIdx);
+                Panic("Could not send unlogged request to replica %u.", replicaIdx);
             }
         }
 
@@ -133,41 +93,14 @@ namespace replication
 
         void VRClient::SendRequest(uint64_t tid, uint32_t idx)
         {
-            // proto::RequestMessage reqMsg;
-            // reqMsg.mutable_req()->set_op(req->request);
-            // reqMsg.mutable_req()->set_clientid(clientid);
-            // reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-            proto::DummyRequest reqMsg;
-            reqMsg.set_req_id(tid);
-            reqMsg.set_idx(idx);
+            LinearizeableOperation reqMsg;
+            reqMsg.mutable_rid()->set_client_id(clientid);
+            reqMsg.mutable_rid()->set_client_req_id(tid);
 
-            Debug("SENDING REQUEST TO LEADER for operation with req_id = %lu and type %s", tid, reqMsg.GetTypeName().c_str());
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            if (!(transport->SendMessageToReplica(this, group, 0, reqMsg)))
             {
-                // req->timer->Reset();
+                Panic("Could not send request to replicas.");
             }
-            else
-            {
-                Warning("Could not send request to replicas.");
-                // pendingReqs.erase(req->clientReqId);
-                // delete req;
-            }
-        }
-
-        void VRClient::ResendRequest(const uint64_t reqId)
-        {
-            Panic("Shouldn't be resending");
-            if (pendingReqs.find(reqId) == pendingReqs.end())
-            {
-                Debug("Received resend request when no request was pending");
-                return;
-            }
-
-            Warning("Client timeout; resending request: %lu", reqId);
-            SendRequest(0, 0);
         }
 
         void VRClient::ReceiveMessage(const TransportAddress &remote,
@@ -202,83 +135,46 @@ namespace replication
             // }
         }
 
-        void VRClient::HandleDummyReply(const TransportAddress &remote,
-                                    const proto::DummyReply &msg)
-        {
-            Debug("in dummrReply!");
-            uint64_t reqId = msg.req_id();
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
-
-            PendingRequest *req = it->second;
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            req->continuation(req->request, "");
-            delete req;
-        }
-
         void VRClient::HandleReply(const TransportAddress &remote,
                                    const proto::ReplyMessage &msg)
         {
-            uint64_t reqId = msg.clientreqid();
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
+            Panic("Shouldn't be getting reply");
+            // uint64_t reqId = msg.clientreqid();
+            // auto it = pendingReqs.find(reqId);
+            // if (it == pendingReqs.end())
+            // {
+            //     Debug("Received reply when no request was pending");
+            //     return;
+            // }
 
-            PendingRequest *req = it->second;
-            Debug("Client received reply: %lu", reqId);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            req->continuation(req->request, msg.reply());
-            // delete req;
+            // PendingRequest *req = it->second;
+            // Debug("Client received reply: %lu", reqId);
+            // // req->timer->Stop();
+            // pendingReqs.erase(it);
+            // req->continuation(req->request, msg.reply());
+            // // delete req;
         }
 
         void VRClient::HandleUnloggedReply(const TransportAddress &remote,
                                            const proto::UnloggedReplyMessage &msg)
         {
-            uint64_t reqId = msg.clientreqid();
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
+            Panic("Shouldn't be getting unlogged reply");
+            // uint64_t reqId = msg.clientreqid();
+            // auto it = pendingReqs.find(reqId);
+            // if (it == pendingReqs.end())
+            // {
+            //     Debug("Received reply when no request was pending");
+            //     return;
+            // }
 
-            PendingUnloggedRequest *req =
-                static_cast<PendingUnloggedRequest *>(it->second);
+            // PendingUnloggedRequest *req =
+            //     static_cast<PendingUnloggedRequest *>(it->second);
 
-            Debug("Client received unloggedReply %lu", reqId);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            req->continuation(req->request, msg.reply());
-            delete req;
-        }
-
-        void VRClient::UnloggedRequestTimeoutCallback(const uint64_t reqId)
-        {
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
-            Warning("Unlogged request timed out");
-            PendingUnloggedRequest *req =
-                static_cast<PendingUnloggedRequest *>(it->second);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            if (req->error_continuation)
-            {
-                req->error_continuation(req->request, ErrorCode::TIMEOUT);
-            }
-            delete req;
+            // Debug("Client received unloggedReply %lu", reqId);
+            // // req->timer->Stop();
+            // pendingReqs.erase(it);
+            // req->continuation(req->request, msg.reply());
+            // delete req;
         }
 
     } // namespace vr

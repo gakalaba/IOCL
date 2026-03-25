@@ -61,6 +61,11 @@ namespace replication
                                 const string &data, void *meta_data);
 
         private:
+            static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
+            static constexpr const char *DUMMY_REP_STR = "replication.vr.proto.DummyReplication";
+            static constexpr const char *DUMMY_REP_RESP_STR = "replication.vr.proto.DummyReplicationResponse";
+            static constexpr const char *DUMMY_COMMIT_STR = "replication.vr.proto.DummyCommit";
+            static constexpr const char *COMMIT_STR = "replication.vr.proto.CommitMessage";
             view_t view;
             opnum_t lastCommitted;
             opnum_t lastOp;
@@ -96,12 +101,6 @@ namespace replication
             Latency_t upcall_to_exec_lat_;
             Latency_t exec_to_sent_lat_;
 
-            std::string dummy_req_str = "replication.vr.proto.DummyRequest";
-            std::string dummy_rep_str = "replication.vr.proto.DummyReplication";
-            std::string dummy_rep_resp_str = "replication.vr.proto.DummyReplicationResponse";
-            std::string dummy_commit_str = "replication.vr.proto.DummyCommit";
-            std::string commit_str = "replication.vr.proto.CommitMessage";
-
             bool debug_stats_;
 
             bool AmLeader() const;
@@ -116,9 +115,7 @@ namespace replication
             void CloseBatch();
 
             void HandleRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
-            void HandleRequestDummy(const TransportAddress &remote,
-                               const proto::DummyRequest &msg);
+                               const LinearizeableOperation &msg);
             void HandleDummyReplication(const TransportAddress &remote,
                                const proto::DummyReplication &msg);
             void HandleDummyReplicationResponse(const TransportAddress &remote,

@@ -4,15 +4,6 @@ import "request.proto";
 
 package replication.vr.proto;
 
-message RequestMessage {
-    required replication.Request req = 1;
-}
-
-message DummyRequest {
-    required uint64 req_id = 1;
-    required uint32 idx = 2;
-}
-
 message DummyReplication {
     required uint64 req_id = 1;
     required uint32 idx = 2;

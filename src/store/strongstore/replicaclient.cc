@@ -68,35 +68,9 @@ namespace strongstore
     //                      replication::LinearizeableOperation &msg,
     //                      op_callback ocb, op_timeout_callback otcb,
     //                      uint32_t timeout)
-    void ReplicaClient::SendOperation(replication::DummyOperation &msg)
+    void ReplicaClient::SendOperation(replication::LinearizeableOperation &msg)
     {
-        Debug("[shard %i] ReplicaClient SendRequest sending msg with req_id = %d", shard_idx_, msg.req_id());
-        // Debug("the entire linearizeable operation RPC proto was sent and it looks like this: %s",
-        //       msg.DebugString().c_str());
-
-        // string request_str;
-        // uint64_t reqId = lastReqId++;
-        // PendingOperation *pendingOperation = new PendingOperation(reqId);
-        // auto pendingOperation = dummypending;
-        // dummypending->reqId = reqId;
-        // pendingOperations[reqId] = pendingOperation;
-        // pendingOperation->ocb = ocb;
-        // pendingOperation->otcb = otcb;
-
-        switch (linproto_) {
-            case LinearizableProtocol::PROTO_VR:
-                // create request
-                Debug("Running VR: serializing LinearizeableOperation into string");
-                // msg.SerializeToString(&request_str);
-                // Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
-
-                client->InvokeDummy(msg);
-                break;
-            case LinearizableProtocol::PROTO_IOCL_CT:
-                Debug("Running IOCL_CT: sending LinearizeableOperation proto directly");
-                client->InvokeIOCLDummy(msg);
-                break;
-        }
+        client->Invoke(msg);
     }
 
     // /* Callback from a shard replica on sendrequest operation completion. */
@@ -152,10 +126,10 @@ namespace strongstore
         pendingPrepare->pcb = pcb;
         pendingPrepare->ptcb = ptcb;
 
-        client->Invoke(
-            request_str,
-            bind(&ReplicaClient::PrepareCallback, this, pendingPrepare->reqId,
-                 std::placeholders::_1, std::placeholders::_2));
+        // client->Invoke(
+        //     request_str,
+        //     bind(&ReplicaClient::PrepareCallback, this, pendingPrepare->reqId,
+        //          std::placeholders::_1, std::placeholders::_2));
     }
 
     /* Callback from a shard replica on prepare operation completion. */
@@ -229,8 +203,8 @@ namespace strongstore
         //     bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
         //          std::placeholders::_1, std::placeholders::_2));
 
-        client->InvokeDummy(dummy_op);
-            // request_str, transaction_id);
+        // client->InvokeDummy(dummy_op);
+        //     // request_str, transaction_id);
     }
 
     void ReplicaClient::Commit(uint64_t transaction_id, Timestamp &commit_timestamp,
@@ -301,9 +275,9 @@ namespace strongstore
         pendingAbort->acb = acb;
         pendingAbort->atcb = atcb;
 
-        client->Invoke(request_str, bind(&ReplicaClient::AbortCallback, this,
-                                         pendingAbort->reqId, std::placeholders::_1,
-                                         std::placeholders::_2));
+        // client->Invoke(request_str, bind(&ReplicaClient::AbortCallback, this,
+        //                                  pendingAbort->reqId, std::placeholders::_1,
+        //                                  std::placeholders::_2));
     }
 
     /* Callback from a shard replica on abort operation completion. */

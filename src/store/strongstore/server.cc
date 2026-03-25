@@ -342,17 +342,15 @@ namespace strongstore
         uint32_t idx = free_slots_.back();
         free_slots_.pop_back();
 
-        // auto reply = new PendingOperationReply(0, msg.req_id(), &remote);
         PendingOpReplySlot &reply = slots_[idx];
         ASSERT(!reply.in_use);
         reply.in_use = true;
         reply.remote = &remote;
-        // reply->key = msg.key();
-        // reply->value = msg.value();
-        dummy_op_.Clear();
-        dummy_op_.set_idx(idx);
-        dummy_op_.set_req_id(msg.rid().client_req_id());
-        replica_client_->SendOperation(dummy_op_);
+        msg.set_idx(idx);
+        replica_client_->SendOperation(msg);
+        // transport_->TimerMicro(0, [this, replica, m = std::move(msg)]() mutable {
+        //     replica->HandleRequest(m);
+        // });
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)
@@ -1774,24 +1772,18 @@ namespace strongstore
         // const std::string &key = reply->key;
         // const std::string &val = reply->value;
 
-        // Debug("[%lu] SendOperationCallback request on key %s, with value %s", transaction_id, key.c_str(), val.c_str());
-
         op_reply_.Clear();
         // op_reply_.mutable_rid()->set_client_id(client_id);
+        op_reply_.mutable_rid()->set_client_id(0);
         op_reply_.mutable_rid()->set_client_req_id(transaction_id);
-        // dummy_reply_.set_req_id(client_req_id);
-        // op_reply_.set_status(status);
-        // op_reply_.set_return_value(retval);
-        // op_reply_.set_transaction_id(transaction_id);
+        op_reply_.set_status(status);
+        op_reply_.set_return_value(retval);
+        op_reply_.set_transaction_id(transaction_id);
 
-        // transport_->SendMessage(this, *remote, op_reply_);
         transport_->SendMessage(this, *remote, op_reply_);
         reply->in_use = false;
         reply->remote = nullptr;
         free_slots_.push_back(idx);
-
-        // delete remote;
-        // delete reply;
     }
 
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx)

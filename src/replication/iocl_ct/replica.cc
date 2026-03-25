@@ -552,71 +552,40 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            // RequestMessage request;
-            // DummyRequest dummyRequest;
-            // DummyReplication dummyReplication;
-            // DummyReplicationResponse dummyReplicationResponse;
-            // DummyReplicationSecond dummyReplicationSecond;
-            // DummyReplicationSecondResponse dummyReplicationSecondResponse;
-            // DummyCommit dummyCommit;
-            // UnloggedRequestMessage unloggedRequest;
-            // PrepareMessage prepare;
-            // PrepareOKMessage prepareOK;
-            // UnorderedPrepareMessage unorderedPrepare;
-            // UnorderedPrepareOKMessage unorderedPrepareOK;
-            // CommitMessage commit;
-            // RequestStateTransferMessage requestStateTransfer;
-            // StateTransferMessage stateTransfer;
-            // StartViewChangeMessage startViewChange;
-            // DoViewChangeMessage doViewChange;
-            // StartViewMessage startView;
-            // SuccessorRequestMessage coordReq;
-            // PredecessorReplyMessage coordResp;
-            // PredecessorFinalMessage coordFinal;
-
-
-            // if (type == request.GetTypeName())
-            // {
-            //     // Request arrived -- issue unordered prepare
-            //     request.ParseFromString(data);
-            //     HandleRequest(remote, request);
-            // }
-            if (type == dummy_req_str)
+            if (type == REQ_STR)
             {
-                Debug("DummyReqeust Received");
-                DummyRequest dummyRequest;
-                dummyRequest.ParseFromString(data);
-                HandleRequestDummy(remote, dummyRequest);
+                LinearizeableOperation request;
+                request.ParseFromString(data);
+                HandleRequest(remote, request);
             }
-            else if (type == dummy_rep_str)
+            else if (type == DUMMY_REP_STR)
             {
-                Debug("DummyReplication Received");
                 DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
                 HandleDummyReplication(remote, dummyReplication);
             }
-            else if (type == dummy_rep_resp_str)
+            else if (type == DUMMY_REP_RESP_STR)
             {
                 Debug("DummyReplicationResponse Received");
                 DummyReplicationResponse dummyReplicationResponse;
                 dummyReplicationResponse.ParseFromString(data);
                 HandleDummyReplicationResponse(remote, dummyReplicationResponse);
             }
-            else if (type == dummy_rep_second_str)
+            else if (type == DUMMY_REP_SECOND_STR)
             {
                 Debug("DummyReplicationSecond Received");
                 DummyReplicationSecond dummyReplicationSecond;
                 dummyReplicationSecond.ParseFromString(data);
                 HandleDummySecondReplication(remote, dummyReplicationSecond);
             }
-            else if (type == dummy_rep_second_resp_str)
+            else if (type == DUMMY_REP_SECOND_RESP_STR)
             {
                 Debug("DummyReplicationSecondResponse Received");
                 DummyReplicationSecondResponse dummyReplicationSecondResponse;
                 dummyReplicationSecondResponse.ParseFromString(data);
                 HandleDummySecondReplicationResponse(remote, dummyReplicationSecondResponse);
             }
-            else if (type == dummy_commit_str)
+            else if (type == DUMMY_COMMIT_STR)
             {
                 Debug("DummyCommit Received");
                 DummyCommit dummyCommit;
@@ -668,7 +637,7 @@ namespace replication
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
             }*/
-            else if (type == commit_str)
+            else if (type == COMMIT_STR)
             {
                 CommitMessage commit;
                 commit.ParseFromString(data);
@@ -705,20 +674,6 @@ namespace replication
                 RPanic("Received unexpected message type in iocl_ct proto: %s",
                        type.c_str());
             }
-        }
-
-        void IOCL_CTReplica::HandleRequestDummy(const TransportAddress &remote,
-                                      const DummyRequest &msg)
-        {
-            Debug("Received dummy request with req_id %lu", msg.req_id());
-            DummyReplication m;
-            m.set_req_id(msg.req_id());
-            m.set_idx(msg.idx());
-            if (!transport->SendMessageToAll(this, m))
-            {
-                RWarning("Failed to send DummyReplication message to all replicas");
-            }
-            nullCommitTimeout->Reset();
         }
 
         void IOCL_CTReplica::HandleDummyReplication(const TransportAddress &remote,
@@ -816,8 +771,18 @@ namespace replication
         }
 
         void IOCL_CTReplica::HandleRequest(const TransportAddress &remote,
-                                      RequestMessage &msg)
+                                      LinearizeableOperation &msg)
         {
+            Debug("Received dummy request with req_id %lu", msg.rid().client_req_id());
+            DummyReplication m;
+            m.set_req_id(msg.rid().client_req_id());
+            m.set_idx(msg.idx());
+            if (!transport->SendMessageToAll(this, m))
+            {
+                RWarning("Failed to send DummyReplication message to all replicas");
+            }
+            nullCommitTimeout->Reset();
+            /*
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -840,45 +805,6 @@ namespace replication
                     msg.req().clientid(),
                     std::unique_ptr<TransportAddress>(remote.clone())));
 
-            // Check the client table to see if this is a duplicate request
-            /*
-            auto kv = clientTable.find(msg.req().clientid());
-            if (kv != clientTable.end())
-            {
-                const ClientTableEntry &entry = kv->second;
-                if (msg.req().clientreqid() < entry.lastReqId)
-                {
-                    RNotice("Ignoring stale request");
-                    return;
-                }
-                if (msg.req().clientreqid() == entry.lastReqId)
-                {
-                    // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
-                    // waiting for the other replicas; in that case, just
-                    // discard the request.
-                    if (entry.replied)
-                    {
-                        RNotice("Received duplicate request; resending reply");
-                        if (!(transport->SendMessage(this, remote, entry.reply)))
-                        {
-                            RWarning("Failed to resend reply to client");
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        RNotice(
-                            "Received duplicate request but no reply available; "
-                            "ignoring");
-                        return;
-                    }
-                }
-            }*/
-
-            // Update the client table
-            //UpdateClientTable(msg.req());
-
             // Leader Upcall
             bool replicate = false;
             string res;
@@ -891,14 +817,14 @@ namespace replication
             request.set_clientid(msg.req().clientid());
             request.set_clientreqid(msg.req().clientreqid());
 
-            /* Assign it an opnum within this view --> this is 
-                strictly to compy with quorum checking which 
-                currently is unique per viewstamp_t */
+            // Assign it an opnum within this view --> this is
+            // strictly to compy with quorum checking which
+            // currently is unique per viewstamp_t
             ++this->lastUnorderedOp;
             v.view = this->view;
             v.opnum = this->lastUnorderedOp;
 
-            /* Add the request to the unordered bag */
+            // Add the request to the unordered bag
             uint64_t shardtag = msg.shardtag();
 
             auto result = unorderedBag.emplace(
@@ -920,10 +846,10 @@ namespace replication
             entryPtr->predList.mutable_predlist()->Swap(msg.mutable_predlist());
             entryPtr->predecessorArrivalTs.resize(entryPtr->predList.predlist_size());
 
-            /* Add entry to "ordered" unorderedBag (for batching) */
+            // Add entry to "ordered" unorderedBag (for batching)
             unorderedBagByOpnum.emplace(v.opnum, entryPtr);
 
-            /* Go through any outstanding predecessor replies and add them in */
+            // Go through any outstanding predecessor replies and add them in
             auto pit = outstandingCoordinationResps.find(shardtag);
             if (pit != outstandingCoordinationResps.end()) {
                 auto &predAcks = pit->second;
@@ -935,7 +861,7 @@ namespace replication
                 }
                 outstandingCoordinationResps.erase(pit);
             }
-            /* Also go through any outstanding predecessor final ACKs and add them in */
+            // Also go through any outstanding predecessor final ACKs and add them in
             auto fit = outstandingCoordinationFinals.find(shardtag);
             if (fit != outstandingCoordinationFinals.end()) {
                 auto &predFinals = fit->second;
@@ -945,7 +871,7 @@ namespace replication
                         Warning("Duplicate final ACK received from predecessor with shardtag %lu and shardidx %lu for my shardtag %lu",
                             finalAck.p(), finalAck.shardidx(), entryPtr->myShardTag);
                     } else {
-                        /* ASSERT THIS IS A LEGAL PREDECESSOR */
+                        // ASSERT THIS IS A LEGAL PREDECESSOR
                         entryPtr->finalAcks.emplace(finalAck.p(), finalAck.shardidx());
                     }
                 }
@@ -965,6 +891,7 @@ namespace replication
                 }
             }
             nullCommitTimeout->Reset();
+            */
         }
 
         uint64_t IOCL_CTReplica::FoldL(const proto::PredListHolder &pl)

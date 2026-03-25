@@ -85,23 +85,4 @@ Client::ReceiveMessage(const TransportAddress &remote,
 void Client::Close()
 {}
 
-void
-Client::InvokeIOCL(LinearizeableOperation &msg,
-                                    continuation_t continuation,
-                                    error_continuation_t error_continuation)
-{
-    Panic("Shouldn't be calling this if not IOCL");
-}
-
-void
-Client::InvokeDummy(DummyOperation &msg)
-{
-    Panic("Shouldn't be calling this if not dummy");
-}
-
-void Client::InvokeIOCLDummy(DummyOperation &msg)
-{
-    Panic("Shouldn't be calling this if not IOCL_CT");
-}
-
 } // namespace replication

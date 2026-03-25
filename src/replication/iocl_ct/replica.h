@@ -120,6 +120,13 @@ namespace replication
                                 const string &data, void *meta_data);
 
         private:
+            static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
+            static constexpr const char *DUMMY_REP_STR = "replication.iocl_ct.proto.DummyReplication";
+            static constexpr const char *DUMMY_REP_RESP_STR = "replication.iocl_ct.proto.DummyReplicationResponse";
+            static constexpr const char *DUMMY_REP_SECOND_STR = "replication.iocl_ct.proto.DummyReplicationSecond";
+            static constexpr const char *DUMMY_REP_SECOND_RESP_STR = "replication.iocl_ct.proto.DummyReplicationSecondResponse";
+            static constexpr const char *DUMMY_COMMIT_STR = "replication.iocl_ct.proto.DummyCommit";
+            static constexpr const char *COMMIT_STR = "replication.iocl_ct.proto.CommitMessage";
             view_t view;
             opnum_t lastCommitted;
             opnum_t lastOp;
@@ -178,14 +185,6 @@ namespace replication
 
             bool debug_stats_;
 
-            std::string dummy_req_str = "replication.iocl_ct.proto.DummyRequest";
-            std::string dummy_rep_str = "replication.iocl_ct.proto.DummyReplication";
-            std::string dummy_rep_resp_str = "replication.iocl_ct.proto.DummyReplicationResponse";
-            std::string dummy_rep_second_str = "replication.iocl_ct.proto.DummyReplicationSecond";
-            std::string dummy_rep_second_resp_str = "replication.iocl_ct.proto.DummyReplicationSecondResponse";
-            std::string dummy_commit_str = "replication.iocl_ct.proto.DummyCommit";
-            std::string commit_str = "replication.iocl_ct.proto.CommitMessage";
-
             bool AmLeader() const;
             void CommitUpTo(opnum_t upto);
             void SendPrepareOKs(opnum_t oldLastOp);
@@ -206,9 +205,7 @@ namespace replication
             uint64_t FoldL(const proto::PredListHolder &pl);
 
             void HandleRequest(const TransportAddress &remote,
-                               proto::RequestMessage &msg);
-            void HandleRequestDummy(const TransportAddress &remote,
-                                      const proto::DummyRequest &msg);
+                               LinearizeableOperation &msg);
             void HandleDummyReplication(const TransportAddress &remote,
                                const proto::DummyReplication &msg);
             void HandleDummyReplicationResponse(const TransportAddress &remote,

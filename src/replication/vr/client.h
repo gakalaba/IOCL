@@ -50,9 +50,7 @@ namespace replication
             VRClient(const transport::Configuration &config, Transport *transport,
                      int group, uint64_t clientid);
             virtual ~VRClient();
-            virtual void Invoke(const string &request, continuation_t continuation,
-                                error_continuation_t error_continuation = nullptr);
-            virtual void InvokeDummy(DummyOperation &msg);
+            virtual void Invoke(LinearizeableOperation &msg);
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -95,19 +93,15 @@ namespace replication
                       error_continuation(error_continuation){};
             };
 
-            std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
-            // DUMMY
-            PendingRequest *dummypending;
+            // std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
 
             void SendRequest(uint64_t tid, uint32_t idx);
-            void ResendRequest(const uint64_t reqId);
+            // void ResendRequest(const uint64_t reqId);
             void HandleReply(const TransportAddress &remote,
                              const proto::ReplyMessage &msg);
-            void HandleDummyReply(const TransportAddress &remote,
-                             const proto::DummyReply &msg);
             void HandleUnloggedReply(const TransportAddress &remote,
                                      const proto::UnloggedReplyMessage &msg);
-            void UnloggedRequestTimeoutCallback(const uint64_t reqId);
+            // void UnloggedRequestTimeoutCallback(const uint64_t reqId);
         };
 
     } // namespace vr

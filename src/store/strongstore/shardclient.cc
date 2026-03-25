@@ -321,6 +321,7 @@ namespace strongstore
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);
+        op_.set_idx(0);
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)

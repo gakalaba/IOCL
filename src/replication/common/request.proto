@@ -25,10 +25,11 @@ message LinearizeableOperation {
     required string op = 3;
     required string key = 4;
     required string value = 5;
-    optional uint64 shardtag = 6;
-    optional uint64 intkey = 7;
-    repeated uint64 predlist = 8;
-    repeated uint32 shardlist = 9;
+    required uint32 idx = 6;
+    optional uint64 shardtag = 7;
+    optional uint64 intkey = 8;
+    repeated uint64 predlist = 9;
+    repeated uint32 shardlist = 10;
 }
 
 message DummyOperation {
