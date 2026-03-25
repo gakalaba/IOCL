@@ -552,13 +552,7 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            if (type == REQ_STR)
-            {
-                LinearizeableOperation request;
-                request.ParseFromString(data);
-                HandleRequest(remote, request);
-            }
-            else if (type == DUMMY_REP_STR)
+            if (type == DUMMY_REP_STR)
             {
                 DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
@@ -593,12 +587,6 @@ namespace replication
                 HandleDummyCommit(remote, dummyCommit);
             }
             /*
-            else if (type == coordReq.GetTypeName())
-            {
-                // Successor request arrived
-                coordReq.ParseFromString(data);
-                HandleCoordination(remote, coordReq);
-            }
             else if (type == coordResp.GetTypeName())
             {
                 // Predecessor reply arrived
@@ -770,8 +758,7 @@ namespace replication
             return;
         }
 
-        void IOCL_CTReplica::HandleRequest(const TransportAddress &remote,
-                                      LinearizeableOperation &msg)
+        void IOCL_CTReplica::HandleRequest(const LinearizeableOperation &msg)
         {
             Debug("Received dummy request with req_id %lu", msg.rid().client_req_id());
             DummyReplication m;
@@ -1495,8 +1482,7 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::HandleCoordination(const TransportAddress &remote,
-                                                const proto::SuccessorRequestMessage &msg)
+        void IOCL_CTReplica::HandleCoordination(const SuccessorRequestMessage &msg)
         {
             auto it = unorderedBag.find(msg.p());
             if (it == unorderedBag.end()) {

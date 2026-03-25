@@ -394,13 +394,7 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            if (type == REQ_STR)
-            {
-                LinearizeableOperation request;
-                request.ParseFromString(data);
-                HandleRequest(remote, request);
-            }
-            else if (type == DUMMY_REP_STR)
+            if (type == DUMMY_REP_STR)
             {
                 DummyReplication dummyReplication;
                 dummyReplication.ParseFromString(data);
@@ -511,8 +505,12 @@ namespace replication
             nullCommitTimeout->Reset();
         }
 
-        void VRReplica::HandleRequest(const TransportAddress &remote,
-                                      const LinearizeableOperation &msg)
+        void VRReplica::HandleCoordination(const SuccessorRequestMessage &msg)
+        {
+            Panic("shouldn't be calling this from VR");
+        }
+
+        void VRReplica::HandleRequest(const LinearizeableOperation &msg)
         {
             RDebug("Received dummy request with req_id = %d", msg.rid().client_req_id());
             // Replicate

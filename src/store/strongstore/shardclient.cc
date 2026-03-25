@@ -331,14 +331,25 @@ namespace strongstore
             op_.set_shardtag(myshardtag);
             op_.set_intkey(std::stoull(key)); // for iocl optimization
 
-            // Construct predecessor list
+            // Construct predecessor list and Issue coordination requests
+            replication::SuccessorRequestMessage coordReqMsg;
+            coordReqMsg.set_s(myshardtag); // my shard tag
+            coordReqMsg.set_shardidx(shard_idx_); // who pred should return to??
+            uint32_t i = 0;
             for (auto &entry : outstandingOperationVec) {
                 // increment refcount entry
                 entry.refcount++;
                 // Add this entry to predecessor list and the RPC message
                 op_.add_predlist(entry.tag);
-                op_.add_shardlist(entry.shardid);
                 pendingOp.pred_list.push_back(std::make_pair(entry.tag, entry.shardid));
+                // Send message to predecessor shard
+                coordReqMsg.set_p(entry.tag);
+                coordReqMsg.set_predidx(i);
+                if (!transport_->SendMessageToReplica(this, entry.shardid, 0, coordReqMsg))
+                {
+                    Warning("Could not send request to replicas.");
+                }
+                i++;
             }
             // Add self to outstanding operations and refcount lists
             outstandingOperationVec.push_back(OutstandingPred{myshardtag, (uint32_t)shard_idx_, 1});

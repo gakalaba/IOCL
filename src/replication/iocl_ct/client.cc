@@ -63,32 +63,6 @@ namespace replication
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
 
-            // Issue coordination requests
-            proto::SuccessorRequestMessage coordReqMsg;
-            coordReqMsg.set_s(msg.shardtag()); // my shard tag
-            coordReqMsg.set_shardidx(group); // who pred should return to??
-            for (uint32_t i = 0; i < msg.predlist().size(); i++)
-            {
-                uint64_t sendTo = msg.shardlist(i);
-                // if (sendTo == group)
-                // {
-                //     Debug("Skipping sending COORD REQUEST to self for predecessor_tag %u",
-                //           reqMsg.predlist(i));
-                //     // Append this index to the same_shards field
-                //     reqMsg.add_same_shards(i);
-                //     continue;
-                // }
-                uint64_t predShardTag = msg.predlist(i);
-                coordReqMsg.set_p(predShardTag);
-                coordReqMsg.set_predidx(i);
-                // XXX Try sending only to (what we think is) the leader first
-                if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
-                {
-                    Warning("Could not send request to replicas.");
-                }
-            }
-            msg.clear_shardlist(); // Don't need to keep this around
-
             /*------------------ Send Request ------------------*/
             if (!(transport->SendMessageToReplica(this, group, 0, msg)))
             {

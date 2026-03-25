@@ -180,6 +180,11 @@ namespace strongstore
     {
     }
 
+    void Server::SetReplica(replication::Replica *replica)
+    {
+        this->replica_ = replica;
+    }
+
     void Server::ReceiveMessage(const TransportAddress &remote,
                                 const std::string &type, const std::string &data,
                                 void *meta_data)
@@ -194,6 +199,12 @@ namespace strongstore
         {
             op_.ParseFromString(data);
             HandleSendOperation(remote, op_);
+        }
+        else if (type == CLIENT_COORD_STR)
+        {
+            SuccessorRequestMessage succ;
+            succ.ParseFromString(data);
+            HandleClientCoordination(succ);
         }
         else if (type == dummy_commit_.GetTypeName())
         {
@@ -347,10 +358,17 @@ namespace strongstore
         reply.in_use = true;
         reply.remote = &remote;
         msg.set_idx(idx);
-        replica_client_->SendOperation(msg);
-        // transport_->TimerMicro(0, [this, replica, m = std::move(msg)]() mutable {
-        //     replica->HandleRequest(m);
-        // });
+
+        transport_->TimerMicro(0, [this, m = std::move(msg)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
+    }
+
+    void Server::HandleClientCoordination(replication::SuccessorRequestMessage &msg)
+    {
+        transport_->TimerMicro(0, [this, m = std::move(msg)]() mutable {
+            this->replica_->HandleCoordination(m);
+        });
     }
 
     void Server::ContinueGetAbort(uint64_t transaction_id)

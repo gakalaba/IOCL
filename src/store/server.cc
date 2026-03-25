@@ -498,6 +498,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_VR:
@@ -507,6 +508,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_IOCL_CT:
@@ -516,6 +518,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::iocl_ct::IOCL_CTReplica *>(replica));
         break;
     }
     default:

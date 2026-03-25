@@ -118,9 +118,10 @@ namespace replication
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            virtual void HandleRequest(const LinearizeableOperation &msg);
+            virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:
-            static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
             static constexpr const char *DUMMY_REP_STR = "replication.iocl_ct.proto.DummyReplication";
             static constexpr const char *DUMMY_REP_RESP_STR = "replication.iocl_ct.proto.DummyReplicationResponse";
             static constexpr const char *DUMMY_REP_SECOND_STR = "replication.iocl_ct.proto.DummyReplicationSecond";
@@ -153,7 +154,7 @@ namespace replication
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
-            ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
+            ska::flat_hash_map<uint64_t, std::vector<SuccessorRequestMessage>> outstandingCoordinationReqs;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
             ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorFinalMessage>> outstandingCoordinationFinals;
             std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
@@ -204,8 +205,6 @@ namespace replication
             viewstamp_t LastViewstampOfLog() const;
             uint64_t FoldL(const proto::PredListHolder &pl);
 
-            void HandleRequest(const TransportAddress &remote,
-                               LinearizeableOperation &msg);
             void HandleDummyReplication(const TransportAddress &remote,
                                const proto::DummyReplication &msg);
             void HandleDummyReplicationResponse(const TransportAddress &remote,
@@ -227,8 +226,6 @@ namespace replication
                                proto::UnorderedPrepareMessage &msg);
             void HandleUnorderedPrepareOK(const TransportAddress &remote,
                                  const proto::UnorderedPrepareOKMessage &msg);
-            void HandleCoordination(const TransportAddress &remote,
-                                 const proto::SuccessorRequestMessage &msg);
             void HandleCoordinationReply(const TransportAddress &remote,
                                 const proto::PredecessorReplyMessage &msg);
             void HandleCoordinationFinal(const TransportAddress &remote,

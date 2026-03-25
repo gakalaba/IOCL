@@ -59,9 +59,10 @@ namespace replication
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            virtual void HandleRequest(const LinearizeableOperation &msg);
+            virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:
-            static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
             static constexpr const char *DUMMY_REP_STR = "replication.vr.proto.DummyReplication";
             static constexpr const char *DUMMY_REP_RESP_STR = "replication.vr.proto.DummyReplicationResponse";
             static constexpr const char *DUMMY_COMMIT_STR = "replication.vr.proto.DummyCommit";
@@ -114,8 +115,6 @@ namespace replication
             void ResendPrepare();
             void CloseBatch();
 
-            void HandleRequest(const TransportAddress &remote,
-                               const LinearizeableOperation &msg);
             void HandleDummyReplication(const TransportAddress &remote,
                                const proto::DummyReplication &msg);
             void HandleDummyReplicationResponse(const TransportAddress &remote,

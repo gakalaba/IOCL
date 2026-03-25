@@ -128,6 +128,7 @@ namespace strongstore
         void ReceiveMessage(const TransportAddress &remote, const std::string &type,
                             const std::string &data, void *meta_data) override;
         void Close() override;
+        void SetReplica(replication::Replica *replica) override;
 
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
@@ -144,6 +145,7 @@ namespace strongstore
         void SeeAllTxns() override;
 
     private:
+        static constexpr const char *CLIENT_COORD_STR = "replication.SuccessorRequestMessage";
         class PendingRWCommitCoordinatorReply
         {
         public:
@@ -225,6 +227,8 @@ namespace strongstore
         void HandleGet(const TransportAddress &remote, proto::DummyGet &msg);
 
         void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
+
+        void HandleClientCoordination(replication::SuccessorRequestMessage &msg);
 
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
@@ -309,6 +313,7 @@ namespace strongstore
         ReplicaClient *replica_client_;
 
         Transport *transport_;
+        replication::Replica *replica_;
 
         uint64_t server_id_;
 

@@ -1,0 +1,7 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-03-25-12-49-55/2026-03-25-12-55-31/plots/tput-p50-lat.png'
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-03-25-12-49-55/2026-03-25-12-55-31/plots/tput-p50-lat.csv' title 'Dummy VR' with linespoint
