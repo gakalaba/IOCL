@@ -173,6 +173,10 @@ namespace strongstore
         void AbortPut(uint64_t transaction_id);
 
     private:
+        static constexpr const char *DUMMY_GET_REPLY_STR = "strongstore.proto.DummyGetReply";
+        static constexpr const char *DUMMY_COMMIT_REPLY_STR = "strongstore.proto.DummyCommitReply";
+        static constexpr const char *OP_REPLY_STR = "strongstore.proto.LinearizeableReply";
+
         struct PendingRequest
         {
             PendingRequest(uint64_t transaction_id, uint64_t req_id) : transaction_id{transaction_id}, req_id(req_id) {}

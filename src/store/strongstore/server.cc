@@ -190,12 +190,12 @@ namespace strongstore
                                 void *meta_data)
     {
         Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %s", type.c_str());
-        if (type == dummy_get_.GetTypeName())
+        if (type == DUMMY_GET_STR)
         {
             dummy_get_.ParseFromString(data);
             HandleGet(remote, dummy_get_);
         }
-        else if (type == op_.GetTypeName())
+        else if (type == REQ_STR)
         {
             op_.ParseFromString(data);
             HandleSendOperation(remote, op_);
@@ -206,12 +206,13 @@ namespace strongstore
             succ.ParseFromString(data);
             HandleClientCoordination(succ);
         }
-        else if (type == dummy_commit_.GetTypeName())
+        else if (type == DUMMY_COMMIT_STR)
         {
             Debug("Server got commit");
             dummy_commit_.ParseFromString(data);
             HandleRWCommitCoordinator(remote, dummy_commit_);
         }
+        /*
         else if (type == rw_commit_p_.GetTypeName())
         {
             rw_commit_p_.ParseFromString(data);
@@ -247,6 +248,7 @@ namespace strongstore
             ping_.ParseFromString(data);
             HandlePingMessage(this, remote, ping_);
         }
+        */
         else
         {
             Panic("Received unexpected message type: %s", type.c_str());

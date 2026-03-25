@@ -145,7 +145,10 @@ namespace strongstore
         void SeeAllTxns() override;
 
     private:
+        static constexpr const char *REQ_STR = "replication.LinearizeableOperation";
         static constexpr const char *CLIENT_COORD_STR = "replication.SuccessorRequestMessage";
+        static constexpr const char *DUMMY_GET_STR = "strongstore.proto.DummyGet";
+        static constexpr const char *DUMMY_COMMIT_STR = "strongstore.proto.DummyCommit";
         class PendingRWCommitCoordinatorReply
         {
         public:
@@ -325,7 +328,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        replication::DummyOperation dummy_op_;
         proto::DummyGet dummy_get_;
         proto::DummyCommit dummy_commit_;
         proto::DummyGetReply dummy_get_reply_;

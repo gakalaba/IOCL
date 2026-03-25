@@ -71,21 +71,22 @@ namespace strongstore
                                      const std::string &data, void *meta_data)
     {
         Debug("Got message wahoo");
-        if (type == dummy_get_reply_.GetTypeName())
+        if (type == DUMMY_GET_REPLY_STR)
         {
             dummy_get_reply_.ParseFromString(data);
             HandleGetReply(dummy_get_reply_);
         }
-        else if (type == op_reply_.GetTypeName())
+        else if (type == OP_REPLY_STR)
         {
             op_reply_.ParseFromString(data);
             HandleSendOperationReply(op_reply_);
         }
-        else if (type == dummy_commit_reply_.GetTypeName())
+        else if (type == DUMMY_COMMIT_REPLY_STR)
         {
             dummy_commit_reply_.ParseFromString(data);
             HandleRWCommitCoordinatorReply(dummy_commit_reply_);
         }
+        /*
         else if (type == rw_commit_p_reply_.GetTypeName())
         {
             rw_commit_p_reply_.ParseFromString(data);
@@ -121,6 +122,7 @@ namespace strongstore
             wound_.ParseFromString(data);
             HandleWound(wound_);
         }
+        */
         else
         {
             Panic("Received unexpected message type: %s", type.c_str());
