@@ -100,8 +100,8 @@ namespace replication
 
             void SendRequest(uint64_t tid, uint32_t idx);
             // void ResendRequest(const uint64_t reqId);
-            void HandleReply(const TransportAddress &remote,
-                             const proto::ReplyMessage &msg);
+            // void HandleReply(const TransportAddress &remote,
+            //                  const proto::ReplyMessage &msg);
             void HandleUnloggedReply(const TransportAddress &remote,
                                      const proto::UnloggedReplyMessage &msg);
             // void UnloggedRequestTimeoutCallback(const uint64_t reqId);

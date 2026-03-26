@@ -210,9 +210,11 @@ Log::ComputeHash(string lastHash, const LogEntry &entry)
     x = entry.request.clientid();
     SHA1_Update(&ctx, &x, sizeof(x));
     x = entry.request.clientreqid();
+    // concatonate the op, key and value strings into one
+    string concat = entry.request.the_op() + entry.request.key() + entry.request.val();
     SHA1_Update(&ctx, &x, sizeof(x));
-    SHA1_Update(&ctx, entry.request.op().c_str(),
-                entry.request.op().size());
+    SHA1_Update(&ctx, concat.c_str(),
+                concat.size());
 
     SHA1_Final(out, &ctx);
 

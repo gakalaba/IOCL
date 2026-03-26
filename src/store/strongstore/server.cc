@@ -1355,12 +1355,6 @@ namespace strongstore
         }
     }
 
-    // void Server::SendOperationCallback(uint64_t transaction_id, int status)
-    // {
-    //     ASSERT(status == REPLY_OK);
-    //     // Debug("[%lu] Received SendOperationCallback callback: %d %d", transaction_id, shard_idx_, status);
-    // }
-
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {
         // Debug("[%lu] Received PREPARE_OK callback: %d %d", transaction_id, shard_idx_, status);
@@ -1786,25 +1780,19 @@ namespace strongstore
         }
     }
 
-    void Server::RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx,
-                            uint64_t transaction_id, int status, string retval)
+    void Server::RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, 
+                        uint64_t clientid, uint64_t client_req_id, int status, string retval)
     {
-        Debug("got this status %d and this retval %s for transaction_id = %d", status, retval.c_str(), transaction_id);
+        Debug("got this status %d and this retval %s for transaction_id = %d", status, retval.c_str(), client_req_id);
 
-        // uint64_t client_id = reply->rid.client_id();
-        // uint64_t client_req_id = reply->rid.client_req_id();
         const TransportAddress *remote = reply->remote;
 
-        // const std::string &key = reply->key;
-        // const std::string &val = reply->value;
-
         op_reply_.Clear();
-        // op_reply_.mutable_rid()->set_client_id(client_id);
-        op_reply_.mutable_rid()->set_client_id(0);
-        op_reply_.mutable_rid()->set_client_req_id(transaction_id);
+        op_reply_.mutable_rid()->set_client_id(clientid);
+        op_reply_.mutable_rid()->set_client_req_id(client_req_id);
         op_reply_.set_status(status);
         op_reply_.set_return_value(retval);
-        op_reply_.set_transaction_id(transaction_id);
+        op_reply_.set_transaction_id(client_req_id); //op_reply_.set_transaction_id(transaction_id); ???
 
         transport_->SendMessage(this, *remote, MsgType::LIN_REPLY_TYPE, op_reply_);
         reply->in_use = false;
@@ -1914,19 +1902,17 @@ namespace strongstore
      * op is the request string passed by the client.
      * response is the reply which will be sent back to the client.
      */
-    void Server::ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &op)
+    void Server::ReplicaUpcall(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
     {
         // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
-        LinearizeableOperation linreq;
         if (consistency_ == LIN)
         {
-            // linreq.ParseFromString(op);
-            ReplicaUpcallAppRequest(opnum, idx, linreq);
+            ReplicaUpcallAppRequest(idx, clientid, client_req_id, op, k, v);
             return;
         }
-        Debug("Replica upcall with transaction_id = %lu and idx = %lu", opnum, idx);
+        Debug("Replica upcall with transaction_id = %lu and idx = %lu", client_req_id, idx);
         if (replica_idx_ != 0) return;
-        CoordinatorCommitTransaction(opnum, idx);
+        CoordinatorCommitTransaction(client_req_id, idx);
 
         // Request request;
         // Reply reply;
@@ -2087,49 +2073,36 @@ namespace strongstore
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcallAppRequest(opnum_t opnum, uint32_t idx, LinearizeableOperation &req)
+    void Server::ReplicaUpcallAppRequest(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
     {
-        // Debug("Inside new ReplicaUpcall for AppRequests: op = %s, k = %s, v = %s", req.op().c_str(), req.key().c_str(), req.value().c_str());
-        // LinearizeableReply reply;
-        Debug("inside ReplicaUpcall with req_id = %d", opnum);
-        if (replica_idx_ != 0) return;
+        Debug("inside ReplicaUpcall with req_id = %d", client_req_id);
 
         string retval;
-        // int status = REPLY_OK;
-        // if (req.op() == "get")
-        // {
-        //     Debug("the request is get");
-        //     // TODO ANJA look up how to mutate variables
-        //     if (!linearizeable_kv_store_.get(req.key(), retval))
-        //     {
-        //         status = REPLY_FAIL;
-        //     };
-        // }
-        // else if (req.op() == "put")
-        // {
-        //     Debug("the request is put");
-        //     if (!linearizeable_kv_store_.put(req.key(), req.value()))
-        //     {
-        //         status = REPLY_FAIL;
-        //     };
-        // }
-        // else
-        // {
-        //     Panic("Unrecognized operation.");
-        // }
-        // reply.set_status(status);
-        // reply.set_return_value(retval);
-        // uint64_t transaction_id = req.transaction_id();
-        // reply.set_transaction_id(transaction_id);
-        // reply.mutable_rid()->set_client_id(req.rid().client_id());
-        // reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
-        // reply.SerializeToString(&response);
-        // dummy_reply.SerializeToString(&response);
+        int status = REPLY_OK;
+        if (op == "get")
+        {
+            if (!linearizeable_kv_store_.get(k, retval))
+            {
+                status = REPLY_FAIL;
+            };
+        }
+        else if (op == "put")
+        {
+            Debug("the request is put");
+            if (!linearizeable_kv_store_.put(k, v))
+            {
+                status = REPLY_FAIL;
+            };
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        if (replica_idx_ != 0) return;
 
         PendingOpReplySlot &pending_reply = slots_[idx];
         ASSERT(pending_reply.in_use);
-        // transport_->TimerMicro(0, std::bind(&Server::RespondToClientOperation, this, pending_reply, transaction_id, status, retval));
-        RespondToClientOperation(&pending_reply, idx, opnum, REPLY_OK, retval);
+        RespondToClientOperation(&pending_reply, idx, clientid, client_req_id, status, retval);
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

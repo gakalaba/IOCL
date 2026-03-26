@@ -33,7 +33,8 @@
 
 template <class MSG>
 void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply) {
-    ReplicaUpcall(opnum, 0, msg.op());
+    Panic("Don't use this");
+    ReplicaUpcall(0, 0, 0, "", "", "");
 
     // reply.set_reply(res);
 }

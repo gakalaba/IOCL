@@ -77,14 +77,14 @@ namespace replication
             opnum_t lastBatchEnd;
 
             Log log;
-            std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
-            struct ClientTableEntry
-            {
-                uint64_t lastReqId;
-                bool replied;
-                proto::ReplyMessage reply;
-            };
-            std::map<uint64_t, ClientTableEntry> clientTable;
+            // std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
+            // struct ClientTableEntry
+            // {
+            //     uint64_t lastReqId;
+            //     bool replied;
+            //     proto::ReplyMessage reply;
+            // };
+            // std::map<uint64_t, ClientTableEntry> clientTable;
 
             QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
             QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
@@ -109,14 +109,10 @@ namespace replication
             void EnterView(view_t newview);
             void StartViewChange(view_t newview);
             void SendNullCommit();
-            void UpdateClientTable(const Request &req);
+            // void UpdateClientTable(const Request &req);
             void ResendPrepare();
             void CloseBatch();
 
-            void HandleDummyReplication(const TransportAddress &remote,
-                               const proto::DummyReplication &msg);
-            void HandleDummyReplicationResponse(const TransportAddress &remote,
-                               const proto::DummyReplicationResponse &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 
@@ -126,8 +122,6 @@ namespace replication
                                  const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
                               const proto::CommitMessage &msg);
-            void HandleDummyCommit(const TransportAddress &remote,
-                              const proto::DummyCommit &msg);
             void HandleRequestStateTransfer(
                 const TransportAddress &remote,
                 const proto::RequestStateTransferMessage &msg);

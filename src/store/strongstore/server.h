@@ -135,7 +135,7 @@ namespace strongstore
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                           string &response) override;
-        void ReplicaUpcall(opnum_t opnum, uint32_t idx, const string &op) override;
+        void ReplicaUpcall(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 
@@ -268,7 +268,6 @@ namespace strongstore
 
         void PrepareCallback(uint64_t transaction_id, int status,
                              Timestamp timestamp);
-        void SendOperationCallback(uint64_t transaction_id, int status);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
@@ -294,12 +293,12 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(opnum_t opnum, uint32_t idx, replication::LinearizeableOperation &op);
+        void ReplicaUpcallAppRequest(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
-        void RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, uint64_t transaction_id, int status, string retval);
+        void RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, uint64_t clientid, uint64_t client_req_id, int status, string retval);
 
         const TrueTime &tt_;
         TransactionStore transactions_;

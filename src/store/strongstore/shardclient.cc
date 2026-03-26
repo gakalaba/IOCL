@@ -318,18 +318,14 @@ namespace strongstore
         pendingOp.in_use = true;
         pendingOp.ocb = ocb;
 
-        // REMOVE
-        uint64_t myshardtag = CreateTag(client_id_, req_id);
-        // REMOVE
         op_.Clear();
         op_.mutable_rid()->set_client_id(client_id_);
-        // op_.mutable_rid()->set_client_req_id(req_id);
-        op_.mutable_rid()->set_client_req_id(myshardtag);
+        op_.mutable_rid()->set_client_req_id(req_id);
         op_.set_transaction_id(app_request_id);
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);
-        op_.set_idx(0);
+        op_.set_idx(0); // slot index is decided at the server
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)
@@ -350,7 +346,7 @@ namespace strongstore
                 // Add this entry to predecessor list and the RPC message
                 op_.add_predlist(entry.tag);
                 pendingOp.pred_list.push_back(std::make_pair(entry.tag, entry.shardid));
-                // Send message to predecessor shard
+                // Send coordination message to predecessor shard
                 coordReqMsg.set_p(entry.tag);
                 coordReqMsg.set_predidx(i);
                 if (!transport_->SendMessageToReplica(this, entry.shardid, 0, MsgType::CLIENT_COORD_TYPE, coordReqMsg))
@@ -370,18 +366,16 @@ namespace strongstore
     void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
         uint64_t req_id = reply.rid().client_req_id();
-        // int status = reply.status();
-        // string retval = reply.return_value();
+        int status = reply.status();
+        string retval = reply.return_value();
 
-        // uint32_t idx = req_id % fanout_;
-        uint32_t idx = (req_id & 0xFFFFFFFF) % fanout_;
+        uint32_t idx = req_id % fanout_;
         auto &pendingOp = slots_[idx];
         ASSERT(pendingOp.in_use);
 
         op_callback ocb = std::move(pendingOp.ocb); // wrapped in move to make efficient
 
-        ocb(0, "", pendingOp.pred_list);
-        // ocb(status, retval, pred_list);
+        ocb(status, retval, pendingOp.pred_list);
         pendingOp.in_use = false;
         pendingOp.pred_list.clear();
     }

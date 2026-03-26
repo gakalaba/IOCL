@@ -141,25 +141,25 @@ namespace replication
             // }
         }
 
-        void VRClient::HandleReply(const TransportAddress &remote,
-                                   const proto::ReplyMessage &msg)
-        {
-            Panic("Shouldn't be getting reply");
-            // uint64_t reqId = msg.clientreqid();
-            // auto it = pendingReqs.find(reqId);
-            // if (it == pendingReqs.end())
-            // {
-            //     Debug("Received reply when no request was pending");
-            //     return;
-            // }
+        // void VRClient::HandleReply(const TransportAddress &remote,
+        //                            const proto::ReplyMessage &msg)
+        // {
+        //     Panic("Shouldn't be getting reply");
+        //     // uint64_t reqId = msg.clientreqid();
+        //     // auto it = pendingReqs.find(reqId);
+        //     // if (it == pendingReqs.end())
+        //     // {
+        //     //     Debug("Received reply when no request was pending");
+        //     //     return;
+        //     // }
 
-            // PendingRequest *req = it->second;
-            // Debug("Client received reply: %lu", reqId);
-            // // req->timer->Stop();
-            // pendingReqs.erase(it);
-            // req->continuation(req->request, msg.reply());
-            // // delete req;
-        }
+        //     // PendingRequest *req = it->second;
+        //     // Debug("Client received reply: %lu", reqId);
+        //     // // req->timer->Stop();
+        //     // pendingReqs.erase(it);
+        //     // req->continuation(req->request, msg.reply());
+        //     // // delete req;
+        // }
 
         void VRClient::HandleUnloggedReply(const TransportAddress &remote,
                                            const proto::UnloggedReplyMessage &msg)

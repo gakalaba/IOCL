@@ -156,38 +156,10 @@ namespace replication
 
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
-                ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
+                ReplicaUpcall(request.slot_idx(), request.clientid(), request.clientreqid(), request.the_op(), request.key(), request.val());
 
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
-
-                // Store reply in the client table
-                ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                if (cte.lastReqId <= entry->request.clientreqid())
-                {
-                    cte.lastReqId = entry->request.clientreqid();
-                    cte.replied = true;
-                    cte.reply = reply;
-                }
-                else
-                {
-                    // We've subsequently prepared another operation from the
-                    // same client. So this request must have been completed
-                    // at the client, and there's no need to record the
-                    // result.
-                }
-
-                /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
-                }
             }
         }
 
@@ -208,7 +180,7 @@ namespace replication
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
                 ASSERT(entry->state == LOG_STATE_PREPARED);
-                UpdateClientTable(entry->request);
+                // UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
                 reply.set_view(view);
@@ -282,8 +254,7 @@ namespace replication
 
         void VRReplica::StartViewChange(view_t newview)
         {
-            Warning("We did call StartViewChange :/");
-            return;
+            Panic("We did call StartViewChange :/");
             RNotice("Starting view change for view " FMT_VIEW, newview);
 
             view = newview;
@@ -322,21 +293,21 @@ namespace replication
             nullCommitTimeout->Reset();
         }
 
-        void VRReplica::UpdateClientTable(const Request &req)
-        {
-            ClientTableEntry &entry = clientTable[req.clientid()];
+        // void VRReplica::UpdateClientTable(const Request &req)
+        // {
+        //     ClientTableEntry &entry = clientTable[req.clientid()];
 
-            ASSERT(entry.lastReqId <= req.clientreqid());
+        //     ASSERT(entry.lastReqId <= req.clientreqid());
 
-            if (entry.lastReqId == req.clientreqid())
-            {
-                return;
-            }
+        //     if (entry.lastReqId == req.clientreqid())
+        //     {
+        //         return;
+        //     }
 
-            entry.lastReqId = req.clientreqid();
-            entry.replied = false;
-            entry.reply.Clear();
-        }
+        //     entry.lastReqId = req.clientreqid();
+        //     entry.replied = false;
+        //     entry.reply.Clear();
+        // }
 
         void VRReplica::ResendPrepare()
         {
@@ -346,7 +317,7 @@ namespace replication
                 return;
             }
             RNotice("Resending prepare");
-            if (!(transport->SendMessageToAll(this, lastPrepare)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, lastPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
@@ -380,7 +351,7 @@ namespace replication
             }
             lastPrepare = p;
 
-            if (!(transport->SendMessageToAll(this, p)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
@@ -402,40 +373,20 @@ namespace replication
                                        void *meta_data)
         {
             switch (type) {
-            case MsgType::DUMMY_REP_TYPE: {
-                DummyReplication dummyReplication;
-                dummyReplication.ParseFromString(data);
-                HandleDummyReplication(remote, dummyReplication);
-                break;
-            }
-            case MsgType::DUMMY_REP_RESP_TYPE: {
-                DummyReplicationResponse dummyReplicationResponse;
-                dummyReplicationResponse.ParseFromString(data);
-                HandleDummyReplicationResponse(remote, dummyReplicationResponse);
-                break;
-            }
-            case MsgType::DUMMY_COMMIT_TYPE: {
-                DummyCommit dummyCommit;
-                dummyCommit.ParseFromString(data);
-                HandleDummyCommit(remote, dummyCommit);
-                break;
-            }
-            /*
-            else if (type == unloggedRequest.GetTypeName())
+            case MsgType::PREPARE_TYPE:
             {
-                unloggedRequest.ParseFromString(data);
-                HandleUnloggedRequest(remote, unloggedRequest);
-            }
-            else if (type == prepare.GetTypeName())
-            {
+                PrepareMessage prepare;
                 prepare.ParseFromString(data);
                 HandlePrepare(remote, prepare);
+                break;
             }
-            else if (type == prepareOK.GetTypeName())
+            case MsgType::PREPARE_OK_TYPE:
             {
+                PrepareOKMessage prepareOK;
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
-            }*/
+                break;
+            }
             case MsgType::COMMIT_TYPE: {
                 CommitMessage commit;
                 commit.ParseFromString(data);
@@ -473,45 +424,6 @@ namespace replication
             }
         }
 
-        void VRReplica::HandleDummyReplication(const TransportAddress &remote,
-                               const proto::DummyReplication &msg)
-        {
-            Debug("Receiving HandleDummyReplication! with req_id = %d", msg.req_id());
-            DummyReplicationResponse reply;
-            reply.set_req_id(msg.req_id());
-            reply.set_id(myIdx);
-            reply.set_idx(msg.idx());
-
-            if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), MsgType::DUMMY_REP_RESP_TYPE, reply)))
-            {
-                RWarning("Failed to send PrepareOK message to leader");
-            }
-
-        }
-        void VRReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
-                            const proto::DummyReplicationResponse &msg)
-        {
-            // opnum_t opnum, const std::__cxx11::string &op, std::__cxx11::string &res
-            Debug("Receiving HandleDummyReplicationResponse with req_id = %d and idx = %d", msg.req_id(), msg.idx());
-            if (msg.id() > 1) {
-                return;
-            }
-            opnum_t opnum = msg.req_id();
-            const string &op = "";
-            ReplicaUpcall(opnum, msg.idx(), op);
-
-            // Send Dummy Commit
-            DummyCommit cm;
-            cm.set_dummyval(420);
-
-            if (!(transport->SendMessageToAll(this, MsgType::DUMMY_COMMIT_TYPE, cm)))
-            {
-                RWarning("Failed to send COMMIT message to all replicas");
-            }
-            nullCommitTimeout->Reset();
-        }
-
         void VRReplica::HandleCoordination(const SuccessorRequestMessage &msg)
         {
             Panic("shouldn't be calling this from VR");
@@ -519,18 +431,6 @@ namespace replication
 
         void VRReplica::HandleRequest(const LinearizeableOperation &msg)
         {
-            RDebug("Received dummy request with req_id = %d", msg.rid().client_req_id());
-            // Replicate
-            DummyReplication p;
-            p.set_req_id(msg.rid().client_req_id());
-            p.set_idx(msg.idx());
-            if (!(transport->SendMessageToAll(this, MsgType::DUMMY_REP_TYPE, p)))
-            {
-                RWarning("Failed to send prepare message to all replicas");
-            }
-            nullCommitTimeout->Reset();
-
-            /*
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -546,103 +446,55 @@ namespace replication
                 return;
             }
 
-            // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
-
-            // Check the client table to see if this is a duplicate request
-            auto kv = clientTable.find(msg.req().clientid());
-            if (kv != clientTable.end())
-            {
-                const ClientTableEntry &entry = kv->second;
-                if (msg.req().clientreqid() < entry.lastReqId)
-                {
-                    RNotice("Ignoring stale request");
-                    return;
-                }
-                if (msg.req().clientreqid() == entry.lastReqId)
-                {
-                    // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
-                    // waiting for the other replicas; in that case, just
-                    // discard the request.
-                    if (entry.replied)
-                    {
-                        RNotice("Received duplicate request; resending reply");
-                        if (!(transport->SendMessage(this, remote, entry.reply)))
-                        {
-                            RWarning("Failed to resend reply to client");
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        RNotice(
-                            "Received duplicate request but no reply available; "
-                            "ignoring");
-                        return;
-                    }
-                }
-            }
-
-            // Update the client table
-            UpdateClientTable(msg.req());
-
-            // Leader Upcall
-            bool replicate = false;
-            string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
-
             // Check whether this request should be committed to replicas
-            if (!replicate)
+            // if (!replicate)
+            // {
+            //     RDebug("Not replicating to replicas");
+            //     ReplyMessage reply;
+            //     reply.set_reply(res);
+            //     reply.set_view(0);
+            //     reply.set_opnum(0);
+            //     reply.set_clientreqid(msg.req().clientreqid());
+            //     cte.replied = true;
+            //     cte.reply = reply;
+            //     transport->SendMessage(this, remote, reply);
+            // }
+            // else
+            // {
+            Request request;
+            request.set_the_op(msg.op());
+            request.set_key(msg.key());
+            request.set_val(msg.value());
+            request.set_clientid(msg.rid().client_id());
+            request.set_clientreqid(msg.rid().client_req_id());
+            request.set_slot_idx(msg.idx());
+
+            // Assign it an opnum
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+
+            RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+
+            // Add the request to my log
+            log.Append(v, request, LOG_STATE_PREPARED);
+
+            if (lastOp - lastBatchEnd + 1 > batchSize)
             {
-                RDebug("Not replicating to replicas");
-                ReplyMessage reply;
-                reply.set_reply(res);
-                reply.set_view(0);
-                reply.set_opnum(0);
-                reply.set_clientreqid(msg.req().clientreqid());
-                cte.replied = true;
-                cte.reply = reply;
-                transport->SendMessage(this, remote, reply);
+                CloseBatch();
             }
             else
             {
-                Request request;
-                request.set_op(res);
-                request.set_clientid(msg.req().clientid());
-                request.set_clientreqid(msg.req().clientreqid());
-
-                // Assign it an opnum
-                ++this->lastOp;
-                v.view = this->view;
-                v.opnum = this->lastOp;
-
-                RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
-                // Add the request to my log
-                log.Append(v, request, LOG_STATE_PREPARED);
-
-                if (lastOp - lastBatchEnd + 1 > batchSize)
+                RDebug("Keeping in batch");
+                if (!closeBatchTimeout->Active())
                 {
-                    CloseBatch();
+                    closeBatchTimeout->Start();
                 }
-                else
-                {
-                    RDebug("Keeping in batch");
-                    if (!closeBatchTimeout->Active())
-                    {
-                        closeBatchTimeout->Start();
-                    }
-                }
-
-                nullCommitTimeout->Reset();
             }
-            */
+
+            nullCommitTimeout->Reset();
+            // }
+
         }
 
         void VRReplica::HandleUnloggedRequest(const TransportAddress &remote,
@@ -713,7 +565,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                        this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -739,7 +591,7 @@ namespace replication
                 }
                 this->lastOp++;
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
-                UpdateClientTable(req);
+                // UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
 
@@ -750,7 +602,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+                    this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -816,19 +668,13 @@ namespace replication
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
 
-                if (!(transport->SendMessageToAll(this, cm)))
+                if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
                 {
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
 
                 nullCommitTimeout->Reset();
             }
-        }
-
-        void VRReplica::HandleDummyCommit(const TransportAddress &remote,
-                                     const DummyCommit &msg)
-        {
-            return;
         }
 
         void VRReplica::HandleCommit(const TransportAddress &remote,
