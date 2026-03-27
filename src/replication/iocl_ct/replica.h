@@ -163,10 +163,10 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
-            QuorumSet<viewstamp_t, proto::UnorderedPrepareOKMessage> unorderedPrepareOKQuorum;
-            QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-            QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-            QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> unorderedPrepareOKQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> prepareOKQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;
 
             Timeout *viewChangeTimeout;
             Timeout *nullCommitTimeout;

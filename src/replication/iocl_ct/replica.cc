@@ -60,10 +60,10 @@ namespace replication
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
-              unorderedPrepareOKQuorum(config.QuorumSize() - 1),
-              prepareOKQuorum(config.QuorumSize() - 1),
-              startViewChangeQuorum(config.QuorumSize() - 1),
-              doViewChangeQuorum(config.QuorumSize() - 1),
+              unorderedPrepareOKQuorum(config.QuorumSize() - 1, config.n),
+              prepareOKQuorum(config.QuorumSize() - 1, config.n),
+              startViewChangeQuorum(config.QuorumSize() - 1, config.n),
+              doViewChangeQuorum(config.QuorumSize() - 1, config.n),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
@@ -1076,13 +1076,8 @@ namespace replication
             }
 
             viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (auto msgs =
-                    (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+            if (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
             {
-                if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                {
-                    return;
-                }
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
                 {
                     auto pair = unorderedBagByOpnum.find(i);
@@ -1416,8 +1411,7 @@ namespace replication
             }
 
             viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (auto msgs =
-                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+            if (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
             {
                 /*
                  * We have a quorum of PrepareOK messages for this
@@ -1429,11 +1423,6 @@ namespace replication
                  * This also notifies the client of the result.
                  */
                 CommitUpTo(msg.opnum());
-
-                if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                {
-                    return;
-                }
 
                 /*
                  * Send COMMIT message to the other replicas.
@@ -1767,8 +1756,9 @@ namespace replication
 
             ASSERT(msg.view() == view);
 
-            if (auto msgs = startViewChangeQuorum.AddAndCheckForQuorum(
-                    msg.view(), msg.replicaidx(), msg))
+            viewstamp_t vs = {msg.view(), 0};
+            if (startViewChangeQuorum.AddAndCheckForQuorum(
+                    vs, msg.replicaidx()))
             {
                 int leader = configuration.GetLeaderIndex(view);
                 // Don't try to send a DoViewChange message to ourselves
@@ -1782,16 +1772,16 @@ namespace replication
                     dvc.set_replicaidx(myIdx);
 
                     // Figure out how much of the log to include
-                    opnum_t minCommitted =
-                        std::min_element(
-                            msgs->begin(), msgs->end(),
-                            [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                            {
-                                return a.second.lastcommitted() <
-                                       b.second.lastcommitted();
-                            })
-                            ->second.lastcommitted();
-                    minCommitted = std::min(minCommitted, lastCommitted);
+                    // opnum_t minCommitted =
+                    //     std::min_element(
+                    //         msgs->begin(), msgs->end(),
+                    //         [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
+                    //         {
+                    //             return a.second.lastcommitted() <
+                    //                    b.second.lastcommitted();
+                    //         })
+                    //         ->second.lastcommitted();
+                    // minCommitted = std::min(minCommitted, lastCommitted);
 
                     // log.Dump(minCommitted, dvc.mutable_entries());
 
@@ -1836,9 +1826,10 @@ namespace replication
 
             ASSERT(configuration.GetLeaderIndex(msg.view()) == myIdx);
 
-            auto msgs = doViewChangeQuorum.AddAndCheckForQuorum(msg.view(),
-                                                                msg.replicaidx(), msg);
-            if (msgs != NULL)
+            viewstamp_t vs = {msg.view(), 0};
+            auto quorum_reached = doViewChangeQuorum.AddAndCheckForQuorum(vs,
+                                                                msg.replicaidx());
+            if (quorum_reached)
             {
                 // Find the response with the most up to date log, i.e. the
                 // one with the latest viewstamp
@@ -1846,18 +1837,18 @@ namespace replication
                 opnum_t latestOp = LastViewstampOfLog().opnum;
                 DoViewChangeMessage *latestMsg = NULL;
 
-                for (auto kv : *msgs)
-                {
-                    DoViewChangeMessage &x = kv.second;
-                    if ((x.lastnormalview() > latestView) ||
-                        (((x.lastnormalview() == latestView) &&
-                          (x.lastop() > latestOp))))
-                    {
-                        latestView = x.lastnormalview();
-                        latestOp = x.lastop();
-                        latestMsg = &x;
-                    }
-                }
+                // for (auto kv : *msgs)
+                // {
+                //     DoViewChangeMessage &x = kv.second;
+                //     if ((x.lastnormalview() > latestView) ||
+                //         (((x.lastnormalview() == latestView) &&
+                //           (x.lastop() > latestOp))))
+                //     {
+                //         latestView = x.lastnormalview();
+                //         latestOp = x.lastop();
+                //         latestMsg = &x;
+                //     }
+                // }
 
                 // Install the new log. We might not need to do this, if our
                 // log was the most current one.
@@ -1902,25 +1893,25 @@ namespace replication
                 //
                 // We need to compute this before we enter the new view
                 // because the saved messages will go away.
-                auto svcs = startViewChangeQuorum.GetMessages(view);
-                opnum_t minCommittedSVC =
-                    std::min_element(
-                        svcs.begin(), svcs.end(),
-                        [](decltype(*svcs.begin()) a, decltype(*svcs.begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommittedDVC =
-                    std::min_element(
-                        msgs->begin(), msgs->end(),
-                        [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
-                minCommitted = std::min(minCommitted, lastCommitted);
+                // auto svcs = startViewChangeQuorum.GetMessages(view);
+                // opnum_t minCommittedSVC =
+                //     std::min_element(
+                //         svcs.begin(), svcs.end(),
+                //         [](decltype(*svcs.begin()) a, decltype(*svcs.begin()) b)
+                //         {
+                //             return a.second.lastcommitted() < b.second.lastcommitted();
+                //         })
+                //         ->second.lastcommitted();
+                // opnum_t minCommittedDVC =
+                //     std::min_element(
+                //         msgs->begin(), msgs->end(),
+                //         [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
+                //         {
+                //             return a.second.lastcommitted() < b.second.lastcommitted();
+                //         })
+                //         ->second.lastcommitted();
+                // opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
+                // minCommitted = std::min(minCommitted, lastCommitted);
 
                 EnterView(msg.view());
 
