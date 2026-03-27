@@ -382,6 +382,12 @@ class IOCLCodebase:
         if 'server_wrap_command' in config and len(config['server_wrap_command']) > 0:
             replica_command = config['server_wrap_command'] % replica_command
 
+        '''
+        # ADDING PERF stat
+        if (replica_idx == 0):
+            replica_command = "perf stat -e cycles,instructions,branches,branch-misses,cache-misses " + replica_command
+        '''
+
         if 'pin_server_processes' in config and isinstance(config['pin_server_processes'], list) and len(config['pin_server_processes']) > 0:
             # if (config["client_protocol_mode"] == "span-lock"):
             #     core = config['pin_server_processes'][server_id %
