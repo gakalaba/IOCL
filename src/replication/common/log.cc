@@ -58,7 +58,8 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
         ASSERT(vs.opnum == LastOpnum()+1);
     }
     
-    LogEntry entry;
+    entries.emplace_back();
+    LogEntry &entry = entries.back();
     entry.viewstamp = vs;
     entry.request = req;
     entry.state = state;
@@ -66,8 +67,7 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
         entry.hash = ComputeHash(LastHash(), entry);        
     }
 
-    entries.push_back(entry);
-    return *Find(vs.opnum);
+    return entry;
 }
 
 // This really ought to be const

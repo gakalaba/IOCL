@@ -1,0 +1,18 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-03-26-15-24-05/plots/tput-p50-lat.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/VR_no_rep/2026-03-26-12-00-51/plots/tput-p50-lat.csv' title 'VR - no rep' ls 1 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/VR_no_rep_w_commit/2026-03-26-13-32-48/plots/tput-p50-lat.csv' title 'VR - no rep w commits' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/VR_1_replica/2026-03-26-13-43-08/plots/tput-p50-lat.csv' title 'VR - 1 replica' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/VR_2_DUMMY_replicas/2026-03-26-14-45-59/plots/tput-p50-lat.csv' title 'VR - 2 DUMMY replicas' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/vr_optimized_full/2026-03-26-10-17-32/plots/tput-p50-lat.csv' title 'VR - 2 replicas' ls 5 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-03-26-15-24-05/2026-03-26-15-24-05/plots/tput-p50-lat.csv' title 'Full VR - 3 basic optimizations' ls 6 with linespoint

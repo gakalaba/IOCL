@@ -152,7 +152,7 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request request = entry->request;
+                const Request &request = entry->request;
 
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
@@ -349,12 +349,12 @@ namespace replication
                 ASSERT(entry->viewstamp.opnum == i);
                 *r = entry->request;
             }
-            lastPrepare = p;
 
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
+            lastPrepare.Swap(&p);
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();
