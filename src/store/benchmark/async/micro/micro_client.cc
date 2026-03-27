@@ -102,7 +102,9 @@ namespace micro
     {
         int this_txn_id = txn_idx_;
         if (this_txn_id >= max_txns_per_client_) {
-            Panic("Exceeded max txns per client!");
+            this_txn_id = 0;
+            txn_idx_ = 0;
+            // Panic("Exceeded max txns per client!");
         }
         txn_idx_++;
         return new BasicAppRequest(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_));
