@@ -338,15 +338,16 @@ namespace replication
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
+            auto *reqs = p.mutable_request();
+            reqs->Reserve(lastOp - batchStart + 1);
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
-                Request *r = p.add_request();
                 const LogEntry *entry = log.Find(i);
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
-                *r = entry->request;
+                *reqs->Add() = entry->request;
             }
 
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
@@ -460,13 +461,6 @@ namespace replication
             // }
             // else
             // {
-            Request request;
-            request.set_the_op(msg.op());
-            request.set_key(msg.key());
-            request.set_val(msg.value());
-            request.set_clientid(msg.rid().client_id());
-            request.set_clientreqid(msg.rid().client_req_id());
-            request.set_slot_idx(msg.idx());
 
             // Assign it an opnum
             ++this->lastOp;
@@ -476,7 +470,14 @@ namespace replication
             RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
             // Add the request to my log
-            log.Append(v, request, LOG_STATE_PREPARED);
+            LogEntry &entry = log.Append(v, LOG_STATE_PREPARED);
+            Request &request = entry.request;
+            request.set_the_op(msg.op());
+            request.set_key(msg.key());
+            request.set_val(msg.value());
+            request.set_clientid(msg.rid().client_id());
+            request.set_clientreqid(msg.rid().client_req_id());
+            request.set_slot_idx(msg.idx());
 
             if (lastOp - lastBatchEnd + 1 > batchSize)
             {
@@ -590,7 +591,14 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
+                LogEntry &entry = log.Append(viewstamp_t(msg.view(), op), LOG_STATE_PREPARED);
+                Request &request = entry.request;
+                request.set_the_op(req.the_op());
+                request.set_key(req.key());
+                request.set_val(req.val());
+                request.set_clientid(req.clientid());
+                request.set_clientreqid(req.clientreqid());
+                request.set_slot_idx(req.slot_idx());
                 // UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
@@ -810,7 +818,15 @@ namespace replication
                         oldLastOp = lastOp;
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                        LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
+                        Request &request = created_entry.request;
+                        request.set_the_op(newEntry.request().the_op());
+                        request.set_key(newEntry.request().key());
+                        request.set_val(newEntry.request().val());
+                        request.set_clientid(newEntry.request().clientid());
+                        request.set_clientreqid(newEntry.request().clientreqid());
+                        request.set_slot_idx(newEntry.request().slot_idx());
+                        // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
                     }
                 }
                 else
@@ -820,7 +836,15 @@ namespace replication
 
                     lastOp++;
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
+                    Request &request = created_entry.request;
+                    request.set_the_op(newEntry.request().the_op());
+                    request.set_key(newEntry.request().key());
+                    request.set_val(newEntry.request().val());
+                    request.set_clientid(newEntry.request().clientid());
+                    request.set_clientreqid(newEntry.request().clientreqid());
+                    request.set_slot_idx(newEntry.request().slot_idx());
                 }
             }
 

@@ -80,7 +80,13 @@ Log::Install(iter start, iter end)
     // Install the new log entries
     for (; it != end; it++) {
         viewstamp_t vs = { it->view(), it->opnum() };
-        Append(vs, it->request(), LOG_STATE_PREPARED);
+        LogEntry &entry = Append(vs, LOG_STATE_PREPARED);
+        entry.request.set_the_op(it->request().the_op());
+        entry.request.set_key(it->request().key());
+        entry.request.set_val(it->request().val());
+        entry.request.set_clientid(it->request().clientid());
+        entry.request.set_clientreqid(it->request().clientreqid());
+        entry.request.set_slot_idx(it->request().slot_idx());
     }
 }
 

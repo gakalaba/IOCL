@@ -86,7 +86,7 @@ struct LogEntry {
 class Log {
    public:
     Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
-    LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
+    LogEntry &Append(viewstamp_t vs, LogEntryState state);
     LogEntry *Find(opnum_t opnum);
     bool SetStatus(opnum_t opnum, LogEntryState state);
     bool SetRequest(opnum_t op, const Request &req);

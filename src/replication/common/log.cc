@@ -50,7 +50,7 @@ Log::Log(bool useHash, opnum_t start, string initialHash)
 
 
 LogEntry &
-Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
+Log::Append(viewstamp_t vs, LogEntryState state)
 {
     if (entries.empty()) {
         ASSERT(vs.opnum == start);
@@ -61,7 +61,6 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     entries.emplace_back();
     LogEntry &entry = entries.back();
     entry.viewstamp = vs;
-    entry.request = req;
     entry.state = state;
     entry.prepare_ok_count = 0;
     entry.prepare_ok_mask = 0;
