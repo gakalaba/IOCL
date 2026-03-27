@@ -75,6 +75,7 @@ namespace replication
             proto::PrepareMessage lastPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
+            uint8_t Q;
 
             Log log;
             // std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;

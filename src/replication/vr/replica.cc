@@ -70,6 +70,7 @@ namespace replication
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
+            Q = config.QuorumSize() - 1;
 
             if (batchSize > 1)
             {
@@ -553,6 +554,7 @@ namespace replication
                    (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
+            int leaderIdx = configuration.GetLeaderIndex(view);
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -563,7 +565,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
+                        this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -600,7 +602,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
+                    this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -648,7 +650,7 @@ namespace replication
                 entry->prepare_ok_count++;
             }
 
-            if (entry->prepare_ok_count == configuration.QuorumSize())
+            if (entry->prepare_ok_count == Q)
             {
                 /*
                  * We have a quorum of PrepareOK messages for this
