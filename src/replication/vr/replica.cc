@@ -59,7 +59,6 @@ namespace replication
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
-              prepareOKQuorum(config.QuorumSize() - 1, config.n),
               startViewChangeQuorum(config.QuorumSize() - 1, config.n),
               doViewChangeQuorum(config.QuorumSize() - 1, config.n),
               debug_stats_{debug_stats}
@@ -247,7 +246,6 @@ namespace replication
                 closeBatchTimeout->Stop();
             }
 
-            prepareOKQuorum.Clear();
             startViewChangeQuorum.Clear();
             doViewChangeQuorum.Clear();
         }
@@ -638,8 +636,19 @@ namespace replication
                 return;
             }
 
-            viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
+            LogEntry *entry = log.Find(msg.opnum());
+            if (entry == nullptr)
+            {
+                RPanic("Did not find operation " FMT_OPNUM " in log",
+                           msg.opnum());
+            }
+            uint64_t bit = 1ULL << msg.replicaidx();
+            if ((entry->prepare_ok_mask & bit) == 0) {
+                entry->prepare_ok_mask |= bit;
+                entry->prepare_ok_count++;
+            }
+
+            if (entry->prepare_ok_count == configuration.QuorumSize())
             {
                 /*
                  * We have a quorum of PrepareOK messages for this

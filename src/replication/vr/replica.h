@@ -86,7 +86,6 @@ namespace replication
             // };
             // std::map<uint64_t, ClientTableEntry> clientTable;
 
-            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> prepareOKQuorum;
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;
 

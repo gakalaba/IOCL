@@ -59,6 +59,10 @@ struct LogEntry {
     opnum_t prevClientReqOpnum;
     ::google::protobuf::Message *replyMessage;
 
+    // Quorum tracking stuff
+    uint64_t prepare_ok_mask = 0;
+    uint8_t prepare_ok_count = 0;
+
     LogEntry() { replyMessage = NULL; }
     LogEntry(const LogEntry &x)
         : viewstamp(x.viewstamp), state(x.state), request(x.request), hash(x.hash), prevClientReqOpnum(x.prevClientReqOpnum) {

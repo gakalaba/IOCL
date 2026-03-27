@@ -63,6 +63,8 @@ Log::Append(viewstamp_t vs, const Request &req, LogEntryState state)
     entry.viewstamp = vs;
     entry.request = req;
     entry.state = state;
+    entry.prepare_ok_count = 0;
+    entry.prepare_ok_mask = 0;
     if (useHash) {
         entry.hash = ComputeHash(LastHash(), entry);        
     }
