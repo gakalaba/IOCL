@@ -84,6 +84,11 @@ namespace replication
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
+            // Quorum tracking stuff
+            uint64_t prepare_ok_mask = 0;
+            uint8_t prepare_ok_count = 0;
+            uint64_t u_prepare_ok_mask = 0;
+            uint8_t u_prepare_ok_count = 0;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
                     const Request &request, uint64_t shardtag, uint64_t intkey)
@@ -92,6 +97,10 @@ namespace replication
                   request(request),
                   myShardTag(shardtag),
                   ACKs(0),
+                  prepare_ok_count(0),
+                  prepare_ok_mask(0),
+                  u_prepare_ok_count(0),
+                  u_prepare_ok_mask(0),
                   intkey(intkey) {}
             virtual ~IoclEntry() {}
         };
@@ -137,6 +146,7 @@ namespace replication
             unsigned int batchSize;
             opnum_t lastBatchEnd;
             opnum_t lastUnorderedBatchEnd;
+            uint8_t Q;
 
             std::vector<IoclEntry *> log;
             ska::flat_hash_map<uint64_t, std::vector<opnum_t>> perKeySubLogs;
@@ -163,8 +173,6 @@ namespace replication
             };
             std::map<uint64_t, ClientTableEntry> clientTable;
 
-            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> unorderedPrepareOKQuorum;
-            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> prepareOKQuorum;
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;
 
@@ -189,7 +197,7 @@ namespace replication
             void EnterView(view_t newview);
             void StartViewChange(view_t newview);
             void SendNullCommit();
-            void UpdateClientTable(const Request &req);
+            // void UpdateClientTable(const Request &req);
             void ResendPrepare();
             void ResendUnorderedPrepare();
             void CloseBatch();

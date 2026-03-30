@@ -60,8 +60,6 @@ namespace replication
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
-              unorderedPrepareOKQuorum(config.QuorumSize() - 1, config.n),
-              prepareOKQuorum(config.QuorumSize() - 1, config.n),
               startViewChangeQuorum(config.QuorumSize() - 1, config.n),
               doViewChangeQuorum(config.QuorumSize() - 1, config.n),
               debug_stats_{debug_stats}
@@ -75,6 +73,7 @@ namespace replication
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
             lastUnorderedBatchEnd = 0;
+            Q = config.QuorumSize() - 1;
 
             if (batchSize > 1)
             {
@@ -210,7 +209,7 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request request = entry->request;
+                const Request &request = entry->request;
 
                 /* Mark it as committed */
                 entry->state = IOCL_STATE_COMMITTED;
@@ -266,7 +265,7 @@ namespace replication
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
                 ASSERT(entry->state == IOCL_STATE_PREPARED);
-                UpdateClientTable(entry->request);
+                // UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
                 reply.set_view(view);
@@ -333,10 +332,8 @@ namespace replication
                 closeBatchTimeout->Stop();
             }
 
-            prepareOKQuorum.Clear();
             startViewChangeQuorum.Clear();
             doViewChangeQuorum.Clear();
-            unorderedPrepareOKQuorum.Clear();
         }
 
         void IOCL_CTReplica::StartViewChange(view_t newview)
@@ -380,30 +377,30 @@ namespace replication
             nullCommitTimeout->Reset();
         }
 
-        void IOCL_CTReplica::UpdateClientTable(const Request &req)
-        {
-            Panic("Shouldn't be calling this right now");
-            ClientTableEntry &entry = clientTable[req.clientid()];
-            Debug("the request has clientid %lu and clientreqid %lu",
-                   req.clientid(), req.clientreqid());
-            Debug("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
-                   entry.lastReqId, req.clientreqid());
+        // void IOCL_CTReplica::UpdateClientTable(const Request &req)
+        // {
+        //     Panic("Shouldn't be calling this right now");
+        //     ClientTableEntry &entry = clientTable[req.clientid()];
+        //     Debug("the request has clientid %lu and clientreqid %lu",
+        //            req.clientid(), req.clientreqid());
+        //     Debug("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
+        //            entry.lastReqId, req.clientreqid());
 
-            if (entry.lastReqId > req.clientreqid()) {
+        //     if (entry.lastReqId > req.clientreqid()) {
 
-                Panic("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
-                   entry.lastReqId, req.clientreqid());
-            }
+        //         Panic("we are checking entry.lastReqId (= %lu) < req.clientreqid (= %lu)",
+        //            entry.lastReqId, req.clientreqid());
+        //     }
 
-            if (entry.lastReqId == req.clientreqid())
-            {
-                return;
-            }
+        //     if (entry.lastReqId == req.clientreqid())
+        //     {
+        //         return;
+        //     }
 
-            entry.lastReqId = req.clientreqid();
-            entry.replied = false;
-            entry.reply.Clear();
-        }
+        //     entry.lastReqId = req.clientreqid();
+        //     entry.replied = false;
+        //     entry.reply.Clear();
+        // }
 
         void IOCL_CTReplica::ResendPrepare()
         {
@@ -448,23 +445,23 @@ namespace replication
             up.set_view(view);
             up.set_opnum(lastUnorderedOp);
             up.set_batchstart(unorderedBatchStart);
+            auto *reqs = up.mutable_request();
 
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
-                Request *r = up.add_request();
                 const IoclEntry& entry = *unorderedBagByOpnum[i];
                 ASSERT(entry.viewstamp.view == view);
-                *r = entry.request;
+                *reqs->Add() = entry.request;
                 up.add_shardtags(entry.myShardTag);
                 PredListHolder* pl = up.add_predlists();
                 pl->CopyFrom(entry.predList);
             }
-            lastUnorderedPrepare = up;
 
             if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, up)))
             {
                 RWarning("Failed to send UNORDERED_PREPARE message to all replicas");
             }
+            lastUnorderedPrepare.Swap(&up);
             lastUnorderedBatchEnd = lastUnorderedOp;
 
             resendUnorderedPrepareTimeout->Reset();
@@ -486,15 +483,16 @@ namespace replication
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
+            auto *reqs = p.mutable_request();
+            reqs->Reserve(lastOp - batchStart + 1);
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
-                Request *r = p.add_request();
                 const IoclEntry *entry = FindInLog(i);
                 ASSERT(entry != NULL);
                 ASSERT(entry->viewstamp.view == view);
                 ASSERT(entry->viewstamp.opnum == i);
-                *r = entry->request;
+                *reqs->Add() = entry->request;
                 p.add_shardtags(entry->myShardTag);
                 PredListHolder* ts_chain = p.add_timestamp_chains();
                 // loop through predecessorArrivalTs and add to timestamp chain
@@ -504,12 +502,12 @@ namespace replication
                 // Add my finalTs at the end
                 ts_chain->add_predlist(entry->finalTs);
             }
-            lastPrepare = p;
 
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
+            lastPrepare.Swap(&p);
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();
@@ -872,13 +870,20 @@ namespace replication
                 return;
             }
 
-            viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
+            auto pair = unorderedBagByOpnum.find(msg.batchstart());
+            if (pair == unorderedBagByOpnum.end())
             {
-                if (unorderedPrepareOKQuorum.Count(vs) > (configuration.QuorumSize() - 1))
-                {
-                    return;
-                }
+                return;
+            }
+            IoclEntry *entry = pair->second;
+            uint64_t bit = 1ULL << msg.replicaidx();
+            if ((entry->u_prepare_ok_mask & bit) == 0) {
+                entry->u_prepare_ok_mask |= bit;
+                entry->u_prepare_ok_count++;
+            }
+
+            if (entry->u_prepare_ok_count == Q)
+            {
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
                 {
                     auto pair = unorderedBagByOpnum.find(i);
@@ -998,6 +1003,7 @@ namespace replication
                    (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
+            int leaderIdx = configuration.GetLeaderIndex(view);
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -1008,7 +1014,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
+                        this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -1072,7 +1078,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
+                    this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -1115,6 +1121,7 @@ namespace replication
                    (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
+            int leaderIdx = configuration.GetLeaderIndex(view);
 
             if (msg.opnum() <= this->lastUnorderedOp)
             {
@@ -1126,7 +1133,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
+                        this, leaderIdx, MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -1175,7 +1182,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
+                    this, leaderIdx, MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -1211,13 +1218,20 @@ namespace replication
                 return;
             }
 
-            viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
+            IoclEntry *entry = FindInLog(msg.opnum());
+            if (entry == nullptr)
             {
-                if (prepareOKQuorum.Count(vs) > (configuration.QuorumSize() - 1))
-                {
-                    return;
-                }
+                RPanic("Did not find operation " FMT_OPNUM " in log",
+                           msg.opnum());
+            }
+            uint64_t bit = 1ULL << msg.replicaidx();
+            if ((entry->prepare_ok_mask & bit) == 0) {
+                entry->prepare_ok_mask |= bit;
+                entry->prepare_ok_count++;
+            }
+
+            if (entry->prepare_ok_count == Q)
+            {
                 /*
                  * We have a quorum of PrepareOK messages for this
                  * opnumber. Execute it and all previous operations.
