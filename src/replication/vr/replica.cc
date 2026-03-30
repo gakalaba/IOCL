@@ -429,7 +429,7 @@ namespace replication
             Panic("shouldn't be calling this from VR");
         }
 
-        void VRReplica::HandleRequest(const LinearizeableOperation &msg)
+        void VRReplica::HandleRequest(LinearizeableOperation &msg)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
@@ -472,9 +472,9 @@ namespace replication
             // Add the request to my log
             LogEntry &entry = log.Append(v, LOG_STATE_PREPARED);
             Request &request = entry.request;
-            request.set_the_op(msg.op());
-            request.set_key(msg.key());
-            request.set_val(msg.value());
+            request.mutable_the_op()->swap(*msg.mutable_op());
+            request.mutable_key()->swap(*msg.mutable_key());
+            request.mutable_val()->swap(*msg.mutable_value());
             request.set_clientid(msg.rid().client_id());
             request.set_clientreqid(msg.rid().client_req_id());
             request.set_slot_idx(msg.idx());

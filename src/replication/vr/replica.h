@@ -61,7 +61,7 @@ namespace replication
                                 const string &data, void *meta_data);
             void ReceiveMessage(const TransportAddress &remote, MsgType type,
                                 const string &data, void *meta_data);
-            virtual void HandleRequest(const LinearizeableOperation &msg);
+            virtual void HandleRequest(LinearizeableOperation &msg);
             virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:

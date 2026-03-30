@@ -76,7 +76,7 @@ class Replica : public TransportReceiver {
     Replica(const transport::Configuration &config, int groupIdx, int myIdx,
             Transport *transport, AppReplica *app);
     virtual ~Replica();
-    virtual void HandleRequest(const LinearizeableOperation &msg) = 0;
+    virtual void HandleRequest(LinearizeableOperation &msg) = 0;
     virtual void HandleCoordination(const SuccessorRequestMessage &msg) = 0;
 
    protected:

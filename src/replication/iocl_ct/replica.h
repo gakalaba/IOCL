@@ -70,7 +70,7 @@ namespace replication
             };
             viewstamp_t viewstamp;
             IoclEntryState state;
-            Request request;
+            Request request; // op, key, value, slot_idx, clientid, clientreqid
             uint64_t myShardTag;
             proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
             uint64_t arrivalTs;
@@ -120,7 +120,7 @@ namespace replication
                                 const string &data, void *meta_data);
             void ReceiveMessage(const TransportAddress &remote, MsgType type,
                                 const string &data, void *meta_data);
-            virtual void HandleRequest(const LinearizeableOperation &msg);
+            virtual void HandleRequest(LinearizeableOperation &msg);
             virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:
@@ -201,16 +201,6 @@ namespace replication
             viewstamp_t LastViewstampOfLog() const;
             uint64_t FoldL(const proto::PredListHolder &pl);
 
-            void HandleDummyReplication(const TransportAddress &remote,
-                               const proto::DummyReplication &msg);
-            void HandleDummyReplicationResponse(const TransportAddress &remote,
-                               const proto::DummyReplicationResponse &msg);
-            void HandleDummySecondReplication(const TransportAddress &remote,
-                               const proto::DummyReplicationSecond &msg);
-            void HandleDummySecondReplicationResponse(const TransportAddress &remote,
-                               const proto::DummyReplicationSecondResponse &msg);
-            void HandleDummyCommit(const TransportAddress &remote,
-                               const proto::DummyCommit &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 

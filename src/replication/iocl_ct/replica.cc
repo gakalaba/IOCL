@@ -245,35 +245,7 @@ namespace replication
 
                 /* Replica path: */
                 /* Execute it */
-                ReplyMessage reply;
-                Execute(entry->viewstamp.opnum, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
-
-                // Store reply in the client table
-                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                // if (cte.lastReqId <= entry->request.clientreqid())
-                // {
-                //     cte.lastReqId = entry->request.clientreqid();
-                //     cte.replied = true;
-                //     cte.reply = reply;
-                // }
-                // else
-                // {
-                //     // We've subsequently prepared another operation from the
-                //     // same client. So this request must have been completed
-                //     // at the client, and there's no need to record the
-                //     // result.
-                // }
-
-                // /* Send reply */
-                // auto iter = clientAddresses.find(entry->request.clientid());
-                // if (iter != clientAddresses.end())
-                // {
-                //     transport->SendMessage(this, *iter->second, reply);
-                // }
+                ReplicaUpcall(entry->request.slot_idx(), entry->request.clientid(), entry->request.clientreqid(), entry->request.the_op(), entry->request.key(), entry->request.val());
             }
         }
 
@@ -441,7 +413,7 @@ namespace replication
                 return;
             }
             RNotice("Resending prepare");
-            if (!(transport->SendMessageToAll(this, lastPrepare)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, lastPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
@@ -457,7 +429,7 @@ namespace replication
                 return;
             }
             RNotice("Resending unordered prepare for last message with shardtag = %lu", lastUnorderedPrepare.shardtags(0));
-            if (!(transport->SendMessageToAll(this, lastUnorderedPrepare)))
+            if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, lastUnorderedPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
@@ -489,7 +461,7 @@ namespace replication
             }
             lastUnorderedPrepare = up;
 
-            if (!(transport->SendMessageToAll(this, up)))
+            if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, up)))
             {
                 RWarning("Failed to send UNORDERED_PREPARE message to all replicas");
             }
@@ -531,14 +503,10 @@ namespace replication
                 }
                 // Add my finalTs at the end
                 ts_chain->add_predlist(entry->finalTs);
-                // Debug("The final added ts_chain looks like this:");
-                // for (int idx = 0; idx < ts_chain->predlist_size(); idx++) {
-                //     Warning("TO DELETE!!!!!!!! ts_chain predlist[%d] = %lu", idx, ts_chain->predlist(idx));
-                // }
             }
             lastPrepare = p;
 
-            if (!(transport->SendMessageToAll(this, p)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
@@ -559,85 +527,56 @@ namespace replication
                                        void *meta_data)
         {
             switch (type) {
-            case MsgType::DUMMY_REP_TYPE: {
-                DummyReplication dummyReplication;
-                dummyReplication.ParseFromString(data);
-                HandleDummyReplication(remote, dummyReplication);
-                break;
-            }
-            case MsgType::DUMMY_REP_RESP_TYPE: {
-                Debug("DummyReplicationResponse Received");
-                DummyReplicationResponse dummyReplicationResponse;
-                dummyReplicationResponse.ParseFromString(data);
-                HandleDummyReplicationResponse(remote, dummyReplicationResponse);
-                break;
-            }
-            case MsgType::DUMMY_REP_SECOND_TYPE: {
-                Debug("DummyReplicationSecond Received");
-                DummyReplicationSecond dummyReplicationSecond;
-                dummyReplicationSecond.ParseFromString(data);
-                HandleDummySecondReplication(remote, dummyReplicationSecond);
-                break;
-            }
-            case MsgType::DUMMY_REP_SECOND_RESP_TYPE: {
-                Debug("DummyReplicationSecondResponse Received");
-                DummyReplicationSecondResponse dummyReplicationSecondResponse;
-                dummyReplicationSecondResponse.ParseFromString(data);
-                HandleDummySecondReplicationResponse(remote, dummyReplicationSecondResponse);
-                break;
-            }
-            case MsgType::DUMMY_COMMIT_TYPE: {
-                Debug("DummyCommit Received");
-                DummyCommit dummyCommit;
-                dummyCommit.ParseFromString(data);
-                HandleDummyCommit(remote, dummyCommit);
-                break;
-            }
-            /*
-            else if (type == coordResp.GetTypeName())
-            {
-                // Predecessor reply arrived
-                coordResp.ParseFromString(data);
-                HandleCoordinationReply(remote, coordResp);
-            }
-            else if (type == coordFinal.GetTypeName())
-            {
-                // Predecessor final ACK arrived
-                coordFinal.ParseFromString(data);
-                HandleCoordinationFinal(remote, coordFinal);
-            }
-            else if (type == unorderedPrepare.GetTypeName())
-            {
+            case MsgType::UNORDERED_PREPARE_TYPE: {
+                UnorderedPrepareMessage unorderedPrepare;
                 unorderedPrepare.ParseFromString(data);
                 HandleUnorderedPrepare(remote, unorderedPrepare);
+                break;
             }
-            else if (type == unorderedPrepareOK.GetTypeName())
-            {
-                // Request persisted at quorum -- ensue regular VR prepare
+            case MsgType::UNORDERED_PREPARE_OK_TYPE: {
+                UnorderedPrepareOKMessage unorderedPrepareOK;
                 unorderedPrepareOK.ParseFromString(data);
                 HandleUnorderedPrepareOK(remote, unorderedPrepareOK);
+                break;
             }
-            else if (type == unloggedRequest.GetTypeName())
-            {
-                unloggedRequest.ParseFromString(data);
-                HandleUnloggedRequest(remote, unloggedRequest);
-            }
-            else if (type == prepare.GetTypeName())
-            {
+            case MsgType::PREPARE_TYPE: {
+                PrepareMessage prepare;
                 prepare.ParseFromString(data);
                 HandlePrepare(remote, prepare);
+                break;
             }
-            else if (type == prepareOK.GetTypeName())
-            {
+            case MsgType::PREPARE_OK_TYPE: {
+                PrepareOKMessage prepareOK;
                 prepareOK.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOK);
-            }*/
+                break;
+            }
             case MsgType::COMMIT_TYPE: {
                 CommitMessage commit;
                 commit.ParseFromString(data);
                 HandleCommit(remote, commit);
                 break;
-            }/*
+            }
+            case MsgType::COORD_RESP_TYPE: {
+                // Predecessor reply arrived
+                PredecessorReplyMessage coordResp;
+                coordResp.ParseFromString(data);
+                HandleCoordinationReply(remote, coordResp);
+                break;
+            }
+            case MsgType::COORD_FINAL_TYPE: {
+                // Predecessor final ACK arrived
+                PredecessorFinalMessage coordFinal;
+                coordFinal.ParseFromString(data);
+                HandleCoordinationFinal(remote, coordFinal);
+                break;
+            }
+            /*
+            else if (type == unloggedRequest.GetTypeName())
+            {
+                unloggedRequest.ParseFromString(data);
+                HandleUnloggedRequest(remote, unloggedRequest);
+            }
             else if (type == requestStateTransfer.GetTypeName())
             {
                 requestStateTransfer.ParseFromString(data);
@@ -670,112 +609,8 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::HandleDummyReplication(const TransportAddress &remote,
-                                      const proto::DummyReplication &msg)
+        void IOCL_CTReplica::HandleRequest(LinearizeableOperation &msg)
         {
-            Debug("Received dummy replication with req_id %lu", msg.req_id());
-            DummyReplicationResponse m;
-            m.set_req_id(msg.req_id());
-            m.set_id(myIdx);
-            m.set_idx(msg.idx());
-
-            if (!transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), MsgType::DUMMY_REP_RESP_TYPE, m))
-            {
-                RWarning("Failed to send DummyReplicationResponse message to all replicas");
-            }
-        }
-
-        void IOCL_CTReplica::HandleDummyReplicationResponse(const TransportAddress &remote,
-                                      const proto::DummyReplicationResponse &msg)
-        {
-            Debug("Received dummy replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
-            if (msg.id() > 1) {
-                return;
-            }
-            DummyReplicationSecond m;
-            m.set_req_id(msg.req_id());
-            m.set_idx(msg.idx());
-
-            if (!transport->SendMessageToAll(this, MsgType::DUMMY_REP_SECOND_TYPE, m))
-            {
-                RWarning("Failed to send DummyReplicationSecond message to all replicas");
-            }
-            nullCommitTimeout->Reset();
-            // if (msg.id() > 1) {
-            //     return;
-            // }
-            // opnum_t opnum = msg.req_id();
-            // const string &op = "";
-            // // string res;
-            // ReplicaUpcall(opnum, msg.idx(), op);
-
-            // // Send Dummy Commit
-            // DummyCommit cm;
-            // cm.set_dummyval(420);
-
-            // if (!transport->SendMessageToAll(this, cm))
-            // {
-            //     RWarning("Failed to send DummyCommit message to all replicas");
-            // }
-            // nullCommitTimeout->Reset();
-        }
-
-        void IOCL_CTReplica::HandleDummySecondReplication(const TransportAddress &remote,
-                                      const proto::DummyReplicationSecond &msg)
-        {
-            Debug("Received dummy second replication with req_id %lu", msg.req_id());
-            DummyReplicationSecondResponse m;
-            m.set_req_id(msg.req_id());
-            m.set_id(myIdx);
-            m.set_idx(msg.idx());
-
-            if (!transport->SendMessageToReplica(this, configuration.GetLeaderIndex(view), MsgType::DUMMY_REP_SECOND_RESP_TYPE, m))
-            {
-                RWarning("Failed to send DummyReplicationSecondResponse message to all replicas");
-            }
-        }
-
-        void IOCL_CTReplica::HandleDummySecondReplicationResponse(const TransportAddress &remote,
-                                      const proto::DummyReplicationSecondResponse &msg)
-        {
-            Debug("Received dummy second replication response with req_id %lu from replica %d", msg.req_id(), msg.id());
-            if (msg.id() > 1) {
-                return;
-            }
-            opnum_t opnum = msg.req_id();
-            const string &op = "";
-            // string res;
-            // ReplicaUpcall(opnum, msg.idx(), op); //ADD BACK IN!
-
-            // Send Dummy Commit
-            DummyCommit cm;
-            cm.set_dummyval(420);
-
-            if (!transport->SendMessageToAll(this, MsgType::DUMMY_COMMIT_TYPE, cm))
-            {
-                RWarning("Failed to send DummyCommit message to all replicas");
-            }
-            nullCommitTimeout->Reset();
-        }
-
-        void IOCL_CTReplica::HandleDummyCommit(const TransportAddress &remote,
-                                     const DummyCommit &msg)
-        {
-            return;
-        }
-
-        void IOCL_CTReplica::HandleRequest(const LinearizeableOperation &msg)
-        {
-            Debug("Received dummy request with req_id %lu", msg.rid().client_req_id());
-            DummyReplication m;
-            m.set_req_id(msg.rid().client_req_id());
-            m.set_idx(msg.idx());
-            if (!transport->SendMessageToAll(this, MsgType::DUMMY_REP_TYPE, m))
-            {
-                RWarning("Failed to send DummyReplication message to all replicas");
-            }
-            nullCommitTimeout->Reset();
-            /*
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -791,25 +626,6 @@ namespace replication
                 return;
             }
 
-            // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
-
-            // Leader Upcall
-            bool replicate = false;
-            string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-
-            // Check whether this request should be committed to replicas
-            ASSERT(replicate);
-            Request request;
-            request.set_op(res);
-            request.set_clientid(msg.req().clientid());
-            request.set_clientreqid(msg.req().clientreqid());
-
             // Assign it an opnum within this view --> this is
             // strictly to compy with quorum checking which
             // currently is unique per viewstamp_t
@@ -818,6 +634,17 @@ namespace replication
             v.opnum = this->lastUnorderedOp;
 
             // Add the request to the unordered bag
+            Request request;
+            request.set_the_op(msg.op());
+            request.set_key(msg.key());
+            request.set_val(msg.value());
+            // request.mutable_the_op()->swap(*msg.mutable_op());
+            // request.mutable_key()->swap(*msg.mutable_key());
+            // request.mutable_val()->swap(*msg.mutable_value());
+            request.set_clientid(msg.rid().client_id());
+            request.set_clientreqid(msg.rid().client_req_id());
+            request.set_slot_idx(msg.idx());
+
             uint64_t shardtag = msg.shardtag();
 
             auto result = unorderedBag.emplace(
@@ -830,9 +657,8 @@ namespace replication
             bool inserted = result.second;
             if (!inserted) {
                 IoclEntry *existingEntry = it->second.get();
-                Warning("here's everything i know abotu the existing entry: state = %d, myShardTag = %lu, intkey = %lu, ACKs = %d arrivalTs = %lu finalTs = %lu, num_preds = %d, clientreqid = %lu",
+                Panic("here's everything i know abotu the existing entry: state = %d, myShardTag = %lu, intkey = %lu, ACKs = %d arrivalTs = %lu finalTs = %lu, num_preds = %d, clientreqid = %lu",
                         existingEntry->state, existingEntry->myShardTag, existingEntry->intkey, existingEntry->ACKs, existingEntry->arrivalTs, existingEntry->finalTs, existingEntry->predList.predlist_size(), existingEntry->request.clientreqid());
-                Panic("ok");
             }
             IoclEntry *entryPtr = it->second.get();
             // Grab the msg.predlist() efficiently and store
@@ -884,7 +710,6 @@ namespace replication
                 }
             }
             nullCommitTimeout->Reset();
-            */
         }
 
         uint64_t IOCL_CTReplica::FoldL(const proto::PredListHolder &pl)
@@ -939,35 +764,7 @@ namespace replication
                 /* Remove from sublog */
                 vec.erase(vec.begin());
                 /* Execute it */
-                ReplyMessage reply;
-                Execute(entry->viewstamp.opnum, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
-
-                // Store reply in the client table
-                // ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                // if (cte.lastReqId <= entry->request.clientreqid())
-                // {
-                //     cte.lastReqId = entry->request.clientreqid();
-                //     cte.replied = true;
-                //     cte.reply = reply;
-                // }
-                // else
-                // {
-                //     // We've subsequently prepared another operation from the
-                //     // same client. So this request must have been completed
-                //     // at the client, and there's no need to record the
-                //     // result.
-                // }
-
-                /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
-                }
+                ReplicaUpcall(entry->request.slot_idx(), entry->request.clientid(), entry->request.clientreqid(), entry->request.the_op(), entry->request.key(), entry->request.val());
             }
         }
 
@@ -1008,7 +805,7 @@ namespace replication
                         continue;
                     }
                     predFinal.set_s(kv.first.first);
-                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, predFinal)))
+                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinal)))
                     {
                         RWarning("Failed to send SuccessorRequest message to client");
                     }
@@ -1078,6 +875,10 @@ namespace replication
             viewstamp_t vs = {msg.view(), msg.opnum()};
             if (unorderedPrepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
             {
+                if (unorderedPrepareOKQuorum.Count(vs) > (configuration.QuorumSize() - 1))
+                {
+                    return;
+                }
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
                 {
                     auto pair = unorderedBagByOpnum.find(i);
@@ -1110,7 +911,7 @@ namespace replication
                         for (const auto& succ : it->second) {
                             preply.set_s(succ.s());
                             preply.set_predidx(succ.predidx());
-                            if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, preply)))
+                            if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, MsgType::COORD_RESP_TYPE, preply)))
                             {
                                 RWarning("Failed to send SuccessorReply message to client");
                             }
@@ -1207,7 +1008,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                        this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -1271,7 +1072,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+                    this, configuration.GetLeaderIndex(view), MsgType::PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -1297,7 +1098,7 @@ namespace replication
 
             if (msg.view() > this->view)
             {
-                RequestStateTransfer();
+                // RequestStateTransfer();
                 Panic("not implemented");
                 // pendingPrepares.push_back(
                 //     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
@@ -1325,7 +1126,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                        this, configuration.GetLeaderIndex(view), MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -1374,7 +1175,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+                    this, configuration.GetLeaderIndex(view), MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -1413,6 +1214,10 @@ namespace replication
             viewstamp_t vs = {msg.view(), msg.opnum()};
             if (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx()))
             {
+                if (prepareOKQuorum.Count(vs) > (configuration.QuorumSize() - 1))
+                {
+                    return;
+                }
                 /*
                  * We have a quorum of PrepareOK messages for this
                  * opnumber. Execute it and all previous operations.
@@ -1434,7 +1239,7 @@ namespace replication
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
 
-                if (!(transport->SendMessageToAll(this, cm)))
+                if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
                 {
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
@@ -1503,7 +1308,7 @@ namespace replication
             preply.set_arrivalts(entry->arrivalTs);
             preply.set_s(msg.s());
             preply.set_predidx(msg.predidx());
-            if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, preply)))
+            if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_RESP_TYPE, preply)))
             {
                 RWarning("Failed to send SuccessorReply message to client");
             }
@@ -1524,7 +1329,7 @@ namespace replication
                 predFinal.set_s(msg.s());
                 predFinal.set_shardidx(groupIdx);
                 entry->successors[{msg.s(), msg.shardidx()}] = 1; // Mark that we've sent final ACK to this successor
-                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, predFinal)))
+                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_FINAL_TYPE, predFinal)))
                 {
                     RWarning("Failed to send SuccessorRequest message to client");
                 }
