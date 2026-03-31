@@ -490,7 +490,7 @@ def run_experiment(config_file, client_config_idx, executor):
                     config, local_exp_directory, remote_exp_directory, i)
                 all_alive = True
                 for st in range(len(server_threads)):
-                    if server_threads[i].poll() != None:
+                    if server_threads[st].poll() != None:
                         print("Server thread %d not alive." % st)
                         all_alive = False
                         break
