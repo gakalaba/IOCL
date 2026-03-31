@@ -1,0 +1,7 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-03-30-15-22-15/2026-03-30-15-22-15/plots/tput-p95-lat.png'
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-03-30-15-22-15/2026-03-30-15-22-15/plots/tput-p95-lat.csv' title 'IOCL\_CT' with linespoint

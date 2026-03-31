@@ -1,0 +1,23 @@
+20260230-162615-6496 00733 * main            (server.cc:213):    Starting server.
+20260230-162615-6500 00733 * main            (server.cc:331):    Creating a default paritioner!
+20260230-162626-8040 00733 * main            (server.cc:490):    Done loading server.
+20260230-162718-7213 00733 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 3] EOF, lifetime=41035.42 ms
+20260230-162718-7240 00733 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 5] EOF, lifetime=41035.83 ms
+20260230-162718-7246 00733 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 6] EOF, lifetime=41036.11 ms
+20260230-162718-7265 00733 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 7] EOF, lifetime=41037.37 ms
+20260230-162718-7280 00733 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 8] EOF, lifetime=41038.02 ms
+20260230-162724-9927 00733 * Cleanup         (server.cc:551):    Gracefully exiting after signal 15.
+20260230-162724-9928 00733 * Stop            (tcptransport.cc:666): [TCP SUMMARY] outgoingCreated=2 outgoingClosed=0 incomingCreated=6 incomingClosed=5 outgoingPeak=2 incomingPeak=5
+Inserted events:
+  0x564fd5efd5a0 [fd  9] Read Persist Internal
+  0x564fd5ef6420 [fd  10] Read Persist
+  0x564fd5ef8a20 [fd  11] Read Persist
+  0x56502ca00880 [fd  12] Read Persist
+  0x56502ca01200 [fd  13] Read Persist
+  0x56502ca025e0 [fd  15] Read Persist
+  0x56502ca01c90 [fd  -1] Timeout=1774906045.691640
+  0x564fd5efacc0 [fd  -1] Timeout=1774906063.690079
+Active events:
+20260230-162724-9930 00733 * Cleanup         (server.cc:555):    Exporting stats to /mnt/extra/experiments/2026-03-30-16-26-13/out/server-0-0-0-stats-0.json.
+==== IOCL Per-Key Queue Length Dump ====
+==== End of Dump ====

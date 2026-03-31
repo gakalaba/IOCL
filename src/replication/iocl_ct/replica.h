@@ -237,8 +237,6 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
-            void HandlePrepareOKDuplicate(const proto::PrepareOKMessage &msg);
-            void HandleUnorderedPrepareOKDuplicate(const proto::UnorderedPrepareOKMessage &msg);
         };
 
     } // namespace iocl_ct
