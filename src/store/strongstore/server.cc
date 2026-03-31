@@ -2052,7 +2052,7 @@ namespace strongstore
         reply.mutable_rid()->set_client_req_id(req.rid().client_req_id());
         reply.SerializeToString(&response);
 
-        if (linproto_ == PROTO_CRAQ)
+        if (linproto_ == PROTO_CRAQ || linproto_ == PROTO_IOCL_CRAQ)
         {
             bool is_tail = (replica_idx_ == replica_config_.n - 1);
             if (req.op() == "get" || is_tail && req.op() == "put") {
@@ -2155,7 +2155,7 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        if (consistency_ == LIN && linproto_ != PROTO_CRAQ)
+        if (consistency_ == LIN && (linproto_ != PROTO_CRAQ || linproto_ != PROTO_IOCL_CRAQ))
         {
             linearizeable_kv_store_.put(key, value);
         }

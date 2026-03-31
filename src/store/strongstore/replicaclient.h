@@ -35,6 +35,7 @@
 #include "lib/message.h"
 #include "lib/transport.h"
 #include "replication/craq/client.h"
+#include "replication/iocl_craq/client.h"
 #include "replication/vr/client.h"
 #include "replication/iocl_ct/client.h"
 #include "store/common/frontend/client.h"

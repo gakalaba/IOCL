@@ -44,7 +44,8 @@ namespace strongstore
         PROTO_STRONG,
         PROTO_VR,
         PROTO_IOCL_CT,
-        PROTO_CRAQ
+        PROTO_CRAQ,
+        PROTO_IOCL_CRAQ
     };
 
 } // namespace strongstore

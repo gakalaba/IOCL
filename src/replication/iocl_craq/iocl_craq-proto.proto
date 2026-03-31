@@ -1,0 +1,69 @@
+syntax = "proto2";
+
+import "request.proto";
+
+package replication.iocl_craq.proto;
+
+message RequestMessage {
+    required replication.Request req = 1;
+}
+
+message ReplyMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint64 clientreqid = 3;
+    required bytes reply = 4;
+}
+
+message UnloggedRequestMessage {
+    required replication.UnloggedRequest req = 1;
+}
+
+message UnloggedReplyMessage {
+    required bytes reply = 1;
+    required uint64 clientreqid = 2;
+}
+
+message PrepareMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    required uint64 batchstart = 3;
+    repeated Request request = 4;
+}
+
+message CommitMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;    
+    required string key = 3;
+}
+
+message RequestStateTransferMessage {
+    required uint64 view = 1;
+    required uint64 opnum = 2;    
+}
+
+message StateTransferMessage {
+    message LogEntry {
+        required uint64 view = 1;
+        required uint64 opnum = 2;
+        required replication.Request request = 3;
+        optional uint32 state = 4;
+        optional bytes hash = 5;
+    }
+    required uint64 view = 1;
+    required uint64 opnum = 2;
+    repeated LogEntry entries = 3;
+}
+
+message VersionRequestMessage {
+    required string key = 1;
+    required uint64 clientid = 2;
+    required uint64 clientreqid = 3;
+    required uint32 replicaIdx = 4;
+}
+
+message VersionResponseMessage {
+    required uint64 clientid = 1;
+    required uint64 clientreqid = 2;
+    required uint64 opnum = 3;
+}

@@ -60,6 +60,10 @@ namespace strongstore
                 client = new replication::craq::CRAQClient(config_, transport_, shard_idx_,
                                                     client_id_);
                 break;
+            case LinearizableProtocol::PROTO_IOCL_CRAQ:
+                client = new replication::iocl_craq::IOCL_CRAQClient(config_, transport_, shard_idx_,
+                                                    client_id_);
+                break;
             default:
                 Panic("Invalid linearizable protocol");
         }
@@ -110,6 +114,21 @@ namespace strongstore
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
                 if (replication::craq::CRAQClient * craqclient = dynamic_cast<replication::craq::CRAQClient *>(client))
+                {
+                    craqclient->Invoke(
+                        request_str,
+                        bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
+                            std::placeholders::_1, std::placeholders::_2), replicaIndex);
+                }
+                break;
+
+            case LinearizableProtocol::PROTO_IOCL_CRAQ:
+                // create request
+                Debug("Running IOCL CRAQ: serializing LinearizeableOperation into string");
+                msg.SerializeToString(&request_str);
+                Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
+
+                if (replication::iocl_craq::IOCL_CRAQClient * craqclient = dynamic_cast<replication::iocl_craq::IOCL_CRAQClient *>(client))
                 {
                     craqclient->Invoke(
                         request_str,

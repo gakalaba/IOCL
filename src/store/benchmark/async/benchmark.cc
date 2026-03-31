@@ -116,12 +116,13 @@ DEFINE_string(trans_protocol, trans_args[0],
               " passing messages");
 DEFINE_validator(trans_protocol, &ValidateTransMode);
 
-const std::string protocol_args[] = {"span-lock", "vr", "iocl_ct", "craq"};
+const std::string protocol_args[] = {"span-lock", "vr", "iocl_ct", "craq", "iocl_craq"};
 const strongstore::LinearizableProtocol protomodes[]{
     strongstore::LinearizableProtocol::PROTO_STRONG, 
     strongstore::LinearizableProtocol::PROTO_VR, 
     strongstore::LinearizableProtocol::PROTO_IOCL_CT,
-    strongstore::LinearizableProtocol::PROTO_CRAQ};
+    strongstore::LinearizableProtocol::PROTO_CRAQ,
+    strongstore::LinearizableProtocol::PROTO_IOCL_CRAQ};
 const strongstore::Mode strongmodes[]{strongstore::Mode::MODE_SPAN_LOCK};
 static bool ValidateProtocolMode(const char *flagname,
                                  const std::string &value)
@@ -704,7 +705,9 @@ int main(int argc, char **argv)
         if (mode == strongstore::LinearizableProtocol::PROTO_STRONG || 
             mode == strongstore::LinearizableProtocol::PROTO_VR || 
             mode == strongstore::LinearizableProtocol::PROTO_IOCL_CT ||
-            mode == strongstore::LinearizableProtocol::PROTO_CRAQ)
+            mode == strongstore::LinearizableProtocol::PROTO_CRAQ || 
+            mode == strongstore::LinearizableProtocol::PROTO_IOCL_CRAQ
+            )
         {
             net_config_stream.seekg(0);
             net_configs.emplace_back(replica_configs[i], net_config_stream);
@@ -733,6 +736,7 @@ int main(int argc, char **argv)
         case strongstore::LinearizableProtocol::PROTO_IOCL_CT:
         case strongstore::LinearizableProtocol::PROTO_STRONG:
         case strongstore::LinearizableProtocol::PROTO_CRAQ:
+        case strongstore::LinearizableProtocol::PROTO_IOCL_CRAQ:
         {
             auto &shard_config = replica_configs[i];
             auto &net_config = net_configs[i];

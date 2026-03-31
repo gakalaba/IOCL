@@ -42,6 +42,8 @@
 #include "lib/tcptransport.h"
 #include "replication/craq/client.h"
 #include "replication/craq/replica.h"
+#include "replication/iocl_craq/client.h"
+#include "replication/iocl_craq/replica.h"
 #include "replication/vr/client.h"
 #include "replication/vr/replica.h"
 #include "replication/iocl_ct/client.h"
