@@ -1,0 +1,37 @@
+20260301-100538-1092 20572 * main            (server.cc:213):    Starting server.
+20260301-100538-1095 20572 * main            (server.cc:331):    Creating a default paritioner!
+20260301-100549-1666 20572 * main            (server.cc:490):    Done loading server.
+20260301-100550-1675 20572 ! TCPOutgoingEventCallback (tcptransport.cc:1095): [TCP OUTGOING 2] ERROR to 10.10.1.4:7087 (receiver=0x5596cf123f70): errno=111 (Connection refused), events={ERROR }, lifetime=0.19 ms
+20260301-100550-1676 20572 ! TCPOutgoingEventCallback (tcptransport.cc:1097): Outgoing TCP event (EOF/ERROR). outq=25 bytes
+20260301-100641-2370 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 4] EOF, lifetime=41018.28 ms
+20260301-100641-2376 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 6] EOF, lifetime=41017.94 ms
+20260301-100641-2382 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 11] EOF, lifetime=41017.99 ms
+20260301-100641-2383 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 10] EOF, lifetime=41018.29 ms
+20260301-100641-2384 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 12] EOF, lifetime=41018.03 ms
+20260301-100641-2390 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 14] EOF, lifetime=41018.05 ms
+20260301-100641-2391 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 8] EOF, lifetime=41019.37 ms
+20260301-100641-2398 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 5] EOF, lifetime=41020.64 ms
+20260301-100641-2402 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 15] EOF, lifetime=41019.04 ms
+20260301-100641-2410 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 13] EOF, lifetime=41020.41 ms
+20260301-100641-2415 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 19] EOF, lifetime=41017.45 ms
+20260301-100641-2416 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 16] EOF, lifetime=41018.79 ms
+20260301-100641-2422 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 17] EOF, lifetime=41019.30 ms
+20260301-100641-2426 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 20] EOF, lifetime=41017.98 ms
+20260301-100641-2427 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 21] EOF, lifetime=41017.27 ms
+20260301-100641-2427 20572 ! TCPIncomingEventCallback (tcptransport.cc:1015): [TCP INCOMING 18] EOF, lifetime=41019.53 ms
+20260301-100647-5342 20572 * Cleanup         (server.cc:551):    Gracefully exiting after signal 15.
+20260301-100647-5343 20572 * Stop            (tcptransport.cc:666): [TCP SUMMARY] outgoingCreated=3 outgoingClosed=1 incomingCreated=18 incomingClosed=16 outgoingPeak=2 incomingPeak=16
+Inserted events:
+  0x5596793af5a0 [fd  9] Read Persist Internal
+  0x5596793a8420 [fd  10] Read Persist
+  0x5596793aaa20 [fd  11] Read Persist
+  0x5596cf1ea650 [fd  12] Read Persist
+  0x5596cf1eb920 [fd  13] Read Persist
+  0x5596cf1ed0c0 [fd  17] Read Persist
+  0x5596cf1ed940 [fd  19] Read Persist
+  0x5596cf1ebee0 [fd  -1] Timeout=1775056008.227538
+  0x5596d10ed130 [fd  -1] Timeout=1775056026.225855
+Active events:
+20260301-100647-5343 20572 * Cleanup         (server.cc:555):    Exporting stats to /mnt/extra/experiments/2026-04-01-10-05-35/out/server-0-0-0-stats-0.json.
+==== IOCL Per-Key Queue Length Dump ====
+==== End of Dump ====

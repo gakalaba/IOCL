@@ -105,14 +105,18 @@ namespace replication
             virtual ~IoclEntry() {}
         };
         // Comparison operator for ordering IoclEntries
-        struct EntryReadyCompare {
-            bool operator()(const IoclEntry* a, const IoclEntry* b) const {
+        struct EntryReadyCompareIdx {
+            const std::vector<IoclEntry> *store;
+            bool operator()(uint32_t a, uint32_t b) const {
+                const IoclEntry &ea = (*store)[a];
+                const IoclEntry &eb = (*store)[b];
+
                 // First by final timestamp
-                if (a->finalTs < b->finalTs) return true;
-                if (a->finalTs > b->finalTs) return false;
+                if (ea.finalTs < eb.finalTs) return true;
+                if (ea.finalTs > eb.finalTs) return false;
 
                 // Then by Tag (unique)
-                return a->myShardTag < b->myShardTag;
+                return ea.myShardTag < eb.myShardTag;
             }
         };
 
@@ -131,6 +135,8 @@ namespace replication
                                 const string &data, void *meta_data);
             virtual void HandleRequest(LinearizeableOperation &msg);
             virtual void HandleCoordination(const SuccessorRequestMessage &msg);
+            inline IoclEntry &Entry(uint32_t idx) { return entryStore[idx]; }
+            inline const IoclEntry &Entry(uint32_t idx) const { return entryStore[idx]; }
 
         private:
             view_t view;
@@ -148,7 +154,6 @@ namespace replication
             opnum_t lastUnorderedBatchEnd;
             uint8_t Q;
 
-            std::vector<IoclEntry *> log;
             struct PerKeySubLog {
                 std::vector<opnum_t> ops;
                 size_t head = 0;
@@ -158,9 +163,17 @@ namespace replication
             /*******************************/
             /* IOCL_CT specific structures */
             /*******************************/
-            ska::flat_hash_map<uint64_t, std::unique_ptr<IoclEntry>> unorderedBag;
-            std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
-            ska::flat_hash_map<uint64_t, std::set<IoclEntry*, EntryReadyCompare>> perKeySubqueues;
+            std::vector<IoclEntry> entryStore;
+            ska::flat_hash_map<uint64_t, uint32_t> shardtagToEntryIdx;
+            std::vector<uint32_t> log;                           // ordered opnum offset -> entry index
+            /* Getting rid of unorderedBagByOpnum because 
+               all of the following will always hold true:
+               1. every unordered request gets exactly one IoclEntry
+               2. entries are appended to entryStore in the same order unordered opnums are assigned
+               3. nothing else gets inserted into entryStore anywhere other than at HandleRequest
+               4. you never remove/recycle entries in a way that changes indices 
+            */
+            ska::flat_hash_map<uint64_t, std::set<uint32_t, EntryReadyCompareIdx>> perKeySubqueues;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
@@ -206,12 +219,13 @@ namespace replication
             void ResendUnorderedPrepare();
             void CloseBatch();
             void CloseUnorderedBatch();
-            void ReadyRoutine(IoclEntry *entry);
+            void ReadyRoutine(IoclEntry *entry, uint32_t idx);
             void ReadyFinalRoutine(uint64_t intkey);
-            void AppendToLog(IoclEntry *entry);
+            void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
             uint64_t FoldL(const proto::PredListHolder &pl);
+            void InsertInSubqueue(uint64_t intkey, uint32_t idx);
 
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
