@@ -763,18 +763,9 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::ReadyRoutine(IoclEntry *entry, uint32_t idx)
+        void IOCL_CTReplica::ReadyRoutine(uint64_t intkey)
         {
-            auto &sq = perKeySubqueues[entry->intkey];
-            /* Remove from subqueue */
-            sq.erase(idx);    // Erase by pointer identity            
-            /* Assign a final TS */
-            entry->finalTs = std::max(entry->arrivalTs, FoldL(entry->predList));
-            lastReadyTS[entry->intkey] = entry->finalTs + 1;
-            /* Reinsert as newly sorted */
-            InsertInSubqueue(entry->intkey, idx);
-            /* Assign it ready state */
-            entry->state = IOCL_STATE_READY;
+            auto &sq = perKeySubqueues[intkey];
 
             while (true) {
                 if (sq.empty()) {
@@ -902,11 +893,6 @@ namespace replication
                     entry.finalTs = entry.arrivalTs; // will be updated later
                     shardTS++;
 
-                    /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
-                    InsertInSubqueue(entry.intkey, i-1);
-                    // /* Code Instrumentation ! */
-                    // perKeyQueueLengths[entry->intkey].push_back(perKeySubqueues[entry->intkey].size());
-
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
                     auto it = outstandingCoordinationReqs.find(entry.myShardTag);
@@ -931,13 +917,77 @@ namespace replication
                         }
                         outstandingCoordinationReqs.erase(it);
                     }
-                    if (entry.state == IOCL_STATE_PERSISTED &&
-                            entry.ACKs == entry.predList.predlist_size()) {
-                        /* Now can progress to READY state */
-                        ReadyRoutine(&entry, i-1);
+
+                    bool readyNow = (entry.ACKs == entry.predList.predlist_size());
+                    auto sq_it = perKeySubqueues.find(entry.intkey);
+                    bool no_subqueue = (sq_it == perKeySubqueues.end());
+                    bool insertedAtHead = false;
+                    uint64_t candidateFinalTs = readyNow ? std::max(entry.arrivalTs, FoldL(entry.predList)) : 0;
+                    if (!no_subqueue && readyNow) {
+                        auto &sq = sq_it->second;
+                        ASSERT(!sq.empty());
+                        uint32_t head_idx = *sq.begin();
+                        IoclEntry &head = Entry(head_idx);
+                        insertedAtHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
+                        if (insertedAtHead) {
+                            ASSERT(head.ACKs < head.predList.predlist_size());
+                            ASSERT(head.state != IOCL_STATE_READY);
+                        }
+                    }
+                    /* FAST PATH: Check if we should never use the subqueue structure anyway */
+                    if (readyNow &&
+                        (no_subqueue || insertedAtHead)) {
+                        /* Assign a final TS */
+                        entry.finalTs = candidateFinalTs;
+                        lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                        /* Assign it ready state */
+                        entry.state = IOCL_STATE_READY;
+                        /* Send out the Final ACK to all successors */
+                        PredecessorFinalMessage predFinal;
+                        predFinal.set_p(entry.myShardTag);
+                        predFinal.set_shardidx(groupIdx);
+                        for (const auto& kv : entry.successors) {
+                            if (kv.second > 0) {
+                                continue;
+                            }
+                            predFinal.set_s(kv.first.first);
+                            if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinal)))
+                            {
+                                RWarning("Failed to send SuccessorRequest message to client");
+                            }
+                            // Mark that we've sent to this successor
+                            entry.successors[kv.first] = 1;
+                        }
+                        /* Assign it a real opnum for this view in the ordered log */
+                        ASSERT(entry.viewstamp.opnum - 1 == i-1);
+                        viewstamp_t v;
+                        ++this->lastOp;
+                        v.view = this->view;
+                        v.opnum = this->lastOp;
+                        entry.viewstamp = v;
+                        /* Set it as Prepared (since it isn't quite committed yet ) */
+                        entry.state = IOCL_STATE_PREPARED;
+
+                        /* Add the request to my log */
+                        AppendToLog(entry.viewstamp.opnum, i-1);
+
+                        if (lastOp - lastBatchEnd + 1 > batchSize)
+                        {
+                            CloseBatch();
+                        }
+                        else
+                        {
+                            Panic("should always be batching with IOCL protocol");
+                            if (!closeBatchTimeout->Active())
+                            {
+                                closeBatchTimeout->Start();
+                            }
+                        }
+                    } else { /* Otherwise, we need to wait for more ACKs before we can mark it ready */
+                        /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                        InsertInSubqueue(entry.intkey, i-1);
                     }
                 }
-
                 nullCommitTimeout->Reset();
             }
         }
@@ -1369,7 +1419,7 @@ namespace replication
             if (entry.state == IOCL_STATE_PERSISTED &&
                      entry.ACKs == entry.predList.predlist_size()) {
                 /* Now can progress to READY state */
-                ReadyRoutine(&entry, idx);
+                ReadyRoutine(entry.intkey);
             }
 
             return;

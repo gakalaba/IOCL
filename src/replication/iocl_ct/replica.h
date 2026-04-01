@@ -219,7 +219,7 @@ namespace replication
             void ResendUnorderedPrepare();
             void CloseBatch();
             void CloseUnorderedBatch();
-            void ReadyRoutine(IoclEntry *entry, uint32_t idx);
+            void ReadyRoutine(uint64_t intkey);
             void ReadyFinalRoutine(uint64_t intkey);
             void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);
