@@ -209,8 +209,6 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request &request = entry->request;
-
                 /* Mark it as committed */
                 entry->state = IOCL_STATE_COMMITTED;
 
@@ -225,20 +223,25 @@ namespace replication
                     (AmLeader() && (entry->finalAcks.size() != entry->predList.predlist_size()))) {
                     // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
                     //         lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
-                    if (entry->finalAcks.size() > entry->predList.predlist_size()) {
-                        Panic("Should not be getting more final ACKs than predecessors?");
-                    }
+                    ASSERT(entry->finalAcks.size() <= entry->predList.predlist_size());
                     // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
-                    auto &vec = perKeySubLogs[entry->intkey];
-                    vec.push_back(lastCommitted);
+                    auto &sublog = perKeySubLogs[entry->intkey];
+                    sublog.ops.push_back(lastCommitted);
                     return;
                 }
                 if (AmLeader()) {
+                    /* Execute it */
                     ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
                     ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
-
-                    /* Execute it */
-                    ReadyFinalRoutine(entry);
+                    if (entry->finalAcks.size() == entry->predList.predlist_size()) {
+                        /* We can immediately execute this entry */
+                        ReplicaUpcall(entry->request.slot_idx(),
+                                        entry->request.clientid(),
+                                        entry->request.clientreqid(),
+                                        entry->request.the_op(),
+                                        entry->request.key(),
+                                        entry->request.val());
+                    }
                     return;
                 }
 
@@ -733,37 +736,34 @@ namespace replication
             return v;
         }
 
-        void IOCL_CTReplica::ReadyFinalRoutine(IoclEntry *entry)
+        // INVARIANT: the sublog is never empty!
+        void IOCL_CTReplica::ReadyFinalRoutine(uint64_t intkey)
         {
-            if (perKeySubLogs.find(entry->intkey) == perKeySubLogs.end()) {
-                /* We can immediately execute this entry */
-                auto &vec = perKeySubLogs[entry->intkey];
-                vec.push_back(entry->viewstamp.opnum);
-            }
-
             /* Execute as many head entries from the sublog as are ready */
-            auto &vec = perKeySubLogs[entry->intkey];
-            while (true) {
-                if (vec.empty()) {
-                    /* Delete it and return */
-                    perKeySubLogs.erase(entry->intkey);
-                    ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
-                    break;
-                }
-                opnum_t headOpnum = vec.front();
-                const IoclEntry *entry = FindInLog(headOpnum);
-                ASSERT(entry->state == IOCL_STATE_COMMITTED);
-                if (entry->finalAcks.size() != entry->predList.predlist_size()) {
+            auto &sublog = perKeySubLogs[intkey];
+            while (sublog.head < sublog.ops.size()) {
+                opnum_t headOpnum = sublog.ops[sublog.head];
+                const IoclEntry *head_entry = FindInLog(headOpnum);
+                ASSERT(head_entry->state == IOCL_STATE_COMMITTED);
+
+                if (head_entry->finalAcks.size() != head_entry->predList.predlist_size()) {
                     /* Still waiting on final ACKs, done with loop */
-                    if (entry->finalAcks.size() > entry->predList.predlist_size()) {
-                        Panic("Should not be getting more final ACKs than predecessors?");
-                    }
+                    ASSERT(head_entry->finalAcks.size() <= head_entry->predList.predlist_size());
                     break;
                 }
                 /* Remove from sublog */
-                vec.erase(vec.begin());
+                sublog.head++;
                 /* Execute it */
-                ReplicaUpcall(entry->request.slot_idx(), entry->request.clientid(), entry->request.clientreqid(), entry->request.the_op(), entry->request.key(), entry->request.val());
+                ReplicaUpcall(head_entry->request.slot_idx(),
+                      head_entry->request.clientid(),
+                      head_entry->request.clientreqid(),
+                      head_entry->request.the_op(),
+                      head_entry->request.key(),
+                      head_entry->request.val());
+            }
+            if (sublog.head == sublog.ops.size()) {
+                /* If we've executed everything in the sublog, remove it to save space */
+                perKeySubLogs.erase(intkey);
             }
         }
 
@@ -1292,7 +1292,8 @@ namespace replication
             /* Check if it is waiting to be executed */
             if ((entry->state == IOCL_STATE_COMMITTED) && (entry->finalAcks.size() == entry->predList.predlist_size())) {
                 ASSERT(perKeySubLogs.find(entry->intkey) != perKeySubLogs.end());
-                ReadyFinalRoutine(entry);
+                // TODO ASSERT WE ARE IN THE LOG
+                ReadyFinalRoutine(entry->intkey);
             }
         }
 

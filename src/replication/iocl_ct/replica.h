@@ -149,7 +149,11 @@ namespace replication
             uint8_t Q;
 
             std::vector<IoclEntry *> log;
-            ska::flat_hash_map<uint64_t, std::vector<opnum_t>> perKeySubLogs;
+            struct PerKeySubLog {
+                std::vector<opnum_t> ops;
+                size_t head = 0;
+            };
+            ska::flat_hash_map<uint64_t, PerKeySubLog> perKeySubLogs;
 
             /*******************************/
             /* IOCL_CT specific structures */
@@ -203,7 +207,7 @@ namespace replication
             void CloseBatch();
             void CloseUnorderedBatch();
             void ReadyRoutine(IoclEntry *entry);
-            void ReadyFinalRoutine(IoclEntry *entry);
+            void ReadyFinalRoutine(uint64_t intkey);
             void AppendToLog(IoclEntry *entry);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
