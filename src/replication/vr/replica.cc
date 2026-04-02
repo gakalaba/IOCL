@@ -375,22 +375,22 @@ namespace replication
             switch (type) {
             case MsgType::PREPARE_TYPE:
             {
-                PrepareMessage prepare;
-                prepare.ParseFromString(data);
-                HandlePrepare(remote, prepare);
+                prepareRecv.Clear();
+                prepareRecv.ParseFromString(data);
+                HandlePrepare(remote, prepareRecv);
                 break;
             }
             case MsgType::PREPARE_OK_TYPE:
             {
-                PrepareOKMessage prepareOK;
-                prepareOK.ParseFromString(data);
-                HandlePrepareOK(remote, prepareOK);
+                prepareOKRecv.Clear();
+                prepareOKRecv.ParseFromString(data);
+                HandlePrepareOK(remote, prepareOKRecv);
                 break;
             }
             case MsgType::COMMIT_TYPE: {
-                CommitMessage commit;
-                commit.ParseFromString(data);
-                HandleCommit(remote, commit);
+                commitRecv.Clear();
+                commitRecv.ParseFromString(data);
+                HandleCommit(remote, commitRecv);
                 break;
             }/*
             else if (type == requestStateTransfer.GetTypeName())

@@ -153,6 +153,15 @@ namespace replication
             opnum_t lastBatchEnd;
             opnum_t lastUnorderedBatchEnd;
             uint8_t Q;
+            UnorderedPrepareMessage unorderedPrepareRecv;
+            UnorderedPrepareOKMessage unorderedPrepareOKRecv;
+            PrepareMessage prepareRecv;
+            PrepareOKMessage prepareOKRecv;
+            CommitMessage commitRecv;
+            PredecessorReplyMessage coordRespRecv;
+            PredecessorFinalMessage coordFinalRecv;
+            PredecessorFinalMessage predFinalSend;
+            PredecessorReplyMessage preplySend;
 
             struct PerKeySubLog {
                 std::vector<opnum_t> ops;

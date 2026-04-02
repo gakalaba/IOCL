@@ -76,6 +76,9 @@ namespace replication
             unsigned int batchSize;
             opnum_t lastBatchEnd;
             uint8_t Q;
+            PrepareMessage prepareRecv;
+            PrepareOKMessage prepareOKRecv;
+            CommitMessage commitRecv;
 
             Log log;
             // std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;

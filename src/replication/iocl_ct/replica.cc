@@ -125,6 +125,7 @@ namespace replication
             log.reserve(200000);
             // shardtagToEntryIdx.reserve(200000);
             shardTS = 0;
+            predFinalSend.set_shardidx(groupIdx);
 
         }
 
@@ -543,47 +544,47 @@ namespace replication
         {
             switch (type) {
             case MsgType::UNORDERED_PREPARE_TYPE: {
-                UnorderedPrepareMessage unorderedPrepare;
-                unorderedPrepare.ParseFromString(data);
-                HandleUnorderedPrepare(remote, unorderedPrepare);
+                unorderedPrepareRecv.Clear();
+                unorderedPrepareRecv.ParseFromString(data);
+                HandleUnorderedPrepare(remote, unorderedPrepareRecv);
                 break;
             }
             case MsgType::UNORDERED_PREPARE_OK_TYPE: {
-                UnorderedPrepareOKMessage unorderedPrepareOK;
-                unorderedPrepareOK.ParseFromString(data);
-                HandleUnorderedPrepareOK(remote, unorderedPrepareOK);
+                unorderedPrepareOKRecv.Clear();
+                unorderedPrepareOKRecv.ParseFromString(data);
+                HandleUnorderedPrepareOK(remote, unorderedPrepareOKRecv);
                 break;
             }
             case MsgType::PREPARE_TYPE: {
-                PrepareMessage prepare;
-                prepare.ParseFromString(data);
-                HandlePrepare(remote, prepare);
+                prepareRecv.Clear();
+                prepareRecv.ParseFromString(data);
+                HandlePrepare(remote, prepareRecv);
                 break;
             }
             case MsgType::PREPARE_OK_TYPE: {
-                PrepareOKMessage prepareOK;
-                prepareOK.ParseFromString(data);
-                HandlePrepareOK(remote, prepareOK);
+                prepareOKRecv.Clear();
+                prepareOKRecv.ParseFromString(data);
+                HandlePrepareOK(remote, prepareOKRecv);
                 break;
             }
             case MsgType::COMMIT_TYPE: {
-                CommitMessage commit;
-                commit.ParseFromString(data);
-                HandleCommit(remote, commit);
+                commitRecv.Clear();
+                commitRecv.ParseFromString(data);
+                HandleCommit(remote, commitRecv);
                 break;
             }
             case MsgType::COORD_RESP_TYPE: {
                 // Predecessor reply arrived
-                PredecessorReplyMessage coordResp;
-                coordResp.ParseFromString(data);
-                HandleCoordinationReply(remote, coordResp);
+                coordRespRecv.Clear();
+                coordRespRecv.ParseFromString(data);
+                HandleCoordinationReply(remote, coordRespRecv);
                 break;
             }
             case MsgType::COORD_FINAL_TYPE: {
                 // Predecessor final ACK arrived
-                PredecessorFinalMessage coordFinal;
-                coordFinal.ParseFromString(data);
-                HandleCoordinationFinal(remote, coordFinal);
+                coordFinalRecv.Clear();
+                coordFinalRecv.ParseFromString(data);
+                HandleCoordinationFinal(remote, coordFinalRecv);
                 break;
             }
             /*
@@ -792,15 +793,13 @@ namespace replication
                 /* Progress to REQUEST ordered */
                 sq.erase(sq.begin());
                 /* Send out the Final ACK to all successors */
-                PredecessorFinalMessage predFinal;
-                predFinal.set_p(head.myShardTag);
-                predFinal.set_shardidx(groupIdx);
+                predFinalSend.set_p(head.myShardTag);
                 for (const auto& kv : head.successors) {
                     if (kv.second > 0) {
                         continue;
                     }
-                    predFinal.set_s(kv.first.first);
-                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinal)))
+                    predFinalSend.set_s(kv.first.first);
+                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                     {
                         RWarning("Failed to send SuccessorRequest message to client");
                     }
@@ -951,15 +950,13 @@ namespace replication
                         /* Assign it ready state */
                         entry.state = IOCL_STATE_READY;
                         /* Send out the Final ACK to all successors */
-                        PredecessorFinalMessage predFinal;
-                        predFinal.set_p(entry.myShardTag);
-                        predFinal.set_shardidx(groupIdx);
+                        predFinalSend.set_p(entry.myShardTag);
                         for (const auto& kv : entry.successors) {
                             if (kv.second > 0) {
                                 continue;
                             }
-                            predFinal.set_s(kv.first.first);
-                            if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinal)))
+                            predFinalSend.set_s(kv.first.first);
+                            if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                             {
                                 RWarning("Failed to send SuccessorRequest message to client");
                             }
@@ -1367,11 +1364,10 @@ namespace replication
             ASSERT(outstandingCoordinationReqs.find(entry.myShardTag) == outstandingCoordinationReqs.end());
 
             /* Send reply now */
-            PredecessorReplyMessage preply;
-            preply.set_arrivalts(entry.arrivalTs);
-            preply.set_s(msg.s());
-            preply.set_predidx(msg.predidx());
-            if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_RESP_TYPE, preply)))
+            preplySend.set_arrivalts(entry.arrivalTs);
+            preplySend.set_s(msg.s());
+            preplySend.set_predidx(msg.predidx());
+            if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_RESP_TYPE, preplySend)))
             {
                 RWarning("Failed to send SuccessorReply message to client");
             }
@@ -1387,12 +1383,10 @@ namespace replication
             /* Reply to the successor if we've already been added to the ordered log */
             if (entry.state == IOCL_STATE_READY || entry.state == IOCL_STATE_PREPARED || entry.state == IOCL_STATE_COMMITTED) {
                 /* Send out the Final ACK to all successors */
-                PredecessorFinalMessage predFinal;
-                predFinal.set_p(entry.myShardTag);
-                predFinal.set_s(msg.s());
-                predFinal.set_shardidx(groupIdx);
+                predFinalSend.set_p(entry.myShardTag);
+                predFinalSend.set_s(msg.s());
                 entry.successors[{msg.s(), msg.shardidx()}] = 1; // Mark that we've sent final ACK to this successor
-                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_FINAL_TYPE, predFinal)))
+                if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                 {
                     RWarning("Failed to send SuccessorRequest message to client");
                 }
