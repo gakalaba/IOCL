@@ -334,7 +334,8 @@ namespace replication
             RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
                    batchStart, lastOp);
             /* Send prepare messages */
-            PrepareMessage p;
+            PrepareMessage &p = lastPrepare;
+            p.Clear();
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
@@ -354,7 +355,6 @@ namespace replication
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
-            lastPrepare.Swap(&p);
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();

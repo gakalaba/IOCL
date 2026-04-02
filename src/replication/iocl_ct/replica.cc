@@ -449,12 +449,17 @@ namespace replication
             ASSERT(lastUnorderedBatchEnd < lastUnorderedOp);
             /* Send the unordered prepare messages */
             opnum_t unorderedBatchStart = lastUnorderedBatchEnd + 1;
+            int batchSize = lastUnorderedOp - unorderedBatchStart + 1;
 
-            UnorderedPrepareMessage up;
+            UnorderedPrepareMessage &up = lastUnorderedPrepare;
+            up.Clear();
             up.set_view(view);
             up.set_opnum(lastUnorderedOp);
             up.set_batchstart(unorderedBatchStart);
             auto *reqs = up.mutable_request();
+            reqs->Reserve(batchSize);
+            up.mutable_shardtags()->Reserve(batchSize);
+            up.mutable_predlists()->Reserve(batchSize);
 
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
@@ -470,7 +475,6 @@ namespace replication
             {
                 RWarning("Failed to send UNORDERED_PREPARE message to all replicas");
             }
-            lastUnorderedPrepare.Swap(&up);
             lastUnorderedBatchEnd = lastUnorderedOp;
 
             resendUnorderedPrepareTimeout->Reset();
@@ -484,39 +488,43 @@ namespace replication
             ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
+            int batchSize = lastOp - batchStart + 1;
 
             RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
                    batchStart, lastOp);
             /* Send prepare messages */
-            PrepareMessage p;
+            PrepareMessage &p = lastPrepare;
+            p.Clear();
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
             auto *reqs = p.mutable_request();
-            reqs->Reserve(lastOp - batchStart + 1);
+            reqs->Reserve(batchSize);
+            p.mutable_shardtags()->Reserve(batchSize);
+            p.mutable_timestamp_chains()->Reserve(batchSize);
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
-                const IoclEntry *entry = FindInLog(i);
-                ASSERT(entry != NULL);
-                ASSERT(entry->viewstamp.view == view);
-                ASSERT(entry->viewstamp.opnum == i);
-                *reqs->Add() = entry->request;
-                p.add_shardtags(entry->myShardTag);
+                uint32_t idx = log[i-1];
+                IoclEntry &entry = Entry(idx);
+                ASSERT(entry.viewstamp.view == view);
+                ASSERT(entry.viewstamp.opnum == i);
+                *reqs->Add() = entry.request;
+                p.add_shardtags(entry.myShardTag);
                 PredListHolder* ts_chain = p.add_timestamp_chains();
+                ts_chain->mutable_predlist()->Reserve(entry.predecessorArrivalTs.size() + 1);
                 // loop through predecessorArrivalTs and add to timestamp chain
-                for (auto ts : entry->predecessorArrivalTs) {
+                for (auto ts : entry.predecessorArrivalTs) {
                     ts_chain->add_predlist(ts);
                 }
                 // Add my finalTs at the end
-                ts_chain->add_predlist(entry->finalTs);
+                ts_chain->add_predlist(entry.finalTs);
             }
 
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
-            lastPrepare.Swap(&p);
             lastBatchEnd = lastOp;
 
             resendPrepareTimeout->Reset();

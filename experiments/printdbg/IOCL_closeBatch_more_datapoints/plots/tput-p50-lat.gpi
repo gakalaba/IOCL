@@ -1,0 +1,17 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/IOCL_closeBatch_more_datapoints/plots/tput-p50-lat.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/iocl_vr_spanner_final_dummy/2026-03-23-21-43-47/plots/tput-p50-lat.csv' title 'Dummy IOCL' ls 1 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/IOCL_no_msg_construction_in_closebatch_more_datapoints/2026-04-01-19-53-44/plots/tput-p50-lat.csv' title 'IOCL\_CT - dummy messages out and NO construction in closebatch more data points' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/IOCL_dummy_msgs_out_more_datapoints/2026-04-01-20-38-07/plots/tput-p50-lat.csv' title 'IOCL\_CT - dummy messages out more data points' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/IOCL_new_subqueue_readyroutine_more_datapooints/2026-04-01-21-16-17/plots/tput-p50-lat.csv' title 'IOCL\_CT' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/IOCL_closeBatch_more_datapoints/2026-04-02-12-04-22/plots/tput-p50-lat.csv' title 'IOCL\_CT' ls 5 with linespoint
