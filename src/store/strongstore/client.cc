@@ -404,9 +404,9 @@ namespace strongstore
         StrongSession session{};
         auto sid = session.id();
 
-        auto [it, inserted] = sessions_.emplace(sid, std::move(session));
+        auto res = sessions_.emplace(sid, std::move(session));
 
-        return it->second;
+        return res.first->second;
     }
 
     Session &Client::ContinueSession(rss::Session &rss_session)

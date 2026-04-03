@@ -131,7 +131,7 @@ namespace strongstore
         }
         */
         default:
-            Panic("Received unexpected message type: %u", type);
+            Panic("Received unexpected message type: %u", (uint32_t)type);
         }
     }
 
@@ -505,7 +505,7 @@ namespace strongstore
         pending_commit_slot_.in_use = true;
         // pendingCommit->ccb = ccb;
         // pendingCommit->ctcb = ctcb;
-        Debug("and added to pendingRWCoordCommits with req_id = %d and (key) transaction_id = %lu", req_id, transaction_id);
+        Debug("and added to pendingRWCoordCommits with req_id = %lu and (key) transaction_id = %lu", req_id, transaction_id);
 
         // TODO: Setup timeout
         dummy_commit_.Clear();

@@ -128,10 +128,10 @@ void BenchmarkClient::SendNext()
     auto transaction = GetNextTransaction();
     stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
-    auto [it, inserted] = session_states_.emplace(
+    auto res = session_states_.emplace(
         sid, SessionState{session, transaction, ecb});
 
-    auto &ss = it->second;
+    auto &ss = res.first->second;
     _Latency_StartRec(ss.lat());
 
     client_->Begin(session);
@@ -153,10 +153,10 @@ void BenchmarkClient::SendNextAppRequest()
     auto appreq = GetNextAppRequest();
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
-    auto [it, inserted] = session_states_.emplace(
+    auto res = session_states_.emplace(
         sid, SessionState{session, appreq, ecb, GetFanout()});
 
-    auto &ss = it->second;
+    auto &ss = res.first->second;
     _Latency_StartRec(ss.lat());
 
     client_->BeginAppRequest(session);
@@ -557,7 +557,7 @@ void BenchmarkClient::CommitTimeout()
 
 void BenchmarkClient::AbortCallback(const uint64_t session_id, transaction_status_t status)
 {
-    Debug("[%lu] Abort callback. with status %lu", session_id, status);
+    Debug("[%lu] Abort callback. with status %d", session_id, status);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 

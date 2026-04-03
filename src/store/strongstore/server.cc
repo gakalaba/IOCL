@@ -195,7 +195,7 @@ namespace strongstore
                                 MsgType type, const std::string &data,
                                 void *meta_data)
     {
-        Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %u", type);
+        Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %u", (uint32_t)type);
         switch (type) {
         case MsgType::DUMMY_GET_TYPE: {
             dummy_get_.ParseFromString(data);
@@ -257,13 +257,13 @@ namespace strongstore
         }
         */
         default:
-            Panic("Received unexpected message type: %u", type);
+            Panic("Received unexpected message type: %u", (uint32_t)type);
         }
     }
 
     void Server::HandleGet(const TransportAddress &remote, proto::DummyGet &msg)
     {
-        Debug("getting Get with req_id = %d", msg.req_id());
+        Debug("getting Get with req_id = %lu", msg.req_id());
         dummy_get_reply_.Clear();
         dummy_get_reply_.set_req_id(msg.req_id());
         transport_->SendMessage(this, remote, dummy_get_reply_);
@@ -354,7 +354,7 @@ namespace strongstore
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
     {
         // Debug("Calling HandleSendOperation! with msg.op = %s, msg.key = %s, msg.value = %s", msg.op().c_str(), msg.key().c_str(), msg.value().c_str());
-        Debug("Calling HandleSendOperation! with msg.req_id = %d", msg.rid().client_req_id());
+        Debug("Calling HandleSendOperation! with msg.req_id = %lu", msg.rid().client_req_id());
 
         // Grab an idx
         ASSERT(!free_slots_.empty());
@@ -891,7 +891,7 @@ namespace strongstore
         // TODO: Handle timeout
         auto participants = std::unordered_set<int>();
         Transaction transaction = {};
-        Debug("sending commit with req_id = %d to replica_client and it was put in slot idx = %u", req_id, idx);
+        Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", req_id, idx);
         replica_client_->CoordinatorCommit(msg);
     }
 
@@ -1006,7 +1006,7 @@ namespace strongstore
         DummyCommitReply dummy_reply;
         dummy_reply.set_req_id(transaction_id);
 
-        Debug("Sending commit reply to client with req_id = %d", transaction_id);
+        Debug("Sending commit reply to client with req_id = %lu", transaction_id);
         // transport_->SendMessage(this, *remote, rw_commit_c_reply_);
         transport_->SendMessage(this, *remote, dummy_reply);
         pending_reply.in_use = false;
@@ -1783,7 +1783,7 @@ namespace strongstore
     void Server::RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, 
                         uint64_t clientid, uint64_t client_req_id, int status, string retval)
     {
-        Debug("got this status %d and this retval %s for transaction_id = %d", status, retval.c_str(), client_req_id);
+        Debug("got this status %d and this retval %s for transaction_id = %lu", status, retval.c_str(), client_req_id);
 
         const TransportAddress *remote = reply->remote;
 
@@ -1910,7 +1910,7 @@ namespace strongstore
             ReplicaUpcallAppRequest(idx, clientid, client_req_id, op, k, v);
             return;
         }
-        Debug("Replica upcall with transaction_id = %lu and idx = %lu", client_req_id, idx);
+        Debug("Replica upcall with transaction_id = %lu and idx = %u", client_req_id, idx);
         if (replica_idx_ != 0) return;
         CoordinatorCommitTransaction(client_req_id, idx);
 
@@ -2075,7 +2075,7 @@ namespace strongstore
     // TODO figure out interface for stuff to work with transformed apps
     void Server::ReplicaUpcallAppRequest(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
     {
-        Debug("inside ReplicaUpcall with req_id = %d", client_req_id);
+        Debug("inside ReplicaUpcall with req_id = %lu", client_req_id);
 
         string retval;
         int status = REPLY_OK;

@@ -420,7 +420,7 @@ namespace replication
             }*/
             default:
                 RPanic("Received unexpected message type in VR proto: %u",
-                       type);
+                       (uint32_t)type);
             }
         }
 

@@ -621,7 +621,7 @@ namespace replication
             */
             default:
                 RPanic("Received unexpected message type in iocl_ct proto: %u",
-                       type);
+                       (uint32_t)type);
             }
         }
 
@@ -694,7 +694,7 @@ namespace replication
                 for (const auto& finalAck : predFinals) {
                     auto facks_it = entry.finalAcks.find({finalAck.p(), finalAck.shardidx()});
                     if (facks_it != entry.finalAcks.end()) {
-                        Warning("Duplicate final ACK received from predecessor with shardtag %lu and shardidx %lu for my shardtag %lu",
+                        Warning("Duplicate final ACK received from predecessor with shardtag %lu and shardidx %u for my shardtag %lu",
                             finalAck.p(), finalAck.shardidx(), entry.myShardTag);
                     } else {
                         // ASSERT THIS IS A LEGAL PREDECESSOR
@@ -919,7 +919,7 @@ namespace replication
                                 // Map the successor shardtag to its shardidx
                                 entry.successors.emplace(std::make_pair(succ.s(), succ.shardidx()), 0);
                             } else {
-                                Warning("Duplicate successor request received for successor %lu on shard %lu", succ.s(), succ.shardidx());
+                                Warning("Duplicate successor request received for successor %lu on shard %u", succ.s(), succ.shardidx());
                             }
                         }
                         outstandingCoordinationReqs.erase(it);
@@ -1327,7 +1327,7 @@ namespace replication
             /* Mark that this predecessor has finalized */
             auto facks_it = entry.finalAcks.find({msg.p(), msg.shardidx()});
             if (facks_it != entry.finalAcks.end()) {
-                Warning("Duplicate final ACK received from predecessor with shardtag %lu on shard %lu for my shardtag %lu",
+                Warning("Duplicate final ACK received from predecessor with shardtag %lu on shard %u for my shardtag %lu",
                         msg.p(), msg.shardidx(), entry.myShardTag);
                 return;
             }
@@ -1378,7 +1378,7 @@ namespace replication
             if (succ_it == entry.successors.end()) {
                 entry.successors.emplace(std::make_pair(msg.s(), msg.shardidx()), 0);
             } else {
-                Warning("Duplicate successor request received for successor %lu on shard %lu", msg.s(), msg.shardidx());
+                Warning("Duplicate successor request received for successor %lu on shard %u", msg.s(), msg.shardidx());
             }
             /* Reply to the successor if we've already been added to the ordered log */
             if (entry.state == IOCL_STATE_READY || entry.state == IOCL_STATE_PREPARED || entry.state == IOCL_STATE_COMMITTED) {
