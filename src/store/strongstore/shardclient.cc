@@ -239,7 +239,7 @@ namespace strongstore
         // get_.set_key(key);
         // get_.set_for_update(for_update);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, dummy_get_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::DUMMY_GET_TYPE, dummy_get_);
         // transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
     }
 
@@ -524,7 +524,7 @@ namespace strongstore
         // }
 
         // transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, dummy_commit_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::DUMMY_COMMIT_TYPE, dummy_commit_);
     }
 
     void ShardClient::HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply)

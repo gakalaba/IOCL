@@ -266,7 +266,7 @@ namespace strongstore
         Debug("getting Get with req_id = %lu", msg.req_id());
         dummy_get_reply_.Clear();
         dummy_get_reply_.set_req_id(msg.req_id());
-        transport_->SendMessage(this, remote, dummy_get_reply_);
+        transport_->SendMessage(this, remote, MsgType::DUMMY_GET_REPLY_TYPE, dummy_get_reply_);
         // uint64_t client_id = msg.rid().client_id();
         // uint64_t client_req_id = msg.rid().client_req_id();
         // uint64_t transaction_id = msg.transaction_id();
@@ -886,13 +886,23 @@ namespace strongstore
         reply.in_use = true;
         reply.remote = &remote;
 
-        msg.set_idx(idx);
-
         // TODO: Handle timeout
         auto participants = std::unordered_set<int>();
         Transaction transaction = {};
         Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", req_id, idx);
-        replica_client_->CoordinatorCommit(msg);
+        LinearizeableOperation commit_op;
+        commit_op.Clear();
+        commit_op.mutable_rid()->set_client_id(0);
+        commit_op.mutable_rid()->set_client_req_id(req_id);
+        commit_op.set_transaction_id(req_id);
+        commit_op.set_op("COMMIT");
+        commit_op.set_key("");
+        commit_op.set_value("");
+        commit_op.set_idx(idx);
+
+        transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
     }
 
     void Server::ContinueCoordinatorPrepare(uint64_t transaction_id)
@@ -1008,7 +1018,7 @@ namespace strongstore
 
         Debug("Sending commit reply to client with req_id = %lu", transaction_id);
         // transport_->SendMessage(this, *remote, rw_commit_c_reply_);
-        transport_->SendMessage(this, *remote, dummy_reply);
+        transport_->SendMessage(this, *remote, MsgType::DUMMY_COMMIT_REPLY_TYPE, dummy_reply);
         pending_reply.in_use = false;
         pending_reply.remote = nullptr;
         free_slots_.push_back(idx);
@@ -1912,6 +1922,7 @@ namespace strongstore
         }
         Debug("Replica upcall with transaction_id = %lu and idx = %u", client_req_id, idx);
         if (replica_idx_ != 0) return;
+        ASSERT(op == "COMMIT");
         CoordinatorCommitTransaction(client_req_id, idx);
 
         // Request request;
