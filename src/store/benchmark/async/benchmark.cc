@@ -750,9 +750,9 @@ int main(int argc, char **argv)
     //     ASSERT(client != nullptr);
     //     clients.push_back(client);
     // }
-    auto &shard_config = replica_configs[i];
-    auto &net_config = net_configs[i];
-    auto &client_region = client_regions[i];
+    auto &shard_config = replica_configs[0];
+    auto &net_config = net_configs[0];
+    auto &client_region = client_regions[0];
 
     the_client = new strongstore::Client(
         consistency, mode, net_config, client_region, shard_config,
