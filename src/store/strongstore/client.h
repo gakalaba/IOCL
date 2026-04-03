@@ -222,15 +222,14 @@ namespace strongstore
 
         // Overriding functions from ::Client
         // Begin a transaction
-        virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void Begin(Session &session) override;
 
         // Begin an application-level request
-        virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void BeginAppRequest(Session &session) override;
 
 
         // Begin a retried transaction.
-        virtual void Retry(Session &session, begin_callback bcb,
-                           begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void Retry(Session &session) override;
 
         // Get the value corresponding to key.
         virtual void Get(Session &session, const std::string &key,
@@ -290,7 +289,6 @@ namespace strongstore
             int outstandingPrepares;
         };
 
-        void ContinueBegin(Session &session, begin_callback bcb);
         void ContinueRetry(Session &session, begin_callback bcb);
 
         // local Prepare function

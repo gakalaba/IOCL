@@ -42,7 +42,7 @@
 
 DEFINE_LATENCY(op);
 
-BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
+BenchmarkClient::BenchmarkClient(Client *client, uint32_t timeout,
                                  Transport &transport, uint64_t id,
                                  BenchmarkClientMode mode,
                                  double switch_probability,
@@ -55,7 +55,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  const std::string &latencyFilename)
     : transport_(transport),
       session_states_{},
-      clients_{clients},
+      client_{client},
       client_id_{id},
       timeout_{timeout},
       next_arrival_dist_{arrival_rate * 1e-6},
@@ -117,13 +117,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
 
 void BenchmarkClient::SendNext()
 {
-    n_sessions_started_++;
-    Debug("[%d] SendNext", n_sessions_started_);
-
-    std::size_t client_index = n_sessions_started_ % clients_.size();
-    auto &client = *clients_[client_index];
-
-    auto &session = client.BeginSession();
+    auto &session = client_->BeginSession();
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
@@ -134,66 +128,21 @@ void BenchmarkClient::SendNext()
     auto transaction = GetNextTransaction();
     stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
-    session_states_.emplace(sid, SessionState{session, transaction, ecb, client_index});
+    auto [it, inserted] = session_states_.emplace(
+        sid, SessionState{session, transaction, ecb});
 
-    auto &ss = session_states_.find(sid)->second;
+    auto &ss = it->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = [this, sid]() {
-        ExecuteNextOperation(sid, true);
-    };
-    auto btcb = []() {};
+    client_->Begin(session);
+    ExecuteNextOperation(sid, true);
 
-    Operation op = transaction->GetNextOperation(0);
-    switch (op.type)
-    {
-    case BEGIN_RO:
-    case BEGIN_RW:
-        client.Begin(session, bcb, btcb, timeout_);
-        break;
-
-    default:
-        NOT_REACHABLE();
-    }
-
-    if (!cooldownStarted)
-    {
-        bool send_next = false;
-        uint64_t next_arrival_us = 0;
-        switch (mode_)
-        {
-        case BenchmarkClientMode::OPEN:
-            send_next = true;
-            next_arrival_us = static_cast<uint64_t>(next_arrival_dist_(rand_));
-            break;
-
-        case BenchmarkClientMode::CLOSED:
-            send_next = (n_sessions_started_ < mpl_);
-            next_arrival_us = 0;
-            break;
-        default:
-            Panic("Unexpected client mode!");
-        }
-
-        if (send_next)
-        {
-            Debug("next arrival in %lu us", next_arrival_us);
-            transport_.TimerMicro(next_arrival_us, [this]() {
-                SendNext();
-            });
-        }
-    }
+    // If we were running Open loop clients, could issue next transaction here
 }
 
 void BenchmarkClient::SendNextAppRequest()
 {
-    n_sessions_started_++;
-    Debug("[%d] SendNextAppRequest", n_sessions_started_);
-
-    std::size_t client_index = n_sessions_started_ % clients_.size();
-    auto &client = *clients_[client_index];
-
-    auto &session = client.BeginSession();
+    auto &session = client_->BeginSession();
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
@@ -204,17 +153,16 @@ void BenchmarkClient::SendNextAppRequest()
     auto appreq = GetNextAppRequest();
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
-    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+    auto [it, inserted] = session_states_.emplace(
+        sid, SessionState{session, appreq, ecb, GetFanout()});
 
-    auto &ss = session_states_.find(sid)->second;
+    auto &ss = it->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = [this, sid]() {
-        ExecuteNextAppRequestOperation(sid);
-    };
-    auto btcb = []() {};
+    client_->BeginAppRequest(session);
+    ExecuteNextAppRequestOperation(sid);
 
-    client.BeginAppRequest(session, bcb, btcb, timeout_);
+     // If we were running Open loop clients, could issue next transaction here
 }
 
 void BenchmarkClient::SendNextInSession(const uint64_t session_id)
@@ -248,31 +196,14 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
     // }
     // else
     // {
-    //     ss.start_transaction(ss.session(), transaction, ecb, ss.current_client_index());
+    // ss.start_transaction(ss.session(), transaction, ecb);
     // }
 
     auto &session = ss.session();
-    auto &client = *clients_[ss.current_client_index()];
 
     _Latency_StartRec(ss.lat());
-
-    auto bcb = [this, session_id]() {
-        ExecuteNextOperation(session_id, true);
-    };
-    
-    auto btcb = []() {};
-
-    Operation op = transaction->GetNextOperation(0);
-    switch (op.type)
-    {
-    case BEGIN_RW:
-    case BEGIN_RO:
-        client.Begin(session, bcb, btcb, timeout_);
-        break;
-
-    default:
-        NOT_REACHABLE();
-    }
+    client_->Begin(session);
+    ExecuteNextOperation(session_id, true);
 }
 
 void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
@@ -285,21 +216,16 @@ void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
     stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
     // reset op_index!
-    ss.start_apprequest(ss.session(), appreq, ss.current_client_index());
+    ss.start_apprequest(ss.session(), appreq);
 
     auto &session = ss.session();
     auto sid = session.id();
     Debug("session id: %lu", sid);
 
-    auto &client = *clients_[ss.current_client_index()];
     _Latency_StartRec(ss.lat());
 
-    auto bcb = [this, sid]() {
-        ExecuteNextAppRequestOperation(sid);
-    };
-    auto btcb = []() {};
-
-    client.BeginAppRequest(session, bcb, btcb, timeout_);
+    client_->BeginAppRequest(session);
+    ExecuteNextAppRequestOperation(sid);
 }
 
 void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id, bool getting)
@@ -337,9 +263,6 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id, bool getti
     // auto acb = std::bind(&BenchmarkClient::AbortCallback, this, session_id, ABORTED_USER);
     // auto atcb = std::bind(&BenchmarkClient::AbortTimeout, this);
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-
     // switch (op.type)
     // {
     // case GET:
@@ -374,9 +297,9 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id, bool getti
     // }
 
     if (getting) {
-        client.Get(session, "", gcb, gtcb, timeout_);
+        client_->Get(session, "", gcb, gtcb, timeout_);
     } else {
-        client.Commit(session, ccb, ctcb, timeout_);
+        client_->Commit(session, ccb, ctcb, timeout_);
     }
 
     // Debug("isue Concurrent = %d, nextOpCommit %d, op.tpye = %d", issueConcurrent, nextOpCommit, op.type);
@@ -412,9 +335,6 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
         SendOperationTimeout(session_id, status, retval);
     };
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-
     // Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
     if (op_index == ss.fanout())
     {
@@ -439,7 +359,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     default:
         Panic("unsupported opeartion type %d", op.type);
     }
-    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
+    client_->SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
 
     if (issueConcurrent)
     {
@@ -462,9 +382,6 @@ void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-
     auto acb = [this, session_id]() {
         AbortCallback(session_id, ABORTED_SYSTEM); // TODO ANJA - what's the real fix?
     };
@@ -472,7 +389,7 @@ void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status
         AbortTimeout();
     };
 
-    client.Abort(session, acb, atcb, timeout_);
+    client_->Abort(session, acb, atcb, timeout_);
 }
 
 void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
@@ -515,9 +432,6 @@ void BenchmarkClient::GetTimeout(const uint64_t session_id,
     auto &ss = search->second;
     auto &session = ss.session();
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-
     auto gcb = [this, session_id](int status, const std::string &key, const std::string &val, Timestamp ts) {
         GetCallback(session_id, status, key, val, ts);
     };
@@ -525,7 +439,7 @@ void BenchmarkClient::GetTimeout(const uint64_t session_id,
         GetTimeout(session_id, status, key);
     };
 
-    client.Get(session, key, gcb, gtcb, timeout_);
+    client_->Get(session, key, gcb, gtcb, timeout_);
 }
 
 void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
@@ -758,14 +672,8 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
 
                 stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
 
-                auto bcb = [this, session_id]() {
-                    ExecuteNextOperation(session_id, true);
-                };
-                
-                auto btcb = []() {};
-
-                auto &client = *clients_[ss.current_client_index()];
-                client.Retry(ss.session(), bcb, btcb, timeout_); });
+                client_->Retry(ss.session());
+                ExecuteNextOperation(session_id, true);});
         }
     }
 }
@@ -808,10 +716,7 @@ void BenchmarkClient::Cleanup()
 
             auto op_index = ss.op_index();
 
-            auto client_index = ss.current_client_index();
-            auto &client = *clients_[client_index];
-
-            client.ForceAbort(transaction_id);
+            client_->ForceAbort(transaction_id);
         }
 
         transport_.TimerMicro(1e6, [this]() {
@@ -924,8 +829,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
 
     if (erase_session)
     {
-        auto &client = *clients_[ss.current_client_index()];
-        client.EndSession(ss.session());
+        client_->EndSession(ss.session());
         session_states_.erase(search);
     }
 

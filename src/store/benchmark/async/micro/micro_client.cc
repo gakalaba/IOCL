@@ -36,7 +36,7 @@
 namespace micro
 {
 
-    MicroClient::MicroClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
+    MicroClient::MicroClient(KeySelector *keySelector, Client *client, uint32_t timeout,
                              Transport &transport, uint64_t id,
                              BenchmarkClientMode mode,
                              double switch_probability,
@@ -47,7 +47,7 @@ namespace micro
                              uint32_t read_percentage,
                              bool wo_replacement,
                              const std::string &latencyFilename)
-        : BenchmarkClient(clients, timeout, transport, id,
+        : BenchmarkClient(client, timeout, transport, id,
                           mode,
                           switch_probability,
                           arrival_rate, think_time, stay_probability,

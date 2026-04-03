@@ -49,7 +49,7 @@ namespace retwis
     class RetwisClient : public BenchmarkClient
     {
     public:
-        RetwisClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
+        RetwisClient(KeySelector *keySelector, Client *client, uint32_t timeout,
                      Transport &transport, uint64_t id,
                      BenchmarkClientMode mode,
                      double switch_probability,

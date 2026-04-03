@@ -404,9 +404,9 @@ namespace strongstore
         StrongSession session{};
         auto sid = session.id();
 
-        sessions_.emplace(sid, std::move(session));
+        auto [it, inserted] = sessions_.emplace(sid, std::move(session));
 
-        return sessions_.find(sid)->second;
+        return it->second;
     }
 
     Session &Client::ContinueSession(rss::Session &rss_session)
@@ -438,13 +438,7 @@ namespace strongstore
     /* Begins a transaction. All subsequent operations before a commit() or
      * abort() are part of this transaction.
      */
-    void Client::Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
-    {
-        ContinueBegin(session, bcb);
-        // rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueBegin, this, std::ref(session), bcb));
-    }
-
-    void Client::ContinueBegin(Session &s, begin_callback bcb)
+    void Client::Begin(Session &s)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -466,11 +460,9 @@ namespace strongstore
         {
             sclients_[i]->Begin(tid, start_ts);
         }
-
-        bcb();
     }
 
-    void Client::BeginAppRequest(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    void Client::BeginAppRequest(Session &s)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -483,28 +475,15 @@ namespace strongstore
 
         Debug("[%lu] BeginAppRequest", arid);
 
-        // Timestamp start_ts{tt_.Now().latest(), client_id_};
-
         session.start_apprequest(arid);
         sessions_by_apprequest_id_.emplace(arid, session);
-
-        // for (uint64_t i = 0; i < nshards_; i++)
-        // {
-        //     sclients_[i]->Begin(tid, start_ts);
-        // }
-
-        bcb();
     }
 
     /* Begins a transaction, retrying the transaction indicated by session.
      */
-    void Client::Retry(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    void Client::Retry(Session &s)
     {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueRetry, this, std::ref(session), bcb));
-    }
-
-    void Client::ContinueRetry(Session &s, begin_callback bcb)
-    {
+        // rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueRetry, this, std::ref(session), bcb));
         auto &session = static_cast<StrongSession &>(s);
 
         if (session.transaction_id() != static_cast<uint64_t>(-1))
@@ -522,8 +501,6 @@ namespace strongstore
         {
             sclients_[i]->Begin(tid, start_ts);
         }
-
-        bcb();
     }
 
     /* Returns the value corresponding to the supplied key. */

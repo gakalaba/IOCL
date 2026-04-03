@@ -49,7 +49,7 @@ namespace micro
     class MicroClient : public BenchmarkClient
     {
     public:
-        MicroClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
+        MicroClient(KeySelector *keySelector, Client *client, uint32_t timeout,
                     Transport &transport, uint64_t id,
                     BenchmarkClientMode mode,
                     double switch_probability,

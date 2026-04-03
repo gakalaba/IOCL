@@ -68,12 +68,11 @@ class Client {
     virtual Session &ContinueSession(rss::Session &session) = 0;
     virtual rss::Session EndSession(Session &session) = 0;
 
-    virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
-    virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout){};
+    virtual void Begin(Session &session) = 0;
+    virtual void BeginAppRequest(Session &session){};
 
 
-    virtual void Retry(Session &session, begin_callback bcb,
-                       begin_timeout_callback btcb, uint32_t timeout) = 0;
+    virtual void Retry(Session &session) = 0;
 
     // Get the value corresponding to key.
     virtual void Get(Session &session, const std::string &key, get_callback gcb,
