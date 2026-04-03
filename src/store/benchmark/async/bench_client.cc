@@ -99,7 +99,7 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     n_sessions_started_ = 0;
     n = 0;
     curr_bdcb_ = bdcb;
-    transport_.TimerMicro(warmupSec * 1000, [this]() {
+    transport_.Timer(warmupSec * 1000, [this]() {
         WarmupDone();
     });
     gettimeofday(&startTime, NULL);
