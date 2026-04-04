@@ -178,6 +178,7 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
 
     if (switch_dist_(rand_))
     {
+        Panic("do we ever call this");
         rss::Session rss_session = client_->EndSession(ss.session());
 
         // auto &next_client = *clients_[next_client_index];
