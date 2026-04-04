@@ -183,13 +183,6 @@ namespace strongstore
             uint64_t transaction_id;
             uint64_t req_id;
         };
-        struct PendingGet : public PendingRequest
-        {
-            PendingGet(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            std::string key;
-            get_callback gcb;
-            get_timeout_callback gtcb;
-        };
         struct PendingRWCoordCommit : public PendingRequest
         {
             PendingRWCoordCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -228,16 +221,6 @@ namespace strongstore
             ro_commit_timeout_callback ctcb;
             uint64_t n_slow_replies;
         };
-        // struct PendingOperation : public PendingRequest
-        // {
-        //     PendingOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-        //     std::string op;
-        //     std::string key;
-        //     std::string val;
-        //     op_callback ocb;
-        //     op_timeout_callback otcb;
-        //     std::vector<std::pair<uint64_t, uint32_t>> pred_list;
-        // };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
 
@@ -245,8 +228,7 @@ namespace strongstore
                  get_callback gcb, get_timeout_callback gtcb,
                  uint32_t timeout, bool for_update);
 
-        void HandleGetReply(const proto::DummyGetReply &reply);
-        // void HandleSendOperationReply(const proto::LinearizeableReply &reply);
+        void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
@@ -260,8 +242,6 @@ namespace strongstore
         std::unordered_map<uint64_t, Transaction> transactions_;
         std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
 
-        std::unordered_map<uint64_t, PendingGet *> pendingGets;
-        // std::unordered_map<uint64_t, PendingOperation *> pendingOps;
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
         std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
@@ -271,7 +251,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        proto::DummyGet dummy_get_;
         proto::DummyCommit dummy_commit_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
@@ -283,7 +262,6 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::DummyGetReply dummy_get_reply_;
         proto::DummyCommitReply dummy_commit_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
@@ -316,7 +294,9 @@ namespace strongstore
 
         struct PendingGetSlot {
             bool in_use = false;
+            uint64_t transaction_id;
             get_callback gcb;
+            std::string key;
         };
         std::vector<PendingGetSlot> get_slots_;
 

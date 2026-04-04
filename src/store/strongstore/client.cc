@@ -525,8 +525,7 @@ namespace strongstore
 
         // ASSERT(session.executing());
         ASSERT(session.executing() || session.getting());
-        // session.add_parallel_get(key);
-        session.add_parallel_get(""); // REMOVE THIS L*R!!!!
+        session.add_parallel_get(key);
 
         // Contact the appropriate shard to get the value.
         int i = (*part_)(key, nshards_, -1, session.participants());

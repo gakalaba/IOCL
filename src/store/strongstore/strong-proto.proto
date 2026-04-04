@@ -24,9 +24,8 @@ message GetReply {
     // -2 = retry
     // -3 = abstain/no reply
     required int32 status = 2;
-    required string key = 3;
-    optional string val = 4;
-    optional TimestampMessage timestamp = 5;
+    optional string val = 3;
+    optional TimestampMessage timestamp = 4;
 }
 
 message RWCommitCoordinator {
@@ -183,17 +182,9 @@ message DummyReply {
     required uint64 req_id = 1;
 }
 
-message DummyGet {
-    required uint64 req_id = 1;
-}
-
 message DummyCommit {
     required uint64 req_id = 1;
     required uint32 idx = 2;
-}
-
-message DummyGetReply {
-    required uint64 req_id = 1;
 }
 
 message DummyCommitReply {

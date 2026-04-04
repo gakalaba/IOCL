@@ -78,9 +78,9 @@ namespace strongstore
     {
         Debug("Got message wahoo");
         switch (type) {
-        case MsgType::DUMMY_GET_REPLY_TYPE: {
-            dummy_get_reply_.ParseFromString(data);
-            HandleGetReply(dummy_get_reply_);
+        case MsgType::GET_REPLY_TYPE: {
+            get_reply_.ParseFromString(data);
+            HandleGetReply(get_reply_);
             break;
         }
         case MsgType::LIN_REPLY_TYPE: {
@@ -211,80 +211,60 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        uint64_t shardtag = CreateTag(client_id_, req_id);
         uint32_t idx = req_id % fanout_;
         auto &pendingGet = get_slots_[idx];
         ASSERT(!pendingGet.in_use);
         pendingGet.in_use = true;
-
-        // PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
-        // pendingGets[shardtag] = pendingGet;
-        // pendingGet->key = key;
         pendingGet.gcb = gcb;
-        // pendingGet->gtcb = gtcb;
+        pendingGet.key = key;
+        pendingGet.transaction_id = transaction_id;
 
-        // auto search = transactions_.find(transaction_id);
-        // ASSERT(search != transactions_.end());
-        // auto &t = search->second;
-        // auto &start_ts = t.start_time();
+        auto search = transactions_.find(transaction_id);
+        ASSERT(search != transactions_.end());
+        auto &t = search->second;
+        auto &start_ts = t.start_time();
 
         // TODO: Setup timeout
-        dummy_get_.Clear();
-        dummy_get_.set_req_id(shardtag);
-        // get_.Clear();
-        // get_.mutable_rid()->set_client_id(client_id_);
-        // get_.mutable_rid()->set_client_req_id(req_id);
-        // get_.set_transaction_id(transaction_id);
-        // start_ts.serialize(get_.mutable_timestamp());
-        // get_.set_key(key);
-        // get_.set_for_update(for_update);
+        get_.Clear();
+        get_.mutable_rid()->set_client_id(client_id_);
+        get_.mutable_rid()->set_client_req_id(req_id);
+        get_.set_transaction_id(transaction_id);
+        start_ts.serialize(get_.mutable_timestamp());
+        get_.set_key(key);
+        get_.set_for_update(for_update);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::DUMMY_GET_TYPE, dummy_get_);
-        // transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::GET_TYPE, get_);
     }
 
-    void ShardClient::HandleGetReply(const proto::DummyGetReply &reply)
+    void ShardClient::HandleGetReply(const proto::GetReply &reply)
     {
-        // uint64_t req_id = reply.rid().client_req_id();
-        // int status = reply.status();
+        uint64_t req_id = reply.rid().client_req_id();
+        int status = reply.status();
 
-        // auto itr = pendingGets.find(req_id);
-        // auto itr = pendingGets.find(reply.req_id());
-        // if (itr == pendingGets.end())
-        // {
-        //     Panic("Didn't find pending GET request for req_id %lu!", reply.req_id());
-        //     // Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
-        //     return; // stale request
-        // }
-
-        uint64_t req_id = reply.req_id();
-        uint32_t idx = (req_id & 0xFFFFFFFF) % fanout_;
+        uint32_t idx = req_id % fanout_;
         auto &pendingGet = get_slots_[idx];
         ASSERT(pendingGet.in_use);
-        // PendingGet *req = itr->second;
-        Debug("Handling GET reply with req_id = %lu", reply.req_id());
         get_callback gcb = pendingGet.gcb;
-        // std::string key = req->key;
-        // pendingGets.erase(itr);
-        // delete req;
+        std::string key = pendingGet.key;
+        uint64_t transaction_id = pendingGet.transaction_id;
 
-        // Debug("[%lu] [shard %i] Received GET reply: %s %d",
-        //       transaction_id, shard_idx_, key.c_str(), status);
+        Debug("[%lu] [shard %i] Received GET reply: %s %d",
+              transaction_id, shard_idx_, key.c_str(), status);
 
-        // std::string val;
-        // Timestamp ts;
-        // if (status == REPLY_OK)
-        // {
-        //     val = reply.val();
-        //     ts = Timestamp(reply.timestamp());
-        // }
+        std::string val;
+        Timestamp ts;
+        if (status == REPLY_OK)
+        {
+            val = reply.val();
+            ts = Timestamp(reply.timestamp());
+        }
 
-        // Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        // transactions_[transaction_id].addReadSet(key, ts);
-        // read_sets_[transaction_id][key] = val;
+        Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
+        transactions_[transaction_id].addReadSet(key, ts);
+        read_sets_[transaction_id][key] = val;
 
         pendingGet.in_use = false;
-        gcb(0, "", "", dummyTimestamp);
+        gcb(status, key, val, ts);
     }
 
     void ShardClient::Put(uint64_t transaction_id, const std::string &key, const std::string &value,
@@ -737,21 +717,18 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Aborting GET", transaction_id, shard_idx_);
 
-        for (auto it = pendingGets.begin(); it != pendingGets.end(); )
+        // Loop through pending get slots
+        for (uint32_t idx = 0; idx < fanout_; idx++)
         {
-            if (it->second->transaction_id == transaction_id)
+            auto &pendingGet = get_slots_[idx];
+            if (pendingGet.in_use && pendingGet.transaction_id == transaction_id)
             {
-                PendingGet *req = it->second;
-                uint64_t transaction_id = req->transaction_id;
-                get_callback gcb = req->gcb;
-                std::string key = req->key;
+                get_callback gcb = pendingGet.gcb;
+                std::string key = pendingGet.key;
 
-                it = pendingGets.erase(it);
-                delete req;
+                pendingGet.in_use = false;
 
                 gcb(REPLY_FAIL, key, "", {});
-            } else {
-                ++it;
             }
         }
     }

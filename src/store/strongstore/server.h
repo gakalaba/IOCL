@@ -191,16 +191,6 @@ namespace strongstore
             RequestID rid;
             std::string key;
         };
-        // class PendingOperationReply
-        // {
-        // public:
-        //     PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
-        //                         const TransportAddress *remote)
-        //         : rid{client_id, client_op_id, remote} {}
-        //     RequestID rid;
-        //     std::string key;
-        //     std::string value;
-        // };
         struct PendingOpReplySlot {
             bool in_use = false;
             const TransportAddress *remote = nullptr;
@@ -224,7 +214,7 @@ namespace strongstore
         };
         void DelayOnEventLoop();
 
-        void HandleGet(const TransportAddress &remote, proto::DummyGet &msg);
+        void HandleGet(const TransportAddress &remote, proto::Get &msg);
 
         void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
@@ -324,9 +314,7 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        proto::DummyGet dummy_get_;
         proto::DummyCommit dummy_commit_;
-        proto::DummyGetReply dummy_get_reply_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

@@ -191,9 +191,9 @@ namespace strongstore
     {
         Debug("hi! we're in Server::ReceiveMessage, and we got a message of type %u", (uint32_t)type);
         switch (type) {
-        case MsgType::DUMMY_GET_TYPE: {
-            dummy_get_.ParseFromString(data);
-            HandleGet(remote, dummy_get_);
+        case MsgType::GET_TYPE: {
+            get_.ParseFromString(data);
+            HandleGet(remote, get_);
             break;
         }
         case MsgType::LIN_OP_TYPE: {
@@ -255,12 +255,13 @@ namespace strongstore
         }
     }
 
-    void Server::HandleGet(const TransportAddress &remote, proto::DummyGet &msg)
+    void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
     {
-        Debug("getting Get with req_id = %lu", msg.req_id());
-        dummy_get_reply_.Clear();
-        dummy_get_reply_.set_req_id(msg.req_id());
-        transport_->SendMessage(this, remote, MsgType::DUMMY_GET_REPLY_TYPE, dummy_get_reply_);
+        Debug("getting Get with req_id = %lu", msg.rid().client_req_id());
+        get_reply_.Clear();
+        get_reply_.mutable_rid()->CopyFrom(msg.rid());
+        get_reply_.set_status(REPLY_OK);
+        transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
         // uint64_t client_id = msg.rid().client_id();
         // uint64_t client_req_id = msg.rid().client_req_id();
         // uint64_t transaction_id = msg.transaction_id();
@@ -395,7 +396,6 @@ namespace strongstore
             get_reply_.Clear();
             get_reply_.mutable_rid()->set_client_id(client_id);
             get_reply_.mutable_rid()->set_client_req_id(client_req_id);
-            get_reply_.set_key(key);
             get_reply_.set_status(REPLY_FAIL);
             // ANJATODO any other logic that is for locks!?!?!?
 
@@ -433,7 +433,6 @@ namespace strongstore
                 get_reply_.Clear();
                 get_reply_.mutable_rid()->set_client_id(client_id);
                 get_reply_.mutable_rid()->set_client_req_id(client_req_id);
-                get_reply_.set_key(reply->key);
 
                 TransactionState s = transactions_.ContinueGet(transaction_id, reply->key);
                 if (s == READING)
