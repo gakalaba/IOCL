@@ -246,7 +246,6 @@ namespace strongstore
         Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
         ASSERT(the_transaction_.transaction_id() == transaction_id);
         the_transaction_.addReadSet(key, ts);
-        the_read_set_[key] = val;
 
         pendingGet.in_use = false;
         gcb(status, key, val, ts);
@@ -490,7 +489,6 @@ namespace strongstore
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
-        the_read_set_.clear();
 
         Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
@@ -544,7 +542,6 @@ namespace strongstore
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
-        the_read_set_.clear();
 
         ccb(reply.status());
     }
@@ -720,7 +717,6 @@ namespace strongstore
         {
             ASSERT(transaction_id == the_transaction_.transaction_id());
             the_transaction_.clear();
-            the_read_set_.clear();
         }
 
         acb();
