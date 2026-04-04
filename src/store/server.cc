@@ -539,8 +539,9 @@ int main(int argc, char **argv)
 
     if (FLAGS_stats_file.size() > 0)
     {
-        Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
-        server->GetStats().ExportJSON(FLAGS_stats_file);
+        Notice("Disabled debug stats for now, not exporting to %s.", FLAGS_stats_file.c_str());
+        // Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
+        // server->GetStats().ExportJSON(FLAGS_stats_file);
     }
 
     return 0;
@@ -552,8 +553,9 @@ void Cleanup(int signal)
     tport->Stop();
     if (FLAGS_stats_file.size() > 0)
     {
-        Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
-        server->GetStats().ExportJSON(FLAGS_stats_file);
+        Notice("Disabled debug stats for now, not exporting to %s.", FLAGS_stats_file.c_str());
+        // Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
+        // server->GetStats().ExportJSON(FLAGS_stats_file);
     }
     replica->Close();
     delete replica;

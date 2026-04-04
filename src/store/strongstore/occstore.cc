@@ -102,7 +102,6 @@ namespace strongstore
                         "[%lu] ABORT wr conflict w/ committed key %s from txn %lu.",
                         id, BytesToHex(read.first, 16).c_str(), cur.first.getID());
 
-                    stats.Increment("abort_committed_wr_conflict");
                     Abort(id, statuses);
                     return REPLY_FAIL;
                 }
@@ -114,7 +113,6 @@ namespace strongstore
                 Debug("[%lu] ABORT wr conflict w/ prepared key %s from txn %lu.",
                       id, BytesToHex(read.first, 16).c_str(),
                       *pWrites.find(read.first)->second.begin());
-                stats.Increment("abort_prepared_wr_conflict");
                 Abort(id, statuses);
                 return REPLY_FAIL;
             }
@@ -132,7 +130,6 @@ namespace strongstore
                 Debug("[%lu] ABORT rw/ww conflict w/ prepared key %s from txn %lu.",
                       id, BytesToHex(write.first, 16).c_str(),
                       *pRW.find(write.first)->second.begin());
-                stats.Increment("abort_prepared_*w_conflict");
                 Abort(id, statuses);
                 return REPLY_FAIL;
             }

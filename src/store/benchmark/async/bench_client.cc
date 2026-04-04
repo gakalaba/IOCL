@@ -126,7 +126,6 @@ void BenchmarkClient::SendNext()
         ExecuteCallback(sid, std::forward<decltype(arg)>(arg));
     };
     auto transaction = GetNextTransaction();
-    stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
     auto res = session_states_.emplace(
         sid, SessionState{session, transaction, ecb});
@@ -151,7 +150,6 @@ void BenchmarkClient::SendNextAppRequest()
         ExecuteCallback(sid, std::forward<decltype(arg)>(arg));
     };
     auto appreq = GetNextAppRequest();
-    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
     auto res = session_states_.emplace(
         sid, SessionState{session, appreq, ecb, GetFanout()});
@@ -177,7 +175,6 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
         ExecuteCallback(session_id, std::forward<decltype(arg)>(arg));
     };
     auto transaction = GetNextTransaction();
-    stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
     if (switch_dist_(rand_))
     {
@@ -210,7 +207,6 @@ void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
     auto &ss = search->second;
 
     auto appreq = GetNextAppRequest();
-    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
     // reset op_index!
     ss.start_apprequest(ss.session(), appreq);
@@ -493,8 +489,6 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
             auto &ttype = appreq->GetTransactionType();
             auto n_attempts = ss.n_attempts();
 
-            stats.Increment(ttype + "_completed", 1);
-
             // Send Next App Request
             if (!cooldownStarted)
             {
@@ -585,8 +579,6 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
         bool erase_session = true;
         if (result == COMMITTED)
         {
-            stats.Increment(ttype + "_committed", 1);
-
             if (!cooldownStarted)
             {
                 bool send_next_in_session = false;
@@ -622,16 +614,10 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
             }
         }
 
-        if (retryAborted)
-        {
-            stats.Add(ttype + "_attempts_list", n_attempts);
-        }
-
         OnReply(session_id, result, erase_session);
     }
     else
     {
-        stats.Increment(ttype + "_" + std::to_string(result), 1);
         BenchmarkClient::BenchState state = GetBenchState();
         Debug("Current bench state: %d.", state);
         if (state == DONE)
@@ -652,7 +638,6 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                 // Debug("Upper is %lu (min of %lu and %lu.", upper, (1UL << exp) * abortBackoff,
                 //       maxBackoff);
                 // backoff = std::uniform_int_distribution<uint64_t>(0UL, upper)(GetRand());
-                // stats.Increment(ttype + "_backoff", backoff);
                 Debug("Backing off for %lu us: %lu", backoff, n_attempts);
             }
 
@@ -663,8 +648,6 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
 
                 auto &ss = search->second;
                 ss.retry_transaction();
-
-                stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
 
                 client_->Retry(ss.session());
                 ExecuteNextOperation(session_id);});

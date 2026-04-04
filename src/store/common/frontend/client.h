@@ -22,7 +22,6 @@
 #include "lib/latency.h"
 #include "lib/message.h"
 #include "store/common/partitioner.h"
-#include "store/common/stats.h"
 #include "store/common/timestamp.h"
 
 enum transaction_status_t {
@@ -109,12 +108,9 @@ class Client {
     virtual bool IsLinearizeable() = 0;
     virtual bool IsIOCL() = 0;
 
-    inline Stats &GetStats() { return stats; }
-
    protected:
     void StartRecLatency();
     void EndRecLatency(const std::string &str);
-    Stats stats;
 
    private:
     Latency_t clientLat;

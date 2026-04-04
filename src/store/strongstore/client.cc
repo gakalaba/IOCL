@@ -99,6 +99,10 @@ namespace strongstore
 
         outstanding_.reserve(fanout_*2);
         ASSERT(consistency != Consistency::RSS);
+        if (debug_stats_)
+        {
+            Panic("Debug stats disabled!");
+        }
     }
 
     Client::~Client()
@@ -778,8 +782,6 @@ namespace strongstore
 
         auto &participants = session.participants();
 
-        stats.IncrementList("txn_groups", participants.size()); // DO WE NEED THIS ANJA???
-
         Debug("[%lu] PREPARE", tid);
         ASSERT(participants.size() > 0);
 
@@ -934,8 +936,6 @@ namespace strongstore
         pending_commit_slot_.ccb = ccb;
         pending_commit_slot_.in_use = true;
         pending_commit_slot_.outstandingPrepares = sharded_keys.size();
-
-        stats.IncrementList("txn_groups", sharded_keys.size());
 
         ASSERT(sharded_keys.size() > 0);
 

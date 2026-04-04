@@ -74,6 +74,7 @@ namespace strongstore
 
         if (debug_stats_)
         {
+            Panic("Debug stats disabled!");
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
         dummyTimestamp = Timestamp(0, 0);
@@ -120,6 +121,7 @@ namespace strongstore
 
         if (debug_stats_)
         {
+            Panic("Debug stats disabled!");
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
         int N = 30000;
@@ -146,14 +148,6 @@ namespace strongstore
         {
             Latency_Dump(&ro_wait_lat_);
         }
-    }
-
-    // Assume GetStats called once before exiting protgram
-    Stats &Server::GetStats()
-    {
-        Stats &s = transactions_.GetStats();
-        stats_.Merge(s);
-        return stats_;
     }
 
     void Server::SeeAllTxns()

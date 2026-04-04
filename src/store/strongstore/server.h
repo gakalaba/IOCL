@@ -143,7 +143,6 @@ namespace strongstore
         void Load(const string &key, const string &value,
                   const Timestamp timestamp) override;
 
-        Stats &GetStats() override;
         void SeeAllTxns() override;
 
     private:
@@ -346,8 +345,6 @@ namespace strongstore
         proto::AbortReply abort_reply_;
         PingMessage ping_;
         proto::Wound wound_;
-
-        Stats stats_;
 
         Latency_t ro_wait_lat_;
 

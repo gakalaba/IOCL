@@ -40,7 +40,6 @@
 #include "store/common/frontend/async_transaction.h"
 #include "store/common/frontend/async_apprequest.h"
 #include "store/common/frontend/client.h"
-#include "store/common/stats.h"
 #include "store/common/transaction.h"
 
 typedef std::function<void(transaction_status_t)> execute_callback;
@@ -82,8 +81,6 @@ public:
     struct Latency_t latency;
     std::vector<uint64_t> latencies;
 
-    inline const Stats &GetStats() const { return stats; }
-
     inline uint64_t GetFanout() { return fanout; };
 
 protected:
@@ -101,8 +98,6 @@ protected:
     };
     BenchState GetBenchState(struct timeval &diff) const;
     BenchState GetBenchState() const;
-
-    Stats stats;
     Transport &transport_;
 
 private:

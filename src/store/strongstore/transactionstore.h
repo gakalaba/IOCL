@@ -38,7 +38,6 @@
 #include "lib/assert.h"
 #include "lib/message.h"
 #include "lib/transport.h"
-#include "store/common/stats.h"
 #include "store/common/transaction.h"
 #include "store/common/truetime.h"
 #include "store/strongstore/common.h"
@@ -133,8 +132,6 @@ namespace strongstore
 
         TransactionFinishResult Commit(uint64_t transaction_id);
         TransactionFinishResult Abort(uint64_t transaction_id);
-
-        Stats &GetStats() { return stats_; };
 
     private:
         class PendingRWTransaction
@@ -261,7 +258,6 @@ namespace strongstore
         std::unordered_map<uint64_t, PendingROTransaction> pending_ro_;
         std::unordered_set<uint64_t> committed_;
         std::unordered_set<uint64_t> aborted_;
-        Stats stats_;
         int this_shard_;
         Consistency consistency_;
         const TrueTime &tt_;

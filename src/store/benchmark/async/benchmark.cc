@@ -47,7 +47,6 @@
 #include "store/benchmark/async/retwis/retwis_client.h"
 #include "store/benchmark/async/micro/micro_client.h"
 #include "store/common/partitioner.h"
-#include "store/common/stats.h"
 #include "store/common/truetime.h"
 #include "store/strongstore/client.h"
 #include "store/strongstore/networkconfig.h"
@@ -890,21 +889,22 @@ void Cleanup()
 
 void FlushStats()
 {
-    if (FLAGS_stats_file.size() > 0)
-    {
-        Notice("Flushing stats to %s.", FLAGS_stats_file.c_str());
-        Stats total;
-        for (unsigned int i = 0; i < benchClients.size(); i++)
-        {
-            total.Merge(benchClients[i]->GetStats());
-        }
-        total.Merge(the_client->GetStats());
+    Notice("Disabled FlushStats for now!");
+    // if (FLAGS_stats_file.size() > 0)
+    // {
+    //     Notice("Flushing stats to %s.", FLAGS_stats_file.c_str());
+    //     Stats total;
+    //     for (unsigned int i = 0; i < benchClients.size(); i++)
+    //     {
+    //         total.Merge(benchClients[i]->GetStats());
+    //     }
+    //     total.Merge(the_client->GetStats());
         // for (unsigned int i = 0; i < clients.size(); i++)
         // {
         //     total.Merge(clients[i]->GetStats());
         // }
 
-        total.ExportJSON(FLAGS_stats_file);
-        Notice("All done!");
-    }
+        // total.ExportJSON(FLAGS_stats_file);
+        // Notice("All done!");
+    // }
 }

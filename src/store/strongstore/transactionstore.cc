@@ -651,7 +651,6 @@ namespace strongstore
 
         ro.StartRO(keys, min_ts, commit_ts, n_conflicts);
 
-        stats_.IncrementList("n_conflicting_prepared", n_conflicts);
         return ro.state();
     }
 
