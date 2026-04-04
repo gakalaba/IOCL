@@ -887,7 +887,7 @@ namespace strongstore
         LinearizeableOperation commit_op;
         commit_op.Clear();
         commit_op.mutable_rid()->set_client_id(client_id);
-        commit_op.mutable_rid()->set_client_req_id(client_req_id);
+        commit_op.mutable_rid()->set_client_req_id(transaction_id);
         commit_op.set_transaction_id(transaction_id);
         commit_op.set_op("COMMIT");
         commit_op.set_key("");
