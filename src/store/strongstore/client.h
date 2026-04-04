@@ -180,7 +180,10 @@ namespace strongstore
         Timestamp snapshot_ts_;
         int current_participant_;
         State state_;
-        std::unordered_set<std::string> parallel_gets;
+        // NOTE: For now it is safe for gets to be
+        // identified by unique key, since we know
+        // transactions never repeat their keys
+        std::unordered_set<std::string> parallel_gets; // (key -> get)
     };
 
     class CommittedTransaction
@@ -274,21 +277,6 @@ namespace strongstore
     private:
         const static std::size_t MAX_SHARDS = 16;
 
-        struct PendingRequest
-        {
-            PendingRequest(uint64_t id)
-                : id(id), outstandingPrepares(0) {}
-
-            ~PendingRequest() {}
-
-            commit_callback ccb;
-            commit_timeout_callback ctcb;
-            abort_callback acb;
-            abort_timeout_callback atcb;
-            uint64_t id;
-            int outstandingPrepares;
-        };
-
         void ContinueRetry(Session &session, begin_callback bcb);
 
         // local Prepare function
@@ -368,8 +356,6 @@ namespace strongstore
         uint64_t next_apprequest_id_;
 
         uint64_t last_req_id_;
-        std::unordered_map<uint64_t, PendingRequest *> pending_reqs_;
-
         Latency_t op_lat_;
         Latency_t commit_lat_;
 
@@ -389,11 +375,11 @@ namespace strongstore
         // (shardtag, shardid) -> refcount
         std::vector<OutstandingPred> outstanding_;
 
-        Timestamp dummyTimestamp;
-
         struct PendingCommitSlot {
             bool in_use = false;
+            uint16_t outstandingPrepares;
             commit_callback ccb;
+            abort_callback acb;
         };
         PendingCommitSlot pending_commit_slot_;
     };
