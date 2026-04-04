@@ -162,51 +162,6 @@ namespace strongstore
         return true;
     }
 
-    void ReplicaClient::CoordinatorCommit(DummyCommit &dummy_commit)
-    {
-        // Debug("[shard %i] Sending fast path COMMIT: %lu", shard_idx_, transaction_id);
-
-        Debug("Coordinator Commit in Replica_client for req_id = %lu and idx = %u", dummy_commit.req_id(), dummy_commit.idx());
-        // create commit request
-        // string request_str;
-        replication::DummyOperation dummy_op;
-        dummy_op.set_req_id(dummy_commit.req_id());
-        dummy_op.set_idx(dummy_commit.idx());
-        // Request request;
-        // request.set_op(Request::COMMIT);
-        // request.set_txnid(transaction_id);
-
-        // auto prepare = request.mutable_prepare();
-
-        // transaction.serialize(prepare->mutable_txn());
-        // start_ts.serialize(prepare->mutable_timestamp());
-        // prepare->set_coordinator(coordinator);
-        // nonblock_ts.serialize(prepare->mutable_nonblock_ts());
-        // for (int p : participants)
-        // {
-        //     prepare->add_participants(p);
-        // }
-
-        // commit_ts.serialize(request.mutable_commit()->mutable_commit_timestamp());
-
-        // request.SerializeToString(&request_str);
-        // dummy_op.SerializeToString(&request_str);
-
-        // uint64_t reqId = lastReqId++;
-        // PendingCommit *pendingCommit = new PendingCommit(reqId);
-        // pendingCommits[reqId] = pendingCommit;
-        // pendingCommit->ccb = ccb;
-        // pendingCommit->ctcb = ctcb;
-
-        // client->Invoke(
-        //     request_str,
-        //     bind(&ReplicaClient::CommitCallback, this, pendingCommit->reqId,
-        //          std::placeholders::_1, std::placeholders::_2));
-
-        // client->InvokeDummy(dummy_op);
-        //     // request_str, transaction_id);
-    }
-
     void ReplicaClient::Commit(uint64_t transaction_id, Timestamp &commit_timestamp,
                                commit_callback ccb, commit_timeout_callback ctcb,
                                uint32_t timeout)

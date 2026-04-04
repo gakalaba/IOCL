@@ -47,17 +47,19 @@ public:
 };
 
 enum class MsgType : uint8_t {
+    // Messages between clients and server
     LIN_OP_TYPE,
     LIN_REPLY_TYPE,
     CLIENT_COORD_TYPE,
+    GET_TYPE,
+    GET_REPLY_TYPE,
+    TXN_COMMIT_TYPE,
+    TXN_COMMIT_REPLY_TYPE,
+    // Messages between servers
     PREPARE_TYPE,
     PREPARE_OK_TYPE,
     UNORDERED_PREPARE_TYPE,
     UNORDERED_PREPARE_OK_TYPE,
-    GET_TYPE,
-    GET_REPLY_TYPE,
-    DUMMY_COMMIT_TYPE,
-    DUMMY_COMMIT_REPLY_TYPE,
     COMMIT_TYPE,
     COORD_RESP_TYPE,
     COORD_FINAL_TYPE,

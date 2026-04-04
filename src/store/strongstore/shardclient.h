@@ -230,7 +230,7 @@ namespace strongstore
 
         void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
-        void HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply);
+        void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
         void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
         void HandlePrepareAbortReply(const proto::PrepareAbortReply &reply);
@@ -251,7 +251,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        proto::DummyCommit dummy_commit_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;
@@ -262,7 +261,6 @@ namespace strongstore
 
         proto::GetReply get_reply_;
         proto::LinearizeableReply op_reply_;
-        proto::DummyCommitReply dummy_commit_reply_;
         proto::RWCommitCoordinatorReply rw_commit_c_reply_;
         proto::RWCommitParticipantReply rw_commit_p_reply_;
         proto::PrepareOKReply prepare_ok_reply_;
@@ -303,6 +301,7 @@ namespace strongstore
         struct PendingCommitSlot {
             bool in_use = false;
             rw_coord_commit_callback ccb;
+            uint64_t transaction_id;
         };
         PendingCommitSlot pending_commit_slot_;
     };

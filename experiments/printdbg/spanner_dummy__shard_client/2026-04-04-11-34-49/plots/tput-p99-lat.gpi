@@ -1,0 +1,7 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-04-04-11-34-49/2026-04-04-11-34-49/plots/tput-p99-lat.png'
+plot '/users/akalaba/IOCL/experiments/printdbg/2026-04-04-11-34-49/2026-04-04-11-34-49/plots/tput-p99-lat.csv' title 'Dummy Spanner' with linespoint

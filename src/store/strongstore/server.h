@@ -194,6 +194,8 @@ namespace strongstore
         struct PendingOpReplySlot {
             bool in_use = false;
             const TransportAddress *remote = nullptr;
+            uint64_t client_id;
+            uint64_t client_req_id;
         };
 
         struct TimestampID
@@ -223,10 +225,11 @@ namespace strongstore
         void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
-                                       proto::DummyCommit &msg);
+                                       proto::RWCommitCoordinator &msg);
 
         void SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
                                              uint32_t idx,
+                                             const Timestamp &commit_ts,
                                              const Timestamp &nonblock_ts);
         void SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
                                                uint64_t client_id,
@@ -314,7 +317,6 @@ namespace strongstore
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
-        proto::DummyCommit dummy_commit_;
         proto::RWCommitCoordinator rw_commit_c_;
         proto::RWCommitParticipant rw_commit_p_;
         proto::PrepareOK prepare_ok_;

@@ -177,16 +177,3 @@ message LinearizeableReply {
     required int32 status = 3;
     required string return_value = 4;
 }
-
-message DummyReply {
-    required uint64 req_id = 1;
-}
-
-message DummyCommit {
-    required uint64 req_id = 1;
-    required uint32 idx = 2;
-}
-
-message DummyCommitReply {
-    required uint64 req_id = 1;
-}

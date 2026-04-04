@@ -207,10 +207,10 @@ namespace strongstore
             HandleClientCoordination(succ);
             break;
         }
-        case MsgType::DUMMY_COMMIT_TYPE: {
+        case MsgType::TXN_COMMIT_TYPE: {
             Debug("Server got commit");
-            dummy_commit_.ParseFromString(data);
-            HandleRWCommitCoordinator(remote, dummy_commit_);
+            rw_commit_c_.ParseFromString(data);
+            HandleRWCommitCoordinator(remote, rw_commit_c_);
             break;
         }
         /*
@@ -758,13 +758,12 @@ namespace strongstore
         }
     }
 
-    void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::DummyCommit &msg)
+    void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::RWCommitCoordinator &msg)
     {
-        uint64_t req_id = msg.req_id();
-        // uint64_t client_id = msg.rid().client_id();
-        // uint64_t client_req_id = msg.rid().client_req_id();
+        uint64_t client_id = msg.rid().client_id();
+        uint64_t client_req_id = msg.rid().client_req_id();
 
-        // uint64_t transaction_id = msg.transaction_id();
+        uint64_t transaction_id = msg.transaction_id();
 
         // std::unordered_set<int> participants{msg.participants().begin(),
         //                                      msg.participants().end()};
@@ -862,7 +861,7 @@ namespace strongstore
         // {
         //     NOT_REACHABLE();
         // }
-        
+
         // Grab an idx
         ASSERT(!free_slots_.empty());
         uint32_t idx = free_slots_.back();
@@ -878,16 +877,18 @@ namespace strongstore
         ASSERT(!reply.in_use);
         reply.in_use = true;
         reply.remote = &remote;
+        reply.client_id = client_id;
+        reply.client_req_id = client_req_id;
 
         // TODO: Handle timeout
         auto participants = std::unordered_set<int>();
         Transaction transaction = {};
-        Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", req_id, idx);
+        Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", client_req_id, idx);
         LinearizeableOperation commit_op;
         commit_op.Clear();
-        commit_op.mutable_rid()->set_client_id(0);
-        commit_op.mutable_rid()->set_client_req_id(req_id);
-        commit_op.set_transaction_id(req_id);
+        commit_op.mutable_rid()->set_client_id(client_id);
+        commit_op.mutable_rid()->set_client_req_id(client_req_id);
+        commit_op.set_transaction_id(transaction_id);
         commit_op.set_op("COMMIT");
         commit_op.set_key("");
         commit_op.set_value("");
@@ -982,43 +983,27 @@ namespace strongstore
 
     void Server::SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
                                                  uint32_t idx,
+                                                 const Timestamp &commit_ts,
                                                  const Timestamp &nonblock_ts)
     {
-        // auto search = pending_rw_commit_c_replies_.find(transaction_id);
-        // if (search == pending_rw_commit_c_replies_.end())
-        // {
-        //     Debug("[%lu] No pending commit coordinator reply found!!!!", transaction_id);
-        //     return;
-        // }
-
-        // PendingRWCommitCoordinatorReply *reply = search->second;
-
-        // uint64_t client_id = reply->rid.client_id();
-        // uint64_t client_req_id = reply->rid.client_req_id();
         Debug("The slot idx for transaction_id = %lu is %d", transaction_id, idx);
         PendingOpReplySlot &pending_reply = slots_[idx];
-        ASSERT(pending_reply.in_use);
+        ASSERT(pending_reply.in_use); // hopefully not too conservative when we start aborting
         const TransportAddress *remote = pending_reply.remote;
+        uint64_t client_id = pending_reply.client_id;
+        uint64_t client_req_id = pending_reply.client_req_id;
 
-        // rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
-        // rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
-        // rw_commit_c_reply_.set_status(REPLY_OK);
-        // commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
-        // nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
-
-        DummyCommitReply dummy_reply;
-        dummy_reply.set_req_id(transaction_id);
+        rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
+        rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        rw_commit_c_reply_.set_status(REPLY_OK);
+        commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
+        nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
         Debug("Sending commit reply to client with req_id = %lu", transaction_id);
-        // transport_->SendMessage(this, *remote, rw_commit_c_reply_);
-        transport_->SendMessage(this, *remote, MsgType::DUMMY_COMMIT_REPLY_TYPE, dummy_reply);
+        transport_->SendMessage(this, *remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
         pending_reply.in_use = false;
         pending_reply.remote = nullptr;
         free_slots_.push_back(idx);
-
-        // delete remote;
-        // delete reply;
-        // pending_rw_commit_c_replies_.erase(search);
     }
 
     void Server::SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
@@ -1828,7 +1813,7 @@ namespace strongstore
 
         // Reply to client
         // SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
-        SendRWCommmitCoordinatorReplyOK(transaction_id, idx, dummyTimestamp);
+        SendRWCommmitCoordinatorReplyOK(transaction_id, idx, dummyTimestamp, dummyTimestamp);
 
         // Reply to participants
         // SendPrepareOKRepliesOK(transaction_id, commit_ts);

@@ -81,8 +81,6 @@ namespace strongstore
                      prepare_callback pcb, prepare_timeout_callback ptcb,
                      uint32_t timeout);
 
-        void CoordinatorCommit(strongstore::proto::DummyCommit &msg);
-
         void Commit(uint64_t transaction_id, Timestamp &commit_timestamp,
                     commit_callback ccb, commit_timeout_callback ctcb,
                     uint32_t timeout);

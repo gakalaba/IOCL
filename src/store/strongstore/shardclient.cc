@@ -88,9 +88,9 @@ namespace strongstore
             HandleSendOperationReply(op_reply_);
             break;
         }
-        case MsgType::DUMMY_COMMIT_REPLY_TYPE: {
-            dummy_commit_reply_.ParseFromString(data);
-            HandleRWCommitCoordinatorReply(dummy_commit_reply_);
+        case MsgType::TXN_COMMIT_REPLY_TYPE: {
+            rw_commit_c_reply_.ParseFromString(data);
+            HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
             break;
         }
         /*
@@ -472,70 +472,47 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);
 
-        // auto search = transactions_.find(transaction_id);
-        // ASSERT(search != transactions_.end());
+        auto search = transactions_.find(transaction_id);
+        ASSERT(search != transactions_.end());
 
-        // const auto &t = search->second;
+        const auto &t = search->second;
 
         uint64_t req_id = last_req_id_++;
-        // PendingRWCoordCommit *pendingCommit = new PendingRWCoordCommit(transaction_id, req_id);
-        // pendingRWCoordCommits[transaction_id] = pendingCommit;
-        ASSERT(pending_commit_slot_.in_use == false);
+        ASSERT(!pending_commit_slot_.in_use);
         pending_commit_slot_.ccb = ccb;
         pending_commit_slot_.in_use = true;
-        // pendingCommit->ccb = ccb;
-        // pendingCommit->ctcb = ctcb;
-        Debug("and added to pendingRWCoordCommits with req_id = %lu and (key) transaction_id = %lu", req_id, transaction_id);
 
         // TODO: Setup timeout
-        dummy_commit_.Clear();
-        dummy_commit_.set_req_id(transaction_id);
-        dummy_commit_.set_idx(0);
-        // rw_commit_c_.Clear();
-        // rw_commit_c_.mutable_rid()->set_client_id(client_id_);
-        // rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
-        // rw_commit_c_.set_transaction_id(transaction_id);
-        // t.serialize(rw_commit_c_.mutable_transaction());
-        // nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
+        rw_commit_c_.Clear();
+        rw_commit_c_.mutable_rid()->set_client_id(client_id_);
+        rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
+        rw_commit_c_.set_transaction_id(transaction_id);
+        t.serialize(rw_commit_c_.mutable_transaction());
+        nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
 
-        // for (int p : participants)
-        // {
-        //     rw_commit_c_.add_participants(p);
-        // }
+        for (int p : participants)
+        {
+            rw_commit_c_.add_participants(p);
+        }
 
-        // transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::DUMMY_COMMIT_TYPE, dummy_commit_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_TYPE, rw_commit_c_);
     }
 
-    void ShardClient::HandleRWCommitCoordinatorReply(const proto::DummyCommitReply &reply)
+    void ShardClient::HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply)
     {
-        // uint64_t req_id = reply.rid().client_req_id();
-        uint64_t req_id = reply.req_id();
-        Debug("Got RWCommitCoordinatorReply for req_id = %lu", req_id);
+        uint64_t req_id = reply.rid().client_req_id();
 
-        // auto itr = pendingRWCoordCommits.find(req_id);
-        // if (itr == pendingRWCoordCommits.end())
-        // {
-        //     Debug("[%d][%lu] RWCommitCoordinatorReply for stale request.", shard_idx_, req_id);
-        //     return; // stale request
-        // }
-
-        // PendingRWCoordCommit *req = itr->second;
-        // uint64_t transaction_id = req->transaction_id;
-        // rw_coord_commit_callback ccb = req->ccb;
-        ASSERT(pending_commit_slot_.in_use);
+        ASSERT(pending_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
         rw_coord_commit_callback ccb = pending_commit_slot_.ccb;
-        // pendingRWCoordCommits.erase(itr);
-        // delete req;
+        uint64_t transaction_id = pending_commit_slot_.transaction_id;
         pending_commit_slot_.in_use = false;
 
-        // transactions_.erase(transaction_id);
-        // read_sets_.erase(transaction_id);
+        transactions_.erase(transaction_id);
+        read_sets_.erase(transaction_id);
 
-        // Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
-        //       reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        // ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
-        ccb(0, dummyTimestamp, dummyTimestamp);
+        Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
+              reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
+        ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,
