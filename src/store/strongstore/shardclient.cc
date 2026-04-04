@@ -145,45 +145,32 @@ namespace strongstore
     /* Sends BEGIN to a single shard indexed by i. */
     void ShardClient::Begin(uint64_t transaction_id, const Timestamp &start_time)
     {
-        Debug("[%lu] [shard %i] BEGIN", transaction_id, shard_idx_);
-
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search == transactions_.end());
-
-        auto &t = transactions_[transaction_id];
-
-        t.set_start_time(start_time);
+        ASSERT(transaction_id != the_transaction_.transaction_id());
+        the_transaction_.set_start_time(start_time);
+        the_transaction_.set_transaction_id(transaction_id);
     }
 
     bool ShardClient::CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb)
     {
-        auto search = transactions_.find(transaction_id);
-        if (search == transactions_.end())
+        if (transaction_id != the_transaction_.transaction_id())
         {
             return false;
         }
 
-        auto &txn = search->second;
-
         // Read your own writes, check the write set first.
-        auto wsearch = txn.getWriteSet().find(key);
-        if (wsearch != txn.getWriteSet().end())
+        auto wsearch = the_transaction_.getWriteSet().find(key);
+        if (wsearch != the_transaction_.getWriteSet().end())
         {
             gcb(REPLY_OK, key, wsearch->second, Timestamp());
             return true;
         }
 
         // Consistent reads, check the read set.
-        auto rssearch = read_sets_.find(transaction_id);
-        if (rssearch != read_sets_.end())
+        auto rsearch = the_read_set_.find(key);
+        if (rsearch != the_read_set_.end())
         {
-            auto &read_set = rssearch->second;
-            auto rsearch = read_set.find(key);
-            if (rsearch != read_set.end())
-            {
-                gcb(REPLY_OK, key, rsearch->second, Timestamp());
-                return true;
-            }
+            gcb(REPLY_OK, key, rsearch->second, Timestamp());
+            return true;
         }
 
         return false;
@@ -219,10 +206,8 @@ namespace strongstore
         pendingGet.key = key;
         pendingGet.transaction_id = transaction_id;
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-        auto &t = search->second;
-        auto &start_ts = t.start_time();
+        ASSERT(transaction_id == the_transaction_.transaction_id());
+        auto &start_ts = the_transaction_.start_time();
 
         // TODO: Setup timeout
         get_.Clear();
@@ -244,24 +229,24 @@ namespace strongstore
         uint32_t idx = req_id % fanout_;
         auto &pendingGet = get_slots_[idx];
         ASSERT(pendingGet.in_use);
-        get_callback gcb = pendingGet.gcb;
-        std::string key = pendingGet.key;
+        get_callback &gcb = pendingGet.gcb;
+        std::string &key = pendingGet.key;
         uint64_t transaction_id = pendingGet.transaction_id;
 
         Debug("[%lu] [shard %i] Received GET reply: %s %d",
               transaction_id, shard_idx_, key.c_str(), status);
 
-        std::string val;
+        const std::string &val = reply.val();
         Timestamp ts;
         if (status == REPLY_OK)
         {
-            val = reply.val();
             ts = Timestamp(reply.timestamp());
         }
 
         Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        transactions_[transaction_id].addReadSet(key, ts);
-        read_sets_[transaction_id][key] = val;
+        ASSERT(the_transaction_.transaction_id() == transaction_id);
+        the_transaction_.addReadSet(key, ts);
+        the_read_set_[key] = val;
 
         pendingGet.in_use = false;
         gcb(status, key, val, ts);
@@ -271,11 +256,9 @@ namespace strongstore
                           put_callback pcb, put_timeout_callback ptcb,
                           uint32_t timeout)
     {
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
-        auto &t = search->second;
-        t.addWriteSet(key, value);
+        the_transaction_.addWriteSet(key, value);
 
         pcb(REPLY_OK, key, value);
     }
@@ -472,22 +455,20 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-
-        const auto &t = search->second;
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
         ASSERT(!pending_commit_slot_.in_use);
         pending_commit_slot_.ccb = ccb;
         pending_commit_slot_.in_use = true;
+        pending_commit_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_c_.Clear();
         rw_commit_c_.mutable_rid()->set_client_id(client_id_);
         rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
         rw_commit_c_.set_transaction_id(transaction_id);
-        t.serialize(rw_commit_c_.mutable_transaction());
+        the_transaction_.serialize(rw_commit_c_.mutable_transaction());
         nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
 
         for (int p : participants)
@@ -503,12 +484,13 @@ namespace strongstore
         uint64_t req_id = reply.rid().client_req_id();
 
         ASSERT(pending_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
-        rw_coord_commit_callback ccb = pending_commit_slot_.ccb;
+        rw_coord_commit_callback &ccb = pending_commit_slot_.ccb;
         uint64_t transaction_id = pending_commit_slot_.transaction_id;
         pending_commit_slot_.in_use = false;
 
-        transactions_.erase(transaction_id);
-        read_sets_.erase(transaction_id);
+        ASSERT(transaction_id == the_transaction_.transaction_id());
+        the_transaction_.clear();
+        the_read_set_.clear();
 
         Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
@@ -522,10 +504,7 @@ namespace strongstore
     {
         Debug("[%lu] [shard %i] Sending RWCommitParticipant", transaction_id, shard_idx_);
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-
-        const auto &t = search->second;
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
         PendingRWParticipantCommit *pendingCommit = new PendingRWParticipantCommit(transaction_id, req_id);
@@ -538,7 +517,7 @@ namespace strongstore
         rw_commit_p_.mutable_rid()->set_client_id(client_id_);
         rw_commit_p_.mutable_rid()->set_client_req_id(req_id);
         rw_commit_p_.set_transaction_id(transaction_id);
-        t.serialize(rw_commit_p_.mutable_transaction());
+        the_transaction_.serialize(rw_commit_p_.mutable_transaction());
         rw_commit_p_.set_coordinator_shard(coordinator_shard);
         nonblock_timestamp.serialize((rw_commit_p_.mutable_nonblock_timestamp()));
 
@@ -563,8 +542,9 @@ namespace strongstore
         pendingRWParticipantCommits.erase(itr);
         delete req;
 
-        transactions_.erase(transaction_id);
-        read_sets_.erase(transaction_id);
+        ASSERT(transaction_id == the_transaction_.transaction_id());
+        the_transaction_.clear();
+        the_read_set_.clear();
 
         ccb(reply.status());
     }
@@ -700,8 +680,8 @@ namespace strongstore
             auto &pendingGet = get_slots_[idx];
             if (pendingGet.in_use && pendingGet.transaction_id == transaction_id)
             {
-                get_callback gcb = pendingGet.gcb;
-                std::string key = pendingGet.key;
+                get_callback &gcb = pendingGet.gcb;
+                std::string &key = pendingGet.key;
 
                 pendingGet.in_use = false;
 
@@ -738,8 +718,9 @@ namespace strongstore
 
         if (reply.status() == REPLY_OK)
         {
-            transactions_.erase(transaction_id);
-            read_sets_.erase(transaction_id);
+            ASSERT(transaction_id == the_transaction_.transaction_id());
+            the_transaction_.clear();
+            the_read_set_.clear();
         }
 
         acb();

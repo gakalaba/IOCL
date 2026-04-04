@@ -863,7 +863,7 @@ namespace strongstore
 
         uint64_t req_id = last_req_id_++;
         if (pending_commit_slot_.in_use) {
-            Notice("I expect the outstanding_prepares to be 0 = %lu", pending_commit_slot_.outstandingPrepares);
+            Notice("I expect the outstanding_prepares to be 0 = %u", pending_commit_slot_.outstandingPrepares);
             Panic("Ok that means it can abort after we issue commit");
         }
         ASSERT(!pending_commit_slot_.in_use);

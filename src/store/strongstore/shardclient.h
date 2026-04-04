@@ -239,8 +239,8 @@ namespace strongstore
         void HandleAbortReply(const proto::AbortReply &reply);
         void HandleWound(const proto::Wound &wound);
 
-        std::unordered_map<uint64_t, Transaction> transactions_;
-        std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
+        Transaction the_transaction_;
+        std::unordered_map<std::string, std::string> the_read_set_;
 
         std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
         std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;

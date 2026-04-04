@@ -40,12 +40,17 @@ class Transaction {
     // Start time (used for deadlock prevention)
     Timestamp start_time_;
 
+    uint64_t transaction_id_;
+
    public:
     Transaction();
     Transaction(const TransactionMessage &msg);
     ~Transaction();
 
     const Timestamp &start_time() const;
+    void clear();
+    void set_transaction_id(uint64_t transaction_id);
+    uint64_t transaction_id();
     const std::unordered_map<std::string, Timestamp> &getReadSet() const;
     const std::unordered_map<std::string, std::string> &getWriteSet() const;
     std::unordered_map<std::string, std::string> &getWriteSet();
