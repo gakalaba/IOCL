@@ -28,7 +28,7 @@ message PrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
-    repeated Request request = 4;
+    repeated LinearizeableOperation request = 4;
     repeated uint64 shardTags = 5;
     repeated PredListHolder timestamp_chains = 6;
 }
@@ -43,7 +43,7 @@ message UnorderedPrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
-    repeated Request request = 4;
+    repeated LinearizeableOperation request = 4;
     repeated uint64 shardTags = 5;
     repeated PredListHolder predLists = 6;
 }
@@ -81,7 +81,7 @@ message StateTransferMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required replication.Request request = 3;
+        required replication.RequestIDMessage request = 3;
         optional uint32 state = 4;
         optional bytes hash = 5;
     }
@@ -100,7 +100,7 @@ message DoViewChangeMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required replication.Request request = 3;
+        required replication.RequestIDMessage request = 3;
         optional uint32 state = 4;
         optional bytes hash = 5;
     }
@@ -116,7 +116,7 @@ message StartViewMessage {
     message LogEntry {
         required uint64 view = 1;
         required uint64 opnum = 2;
-        required replication.Request request = 3;
+        required replication.RequestIDMessage request = 3;
         optional uint32 state = 4;
         optional bytes hash = 5;
     }

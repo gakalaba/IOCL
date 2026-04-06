@@ -1,4 +1,4 @@
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS request.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS common-proto.proto request.proto)
 
 file(GLOB SourceFiles "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
 

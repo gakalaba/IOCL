@@ -152,11 +152,11 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request &request = entry->request;
+                const LinearizeableOperation &request = entry->request;
 
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
-                ReplicaUpcall(request.slot_idx(), request.clientid(), request.clientreqid(), request.the_op(), request.key(), request.val());
+                ReplicaUpcall(request);
 
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
@@ -471,13 +471,7 @@ namespace replication
 
             // Add the request to my log
             LogEntry &entry = log.Append(v, LOG_STATE_PREPARED);
-            Request &request = entry.request;
-            request.mutable_the_op()->swap(*msg.mutable_op());
-            request.mutable_key()->swap(*msg.mutable_key());
-            request.mutable_val()->swap(*msg.mutable_value());
-            request.set_clientid(msg.rid().client_id());
-            request.set_clientreqid(msg.rid().client_req_id());
-            request.set_slot_idx(msg.idx());
+            entry.request.Swap(&msg);
 
             if (lastOp - lastBatchEnd + 1 > batchSize)
             {
@@ -519,8 +513,7 @@ namespace replication
                 Warning("Failed to send reply message");
         }
 
-        void VRReplica::HandlePrepare(const TransportAddress &remote,
-                                      const PrepareMessage &msg)
+        void VRReplica::HandlePrepare(const TransportAddress &remote, PrepareMessage &msg)
         {
             RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
                    msg.view(), msg.batchstart(), msg.opnum());
@@ -583,7 +576,7 @@ namespace replication
 
             /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
-            for (auto &req : msg.request())
+            for (int i = 0; i < msg.request_size(); i++)
             {
                 op++;
                 if (op <= lastOp)
@@ -592,13 +585,7 @@ namespace replication
                 }
                 this->lastOp++;
                 LogEntry &entry = log.Append(viewstamp_t(msg.view(), op), LOG_STATE_PREPARED);
-                Request &request = entry.request;
-                request.set_the_op(req.the_op());
-                request.set_key(req.key());
-                request.set_val(req.val());
-                request.set_clientid(req.clientid());
-                request.set_clientreqid(req.clientreqid());
-                request.set_slot_idx(req.slot_idx());
+                entry.request.Swap(msg.mutable_request(i));
                 // UpdateClientTable(req);
             }
             ASSERT(op == msg.opnum());
@@ -766,7 +753,7 @@ namespace replication
         }
 
         void VRReplica::HandleStateTransfer(const TransportAddress &remote,
-                                            const StateTransferMessage &msg)
+                                            StateTransferMessage &msg)
         {
             RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
 
@@ -819,13 +806,7 @@ namespace replication
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
                         LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
-                        Request &request = created_entry.request;
-                        request.set_the_op(newEntry.request().the_op());
-                        request.set_key(newEntry.request().key());
-                        request.set_val(newEntry.request().val());
-                        request.set_clientid(newEntry.request().clientid());
-                        request.set_clientreqid(newEntry.request().clientreqid());
-                        request.set_slot_idx(newEntry.request().slot_idx());
+                        // created_entry.request.Swap(&newEntry.request());
                         // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
                     }
                 }
@@ -838,13 +819,7 @@ namespace replication
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
                     // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
                     LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
-                    Request &request = created_entry.request;
-                    request.set_the_op(newEntry.request().the_op());
-                    request.set_key(newEntry.request().key());
-                    request.set_val(newEntry.request().val());
-                    request.set_clientid(newEntry.request().clientid());
-                    request.set_clientreqid(newEntry.request().clientreqid());
-                    request.set_slot_idx(newEntry.request().slot_idx());
+                    // created_entry.request.Swap(&newEntry.request());
                 }
             }
 

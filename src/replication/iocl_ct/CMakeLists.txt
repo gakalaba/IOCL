@@ -1,4 +1,4 @@
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_SOURCE_DIR}/replication/common/request.proto iocl_ct-proto.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_SOURCE_DIR}/replication/common/common-proto.proto ${CMAKE_SOURCE_DIR}/replication/common/request.proto iocl_ct-proto.proto)
 
 file(GLOB SourceFiles "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
 

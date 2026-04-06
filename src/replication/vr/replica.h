@@ -120,7 +120,7 @@ namespace replication
                                        const proto::UnloggedRequestMessage &msg);
 
             void HandlePrepare(const TransportAddress &remote,
-                               const proto::PrepareMessage &msg);
+                               proto::PrepareMessage &msg);
             void HandlePrepareOK(const TransportAddress &remote,
                                  const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
@@ -129,7 +129,7 @@ namespace replication
                 const TransportAddress &remote,
                 const proto::RequestStateTransferMessage &msg);
             void HandleStateTransfer(const TransportAddress &remote,
-                                     const proto::StateTransferMessage &msg);
+                                     proto::StateTransferMessage &msg);
             void HandleStartViewChange(const TransportAddress &remote,
                                        const proto::StartViewChangeMessage &msg);
             void HandleDoViewChange(const TransportAddress &remote,

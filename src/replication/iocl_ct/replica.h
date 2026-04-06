@@ -70,7 +70,7 @@ namespace replication
             };
             viewstamp_t viewstamp;
             IoclEntryState state;
-            Request request; // op, key, value, slot_idx, clientid, clientreqid
+            const LinearizeableOperation request; // op, key, value, slot_idx, clientid, clientreqid
             uint64_t myShardTag;
             proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
             uint64_t arrivalTs;
@@ -91,7 +91,7 @@ namespace replication
             uint8_t u_prepare_ok_count = 0;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request, uint64_t shardtag, uint64_t intkey)
+                    const LinearizeableOperation &request, uint64_t shardtag, uint64_t intkey)
                 : viewstamp(viewstamp),
                   state(state),
                   request(request),

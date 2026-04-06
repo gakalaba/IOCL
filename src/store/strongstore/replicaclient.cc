@@ -64,37 +64,10 @@ namespace strongstore
 
     ReplicaClient::~ReplicaClient() { delete client; }
 
-    // void ReplicaClient::SendOperation(uint64_t request_id,
-    //                      replication::LinearizeableOperation &msg,
-    //                      op_callback ocb, op_timeout_callback otcb,
-    //                      uint32_t timeout)
     void ReplicaClient::SendOperation(replication::LinearizeableOperation &msg)
     {
         client->Invoke(msg);
     }
-
-    // /* Callback from a shard replica on sendrequest operation completion. */
-    // bool ReplicaClient::SendOperationCallback(uint64_t reqId, const string &request_str,
-    //                                         const string &reply_str)
-    // {
-    //     Debug("Here in sendOperationCallback in replicaclient");
-    //     // LinearizeableReply reply;
-
-    //     // reply.ParseFromString(reply_str);
-
-    //     // Debug("[shard %i] Received SENDREQUEST callback [%d]", shard_idx_,
-    //     //       reply.status());
-    //     auto itr = this->pendingOperations.find(reqId);
-    //     ASSERT(itr != this->pendingOperations.end());
-    //     PendingOperation *pendingOperation = itr->second;
-    //     op_callback ocb = pendingOperation->ocb;
-    //     this->pendingOperations.erase(itr);
-    //     // delete pendingOperation;
-    //     // ocb(reply.status());
-    //     ocb(0);
-
-    //     return true;
-    // }
 
     void ReplicaClient::Prepare(uint64_t transaction_id,
                                 const Transaction &transaction,
@@ -107,9 +80,9 @@ namespace strongstore
 
         // create prepare request
         string request_str;
-        Request request;
-        request.set_op(Request::PREPARE);
-        request.set_txnid(transaction_id);
+        replication::LinearizeableOperation request;
+        request.set_request_type(replication::LinearizeableOperation::PREPARE);
+        request.set_transaction_id(transaction_id);
 
         auto prepare = request.mutable_prepare();
 
@@ -170,9 +143,9 @@ namespace strongstore
 
         // create commit request
         string request_str;
-        Request request;
-        request.set_op(Request::COMMIT);
-        request.set_txnid(transaction_id);
+        replication::LinearizeableOperation request;
+        request.set_request_type(replication::LinearizeableOperation::COMMIT);
+        request.set_transaction_id(transaction_id);
         commit_timestamp.serialize(
             request.mutable_commit()->mutable_commit_timestamp());
         request.SerializeToString(&request_str);
@@ -189,29 +162,6 @@ namespace strongstore
         //          std::placeholders::_1, std::placeholders::_2));
     }
 
-    // /* Callback from a shard replica on commit operation completion. */
-    // bool ReplicaClient::CommitCallback(uint64_t reqId, const string &request_str,
-    //                                    const string &reply_str)
-    // {
-    //     // COMMITs always succeed.
-    //     Reply reply;
-    //     reply.ParseFromString(reply_str);
-    //     ASSERT(reply.status() == REPLY_OK);
-
-    //     Debug("[shard %i] Received COMMIT callback [%d]", shard_idx_,
-    //           reply.status());
-
-    //     auto itr = this->pendingCommits.find(reqId);
-    //     ASSERT(itr != pendingCommits.end());
-    //     PendingCommit *pendingCommit = itr->second;
-    //     commit_callback ccb = pendingCommit->ccb;
-    //     this->pendingCommits.erase(itr);
-    //     delete pendingCommit;
-    //     ccb(COMMITTED);
-
-    //     return true;
-    // }
-
     void ReplicaClient::Abort(uint64_t transaction_id, abort_callback acb,
                               abort_timeout_callback atcb, uint32_t timeout)
     {
@@ -219,9 +169,9 @@ namespace strongstore
 
         // create commit request
         string request_str;
-        Request request;
-        request.set_op(Request::ABORT);
-        request.set_txnid(transaction_id);
+        replication::LinearizeableOperation request;
+        request.set_request_type(replication::LinearizeableOperation::ABORT);
+        request.set_transaction_id(transaction_id);
         request.SerializeToString(&request_str);
 
         uint64_t reqId = lastReqId++;

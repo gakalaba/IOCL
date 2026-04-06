@@ -105,21 +105,21 @@ Log::SetStatus(opnum_t op, LogEntryState state)
     return true;
 }
 
-bool
-Log::SetRequest(opnum_t op, const Request &req)
-{
-    if (useHash) {
-        Panic("Log::SetRequest on hashed log not supported.");
-    }
+// bool
+// Log::SetRequest(opnum_t op, const LinearizeableOperation &req)
+// {
+//     if (useHash) {
+//         Panic("Log::SetRequest on hashed log not supported.");
+//     }
     
-    LogEntry *entry = Find(op);
-    if (entry == NULL) {
-        return false;
-    }
+//     LogEntry *entry = Find(op);
+//     if (entry == NULL) {
+//         return false;
+//     }
 
-    entry->request = req;
-    return true;
-}
+//     entry->request = req;
+//     return true;
+// }
 
 void
 Log::RemoveAfter(opnum_t op)
@@ -208,11 +208,12 @@ Log::ComputeHash(string lastHash, const LogEntry &entry)
     SHA1_Update(&ctx, lastHash.c_str(), lastHash.size());
     SHA1_Update(&ctx, &entry.viewstamp, sizeof(entry.viewstamp));
     uint64_t x;
-    x = entry.request.clientid();
+    x = entry.request.rid().client_id();
     SHA1_Update(&ctx, &x, sizeof(x));
-    x = entry.request.clientreqid();
+    x = entry.request.rid().client_req_id();
     // concatonate the op, key and value strings into one
-    string concat = entry.request.the_op() + entry.request.key() + entry.request.val();
+    std::string op = (entry.request.kv().op() % 2 == 0) ? "get" : "put";
+    string concat = op + entry.request.kv().key() + entry.request.kv().value();
     SHA1_Update(&ctx, &x, sizeof(x));
     SHA1_Update(&ctx, concat.c_str(),
                 concat.size());

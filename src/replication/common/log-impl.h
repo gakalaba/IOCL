@@ -47,7 +47,7 @@ Log::Dump(opnum_t from, T out)
         elem->set_opnum(entry->viewstamp.opnum);
         elem->set_state(entry->state);
         elem->set_hash(entry->hash);
-        *(elem->mutable_request()) = entry->request;        
+        // *(elem->mutable_request()) = entry->request.rid;
     }
 }
 
@@ -78,16 +78,16 @@ Log::Install(iter start, iter end)
     }
 
     // Install the new log entries
-    for (; it != end; it++) {
-        viewstamp_t vs = { it->view(), it->opnum() };
-        LogEntry &entry = Append(vs, LOG_STATE_PREPARED);
-        entry.request.set_the_op(it->request().the_op());
-        entry.request.set_key(it->request().key());
-        entry.request.set_val(it->request().val());
-        entry.request.set_clientid(it->request().clientid());
-        entry.request.set_clientreqid(it->request().clientreqid());
-        entry.request.set_slot_idx(it->request().slot_idx());
-    }
+    // for (; it != end; it++) {
+    //     viewstamp_t vs = { it->view(), it->opnum() };
+    //     LogEntry &entry = Append(vs, LOG_STATE_PREPARED);
+    //     entry.request.kv().set_op(it->request().kv().op());
+    //     entry.request.kv().set_key(it->request().kv().key());
+    //     entry.request.kv().set_value(it->request().kv().val());
+    //     entry.request.rid().set_client_id(it->request().clientid());
+    //     entry.request.rid().set_client_req_id(it->request().clientreqid());
+    //     entry.request.kv().set_idx(it->request().kv().idx());
+    // }
 }
 
 #endif  /* _COMMON_LOG_IMPL_H_ */

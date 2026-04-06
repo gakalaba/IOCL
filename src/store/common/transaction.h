@@ -13,8 +13,8 @@
 
 #include "lib/assert.h"
 #include "lib/message.h"
-#include "store/common/common-proto.pb.h"
 #include "store/common/timestamp.h"
+#include "replication/common/common-proto.pb.h"
 
 // Reply types
 #define REPLY_OK 0
@@ -40,7 +40,7 @@ class Transaction {
     // Start time (used for deadlock prevention)
     Timestamp start_time_;
 
-    uint64_t transaction_id_;
+    uint64_t transaction_id_ = 0;
 
    public:
     Transaction();

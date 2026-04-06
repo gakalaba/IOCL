@@ -145,7 +145,7 @@ namespace strongstore
     /* Sends BEGIN to a single shard indexed by i. */
     void ShardClient::Begin(uint64_t transaction_id, const Timestamp &start_time)
     {
-        ASSERT(transaction_id != the_transaction_.transaction_id());
+        ASSERT((transaction_id != the_transaction_.transaction_id()) || transaction_id == 0);
         the_transaction_.set_start_time(start_time);
         the_transaction_.set_transaction_id(transaction_id);
     }
@@ -281,13 +281,25 @@ namespace strongstore
         pendingOp.ocb = ocb;
 
         op_.Clear();
+        op_.set_request_type(replication::LinearizeableOperation::KV_OP);
         op_.mutable_rid()->set_client_id(client_id_);
         op_.mutable_rid()->set_client_req_id(req_id);
         op_.set_transaction_id(app_request_id);
-        op_.set_key(key);
-        op_.set_value(value);
-        op_.set_op(op);
-        op_.set_idx(0); // slot index is decided at the server
+        op_.mutable_kv()->set_key(key);
+        op_.mutable_kv()->set_value(value);
+        if (op == "get")
+        {
+            op_.mutable_kv()->set_op(replication::KVOpMessage::GET);
+        }
+        else if (op == "put")
+        {
+            op_.mutable_kv()->set_op(replication::KVOpMessage::PUT);
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        op_.mutable_kv()->set_idx(0); // slot index is decided at the server
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)

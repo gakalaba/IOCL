@@ -242,18 +242,13 @@ namespace replication
                     ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
                     ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
                     /* We can immediately execute this entry */
-                    ReplicaUpcall(entry->request.slot_idx(),
-                                    entry->request.clientid(),
-                                    entry->request.clientreqid(),
-                                    entry->request.the_op(),
-                                    entry->request.key(),
-                                    entry->request.val());
+                    ReplicaUpcall(entry->request);
                     return;
                 }
 
                 /* Replica path: */
                 /* Execute it */
-                ReplicaUpcall(entry->request.slot_idx(), entry->request.clientid(), entry->request.clientreqid(), entry->request.the_op(), entry->request.key(), entry->request.val());
+                ReplicaUpcall(entry->request);
             }
         }
 
@@ -650,21 +645,23 @@ namespace replication
             v.opnum = this->lastUnorderedOp;
 
             // Add the request to the unordered bag
-            Request request;
-            request.set_the_op(msg.op());
-            request.set_key(msg.key());
-            request.set_val(msg.value());
+            LinearizeableOperation request;
+
+            ASSERT((msg.request_type() == replication::LinearizeableOperation::KV_OP) && msg.has_kv());
+            request.mutable_kv()->set_op(msg.kv().op());
+            request.mutable_kv()->set_key(msg.kv().key());
+            request.mutable_kv()->set_value(msg.kv().value());
             // request.mutable_the_op()->swap(*msg.mutable_op());
             // request.mutable_key()->swap(*msg.mutable_key());
             // request.mutable_val()->swap(*msg.mutable_value());
-            request.set_clientid(msg.rid().client_id());
-            request.set_clientreqid(msg.rid().client_req_id());
-            request.set_slot_idx(msg.idx());
+            request.mutable_rid()->set_client_id(msg.rid().client_id());
+            request.mutable_rid()->set_client_req_id(msg.rid().client_req_id());
+            request.mutable_kv()->set_idx(msg.kv().idx());
 
             uint64_t shardtag = msg.shardtag();
 
             uint32_t idx = entryStore.size();
-            entryStore.emplace_back(v, IOCL_STATE_ARRIVED, request, shardtag, msg.intkey());
+            entryStore.emplace_back(v, IOCL_STATE_ARRIVED, msg, shardtag, msg.intkey());
             IoclEntry &entry = Entry(idx);
             ASSERT(entry.viewstamp.opnum - 1 == idx);
             // Grab the msg.predlist() efficiently and store
@@ -759,12 +756,7 @@ namespace replication
                 /* Remove from sublog */
                 sublog.head++;
                 /* Execute it */
-                ReplicaUpcall(head_entry->request.slot_idx(),
-                      head_entry->request.clientid(),
-                      head_entry->request.clientreqid(),
-                      head_entry->request.the_op(),
-                      head_entry->request.key(),
-                      head_entry->request.val());
+                ReplicaUpcall(head_entry->request);
             }
             if (sublog.head == sublog.ops.size()) {
                 /* If we've executed everything in the sublog, remove it to save space */

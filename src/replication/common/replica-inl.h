@@ -32,9 +32,9 @@
 #define _COMMON_REPLICA_INL_H_
 
 template <class MSG>
-void Replica::Execute(opnum_t opnum, const Request &msg, MSG &reply) {
+void Replica::Execute(opnum_t opnum, const LinearizeableOperation &msg, MSG &reply) {
     Panic("Don't use this");
-    ReplicaUpcall(0, 0, 0, "", "", "");
+    ReplicaUpcall(msg);
 
     // reply.set_reply(res);
 }

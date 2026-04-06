@@ -67,10 +67,10 @@ void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
     Debug("Upcall returned");
 }
 
-void Replica::ReplicaUpcall(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
+void Replica::ReplicaUpcall(const LinearizeableOperation &msg)
     {
         // Debug("Making executable upcall for opnum %lu operation %s and key %s and value %s", opnum, op.c_str(), k.c_str(), v.c_str());
-        app->ReplicaUpcall(idx, clientid, client_req_id, op, k, v);
+        app->ReplicaUpcall(msg);
 
         // Debug("Upcall result: %s", res.c_str());
     }

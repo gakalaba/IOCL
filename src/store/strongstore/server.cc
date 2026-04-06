@@ -60,7 +60,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           consistency_{consistency},
-          debug_stats_{debug_stats}
+          debug_stats_{debug_stats},
+          rw_commit_c_slots_(30000)
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -77,15 +78,12 @@ namespace strongstore
             Panic("Debug stats disabled!");
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
-        dummyTimestamp = Timestamp(0, 0);
         int N = 30000;
-        slots_.resize(N);
-        free_slots_.reserve(N);
+        get_slots_.resize(N);
+        free_get_slots_.reserve(N);
         for (uint32_t i = 0; i < N; i++) {
-            free_slots_.push_back(N - 1 - i);
+            free_get_slots_.push_back(N - 1 - i);
         }
-        // dummypending = new PendingOperationReply(0, 0, NULL);
-
         // Debug event loop delay
         // expected_fire_us = 0;
         // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
@@ -106,7 +104,8 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency}
+          consistency_{consistency},
+          op_slots_(30000)
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -124,12 +123,7 @@ namespace strongstore
             Panic("Debug stats disabled!");
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
-        int N = 30000;
-        slots_.resize(N);
-        free_slots_.reserve(N);
-        for (uint32_t i = 0; i < N; i++) {
-            free_slots_.push_back(N - 1 - i);
-        }
+
         // Debug event loop delay
         // expected_fire_us = 0;
         // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
@@ -258,92 +252,90 @@ namespace strongstore
     void Server::HandleGet(const TransportAddress &remote, proto::Get &msg)
     {
         Debug("getting Get with req_id = %lu", msg.rid().client_req_id());
-        get_reply_.Clear();
-        get_reply_.mutable_rid()->CopyFrom(msg.rid());
-        get_reply_.set_status(REPLY_OK);
-        transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
-        // uint64_t client_id = msg.rid().client_id();
-        // uint64_t client_req_id = msg.rid().client_req_id();
-        // uint64_t transaction_id = msg.transaction_id();
+        uint64_t transaction_id = msg.transaction_id();
+        const std::string &key = msg.key();
+        const Timestamp timestamp{msg.timestamp()};
+        bool for_update = msg.has_for_update() && msg.for_update();
 
-        // const std::string &key = msg.key();
-        // const Timestamp timestamp{msg.timestamp()};
+        Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
 
-        // bool for_update = msg.has_for_update() && msg.for_update();
+        transactions_.StartGet(transaction_id, remote, key, for_update);
 
-        // Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
+        LockAcquireResult r;
+        if (for_update)
+        {
+            r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
+        }
+        else
+        {
+            r = locks_.AcquireReadLock(transaction_id, timestamp, key);
+        }
 
-        // transactions_.StartGet(transaction_id, remote, key, for_update);
+        if (r.status == LockStatus::ACQUIRED)
+        {
+            ASSERT(r.wound_rws.size() == 0);
 
-        // LockAcquireResult r;
-        // if (for_update)
-        // {
-        //     r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
-        // }
-        // else
-        // {
-        //     r = locks_.AcquireReadLock(transaction_id, timestamp, key);
-        // }
+            std::pair<TimestampID, std::string> value;
+            // read the value from the store! this doesn't need to be replicated
+            ASSERT(store_.get(key, value));
 
-        // if (r.status == LockStatus::ACQUIRED)
-        // {
-        //     ASSERT(r.wound_rws.size() == 0);
+            get_reply_.Clear();
+            get_reply_.mutable_rid()->CopyFrom(msg.rid());
+            get_reply_.set_status(REPLY_OK);
 
-        //     std::pair<TimestampID, std::string> value;
-        //     // read the value from the store! this doesn't need to be replicated
-        //     ASSERT(store_.get(key, value));
+            get_reply_.set_val(value.second);
+            value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
-        //     get_reply_.Clear();
-        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
-        //     get_reply_.set_status(REPLY_OK);
-        //     get_reply_.set_key(msg.key());
+            // respond back to the client (shard client)
+            transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-        //     get_reply_.set_val(value.second);
-        //     value.first.timestamp.serialize(get_reply_.mutable_timestamp());
+            transactions_.FinishGet(transaction_id, key);
+        }
+        else if (r.status == LockStatus::FAIL)
+        {
+            Panic("Don't think we should be able to enter this case without WaitDie implemented??");
+            ASSERT(r.wound_rws.size() == 0);
 
-        //     // respond back to the client (shard client)
-        //     transport_->SendMessage(this, remote, get_reply_);
+            get_reply_.Clear();
+            get_reply_.mutable_rid()->CopyFrom(msg.rid());
+            get_reply_.set_status(REPLY_FAIL);
 
-        //     transactions_.FinishGet(transaction_id, key);
-        // }
-        // else if (r.status == LockStatus::FAIL)
-        // {
-        //     Panic("Don't think we should be able to enter this case without WaitDie implemented??");
-        //     ASSERT(r.wound_rws.size() == 0);
+            transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-        //     get_reply_.Clear();
-        //     get_reply_.mutable_rid()->CopyFrom(msg.rid());
-        //     get_reply_.set_status(REPLY_FAIL);
-        //     get_reply_.set_key(msg.key());
+            const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
-        //     transport_->SendMessage(this, remote, get_reply_);
+            LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+            transactions_.AbortGet(transaction_id, key);
 
-        //     const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+            NotifyPendingRWs(transaction_id, rr.notify_rws);
+        }
+        else if (r.status == LockStatus::WAITING)
+        {
+            // Grab an idx
+            ASSERT(!free_get_slots_.empty());
+            uint32_t idx = free_get_slots_.back();
+            free_get_slots_.pop_back();
 
-        //     LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        //     transactions_.AbortGet(transaction_id, key);
+            // Set fields
+            PendingGetReplySlot &reply = get_slots_[idx];
+            ASSERT(!reply.in_use);
+            reply.in_use = true;
+            reply.remote = &remote;
+            reply.client_id = msg.rid().client_id();
+            reply.client_req_id = msg.rid().client_req_id();
+            reply.key = key;
 
-        //     NotifyPendingRWs(transaction_id, rr.notify_rws);
-        // }
-        // else if (r.status == LockStatus::WAITING)
-        // {
-        //     auto reply = new PendingGetReply(client_id, client_req_id, remote.clone());
-        //     reply->key = key;
+            // Add to map from transaction_id to pending get slots
+            transaction_id_to_get_slots_[transaction_id].push_back(idx);
 
-        //     if (pending_get_replies_.find(transaction_id) == pending_get_replies_.end()) {
-        //         // create empty vector
-        //         pending_get_replies_[transaction_id] = std::vector<PendingGetReply *>();
-        //     }
-        //     pending_get_replies_[transaction_id].push_back(reply);
+            transactions_.PauseGet(transaction_id, key);
 
-        //     transactions_.PauseGet(transaction_id, key);
-
-        //     WoundPendingRWs(transaction_id, r.wound_rws);
-        // }
-        // else
-        // {
-        //     NOT_REACHABLE();
-        // }
+            WoundPendingRWs(transaction_id, r.wound_rws);
+        }
+        else
+        {
+            NOT_REACHABLE();
+        }
     }
 
     void Server::HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg)
@@ -352,15 +344,10 @@ namespace strongstore
         Debug("Calling HandleSendOperation! with msg.req_id = %lu", msg.rid().client_req_id());
 
         // Grab an idx
-        ASSERT(!free_slots_.empty());
-        uint32_t idx = free_slots_.back();
-        free_slots_.pop_back();
-
-        PendingOpReplySlot &reply = slots_[idx];
-        ASSERT(!reply.in_use);
-        reply.in_use = true;
+        uint32_t idx = op_slots_->Alloc();
+        PendingOpReplySlot &reply = op_slots_->GetByIdx(idx);
         reply.remote = &remote;
-        msg.set_idx(idx);
+        msg.mutable_kv()->set_idx(idx);
 
         transport_->TimerMicro(0, [this, m = std::move(msg)]() mutable {
             this->replica_->HandleRequest(m);
@@ -376,104 +363,102 @@ namespace strongstore
 
     void Server::ContinueGetAbort(uint64_t transaction_id)
     {
-        auto search = pending_get_replies_.find(transaction_id);
-        if (search == pending_get_replies_.end())
+        auto search = transaction_id_to_get_slots_.find(transaction_id);
+        if (search == transaction_id_to_get_slots_.end())
         {
             return;
         }
 
-        auto &replies = search->second;
+        auto &idxs = search->second;
 
-        for (auto reply : replies) {
-            uint64_t client_id = reply->rid.client_id();
-            uint64_t client_req_id = reply->rid.client_req_id();
-            const TransportAddress *remote = reply->rid.addr();
+        for (uint32_t idx : idxs) {
+            auto &reply = get_slots_[idx];
+            ASSERT(reply.in_use);
 
-            const std::string &key = reply->key;
-
-            Debug("[%lu] Aborting GET request %s", transaction_id, key.c_str());
+            // Debug("[%lu] Aborting GET request %s", transaction_id, key.c_str());
 
             get_reply_.Clear();
-            get_reply_.mutable_rid()->set_client_id(client_id);
-            get_reply_.mutable_rid()->set_client_req_id(client_req_id);
+            get_reply_.mutable_rid()->set_client_id(reply.client_id);
+            get_reply_.mutable_rid()->set_client_req_id(reply.client_req_id);
             get_reply_.set_status(REPLY_FAIL);
             // ANJATODO any other logic that is for locks!?!?!?
 
-            TransactionState s = transactions_.ContinueGet(transaction_id, key);
+            TransactionState s = transactions_.ContinueGet(transaction_id, reply.key);
             ASSERT(s == ABORTED);
 
-            transport_->SendMessage(this, *remote, get_reply_);
+            transport_->SendMessage(this, *reply.remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-            delete remote;
-            delete reply;
+            reply.in_use = false;
+            reply.remote = nullptr;
+            reply.key.clear();
+            free_get_slots_.push_back(idx);
         }
-        pending_get_replies_.erase(transaction_id);
+        transaction_id_to_get_slots_.erase(search);
     }
 
     void Server::ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& prevHolderWriteSet)
     {
         // Have a set of keys from the holder Transaction, need to see which ones 
         // overlap with the set of keys from the transaction_id we want to carry on with
-        auto search = pending_get_replies_.find(transaction_id);
-        if (search == pending_get_replies_.end())
+        auto search = transaction_id_to_get_slots_.find(transaction_id);
+        if (search == transaction_id_to_get_slots_.end())
         {
             return;
         }
 
-        auto &replies = search->second;
-        PendingGetReply *reply = nullptr;
-        for (auto it = replies.begin(); it != replies.end(); ) {
-            reply = *it;
-            if (locks_.HasReadLock(transaction_id, reply->key)) {
-                // ASSERT(prevHolderWriteSet.find(reply->key) != prevHolderWriteSet.end());
-
-                uint64_t client_id = reply->rid.client_id();
-                uint64_t client_req_id = reply->rid.client_req_id();
-                const TransportAddress *remote = reply->rid.addr();
+        auto &idxs = search->second;
+        for (size_t i = 0; i < idxs.size(); ) {
+            uint32_t idx = idxs[i];
+            auto &reply = get_slots_[idx];
+            ASSERT(reply.in_use);
+            if (locks_.HasReadLock(transaction_id, reply.key)) {
+                // ASSERT(prevHolderWriteSet.find(reply.key) != prevHolderWriteSet.end());
                 get_reply_.Clear();
-                get_reply_.mutable_rid()->set_client_id(client_id);
-                get_reply_.mutable_rid()->set_client_req_id(client_req_id);
+                get_reply_.mutable_rid()->set_client_id(reply.client_id);
+                get_reply_.mutable_rid()->set_client_req_id(reply.client_req_id);
 
-                TransactionState s = transactions_.ContinueGet(transaction_id, reply->key);
+                TransactionState s = transactions_.ContinueGet(transaction_id, reply.key);
                 if (s == READING)
                 {
-                    // ASSERT(locks_.HasReadLock(transaction_id, reply->key));
+                    // ASSERT(locks_.HasReadLock(transaction_id, reply.key));
 
                     std::pair<TimestampID, std::string> value;
-                    ASSERT(store_.get(reply->key, value));
+                    ASSERT(store_.get(reply.key, value));
 
                     get_reply_.set_status(REPLY_OK);
                     get_reply_.set_val(value.second);
 
                     value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
-                    transport_->SendMessage(this, *remote, get_reply_);
+                    transport_->SendMessage(this, *reply.remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-                    transactions_.FinishGet(transaction_id, reply->key);
+                    transactions_.FinishGet(transaction_id, reply.key);
                 }
                 else if (s == ABORTED)
                 {
                     Panic("Shouldn't we be handling this only from ContinueGetAbort?????");
                     // Already aborted
                     get_reply_.set_status(REPLY_FAIL);
-                    transport_->SendMessage(this, *remote, get_reply_);
+                    transport_->SendMessage(this, *reply.remote, MsgType::GET_REPLY_TYPE, get_reply_);
                 }
                 else
                 {
                     NOT_REACHABLE();
                 }
 
-                auto next_it = replies.erase(it);
-                delete remote;
-                delete reply;
-                it = next_it;
+                reply.in_use = false;
+                reply.remote = nullptr;
+                reply.key.clear();
+                free_get_slots_.push_back(idx);
+                idxs[i] = idxs.back();
+                idxs.pop_back();
             } else {
-                ++it;
+                ++i;
             }
         }
 
-        if (replies.size() == 0) {
-            pending_get_replies_.erase(transaction_id);
+        if (idxs.empty()) {
+            transaction_id_to_get_slots_.erase(search);
         }
     }
 
@@ -540,7 +525,7 @@ namespace strongstore
             if (transaction_id != waiting_rw)
             {
                 Debug("[%lu] continuing %lu", transaction_id, waiting_rw);
-                ASSERT(pending_get_replies_.find(waiting_rw) == pending_get_replies_.end());
+                ASSERT(transaction_id_to_get_slots_.find(waiting_rw) == transaction_id_to_get_slots_.end());
                 // ContinueGet(waiting_rw);
                 ContinueCoordinatorPrepare(waiting_rw);
                 ContinueParticipantPrepare(waiting_rw);
@@ -758,6 +743,36 @@ namespace strongstore
         }
     }
 
+    void Server::ReplicateCoordinatorCommit(uint64_t client_id,
+                uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
+                const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
+                const std::unordered_set<int> &participants)
+    {
+        LinearizeableOperation commit_op;
+        commit_op.Clear();
+        commit_op.set_request_type(replication::LinearizeableOperation::COMMIT);
+        commit_op.mutable_rid()->set_client_id(client_id);
+        commit_op.mutable_rid()->set_client_req_id(client_req_id);
+        commit_op.set_transaction_id(transaction_id);
+
+        auto prepare = commit_op.mutable_prepare();
+
+        transaction.serialize(prepare->mutable_txn());
+        start_ts.serialize(prepare->mutable_timestamp());
+        prepare->set_coordinator(shard_idx_);
+        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+        for (int p : participants)
+        {
+            prepare->add_participants(p);
+        }
+
+        commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
+
+        transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
+    }
+
     void Server::HandleRWCommitCoordinator(const TransportAddress &remote, proto::RWCommitCoordinator &msg)
     {
         uint64_t client_id = msg.rid().client_id();
@@ -765,154 +780,101 @@ namespace strongstore
 
         uint64_t transaction_id = msg.transaction_id();
 
-        // std::unordered_set<int> participants{msg.participants().begin(),
-        //                                      msg.participants().end()};
+        std::unordered_set<int> participants{msg.participants().begin(),
+                                             msg.participants().end()};
 
-        // const Transaction transaction{msg.transaction()};
-        // const Timestamp nonblock_ts{msg.nonblock_timestamp()};
+        const Transaction transaction{msg.transaction()};
+        const Timestamp nonblock_ts{msg.nonblock_timestamp()};
 
-        // Debug("[%lu] Coordinator for transaction", transaction_id);
+        Debug("[%lu] Coordinator for transaction", transaction_id);
 
-        // const TrueTimeInterval now = tt_.Now();
-        // const Timestamp start_ts{now.latest(), client_id};
-        // TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
-        //                                                            participants, transaction, nonblock_ts);
+        const TrueTimeInterval now = tt_.Now();
+        const Timestamp start_ts{now.latest(), client_id};
+        TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
+                                                                   participants, transaction, nonblock_ts);
 
-        // if (s == PREPARING)
-        // {
-        //     // Debug("[%lu] Coordinator preparing", transaction_id);
+        if (s == PREPARING)
+        {
+            // Debug("[%lu] Coordinator preparing", transaction_id);
 
-        //     LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-        //     if (ar.status == LockStatus::ACQUIRED)
-        //     {
-        //         ASSERT(ar.wound_rws.size() == 0);
-        //         const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
-        //         transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
-        //         const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
+            LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+            if (ar.status == LockStatus::ACQUIRED)
+            {
+                ASSERT(ar.wound_rws.size() == 0);
+                const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
+                transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
+                const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
-        //         auto *reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-        //         auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-        //         if (!inserted.second) {
-        //             Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-        //         }
-        //         // pending_rw_commit_c_replies_[transaction_id] = reply;
+                // Grab an idx
+                uint32_t idx = rw_commit_c_slots_->Alloc(transaction_id);
+                PendingRWCommitCoordinatorReplySlot &reply = rw_commit_c_slots_->GetByIdx(idx);
+                reply.remote = &remote;
+                reply.client_id = client_id;
+                reply.client_req_id = client_req_id;
+                Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", client_req_id, idx);
+                ReplicateCoordinatorCommit(client_id, client_req_id,
+                        transaction_id, transaction, start_ts, nonblock_ts, commit_ts, participants);
+            }
+            else if (ar.status == LockStatus::FAIL)
+            {
+                Panic("uhhh i don't think this can happen without WaitDie implemented??");
+                ASSERT(ar.wound_rws.size() == 0);
+                // Debug("[%lu] Coordinator prepare failed", transaction_id);
+                LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
-        //         // TODO: Handle timeout
-        //         replica_client_->CoordinatorCommit(
-        //             transaction_id, start_ts, shard_idx_,
-        //             participants, transaction, nonblock_ts, commit_ts,
-        //             std::bind(&Server::CommitCoordinatorCallback, this,
-        //                       transaction_id, std::placeholders::_1),
-        //             []() {}, COMMIT_TIMEOUT);
-        //     }
-        //     else if (ar.status == LockStatus::FAIL)
-        //     {
-        //         Panic("uhhh i don't think this can happen without WaitDie implemented??");
-        //         ASSERT(ar.wound_rws.size() == 0);
-        //         // Debug("[%lu] Coordinator prepare failed", transaction_id);
-        //         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+                SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
 
-        //         SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
+                NotifyPendingRWs(transaction_id, rr.notify_rws);
 
-        //         NotifyPendingRWs(transaction_id, rr.notify_rws);
+                transactions_.AbortPrepare(transaction_id);
+            }
+            else if (ar.status == LockStatus::WAITING)
+            {
+                Debug("[%lu] Waiting", transaction_id);
+                // Grab an idx
+                uint32_t idx = rw_commit_c_slots_->Alloc(transaction_id);
+                PendingRWCommitCoordinatorReplySlot &reply = rw_commit_c_slots_->GetByIdx(idx);
+                reply.remote = &remote;
+                reply.client_id = client_id;
+                reply.client_req_id = client_req_id;
 
-        //         transactions_.AbortPrepare(transaction_id);
-        //     }
-        //     else if (ar.status == LockStatus::WAITING)
-        //     {
-        //         Debug("[%lu] Waiting", transaction_id);
+                transactions_.PausePrepare(transaction_id);
 
-        //         auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-        //         auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-        //         if (!inserted.second) {
-        //             Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-        //         }
-        //         // pending_rw_commit_c_replies_[transaction_id] = reply;
+                WoundPendingRWs(transaction_id, ar.wound_rws);
+            }
+            else
+            {
+                NOT_REACHABLE();
+            }
+        }
+        else if (s == ABORTED)
+        {
+            // Debug("[%lu] Already aborted", transaction_id);
 
-        //         transactions_.PausePrepare(transaction_id);
+            SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
 
-        //         WoundPendingRWs(transaction_id, ar.wound_rws);
-        //     }
-        //     else
-        //     {
-        //         NOT_REACHABLE();
-        //     }
-        // }
-        // else if (s == ABORTED)
-        // {
-        //     // Debug("[%lu] Already aborted", transaction_id);
-
-        //     SendRWCommmitCoordinatorReplyFail(remote, client_id, client_req_id);
-
-        //     SendAbortParticipants(transaction_id, participants);
-        // }
-        // else if (s == WAIT_PARTICIPANTS)
-        // {
-        //     // Debug("[%lu] Waiting for other participants", transaction_id);
-
-        //     auto reply = new PendingRWCommitCoordinatorReply(client_id, client_req_id, remote.clone());
-        //     auto inserted = pending_rw_commit_c_replies_.insert({transaction_id, reply});
-        //     if (!inserted.second) {
-        //         Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", transaction_id);
-        //     }
-        //     // pending_rw_commit_c_replies_[transaction_id] = reply;
-        // }
-        // else
-        // {
-        //     NOT_REACHABLE();
-        // }
-
-        // Grab an idx
-        ASSERT(!free_slots_.empty());
-        uint32_t idx = free_slots_.back();
-        free_slots_.pop_back();
-
-        // auto *reply = new PendingRWCommitCoordinatorReply(0, 0, remote.clone());
-        // auto inserted = pending_rw_commit_c_replies_.insert({req_id, reply});
-        // if (!inserted.second) {
-        //     Panic("Duplicate RWCommitCoordinator request for transaction_id = %lu", req_id);
-        // }
-        // pending_rw_commit_c_replies_[transaction_id] = reply;
-        PendingOpReplySlot &reply = slots_[idx];
-        ASSERT(!reply.in_use);
-        reply.in_use = true;
-        reply.remote = &remote;
-        reply.client_id = client_id;
-        reply.client_req_id = client_req_id;
-
-        // TODO: Handle timeout
-        auto participants = std::unordered_set<int>();
-        Transaction transaction = {};
-        Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", client_req_id, idx);
-        LinearizeableOperation commit_op;
-        commit_op.Clear();
-        commit_op.mutable_rid()->set_client_id(client_id);
-        commit_op.mutable_rid()->set_client_req_id(transaction_id);
-        commit_op.set_transaction_id(transaction_id);
-        commit_op.set_op("COMMIT");
-        commit_op.set_key("");
-        commit_op.set_value("");
-        commit_op.set_idx(idx);
-
-        transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
-            this->replica_->HandleRequest(m);
-        });
+            SendAbortParticipants(transaction_id, participants);
+        }
+        else if (s == WAIT_PARTICIPANTS)
+        {
+            // Debug("[%lu] Waiting for other participants", transaction_id);
+            // Grab an idx
+            uint32_t idx = rw_commit_c_slots_->Alloc(transaction_id);
+            PendingRWCommitCoordinatorReplySlot &reply = rw_commit_c_slots_->GetByIdx(idx);
+            reply.remote = &remote;
+            reply.client_id = client_id;
+            reply.client_req_id = client_req_id;
+        }
+        else
+        {
+            NOT_REACHABLE();
+        }
     }
 
     void Server::ContinueCoordinatorPrepare(uint64_t transaction_id)
     {
-        auto search = pending_rw_commit_c_replies_.find(transaction_id);
-        if (search == pending_rw_commit_c_replies_.end())
-        {
-            return;
-        }
-        Debug("[%lu] Cont coord prep", transaction_id);
-
-        PendingRWCommitCoordinatorReply *reply = search->second;
-
-        uint64_t client_id = reply->rid.client_id();
-        uint64_t client_req_id = reply->rid.client_req_id();
-        const TransportAddress *remote = reply->rid.addr();
+        // This should never hit an assertion error?? although i guess we'll see when we start aborting
+        PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
 
         TransactionState s = transactions_.ContinuePrepare(transaction_id);
         if (s == PREPARING)
@@ -922,21 +884,13 @@ namespace strongstore
             if (ar.status == LockStatus::ACQUIRED)
             {
                 ASSERT(ar.wound_rws.size() == 0);
-                const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
+                const Timestamp prepare_ts = GetPrepareTimestamp(pending_reply.client_id);
                 transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
                 const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
                 const Timestamp &start_ts = transactions_.GetStartTimestamp(transaction_id);
                 const std::unordered_set<int> &participants = transactions_.GetParticipants(transaction_id);
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
-
-                // TODO: Handle timeout
-                // replica_client_->CoordinatorCommit(
-                //     transaction_id, start_ts, shard_idx_,
-                //     participants, transaction, nonblock_ts, commit_ts,
-                //     std::bind(&Server::CommitCoordinatorCallback, this,
-                //               transaction_id, std::placeholders::_1),
-                //     []() {}, COMMIT_TIMEOUT);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -945,10 +899,8 @@ namespace strongstore
                 // Debug("[%lu] Coordinator prepare failed", transaction_id);
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
-                SendRWCommmitCoordinatorReplyFail(*remote, client_id, client_req_id);
-                delete remote;
-                delete reply;
-                pending_rw_commit_c_replies_.erase(search);
+                SendRWCommmitCoordinatorReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+                rw_commit_c_slots_->FreeByKey(transaction_id);
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws);
 
@@ -969,11 +921,11 @@ namespace strongstore
         }
         else if (s == PREPARED || s == COMMITTING || s == COMMITTED)
         {
-            // Debug("[%lu] Already prepared", transaction_id);
+            Debug("[%lu] Already prepared", transaction_id);
         }
         else if (s == ABORTED)
         { // Already aborted
-            // Debug("[%lu] Already aborted", transaction_id);
+            Debug("[%lu] Already aborted", transaction_id);
         }
         else
         {
@@ -982,28 +934,22 @@ namespace strongstore
     }
 
     void Server::SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
-                                                 uint32_t idx,
                                                  const Timestamp &commit_ts,
                                                  const Timestamp &nonblock_ts)
     {
-        Debug("The slot idx for transaction_id = %lu is %d", transaction_id, idx);
-        PendingOpReplySlot &pending_reply = slots_[idx];
-        ASSERT(pending_reply.in_use); // hopefully not too conservative when we start aborting
-        const TransportAddress *remote = pending_reply.remote;
-        uint64_t client_id = pending_reply.client_id;
-        uint64_t client_req_id = pending_reply.client_req_id;
+        PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
+        ASSERT(pending_reply.in_use);
 
-        rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
-        rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
+        rw_commit_c_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
+        rw_commit_c_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
         rw_commit_c_reply_.set_status(REPLY_OK);
         commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
         nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
         Debug("Sending commit reply to client with req_id = %lu", transaction_id);
-        transport_->SendMessage(this, *remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
-        pending_reply.in_use = false;
+        transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
+        rw_commit_c_slots_->FreeByKey(transaction_id);
         pending_reply.remote = nullptr;
-        free_slots_.push_back(idx);
     }
 
     void Server::SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
@@ -1016,7 +962,7 @@ namespace strongstore
         rw_commit_c_reply_.clear_commit_timestamp();
         rw_commit_c_reply_.clear_nonblock_timestamp();
 
-        transport_->SendMessage(this, remote, rw_commit_c_reply_);
+        transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
     }
 
     void Server::SendPrepareOKRepliesOK(uint64_t transaction_id, const Timestamp &commit_ts)
@@ -1066,13 +1012,6 @@ namespace strongstore
             transport_->SendMessage(this, *remote, prepare_ok_reply_);
             delete remote;
         }
-    }
-
-    void Server::CommitCoordinatorCallback(uint64_t transaction_id, transaction_status_t status)
-    {
-        ASSERT(status == REPLY_OK);
-
-        // Debug("[%lu] COMMIT callback: %d", transaction_id, status);
     }
 
     void Server::SendRWCommmitParticipantReplyOK(uint64_t transaction_id)
@@ -1487,14 +1426,10 @@ namespace strongstore
                 SendAbortParticipants(transaction_id, participants);
 
                 // Reply to client
-                PendingRWCommitCoordinatorReply *cr = pending_rw_commit_c_replies_[transaction_id];
-                uint64_t client_id = cr->rid.client_id();
-                uint64_t client_req_id = cr->rid.client_req_id();
-                const TransportAddress *addr = cr->rid.addr();
-                SendRWCommmitCoordinatorReplyFail(*addr, client_id, client_req_id);
-                delete addr;
-                delete cr;
-                pending_rw_commit_c_replies_.erase(transaction_id);
+                PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
+                SendRWCommmitCoordinatorReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+                rw_commit_c_slots_->FreeByKey(transaction_id);
+                pending_reply.remote = nullptr;
 
                 // Notify waiting RW transactions
                 NotifyPendingRWs(transaction_id, rr.notify_rws);
@@ -1572,26 +1507,14 @@ namespace strongstore
         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
         // Reply to client
-        auto search = pending_rw_commit_c_replies_.find(transaction_id);
-        if (search != pending_rw_commit_c_replies_.end())
-        {
-            PendingRWCommitCoordinatorReply *reply = search->second;
-
-            uint64_t client_id = reply->rid.client_id();
-            uint64_t client_req_id = reply->rid.client_req_id();
-            const TransportAddress *addr = reply->rid.addr();
-
-            SendRWCommmitCoordinatorReplyFail(*addr, client_id, client_req_id);
-
-            std::unordered_set<int> participants = transactions_.GetParticipants(transaction_id);
-
-            // Notify participants
-            SendAbortParticipants(transaction_id, participants);
-
-            delete addr;
-            delete reply;
-            pending_rw_commit_c_replies_.erase(search);
-        }
+        // AGAIN might be too conservative for this to return something every time...
+        PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
+        SendRWCommmitCoordinatorReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+        rw_commit_c_slots_->FreeByKey(transaction_id);
+        pending_reply.remote = nullptr;
+        // Notify participants
+        std::unordered_set<int> participants = transactions_.GetParticipants(transaction_id);
+        SendAbortParticipants(transaction_id, participants);
 
         // Reply to OK participants
         auto search2 = pending_prepare_ok_replies_.find(transaction_id);
@@ -1639,21 +1562,11 @@ namespace strongstore
             ASSERT(transactions_.GetCoordinator(transaction_id) == shard_idx_);
 
             // Reply to client
-            auto search = pending_rw_commit_c_replies_.find(transaction_id);
-            if (search != pending_rw_commit_c_replies_.end())
-            {
-                PendingRWCommitCoordinatorReply *reply = search->second;
-
-                uint64_t client_id = reply->rid.client_id();
-                uint64_t client_req_id = reply->rid.client_req_id();
-                const TransportAddress *addr = reply->rid.addr();
-
-                SendRWCommmitCoordinatorReplyFail(*addr, client_id, client_req_id);
-
-                delete addr;
-                delete reply;
-                pending_rw_commit_c_replies_.erase(search);
-            }
+            // AGAIN might be too conservative for this to return something every time...
+            PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
+            SendRWCommmitCoordinatorReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+            rw_commit_c_slots_->FreeByKey(transaction_id);
+            pending_reply.remote = nullptr;
 
             // Reply to OK participants
             auto search2 = pending_prepare_ok_replies_.find(transaction_id);
@@ -1768,12 +1681,10 @@ namespace strongstore
         }
     }
 
-    void Server::RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, 
+    void Server::RespondToClientOperation(const TransportAddress *remote, uint32_t idx,
                         uint64_t clientid, uint64_t client_req_id, int status, string retval)
     {
         Debug("got this status %d and this retval %s for transaction_id = %lu", status, retval.c_str(), client_req_id);
-
-        const TransportAddress *remote = reply->remote;
 
         op_reply_.Clear();
         op_reply_.mutable_rid()->set_client_id(clientid);
@@ -1783,47 +1694,45 @@ namespace strongstore
         op_reply_.set_transaction_id(client_req_id); //op_reply_.set_transaction_id(transaction_id); ???
 
         transport_->SendMessage(this, *remote, MsgType::LIN_REPLY_TYPE, op_reply_);
-        reply->in_use = false;
-        reply->remote = nullptr;
-        free_slots_.push_back(idx);
     }
 
-    void Server::CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx)
+    void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
-        // Debug("[%lu] Commiting", transaction_id);
+        Debug("[%lu] Commiting", transaction_id);
 
-        // const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
         // Commit writes
-        // const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-        // for (auto &write : transaction.getWriteSet())
-        // {
-        //     // apply all the buffered writes to the store!
-        //     store_.put(write.first, write.second, {commit_ts, transaction_id});
-        // }
+        const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+        for (auto &write : transaction.getWriteSet())
+        {
+            // apply all the buffered writes to the store!
+            store_.put(write.first, write.second, {commit_ts, transaction_id});
+        }
 
-        // if (transaction.getWriteSet().size() > 0)
-        // {
-        //     min_prepare_timestamp_ = std::max(min_prepare_timestamp_, commit_ts);
-        // }
+        if (transaction.getWriteSet().size() > 0)
+        {
+            min_prepare_timestamp_ = std::max(min_prepare_timestamp_, commit_ts);
+        }
 
-        // LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        // auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        // TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
+        LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        auto prevHolderWriteSet = std::move(transaction.getWriteSet());
+        TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
 
+        if (replica_idx_ != 0) return;
         // Reply to client
-        // SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
-        SendRWCommmitCoordinatorReplyOK(transaction_id, idx, dummyTimestamp, dummyTimestamp);
+        SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
 
         // Reply to participants
-        // SendPrepareOKRepliesOK(transaction_id, commit_ts);
+        SendPrepareOKRepliesOK(transaction_id, commit_ts);
 
         // Continue waiting RW transactions
-        // NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+        NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
 
         // Continue waiting RO transactions
-        // NotifyPendingROs(fr.notify_ros);
-        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
+        // FOW NOW WE DEPRECATE!!
+        NotifyPendingROs(fr.notify_ros);
+        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
 
     void Server::ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
@@ -1858,30 +1767,30 @@ namespace strongstore
     void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                               string &response)
     {
-        Debug("Received LeaderUpcall: %lu %s", opnum, op.c_str());
+        Panic("Shouldnt be caling this!");
 
-        Request request;
-        LinearizeableOperation linreq;
-        if (consistency_ != LIN)
-        {
-            request.ParseFromString(op);
-            switch (request.op())
-            {
-            case strongstore::proto::Request::PREPARE:
-            case strongstore::proto::Request::COMMIT:
-            case strongstore::proto::Request::ABORT:
-                replicate = true;
-                response = op;
-                break;
-            default:
-                Panic("Unrecognized operation.");
-            }
-        } else {
-            linreq.ParseFromString(op);
-            replicate = true;
-            response = op;
-            Debug("was able to parse LinearizeableOperation!");
-        }
+        // Request request;
+        // LinearizeableOperation linreq;
+        // if (consistency_ != LIN)
+        // {
+        //     request.ParseFromString(op);
+        //     switch (request.op())
+        //     {
+        //     case strongstore::proto::Request::PREPARE:
+        //     case strongstore::proto::Request::COMMIT:
+        //     case strongstore::proto::Request::ABORT:
+        //         replicate = true;
+        //         response = op;
+        //         break;
+        //     default:
+        //         Panic("Unrecognized operation.");
+        //     }
+        // } else {
+        //     linreq.ParseFromString(op);
+        //     replicate = true;
+        //     response = op;
+        //     Debug("was able to parse LinearizeableOperation!");
+        // }
     }
 
     /* Gets called when a command is issued using client.Invoke(...) to this
@@ -1890,195 +1799,180 @@ namespace strongstore
      * op is the request string passed by the client.
      * response is the reply which will be sent back to the client.
      */
-    void Server::ReplicaUpcall(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
+    void Server::ReplicaUpcall(const LinearizeableOperation &msg)
     {
         // Debug("Received Replica Upcall in strongstore server: %lu %s", opnum, op.c_str());
         if (consistency_ == LIN)
         {
-            ReplicaUpcallAppRequest(idx, clientid, client_req_id, op, k, v);
+            ReplicaUpcallAppRequest(msg);
             return;
         }
-        Debug("Replica upcall with transaction_id = %lu and idx = %u", client_req_id, idx);
-        if (replica_idx_ != 0) return;
-        ASSERT(op == "COMMIT");
-        CoordinatorCommitTransaction(client_req_id, idx);
 
-        // Request request;
-        // Reply reply;
+        int status = REPLY_OK;
+        uint64_t transaction_id = msg.transaction_id();
 
-        // request.ParseFromString(op);
+        if (msg.request_type() == replication::LinearizeableOperation::PREPARE)
+        {
+            // Debug("[%lu] Received PREPARE", transaction_id);
 
-        // int status = REPLY_OK;
-        // uint64_t transaction_id = request.txnid();
+            TransactionState s = transactions_.GetRWTransactionState(transaction_id);
+            if (s == ABORTED)
+            {
+                // Debug("[%lu] Already aborted", transaction_id);
+                status = REPLY_FAIL;
+            }
+            else if (s == NOT_FOUND)
+            { // Participant Shard Replica Upcall for Prepare
+                // should these values come from the message itself because already picked by leader?
+                const Timestamp prepare_ts{msg.prepare().timestamp()};
+                int coordinator = msg.prepare().coordinator();
+                const Transaction transaction{msg.prepare().txn()};
+                const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
 
-        // if (request.op() == strongstore::proto::Request::PREPARE)
-        // {
-        //     // Debug("[%lu] Received PREPARE", transaction_id);
+                s = transactions_.StartParticipantPrepare(transaction_id, coordinator, transaction, nonblock_ts);
+                ASSERT(s == PREPARING);
 
-        //     TransactionState s = transactions_.GetRWTransactionState(transaction_id);
-        //     if (s == ABORTED)
-        //     {
-        //         // Debug("[%lu] Already aborted", transaction_id);
-        //         status = REPLY_FAIL;
-        //         // SendRWCommmitParticipantReplyFail(transaction_id);
-        //     }
-        //     else if (s == NOT_FOUND)
-        //     { // Participant Shard Replica Upcall for Prepare
-        //         // should these values come from the message itself because already picked by leader?
-        //         const Timestamp prepare_ts{request.prepare().timestamp()};
-        //         int coordinator = request.prepare().coordinator();
-        //         const Transaction transaction{request.prepare().txn()};
-        //         const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
+                LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+                //WHY DOES THIS FAIL!?!?
+                if (ar.status != LockStatus::ACQUIRED) {
+                    Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                }
+                ASSERT(ar.status == LockStatus::ACQUIRED);
 
-        //         s = transactions_.StartParticipantPrepare(transaction_id, coordinator, transaction, nonblock_ts);
-        //         ASSERT(s == PREPARING);
+                transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
 
-        //         LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-        //         //WHY DOES THIS FAIL!?!?
-        //         if (ar.status != LockStatus::ACQUIRED) {
-        //             Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
-        //         }
-        //         ASSERT(ar.status == LockStatus::ACQUIRED);
+                transactions_.FinishParticipantPrepare(transaction_id);
+            }
+            else if (s == PREPARING || s == PREPARED)
+            {
+                // Debug("[%lu] Already prepared", transaction_id);
+                // should this just run for PREPARED and not PREPARING like OG callback?
+                // int coordinator = transactions_.GetCoordinator(transaction_id);
+                // const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
+                // const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+                // // TODO: Handle timeout
+                // shard_clients_[coordinator]->PrepareOK(
+                //     transaction_id, shard_idx_, prepare_ts, nonblock_ts,
+                //     std::bind(&Server::PrepareOKCallback, this, transaction_id,
+                //             placeholders::_1, placeholders::_2),
+                //     [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
-        //         transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
+                // // Reply to client
+                // SendRWCommmitParticipantReplyOK(transaction_id);
+            }
+            else
+            {
+                NOT_REACHABLE();
+            }
 
-        //         transactions_.FinishParticipantPrepare(transaction_id);
-        //     }
-        //     else if (s == PREPARING || s == PREPARED)
-        //     {
-        //         // Debug("[%lu] Already prepared", transaction_id);
-        //         // should this just run for PREPARED and not PREPARING like OG callback?
-        //         // int coordinator = transactions_.GetCoordinator(transaction_id);
-        //         // const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
-        //         // const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
-        //         // // TODO: Handle timeout
-        //         // shard_clients_[coordinator]->PrepareOK(
-        //         //     transaction_id, shard_idx_, prepare_ts, nonblock_ts,
-        //         //     std::bind(&Server::PrepareOKCallback, this, transaction_id,
-        //         //             placeholders::_1, placeholders::_2),
-        //         //     [](int, Timestamp) {}, PREPARE_TIMEOUT);
+        }
+        else if (msg.request_type() == replication::LinearizeableOperation::COMMIT)
+        {
+            // Debug("[%lu] Received COMMIT", transaction_id);
 
-        //         // // Reply to client
-        //         // SendRWCommmitParticipantReplyOK(transaction_id);
-        //     }
-        //     else
-        //     {
-        //         NOT_REACHABLE();
-        //     }
+            const Timestamp commit_ts{msg.commit().commit_timestamp()};
 
-        // }
-        // else if (request.op() == strongstore::proto::Request::COMMIT)
-        // {
-        //     // Debug("[%lu] Received COMMIT", transaction_id);
+            if (msg.has_prepare())
+            { // Coordinator commit
+                // Debug("[%lu] Coordinator commit", transaction_id);
 
-        //     const Timestamp commit_ts{request.commit().commit_timestamp()};
+                if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+                {
+                    const Timestamp start_ts{msg.prepare().timestamp()};
+                    int coordinator = msg.prepare().coordinator();
+                    const std::unordered_set<int> participants{msg.prepare().participants().begin(),
+                                                               msg.prepare().participants().end()};
+                    const Transaction transaction{msg.prepare().txn()};
+                    const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
 
-        //     if (request.has_prepare())
-        //     { // Coordinator commit
-        //         // Debug("[%lu] Coordinator commit", transaction_id);
+                    ASSERT(coordinator == shard_idx_);
 
-        //         if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
-        //         {
-        //             const Timestamp start_ts{request.prepare().timestamp()};
-        //             int coordinator = request.prepare().coordinator();
-        //             const std::unordered_set<int> participants{request.prepare().participants().begin(),
-        //                                                        request.prepare().participants().end()};
-        //             const Transaction transaction{request.prepare().txn()};
-        //             const Timestamp nonblock_ts{request.prepare().nonblock_ts()};
+                    TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
+                                                                               participants, transaction, nonblock_ts);
+                    for (int p : participants)
+                    {
+                        if (p != coordinator)
+                        {
+                            s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
+                        }
+                    }
+                    ASSERT(s == PREPARING);
 
-        //             ASSERT(coordinator == shard_idx_);
+                    LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+                    //WHY DOES THIS FAIL!?!?
+                    if (ar.status != LockStatus::ACQUIRED) {
+                        Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                    }
+                    ASSERT(ar.status == LockStatus::ACQUIRED);
 
-        //             TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
-        //                                                                        participants, transaction, nonblock_ts);
-        //             for (int p : participants)
-        //             {
-        //                 if (p != coordinator)
-        //                 {
-        //                     s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
-        //                 }
-        //             }
-        //             ASSERT(s == PREPARING);
+                    transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
+                }
+                else
+                {
+                    Debug("[%lu] Already prepared", transaction_id);
+                }
 
-        //             LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-        //             //WHY DOES THIS FAIL!?!?
-        //             if (ar.status != LockStatus::ACQUIRED) {
-        //                 Warning("I'm replica %lu on shard %d and lock acquire failed during prepare for transaction %lu | I got status %lu instead", replica_idx_, shard_idx_, transaction_id, ar.status);
-        //             }
-        //             ASSERT(ar.status == LockStatus::ACQUIRED);
+                uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
+                if (commit_wait_us > 0) {
+                    Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
+                    transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
+                } else {
+                    CoordinatorCommitTransaction(transaction_id, commit_ts);
+                }
+            }
+            else
+            { // Participant commit
+                // Debug("[%lu] Participant commit", transaction_id);
+                if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+                {
+                    transactions_.ParticipantReceivePrepareOK(transaction_id);
+                }
 
-        //             transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
-        //         }
-        //         else
-        //         {
-        //             // Debug("[%lu] Already prepared", transaction_id);
-        //         }
+                ParticipantCommitTransaction(transaction_id, commit_ts);
+            }
+        }
+        else if (msg.request_type() == replication::LinearizeableOperation::ABORT)
+        {
+            // Debug("[%lu] Received ABORT", transaction_id);
 
-        //         uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
-        //         // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
-        //         // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-        //         if (commit_wait_us > 0) {
-        //             Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
-        //             transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-        //         } else {
-        //             CoordinatorCommitTransaction(transaction_id, commit_ts);
-        //         }
-        //     }
-        //     else
-        //     { // Participant commit
-        //         // Debug("[%lu] Participant commit", transaction_id);
-        //         if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
-        //         {
-        //             transactions_.ParticipantReceivePrepareOK(transaction_id);
-        //         }
+            if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
+            { // replica abort
+                const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
-        //         ParticipantCommitTransaction(transaction_id, commit_ts);
-        //     }
-        // }
-        // else if (request.op() == strongstore::proto::Request::ABORT)
-        // {
-        //     // Debug("[%lu] Received ABORT", transaction_id);
+                LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+                auto prevHolderWriteSet = std::move(transaction.getWriteSet());
+                TransactionFinishResult fr = transactions_.Abort(transaction_id);
+                ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
-        //     if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
-        //     { // replica abort
-        //         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-
-        //         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        //         auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        //         TransactionFinishResult fr = transactions_.Abort(transaction_id);
-        //         ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
-
-        //         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-        //         NotifyPendingROs(fr.notify_ros);
-        //         NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
-        //     }
-        // }
-        // else
-        // {
-        //     NOT_REACHABLE();
-        // }
-
-        // reply.set_status(status);
-        // reply.SerializeToString(&response);
+                NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+                NotifyPendingROs(fr.notify_ros);
+                NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+            }
+        }
+        else
+        {
+            NOT_REACHABLE();
+        }
     }
 
     // TODO figure out interface for stuff to work with transformed apps
-    void Server::ReplicaUpcallAppRequest(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v)
+    void Server::ReplicaUpcallAppRequest(const LinearizeableOperation &msg)
     {
-        Debug("inside ReplicaUpcall with req_id = %lu", client_req_id);
+        Debug("inside ReplicaUpcall with req_id = %lu", msg.rid().client_req_id());
 
         string retval;
         int status = REPLY_OK;
-        if (op == "get")
+        if (msg.kv().op() == replication::KVOpMessage::GET)
         {
-            if (!linearizeable_kv_store_.get(k, retval))
+            if (!linearizeable_kv_store_.get(msg.kv().key(), retval))
             {
                 status = REPLY_FAIL;
             };
         }
-        else if (op == "put")
+        else if (msg.kv().op() == replication::KVOpMessage::PUT)
         {
             Debug("the request is put");
-            if (!linearizeable_kv_store_.put(k, v))
+            if (!linearizeable_kv_store_.put(msg.kv().key(), msg.kv().value()))
             {
                 status = REPLY_FAIL;
             };
@@ -2089,9 +1983,12 @@ namespace strongstore
         }
         if (replica_idx_ != 0) return;
 
-        PendingOpReplySlot &pending_reply = slots_[idx];
+        uint32_t idx = msg.kv().idx();
+        PendingOpReplySlot &pending_reply = op_slots_->GetByIdx(idx);
         ASSERT(pending_reply.in_use);
-        RespondToClientOperation(&pending_reply, idx, clientid, client_req_id, status, retval);
+        RespondToClientOperation(pending_reply.remote, idx, msg.rid().client_id(), msg.rid().client_req_id(), status, retval);
+        op_slots_->FreeByIdx(idx);
+        pending_reply.remote = nullptr;
     }
 
     void Server::UnloggedUpcall(const string &op, string &response)

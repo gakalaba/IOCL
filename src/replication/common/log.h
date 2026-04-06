@@ -53,7 +53,7 @@ enum LogEntryState {
 struct LogEntry {
     viewstamp_t viewstamp;
     LogEntryState state;
-    Request request;
+    LinearizeableOperation request;
     string hash;
     // Speculative client table stuff
     opnum_t prevClientReqOpnum;
@@ -74,7 +74,7 @@ struct LogEntry {
         }
     }
     LogEntry(viewstamp_t viewstamp, LogEntryState state,
-             const Request &request, const string &hash)
+             const LinearizeableOperation &request, const string &hash)
         : viewstamp(viewstamp), state(state), request(request), hash(hash), replyMessage(NULL) {}
     virtual ~LogEntry() {
         if (replyMessage) {
@@ -89,7 +89,7 @@ class Log {
     LogEntry &Append(viewstamp_t vs, LogEntryState state);
     LogEntry *Find(opnum_t opnum);
     bool SetStatus(opnum_t opnum, LogEntryState state);
-    bool SetRequest(opnum_t op, const Request &req);
+    // bool SetRequest(opnum_t op, const LinearizeableOperation&req);
     void RemoveAfter(opnum_t opnum);
     LogEntry *Last();
     viewstamp_t LastViewstamp() const;  // deprecated

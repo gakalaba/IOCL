@@ -101,11 +101,11 @@ namespace replication
         {
             LinearizeableOperation reqMsg;
             // req->request is the string type of LinearizeableOperation
-            reqMsg.set_op(req->request);
+            // reqMsg.set_op(req->request);
             reqMsg.mutable_rid()->set_client_id(clientid);
             reqMsg.mutable_rid()->set_client_req_id(req->clientReqId);
-            reqMsg.set_shardtag(req->shardtag);
-            reqMsg.set_intkey(req->intkey);
+            // reqMsg.set_shardtag(req->shardtag);
+            // reqMsg.set_intkey(req->intkey);
 
             if (!(transport->SendMessageToReplica(this, group, 0, reqMsg)))
             {

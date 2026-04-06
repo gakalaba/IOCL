@@ -36,6 +36,7 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <optional>
 
 #include "lib/latency.h"
 #include "lib/transport.h"
@@ -56,6 +57,7 @@
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/strongstore/transactionstore.h"
 #include "store/common/backend/timingdebug.h"
+#include "store/common/slot_pool.h"
 
 namespace strongstore
 {
@@ -135,7 +137,7 @@ namespace strongstore
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                           string &response) override;
-        void ReplicaUpcall(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v) override;
+        void ReplicaUpcall(const replication::LinearizeableOperation &msg) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 
@@ -146,15 +148,6 @@ namespace strongstore
         void SeeAllTxns() override;
 
     private:
-        class PendingRWCommitCoordinatorReply
-        {
-        public:
-            PendingRWCommitCoordinatorReply(uint64_t client_id,
-                                            uint64_t client_req_id,
-                                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
-        };
         class PendingRWCommitParticipantReply
         {
         public:
@@ -182,16 +175,18 @@ namespace strongstore
             uint64_t n_slow_path_replies;
             Latency_Frame_t wait_lat;
         };
-        class PendingGetReply
-        {
-        public:
-            PendingGetReply(uint64_t client_id, uint64_t client_req_id,
-                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
+        struct PendingGetReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+            uint64_t client_id;
+            uint64_t client_req_id;
             std::string key;
         };
         struct PendingOpReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+        };
+        struct PendingRWCommitCoordinatorReplySlot {
             bool in_use = false;
             const TransportAddress *remote = nullptr;
             uint64_t client_id;
@@ -228,7 +223,6 @@ namespace strongstore
                                        proto::RWCommitCoordinator &msg);
 
         void SendRWCommmitCoordinatorReplyOK(uint64_t transaction_id,
-                                             uint32_t idx,
                                              const Timestamp &commit_ts,
                                              const Timestamp &nonblock_ts);
         void SendRWCommmitCoordinatorReplyFail(const TransportAddress &remote,
@@ -265,7 +259,6 @@ namespace strongstore
         void PrepareAbortCallback(uint64_t transaction_id, int status,
                                   Timestamp timestamp);
 
-        void CommitCoordinatorCallback(uint64_t transaction_id, transaction_status_t status);
         void CommitParticipantCallback(uint64_t transaction_id, transaction_status_t status);
         void AbortParticipantCallback(uint64_t transaction_id);
 
@@ -285,13 +278,17 @@ namespace strongstore
                                bool is_commit, const Timestamp &commit_ts = Timestamp());
         void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
                             bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(uint32_t idx, uint64_t clientid, uint64_t client_req_id, const string &op, const string &k, const string &v);
+        void ReplicaUpcallAppRequest(const replication::LinearizeableOperation &msg);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
-        void CoordinatorCommitTransaction(uint64_t transaction_id, uint32_t idx);
+        void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
-        void RespondToClientOperation(PendingOpReplySlot *reply, uint32_t idx, uint64_t clientid, uint64_t client_req_id, int status, string retval);
+        void RespondToClientOperation(const TransportAddress *remote, uint32_t idx, uint64_t clientid, uint64_t client_req_id, int status, string retval);
 
+        void ReplicateCoordinatorCommit(uint64_t client_id,
+                uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
+                const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
+                const std::unordered_set<int> &participant);
         const TrueTime &tt_;
         TransactionStore transactions_;
         LockTable locks_;
@@ -309,11 +306,9 @@ namespace strongstore
 
         uint64_t server_id_;
 
-        std::unordered_map<uint64_t, PendingRWCommitCoordinatorReply *> pending_rw_commit_c_replies_;
         std::unordered_map<uint64_t, PendingRWCommitParticipantReply *> pending_rw_commit_p_replies_;
         std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
-        std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
@@ -346,10 +341,13 @@ namespace strongstore
 
         uint64_t expected_fire_us;
 
-        // DUMMY
-        Timestamp dummyTimestamp;
-        std::vector<PendingOpReplySlot> slots_;
-        std::vector<uint32_t> free_slots_;
+        std::optional<SlotPool<PendingOpReplySlot>> op_slots_;
+        std::optional<SlotPool<PendingRWCommitCoordinatorReplySlot>> rw_commit_c_slots_;
+        // Gets will use opened slot pool structure
+        std::vector<PendingGetReplySlot> get_slots_;
+        std::vector<uint32_t> free_get_slots_;
+        std::unordered_map<uint64_t, std::vector<uint32_t>> transaction_id_to_get_slots_;
+
     };
 
 } // namespace strongstore
