@@ -70,9 +70,6 @@ namespace strongstore
             shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i, 0)); // passing in dummy fanout for now, since not used by these shard clients
         }
 
-        replica_client_ =
-            new ReplicaClient(LinearizableProtocol::PROTO_VR, replica_config_, transport_, server_id_, shard_idx_);
-
         if (debug_stats_)
         {
             Panic("Debug stats disabled!");
@@ -115,9 +112,6 @@ namespace strongstore
         }*/
         Debug("okayyyy starting up!");
 
-        replica_client_ =
-            new ReplicaClient(linproto, replica_config_, transport_, server_id_, shard_idx_);
-
         if (debug_stats_)
         {
             Panic("Debug stats disabled!");
@@ -135,8 +129,6 @@ namespace strongstore
         {
             delete s;
         }
-
-        delete replica_client_;
 
         if (debug_stats_)
         {
@@ -743,6 +735,35 @@ namespace strongstore
         }
     }
 
+    void Server::ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id)
+    {
+        replication::LinearizeableOperation abort_op;
+        abort_op.Clear();
+        abort_op.set_request_type(replication::LinearizeableOperation::ABORT);
+        abort_op.set_transaction_id(transaction_id);
+        abort_op.mutable_rid()->set_client_id(client_id);
+        abort_op.mutable_rid()->set_client_req_id(client_req_id);
+
+        transport_->TimerMicro(0, [this, m = std::move(abort_op)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
+    }
+
+    void Server::ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts)
+    {
+        replication::LinearizeableOperation commit_op;
+        commit_op.Clear();
+        commit_op.set_request_type(replication::LinearizeableOperation::COMMIT);
+        commit_op.set_transaction_id(transaction_id);
+        commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
+        commit_op.mutable_rid()->set_client_id(client_id);
+        commit_op.mutable_rid()->set_client_req_id(client_req_id);
+
+        transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
+    }
+
     void Server::ReplicateCoordinatorCommit(uint64_t client_id,
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
@@ -769,6 +790,28 @@ namespace strongstore
         commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
 
         transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
+            this->replica_->HandleRequest(m);
+        });
+    }
+
+    void Server::ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
+                const Transaction &transaction, const Timestamp &prepare_ts, const Timestamp &nonblock_ts)
+    {
+        LinearizeableOperation prepare_op;
+        prepare_op.Clear();
+        prepare_op.set_request_type(replication::LinearizeableOperation::PREPARE);
+        prepare_op.mutable_rid()->set_client_id(client_id);
+        prepare_op.mutable_rid()->set_client_req_id(client_req_id);
+        prepare_op.set_transaction_id(transaction_id);
+
+        auto prepare = prepare_op.mutable_prepare();
+
+        transaction.serialize(prepare->mutable_txn());
+        prepare_ts.serialize(prepare->mutable_timestamp());
+        prepare->set_coordinator(shard_idx_);
+        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+
+        transport_->TimerMicro(0, [this, m = std::move(prepare_op)]() mutable {
             this->replica_->HandleRequest(m);
         });
     }
@@ -891,6 +934,9 @@ namespace strongstore
                 const Timestamp &start_ts = transactions_.GetStartTimestamp(transaction_id);
                 const std::unordered_set<int> &participants = transactions_.GetParticipants(transaction_id);
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+
+                ReplicateCoordinatorCommit(pending_reply.client_id, pending_reply.client_req_id,
+                        transaction_id, transaction, start_ts, nonblock_ts, commit_ts, participants);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -1101,12 +1147,7 @@ namespace strongstore
                 // pending_rw_commit_p_replies_[transaction_id] = reply;
 
                 // TODO: Handle timeout
-                replica_client_->Prepare(
-                    transaction_id, transaction, prepare_ts,
-                    coordinator, nonblock_ts,
-                    std::bind(&Server::PrepareCallback, this, transaction_id,
-                              std::placeholders::_1, std::placeholders::_2),
-                    [](int, Timestamp) {}, PREPARE_TIMEOUT);
+                ReplicatePrepare(client_id, client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -1194,12 +1235,7 @@ namespace strongstore
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 // TODO: Handle timeout
-                replica_client_->Prepare(
-                    transaction_id, transaction, prepare_ts,
-                    coordinator, nonblock_ts,
-                    std::bind(&Server::PrepareCallback, this, transaction_id,
-                              std::placeholders::_1, std::placeholders::_2),
-                    [](int, Timestamp) {}, PREPARE_TIMEOUT);
+                ReplicatePrepare(client_id, client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -1292,10 +1328,7 @@ namespace strongstore
             ASSERT(s == COMMITTING);
 
             // TODO: Handle timeout
-            replica_client_->Commit(
-                transaction_id, commit_ts,
-                std::bind(&Server::CommitParticipantCallback, this, transaction_id, std::placeholders::_1),
-                []() {}, COMMIT_TIMEOUT);
+            ReplicateCommit(0, 0, transaction_id, commit_ts);
         }
         else if (status == REPLY_FAIL)
         {
@@ -1316,15 +1349,12 @@ namespace strongstore
             // We are going to abort this for suresies
 
             // TODO: Handle timeout
-            replica_client_->Abort(
-                transaction_id,
-                std::bind(&Server::AbortParticipantCallback, this, transaction_id),
-                []() {}, ABORT_TIMEOUT);
+            ReplicateAbort(0, 0, transaction_id); // don't really care about clientid, etc.
             ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
             NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-            NotifyPendingROs(fr.notify_ros);
-            NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+            // NotifyPendingROs(fr.notify_ros);
+            // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
         }
         else
         {
@@ -1338,18 +1368,6 @@ namespace strongstore
         ASSERT(status == REPLY_OK);
 
         // Debug("[%lu] Received PREPARE_ABORT callback: %d %d", transaction_id, shard_idx_, status);
-    }
-
-    void Server::CommitParticipantCallback(uint64_t transaction_id, transaction_status_t status)
-    {
-        ASSERT(status == REPLY_OK);
-
-        // Debug("[%lu] Received COMMIT participant callback: %d %d", transaction_id, status, shard_idx_);
-    }
-
-    void Server::AbortParticipantCallback(uint64_t transaction_id)
-    {
-        // Debug("[%lu] Received ABORT participant callback: %d", transaction_id, shard_idx_);
     }
 
     void Server::HandlePrepareOK(const TransportAddress &remote, proto::PrepareOK &msg)
@@ -1403,12 +1421,8 @@ namespace strongstore
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 // TODO: Handle timeout
-                // replica_client_->CoordinatorCommit(
-                //     transaction_id, start_ts, shard_idx_,
-                //     participants, transaction, nonblock_ts, commit_ts,
-                //     std::bind(&Server::CommitCoordinatorCallback, this,
-                //               transaction_id, std::placeholders::_1),
-                //     []() {}, COMMIT_TIMEOUT);
+                ReplicateCoordinatorCommit(client_id, client_req_id,
+                        transaction_id, transaction, start_ts, nonblock_ts, commit_ts, participants);
             }
             else if (ar.status == FAIL)
             {
@@ -1599,8 +1613,8 @@ namespace strongstore
         ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-        NotifyPendingROs(fr.notify_ros);
-        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+        // NotifyPendingROs(fr.notify_ros);
+        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
     }
 
     void Server::HandleAbort(const TransportAddress &remote, proto::Abort &msg)
@@ -1649,10 +1663,7 @@ namespace strongstore
         if (state == PREPARING || state == PREPARED)
         {
             // TODO: Handle timeout
-            replica_client_->Abort(
-                transaction_id,
-                std::bind(&Server::AbortParticipantCallback, this, transaction_id),
-                []() {}, ABORT_TIMEOUT);
+            ReplicateAbort(0, 0, transaction_id); // don't really care about clientid, etc.
         }
 
         abort_reply_.set_status(REPLY_OK);
@@ -1662,8 +1673,8 @@ namespace strongstore
         ContinueGetAbort(transaction_id);
 
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-        NotifyPendingROs(fr.notify_ros);
-        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+        // NotifyPendingROs(fr.notify_ros);
+        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
     }
 
     void Server::SendAbortParticipants(uint64_t transaction_id, const std::unordered_set<int> &participants)
@@ -1731,8 +1742,8 @@ namespace strongstore
 
         // Continue waiting RO transactions
         // FOW NOW WE DEPRECATE!!
-        NotifyPendingROs(fr.notify_ros);
-        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
+        // NotifyPendingROs(fr.notify_ros);
+        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
 
     void Server::ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
@@ -1760,8 +1771,8 @@ namespace strongstore
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
 
         // Continue waiting RO transactions
-        NotifyPendingROs(fr.notify_ros);
-        NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
+        // NotifyPendingROs(fr.notify_ros);
+        // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
 
     void Server::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
@@ -1945,8 +1956,8 @@ namespace strongstore
                 ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
-                NotifyPendingROs(fr.notify_ros);
-                NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
+                // NotifyPendingROs(fr.notify_ros);
+                // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
             }
         }
         else

@@ -52,7 +52,6 @@
 #include "store/strongstore/common.h"
 #include "store/strongstore/locktable.h"
 #include "store/strongstore/occstore.h"
-#include "store/strongstore/replicaclient.h"
 #include "store/strongstore/shardclient.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/strongstore/transactionstore.h"
@@ -259,9 +258,6 @@ namespace strongstore
         void PrepareAbortCallback(uint64_t transaction_id, int status,
                                   Timestamp timestamp);
 
-        void CommitParticipantCallback(uint64_t transaction_id, transaction_status_t status);
-        void AbortParticipantCallback(uint64_t transaction_id);
-
         void WoundPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
 
         void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
@@ -289,6 +285,11 @@ namespace strongstore
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
                 const std::unordered_set<int> &participant);
+        void ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts);
+        void ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id);
+        void ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
+                const Transaction &transaction, const Timestamp &prepare_ts, const Timestamp &nonblock_ts);
+
         const TrueTime &tt_;
         TransactionStore transactions_;
         LockTable locks_;
@@ -299,7 +300,7 @@ namespace strongstore
         const transport::Configuration &replica_config_;
 
         std::vector<ShardClient *> shard_clients_;
-        ReplicaClient *replica_client_;
+        // ReplicaClient *replica_client_;
 
         Transport *transport_;
         replication::Replica *replica_;
