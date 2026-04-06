@@ -147,23 +147,6 @@ namespace strongstore
         void SeeAllTxns() override;
 
     private:
-        class PendingRWCommitParticipantReply
-        {
-        public:
-            PendingRWCommitParticipantReply(uint64_t client_id,
-                                            uint64_t client_req_id,
-                                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
-        };
-        class PendingPrepareOKReply
-        {
-        public:
-            PendingPrepareOKReply(uint64_t client_id, uint64_t client_req_id,
-                                  TransportAddress *remote)
-                : rids{{client_id, client_req_id, remote}} {}
-            std::unordered_set<RequestID> rids;
-        };
         class PendingROCommitReply
         {
         public:
@@ -190,6 +173,23 @@ namespace strongstore
             const TransportAddress *remote = nullptr;
             uint64_t client_id;
             uint64_t client_req_id;
+        };
+        struct PendingRWCommitParticipantReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+            uint64_t client_id;
+            uint64_t client_req_id;
+        };
+        struct PendingPrepareOKReplySlot {
+            bool in_use = false;
+
+            // Nested key type for set semantics
+            struct Rid {
+                const TransportAddress *remote;
+                uint64_t client_id;
+                uint64_t client_req_id;
+            };
+            std::vector<Rid> participant_rids;
         };
 
         struct TimestampID
@@ -236,7 +236,7 @@ namespace strongstore
                                                uint64_t client_req_id);
 
         void SendPrepareOKRepliesOK(uint64_t transaction_id, const Timestamp &commit_ts);
-        void SendPrepareOKRepliesFail(PendingPrepareOKReply *reply);
+        void SendPrepareOKRepliesFail(PendingPrepareOKReplySlot &reply);
 
         void HandleRWCommitParticipant(const TransportAddress &remote,
                                        proto::RWCommitParticipant &msg);
@@ -307,8 +307,6 @@ namespace strongstore
 
         uint64_t server_id_;
 
-        std::unordered_map<uint64_t, PendingRWCommitParticipantReply *> pending_rw_commit_p_replies_;
-        std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
 
         proto::Get get_;
@@ -344,6 +342,8 @@ namespace strongstore
 
         std::optional<SlotPool<PendingOpReplySlot>> op_slots_;
         std::optional<SlotPool<PendingRWCommitCoordinatorReplySlot>> rw_commit_c_slots_;
+        std::optional<SlotPool<PendingRWCommitParticipantReplySlot>> rw_commit_p_slots_;
+        std::optional<SlotPool<PendingPrepareOKReplySlot>> prepare_ok_slots_;
         // Gets will use opened slot pool structure
         std::vector<PendingGetReplySlot> get_slots_;
         std::vector<uint32_t> free_get_slots_;

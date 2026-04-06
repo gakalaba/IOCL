@@ -73,6 +73,10 @@ public:
         return slots_[it->second];
     }
 
+    bool ContainsKey(Key key) const {
+        return key_to_idx_.find(key) != key_to_idx_.end();
+    }
+
     Slot &GetByIdx(uint32_t idx) {
         ASSERT(idx < slots_.size());
         return slots_[idx];
