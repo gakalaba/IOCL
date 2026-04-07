@@ -36,7 +36,6 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
-#include <optional>
 
 #include "lib/latency.h"
 #include "lib/transport.h"
@@ -340,10 +339,10 @@ namespace strongstore
 
         uint64_t expected_fire_us;
 
-        std::optional<SlotPool<PendingOpReplySlot>> op_slots_;
-        std::optional<SlotPool<PendingRWCommitCoordinatorReplySlot>> rw_commit_c_slots_;
-        std::optional<SlotPool<PendingRWCommitParticipantReplySlot>> rw_commit_p_slots_;
-        std::optional<SlotPool<PendingPrepareOKReplySlot>> prepare_ok_slots_;
+        SlotPool<PendingOpReplySlot> *op_slots_ = nullptr;
+        SlotPool<PendingRWCommitCoordinatorReplySlot> *rw_commit_c_slots_ = nullptr;
+        SlotPool<PendingRWCommitParticipantReplySlot> *rw_commit_p_slots_ = nullptr;
+        SlotPool<PendingPrepareOKReplySlot> *prepare_ok_slots_ = nullptr;
         // Gets will use opened slot pool structure
         std::vector<PendingGetReplySlot> get_slots_;
         std::vector<uint32_t> free_get_slots_;

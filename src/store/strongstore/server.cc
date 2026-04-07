@@ -60,10 +60,7 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           consistency_{consistency},
-          debug_stats_{debug_stats},
-          rw_commit_c_slots_(30000),
-          rw_commit_p_slots_(30000),
-          prepare_ok_slots_(30000)
+          debug_stats_{debug_stats}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -83,6 +80,9 @@ namespace strongstore
         for (uint32_t i = 0; i < N; i++) {
             free_get_slots_.push_back(N - 1 - i);
         }
+        rw_commit_c_slots_ = new SlotPool<PendingRWCommitCoordinatorReplySlot>(N);
+        rw_commit_p_slots_ = new SlotPool<PendingRWCommitParticipantReplySlot>(N);
+        prepare_ok_slots_ = new SlotPool<PendingPrepareOKReplySlot>(N);
         // Debug event loop delay
         // expected_fire_us = 0;
         // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
@@ -103,8 +103,7 @@ namespace strongstore
           shard_idx_{shard_idx},
           replica_idx_{replica_idx},
           debug_stats_{debug_stats},
-          consistency_{consistency},
-          op_slots_(30000)
+          consistency_{consistency}
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
@@ -119,7 +118,7 @@ namespace strongstore
             Panic("Debug stats disabled!");
             _Latency_Init(&ro_wait_lat_, "ro_wait_lat");
         }
-
+        op_slots_ = new SlotPool<PendingOpReplySlot>(30000);
         // Debug event loop delay
         // expected_fire_us = 0;
         // transport_->TimerMicro(1000, std::bind(&Server::DelayOnEventLoop, this));
@@ -136,6 +135,11 @@ namespace strongstore
         {
             Latency_Dump(&ro_wait_lat_);
         }
+
+        delete op_slots_;
+        delete rw_commit_c_slots_;
+        delete rw_commit_p_slots_;
+        delete prepare_ok_slots_;
     }
 
     void Server::SeeAllTxns()
