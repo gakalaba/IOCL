@@ -134,7 +134,7 @@ namespace replication
             linRequest.mutable_rid()->set_client_id(clientid);
             linRequest.mutable_rid()->set_client_req_id(req->clientReqId);
             string op = linRequest.op();
-            Notice("Sending client request with id %d", req->clientReqId);
+            Debug("Sending client request with id %d", req->clientReqId);
 
             if (transport->SendMessageToReplica(this, group, req->replicaIndex, linRequest))
             {

@@ -524,13 +524,13 @@ namespace replication
                 return;
             }
 
+            UpdateClientAddresses(remote, linRequest);
+
             if (!AmHead())
             {
                 RDebug("Ignoring write request because I'm not the head");
                 return;
             }
-
-            UpdateClientAddresses(remote, linRequest);
 
             if (IsDuplicateRequest(remote, linRequest))
                 return;
@@ -754,7 +754,7 @@ namespace replication
             response.set_clientreqid(msg.clientreqid());
             response.set_opnum(keyToVersionNumber[msg.key()]);
 
-            Notice("Sending message to replica via version response, timestamp to read is %d", keyToVersionNumber[msg.key()]);
+            Debug("Sending message to replica via version response, timestamp to read is %d", keyToVersionNumber[msg.key()]);
             transport->SendMessageToReplica(this, msg.replicaidx(), response);
         }
 
