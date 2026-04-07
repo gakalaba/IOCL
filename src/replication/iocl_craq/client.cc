@@ -190,19 +190,6 @@ namespace replication
                 delete req;
                 return;
             }
-
-            // For writes, also send to the tail so it can register the client
-            // address. The tail calls UpdateClientAddresses then returns early
-            // (since it's not the head). Without this, the tail cannot reply
-            // to the client after committing.
-            if (linRequest.op() == PUT_OPERATION)
-            {
-                int tailIdx = config.n - 1;
-                if (req->replicaIndex != tailIdx)
-                {
-                    transport->SendMessageToReplica(this, group, tailIdx, linRequest);
-                }
-            }
         }
 
         void IOCL_CRAQClient::ResendRequest(const uint64_t reqId)
