@@ -59,6 +59,7 @@ namespace strongstore
             slot.pred_list.reserve(fanout);
         }
         get_slots_.resize(fanout);
+        pending_prepare_ok_slot_.resize(fanout);
     }
 
     ShardClient::~ShardClient() {}
@@ -472,10 +473,10 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        ASSERT(!pending_commit_slot_.in_use);
-        pending_commit_slot_.ccb = ccb;
-        pending_commit_slot_.in_use = true;
-        pending_commit_slot_.transaction_id = transaction_id;
+        ASSERT(!pending_rw_coord_commit_slot_.in_use);
+        pending_rw_coord_commit_slot_.ccb = ccb;
+        pending_rw_coord_commit_slot_.in_use = true;
+        pending_rw_coord_commit_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_c_.Clear();
@@ -497,10 +498,10 @@ namespace strongstore
     {
         uint64_t req_id = reply.rid().client_req_id();
 
-        ASSERT(pending_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
-        rw_coord_commit_callback &ccb = pending_commit_slot_.ccb;
-        uint64_t transaction_id = pending_commit_slot_.transaction_id;
-        pending_commit_slot_.in_use = false;
+        ASSERT(pending_rw_coord_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
+        rw_coord_commit_callback &ccb = pending_rw_coord_commit_slot_.ccb;
+        uint64_t transaction_id = pending_rw_coord_commit_slot_.transaction_id;
+        pending_rw_coord_commit_slot_.in_use = false;
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
@@ -520,10 +521,10 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        PendingRWParticipantCommit *pendingCommit = new PendingRWParticipantCommit(transaction_id, req_id);
-        pendingRWParticipantCommits[req_id] = pendingCommit;
-        pendingCommit->ccb = ccb;
-        pendingCommit->ctcb = ctcb;
+        ASSERT(!pending_rw_part_commit_slot_.in_use);
+        pending_rw_part_commit_slot_.ccb = ccb;
+        pending_rw_part_commit_slot_.in_use = true;
+        pending_rw_part_commit_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_p_.Clear();
@@ -542,18 +543,10 @@ namespace strongstore
         Debug("[shard %i] Received RWCommitParticipant", shard_idx_);
         uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingRWParticipantCommits.find(req_id);
-        if (itr == pendingRWParticipantCommits.end())
-        {
-            Debug("[%d][%lu] RWCommitParticipantReply for stale request.", shard_idx_, req_id);
-            return; // stale request
-        }
-
-        PendingRWParticipantCommit *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        rw_part_commit_callback ccb = req->ccb;
-        pendingRWParticipantCommits.erase(itr);
-        delete req;
+        ASSERT(pending_rw_part_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
+        rw_part_commit_callback ccb = pending_rw_part_commit_slot_.ccb;
+        uint64_t transaction_id = pending_rw_part_commit_slot_.transaction_id;
+        pending_rw_part_commit_slot_.in_use = false;
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
@@ -569,10 +562,11 @@ namespace strongstore
         Debug("[shard %i] Sending PrepareOK [%lu]", shard_idx_, transaction_id);
 
         uint64_t req_id = last_req_id_++;
-        PendingPrepareOK *pendingPrepareOK = new PendingPrepareOK(transaction_id, req_id);
-        pendingPrepareOKs[req_id] = pendingPrepareOK;
-        pendingPrepareOK->pcb = pcb;
-        pendingPrepareOK->ptcb = ptcb;
+        uint64_t idx = req_id % fanout_;
+        auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
+        ASSERT(!pendingPrepareOKSlot.in_use);
+        pendingPrepareOKSlot.in_use = true;
+        pendingPrepareOKSlot.pcb = pcb;
 
         // TODO: Setup timeout
         prepare_ok_.mutable_rid()->set_client_id(client_id_);
@@ -590,18 +584,10 @@ namespace strongstore
         Debug("[shard %i] Received PrepareOKReply", shard_idx_);
         uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingPrepareOKs.find(req_id);
-        if (itr == pendingPrepareOKs.end())
-        {
-            Debug("[%d][%lu] PrepareOKReply for stale request.", shard_idx_,
-                  req_id);
-            return; // stale request
-        }
-
-        PendingPrepareOK *req = itr->second;
-        prepare_callback pcb = req->pcb;
-        pendingPrepareOKs.erase(itr);
-        delete req;
+        uint32_t idx = req_id % fanout_;
+        auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
+        ASSERT(pendingPrepareOKSlot.in_use);
+        prepare_callback pcb = pendingPrepareOKSlot.pcb;
 
         Debug("[shard %i] COMMIT timestamp [%lu.%lu]", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
@@ -659,10 +645,10 @@ namespace strongstore
         Debug("[%lu] [shard %i] Sending Abort", transaction_id, shard_idx_);
 
         uint64_t req_id = last_req_id_++;
-        PendingAbort *pendingAbort = new PendingAbort(transaction_id, req_id);
-        pendingAborts[req_id] = pendingAbort;
-        pendingAbort->acb = acb;
-        pendingAbort->atcb = atcb;
+        ASSERT(!pending_abort_slot_.in_use);
+        pending_abort_slot_.in_use = true;
+        pending_abort_slot_.acb = acb;
+        pending_abort_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         abort_.Clear();
@@ -714,19 +700,10 @@ namespace strongstore
         Debug("[shard %i] Received HandleAbortReply for req_id %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingAborts.find(req_id);
-        if (itr == pendingAborts.end())
-        {
-            Debug("[%d][%lu] HandleAbortReply for stale request.", shard_idx_,
-                  req_id);
-            return; // stale request
-        }
-
-        PendingAbort *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        abort_callback acb = req->acb;
-        pendingAborts.erase(itr);
-        delete req;
+        ASSERT(pending_abort_slot_.in_use);
+        uint64_t transaction_id = pending_abort_slot_.transaction_id;
+        abort_callback acb = pending_abort_slot_.acb;
+        pending_abort_slot_.in_use = false;
 
         if (reply.status() == REPLY_OK)
         {

@@ -183,30 +183,6 @@ namespace strongstore
             uint64_t transaction_id;
             uint64_t req_id;
         };
-        struct PendingRWCoordCommit : public PendingRequest
-        {
-            PendingRWCoordCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            rw_coord_commit_callback ccb;
-            rw_coord_commit_timeout_callback ctcb;
-        };
-        struct PendingRWParticipantCommit : public PendingRequest
-        {
-            PendingRWParticipantCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            rw_part_commit_callback ccb;
-            rw_part_commit_timeout_callback ctcb;
-        };
-        struct PendingAbort : public PendingRequest
-        {
-            PendingAbort(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            abort_callback acb;
-            abort_timeout_callback atcb;
-        };
-        struct PendingPrepareOK : public PendingRequest
-        {
-            PendingPrepareOK(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            prepare_callback pcb;
-            prepare_timeout_callback ptcb;
-        };
         struct PendingPrepareAbort : public PendingRequest
         {
             PendingPrepareAbort(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -242,11 +218,7 @@ namespace strongstore
         Transaction the_transaction_;
         std::unordered_map<std::string, std::string> the_read_set_;
 
-        std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
-        std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
-        std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
         std::unordered_map<uint64_t, PendingPrepareAbort *> pendingPrepareAborts;
-        std::unordered_map<uint64_t, PendingAbort *> pendingAborts;
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
@@ -298,12 +270,32 @@ namespace strongstore
         };
         std::vector<PendingGetSlot> get_slots_;
 
-        struct PendingCommitSlot {
+        struct PendingRWCoordCommitSlot {
             bool in_use = false;
             rw_coord_commit_callback ccb;
             uint64_t transaction_id;
         };
-        PendingCommitSlot pending_commit_slot_;
+        PendingRWCoordCommitSlot pending_rw_coord_commit_slot_;
+
+        struct PendingRWPartCommitSlot {
+            bool in_use = false;
+            rw_part_commit_callback ccb;
+            uint64_t transaction_id;
+        };
+        PendingRWPartCommitSlot pending_rw_part_commit_slot_;
+
+        struct PendingPrepareOKSlot {
+            bool in_use = false;
+            prepare_callback pcb;
+        };
+        std::vector<PendingPrepareOKSlot> pending_prepare_ok_slot_;
+
+        struct PendingAbortSlot {
+            bool in_use = false;
+            abort_callback acb;
+            uint64_t transaction_id;
+        };
+        PendingAbortSlot pending_abort_slot_;
     };
 
 } // namespace strongstore
