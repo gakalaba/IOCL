@@ -113,13 +113,10 @@ namespace strongstore
                 msg.SerializeToString(&request_str);
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
-                if (replication::craq::CRAQClient * craqclient = dynamic_cast<replication::craq::CRAQClient *>(client))
-                {
-                    craqclient->Invoke(
+                    client->Invoke(
                         request_str,
                         bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                             std::placeholders::_1, std::placeholders::_2), replicaIndex);
-                }
                 break;
 
             case LinearizableProtocol::PROTO_IOCL_CRAQ:
@@ -128,13 +125,10 @@ namespace strongstore
                 msg.SerializeToString(&request_str);
                 Debug("size of the message that we are stringifying %lu", msg.ByteSizeLong());
 
-                if (replication::iocl_craq::IOCL_CRAQClient * craqclient = dynamic_cast<replication::iocl_craq::IOCL_CRAQClient *>(client))
-                {
-                    craqclient->Invoke(
+                    client->Invoke(
                         request_str,
                         bind(&ReplicaClient::SendOperationCallback, this, pendingOperation->reqId,
                             std::placeholders::_1, std::placeholders::_2), replicaIndex);
-                }
                 break;
         }
     }
