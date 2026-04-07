@@ -259,9 +259,9 @@ namespace strongstore
 
         void WoundPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
 
-        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
+        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
         void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
-        void ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
+        void ContinueGet(uint64_t transaction_id, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
         void ContinueGetAbort(uint64_t transaction_id);
         void ContinueCoordinatorPrepare(uint64_t transaction_id);
         void ContinueParticipantPrepare(uint64_t transaction_id);

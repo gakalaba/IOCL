@@ -393,7 +393,7 @@ namespace strongstore
         transaction_id_to_get_slots_.erase(search);
     }
 
-    void Server::ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& prevHolderWriteSet)
+    void Server::ContinueGet(uint64_t transaction_id, const std::vector<std::pair<std::string, std::string>> & prevHolderWriteSet)
     {
         // Have a set of keys from the holder Transaction, need to see which ones 
         // overlap with the set of keys from the transaction_id we want to carry on with
@@ -502,7 +502,7 @@ namespace strongstore
         }
     }
 
-    void Server::NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& prevHolderWriteSet)
+    void Server::NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::vector<std::pair<std::string, std::string>> & prevHolderWriteSet)
     {
         for (uint64_t waiting_rw : rws)
         {
@@ -1570,7 +1570,7 @@ namespace strongstore
 
         // Coordinator may not yet know about this transaction
         // If so, no locks to release.
-        std::unordered_map<std::__cxx11::string, std::__cxx11::string> prevHolderWriteSet;
+        std::vector<std::pair<std::string, std::string>> prevHolderWriteSet;
         if (state != NOT_FOUND)
         {
             const Transaction &transaction = transactions_.GetTransaction(transaction_id);
@@ -1617,7 +1617,7 @@ namespace strongstore
 
         // Participant may not yet know about this transaction
         // If so, no locks to release.
-        std::unordered_map<std::__cxx11::string, std::__cxx11::string> prevHolderWriteSet;
+        std::vector<std::pair<std::string, std::string>> prevHolderWriteSet;
         if (state != NOT_FOUND)
         {
             const Transaction &transaction = transactions_.GetTransaction(transaction_id);

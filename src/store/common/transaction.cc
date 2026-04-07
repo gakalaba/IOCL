@@ -14,14 +14,16 @@ Transaction::Transaction() : readSet{}, writeSet{}, start_time_{} {}
 
 Transaction::Transaction(const TransactionMessage &msg)
     : start_time_{msg.starttime()} {
+    readSet.reserve(msg.readset_size());
+    writeSet.reserve(msg.writeset_size());
     for (int i = 0; i < msg.readset_size(); i++) {
-        ReadMessage readMsg = msg.readset(i);
-        readSet[readMsg.key()] = Timestamp(readMsg.readtime());
+        const auto &readMsg = msg.readset(i);
+        readSet.emplace_back(readMsg.key(), Timestamp(readMsg.readtime()));
     }
 
     for (int i = 0; i < msg.writeset_size(); i++) {
-        WriteMessage writeMsg = msg.writeset(i);
-        writeSet[writeMsg.key()] = writeMsg.value();
+        const auto &writeMsg = msg.writeset(i);
+        writeSet.emplace_back(writeMsg.key(), writeMsg.value());
     }
 }
 
@@ -31,15 +33,15 @@ uint64_t Transaction::transaction_id() {
     return transaction_id_;
 }
 
-const unordered_map<string, Timestamp> &Transaction::getReadSet() const {
+const std::vector<std::pair<std::string, Timestamp>> &Transaction::getReadSet() const {
     return readSet;
 }
 
-const unordered_map<string, string> &Transaction::getWriteSet() const {
+const std::vector<std::pair<std::string, std::string>> &Transaction::getWriteSet() const {
     return writeSet;
 }
 
-unordered_map<string, string> &Transaction::getWriteSet() {
+std::vector<std::pair<std::string, std::string>> &Transaction::getWriteSet() {
     return writeSet;
 }
 
@@ -53,11 +55,11 @@ void Transaction::clear() {
 void Transaction::set_start_time(const Timestamp &ts) { start_time_ = ts; }
 
 void Transaction::addReadSet(const string &key, const Timestamp &readTime) {
-    readSet[key] = readTime;
+    readSet.emplace_back(key, readTime);
 }
 
 void Transaction::addWriteSet(const string &key, const string &value) {
-    writeSet[key] = value;
+    writeSet.emplace_back(key, value);
 }
 
 void Transaction::set_transaction_id(uint64_t transaction_id) {
@@ -65,24 +67,21 @@ void Transaction::set_transaction_id(uint64_t transaction_id) {
 }
 
 void Transaction::add_read_write_sets(const Transaction &other) {
-    for (auto &kt : other.getReadSet()) {
-        readSet[kt.first] = kt.second;
-    }
-
-    for (auto &kv : other.getWriteSet()) {
-        writeSet[kv.first] = kv.second;
-    }
+    readSet.insert(readSet.end(), other.readSet.begin(), other.readSet.end());
+    writeSet.insert(writeSet.end(), other.writeSet.begin(), other.writeSet.end());
 }
 
 void Transaction::serialize(TransactionMessage *msg) const {
     start_time_.serialize(msg->mutable_starttime());
-    for (auto read : readSet) {
+    msg->mutable_readset()->Reserve(readSet.size());
+    msg->mutable_writeset()->Reserve(writeSet.size());
+    for (const auto &read : readSet) {
         ReadMessage *readMsg = msg->add_readset();
         readMsg->set_key(read.first);
         read.second.serialize(readMsg->mutable_readtime());
     }
 
-    for (auto write : writeSet) {
+    for (const auto &write : writeSet) {
         WriteMessage *writeMsg = msg->add_writeset();
         writeMsg->set_key(write.first);
         writeMsg->set_value(write.second);

@@ -158,11 +158,14 @@ namespace strongstore
         }
 
         // Read your own writes, check the write set first.
-        auto wsearch = the_transaction_.getWriteSet().find(key);
-        if (wsearch != the_transaction_.getWriteSet().end())
+        // auto wsearch = the_transaction_.getWriteSet().find(key);
+        // if (wsearch != the_transaction_.getWriteSet().end())
+        for (auto &write : the_transaction_.getWriteSet())
         {
-            gcb(REPLY_OK, key, wsearch->second, Timestamp());
-            return true;
+            if (write.first == key) {
+                gcb(REPLY_OK, key, write.second, Timestamp());
+                return true;
+            }
         }
 
         // Consistent reads, check the read set.
