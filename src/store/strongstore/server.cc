@@ -256,7 +256,7 @@ namespace strongstore
 
         Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
 
-        transactions_.StartGet(transaction_id, remote, key, for_update);
+        size_t get_idx = transactions_.StartGet(transaction_id, remote, key, for_update);
 
         LockAcquireResult r;
         if (for_update)
@@ -286,7 +286,7 @@ namespace strongstore
             // respond back to the client (shard client)
             transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-            transactions_.FinishGet(transaction_id, key);
+            transactions_.FinishGet(transaction_id, get_idx);
         }
         else if (r.status == LockStatus::FAIL)
         {
@@ -321,11 +321,12 @@ namespace strongstore
             reply.client_id = msg.rid().client_id();
             reply.client_req_id = msg.rid().client_req_id();
             reply.key = key;
+            reply.get_idx = get_idx;
 
             // Add to map from transaction_id to pending get slots
             transaction_id_to_get_slots_[transaction_id].push_back(idx);
 
-            transactions_.PauseGet(transaction_id, key);
+            transactions_.PauseGet(transaction_id, get_idx);
 
             WoundPendingRWs(transaction_id, r.wound_rws);
         }
@@ -380,7 +381,7 @@ namespace strongstore
             get_reply_.set_status(REPLY_FAIL);
             // ANJATODO any other logic that is for locks!?!?!?
 
-            TransactionState s = transactions_.ContinueGet(transaction_id, reply.key);
+            TransactionState s = transactions_.ContinueGet(transaction_id, reply.get_idx);
             ASSERT(s == ABORTED);
 
             transport_->SendMessage(this, *reply.remote, MsgType::GET_REPLY_TYPE, get_reply_);
@@ -414,7 +415,7 @@ namespace strongstore
                 get_reply_.mutable_rid()->set_client_id(reply.client_id);
                 get_reply_.mutable_rid()->set_client_req_id(reply.client_req_id);
 
-                TransactionState s = transactions_.ContinueGet(transaction_id, reply.key);
+                TransactionState s = transactions_.ContinueGet(transaction_id, reply.get_idx);
                 if (s == READING)
                 {
                     // ASSERT(locks_.HasReadLock(transaction_id, reply.key));
@@ -429,7 +430,7 @@ namespace strongstore
 
                     transport_->SendMessage(this, *reply.remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-                    transactions_.FinishGet(transaction_id, reply.key);
+                    transactions_.FinishGet(transaction_id, reply.get_idx);
                 }
                 else if (s == ABORTED)
                 {
@@ -530,6 +531,7 @@ namespace strongstore
         }
     }
 
+    /*
     void Server::NotifyPendingROs(const std::unordered_set<uint64_t> &ros)
     {
         for (uint64_t waiting_ro : ros)
@@ -739,6 +741,7 @@ namespace strongstore
             transactions_.CommitRO(transaction_id);
         }
     }
+    */
 
     void Server::ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id)
     {
@@ -772,7 +775,7 @@ namespace strongstore
     void Server::ReplicateCoordinatorCommit(uint64_t client_id,
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
-                const std::unordered_set<int> &participants)
+                const std::vector<int> &participants)
     {
         LinearizeableOperation commit_op;
         commit_op.Clear();
@@ -828,7 +831,7 @@ namespace strongstore
 
         uint64_t transaction_id = msg.transaction_id();
 
-        std::unordered_set<int> participants{msg.participants().begin(),
+        std::vector<int> participants{msg.participants().begin(),
                                              msg.participants().end()};
 
         const Transaction transaction{msg.transaction()};
@@ -937,7 +940,7 @@ namespace strongstore
                 const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
                 const Timestamp &start_ts = transactions_.GetStartTimestamp(transaction_id);
-                const std::unordered_set<int> &participants = transactions_.GetParticipants(transaction_id);
+                const std::vector<int> &participants = transactions_.GetParticipants(transaction_id);
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 ReplicateCoordinatorCommit(pending_reply.client_id, pending_reply.client_req_id,
@@ -1312,7 +1315,7 @@ namespace strongstore
 
             LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
             auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-            TransactionFinishResult fr = transactions_.Abort(transaction_id);
+            transactions_.Abort(transaction_id);
             // We are going to abort this for suresies
 
             // TODO: Handle timeout
@@ -1377,7 +1380,7 @@ namespace strongstore
         {
             // Debug("[%lu] Coordinator preparing", transaction_id);
 
-            const std::unordered_set<int> &participants = transactions_.GetParticipants(transaction_id);
+            const std::vector<int> &participants = transactions_.GetParticipants(transaction_id);
             const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
             LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
@@ -1470,9 +1473,7 @@ namespace strongstore
             prepare_abort_reply_.set_status(REPLY_OK);
             transport_->SendMessage(this, remote, prepare_abort_reply_);
 
-            TransactionFinishResult fr = transactions_.Abort(transaction_id);
-            ASSERT(fr.notify_ros.size() == 0);
-            ASSERT(fr.notify_slow_path_ros.size() == 0);
+            transactions_.Abort(transaction_id);
             return;
         }
 
@@ -1498,7 +1499,7 @@ namespace strongstore
         rw_commit_c_slots_->FreeByKey(transaction_id);
         pending_reply.remote = nullptr;
         // Notify participants
-        std::unordered_set<int> participants = transactions_.GetParticipants(transaction_id);
+        std::vector<int> participants = transactions_.GetParticipants(transaction_id);
         SendAbortParticipants(transaction_id, participants);
 
         // Reply to OK participants
@@ -1561,12 +1562,11 @@ namespace strongstore
                 reply.participant_rids.clear();
             }
 
-            const std::unordered_set<int> &participants = transactions_.GetParticipants(transaction_id);
+            const std::vector<int> &participants = transactions_.GetParticipants(transaction_id);
             SendAbortParticipants(transaction_id, participants);
         }
 
         LockReleaseResult rr;
-        TransactionFinishResult fr;
 
         // Coordinator may not yet know about this transaction
         // If so, no locks to release.
@@ -1578,7 +1578,7 @@ namespace strongstore
             prevHolderWriteSet = std::move(transaction.getWriteSet());
         }
 
-        fr = transactions_.Abort(transaction_id);
+        transactions_.Abort(transaction_id);
         ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
@@ -1613,8 +1613,6 @@ namespace strongstore
         }
 
         LockReleaseResult rr;
-        TransactionFinishResult fr;
-
         // Participant may not yet know about this transaction
         // If so, no locks to release.
         std::vector<std::pair<std::string, std::string>> prevHolderWriteSet;
@@ -1627,7 +1625,7 @@ namespace strongstore
             Warning("Transaction %lu not found during abort!!!!!!!!!!", transaction_id);
         }
 
-        fr = transactions_.Abort(transaction_id);
+        transactions_.Abort(transaction_id);
 
         if (state == PREPARING || state == PREPARED)
         {
@@ -1646,7 +1644,7 @@ namespace strongstore
         // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, false);
     }
 
-    void Server::SendAbortParticipants(uint64_t transaction_id, const std::unordered_set<int> &participants)
+    void Server::SendAbortParticipants(uint64_t transaction_id, const std::vector<int> &participants)
     {
         for (int p : participants)
         {
@@ -1697,7 +1695,7 @@ namespace strongstore
 
         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
         auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
+        transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
 
         if (replica_idx_ != 0) return;
         // Reply to client
@@ -1709,8 +1707,7 @@ namespace strongstore
         // Continue waiting RW transactions
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
 
-        // Continue waiting RO transactions
-        // FOW NOW WE DEPRECATE!!
+        // Continue waiting RO transactions <-- REMOVED FOR NOW
         // NotifyPendingROs(fr.notify_ros);
         // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
@@ -1734,12 +1731,12 @@ namespace strongstore
 
         LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
         auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        TransactionFinishResult fr = transactions_.Commit(transaction_id);
+        transactions_.Commit(transaction_id);
 
         // Continue waiting RW transactions
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
 
-        // Continue waiting RO transactions
+        // Continue waiting RO transactions <-- REMOVED FOR NOW
         // NotifyPendingROs(fr.notify_ros);
         // NotifySlowPathROs(fr.notify_slow_path_ros, transaction_id, true, commit_ts);
     }
@@ -1860,7 +1857,7 @@ namespace strongstore
                 {
                     const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
-                    const std::unordered_set<int> participants{msg.prepare().participants().begin(),
+                    const std::vector<int> participants{msg.prepare().participants().begin(),
                                                                msg.prepare().participants().end()};
                     const Transaction transaction{msg.prepare().txn()};
                     const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
@@ -1921,7 +1918,7 @@ namespace strongstore
 
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
                 auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-                TransactionFinishResult fr = transactions_.Abort(transaction_id);
+                transactions_.Abort(transaction_id);
                 ContinueGetAbort(transaction_id); // which will remove it before the next NotifyPendingRWs call
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);

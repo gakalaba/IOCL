@@ -161,6 +161,7 @@ namespace strongstore
             const TransportAddress *remote = nullptr;
             uint64_t client_id;
             uint64_t client_req_id;
+            size_t get_idx;
             std::string key;
         };
         struct PendingOpReplySlot {
@@ -215,7 +216,7 @@ namespace strongstore
 
         void HandleClientCoordination(replication::SuccessorRequestMessage &msg);
 
-        void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
+        // void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
                                        proto::RWCommitCoordinator &msg);
@@ -244,7 +245,7 @@ namespace strongstore
         void HandleWound(const TransportAddress &remote, proto::Wound &msg);
 
         void SendAbortParticipants(uint64_t transaction_id,
-                                   const std::unordered_set<int> &participants);
+                                   const std::vector<int> &participants);
 
         void HandlePrepareOK(const TransportAddress &remote, proto::PrepareOK &msg);
         void HandlePrepareAbort(const TransportAddress &remote,
@@ -266,13 +267,13 @@ namespace strongstore
         void ContinueCoordinatorPrepare(uint64_t transaction_id);
         void ContinueParticipantPrepare(uint64_t transaction_id);
 
-        void NotifyPendingROs(const std::unordered_set<uint64_t> &ros);
-        void ContinueROCommit(uint64_t transaction_id);
+        // void NotifyPendingROs(const std::unordered_set<uint64_t> &ros);
+        // void ContinueROCommit(uint64_t transaction_id);
 
-        void NotifySlowPathROs(const std::unordered_set<uint64_t> &ros, uint64_t rw_transaction_id,
-                               bool is_commit, const Timestamp &commit_ts = Timestamp());
-        void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
-                            bool is_commit, const Timestamp &commit_ts);
+        // void NotifySlowPathROs(const std::unordered_set<uint64_t> &ros, uint64_t rw_transaction_id,
+        //                        bool is_commit, const Timestamp &commit_ts = Timestamp());
+        // void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
+        //                     bool is_commit, const Timestamp &commit_ts);
         void ReplicaUpcallAppRequest(const replication::LinearizeableOperation &msg);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
@@ -283,7 +284,7 @@ namespace strongstore
         void ReplicateCoordinatorCommit(uint64_t client_id,
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
-                const std::unordered_set<int> &participant);
+                const std::vector<int> &participant);
         void ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts);
         void ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id);
         void ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
