@@ -256,25 +256,26 @@ namespace strongstore
 
         Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
 
-        transactions_.StartGet(transaction_id, remote, key, for_update);
+        // transactions_.StartGet(transaction_id, remote, key, for_update);
 
         LockAcquireResult r;
         if (for_update)
         {
-            r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
+            // r = locks_.AcquireReadWriteLock(transaction_id, timestamp, key);
         }
         else
         {
-            r = locks_.AcquireReadLock(transaction_id, timestamp, key);
+            // r = locks_.AcquireReadLock(transaction_id, timestamp, key);
         }
 
-        if (r.status == LockStatus::ACQUIRED)
+        // if (r.status == LockStatus::ACQUIRED)
+        if (true)
         {
-            ASSERT(r.wound_rws.size() == 0);
+            // ASSERT(r.wound_rws.size() == 0);
 
             std::pair<TimestampID, std::string> value;
             // read the value from the store! this doesn't need to be replicated
-            ASSERT(store_.get(key, value));
+            // ASSERT(store_.get(key, value));
 
             get_reply_.Clear();
             get_reply_.mutable_rid()->CopyFrom(msg.rid());
@@ -286,7 +287,7 @@ namespace strongstore
             // respond back to the client (shard client)
             transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
 
-            transactions_.FinishGet(transaction_id, key);
+            // transactions_.FinishGet(transaction_id, key);
         }
         else if (r.status == LockStatus::FAIL)
         {
@@ -838,20 +839,25 @@ namespace strongstore
 
         const TrueTimeInterval now = tt_.Now();
         const Timestamp start_ts{now.latest(), client_id};
-        TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
-                                                                   participants, transaction, nonblock_ts);
+        TransactionState s;
+        // TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, shard_idx_,
+        //                                                            participants, transaction, nonblock_ts);
 
-        if (s == PREPARING)
+        // if (s == PREPARING)
+        if (true)
         {
             // Debug("[%lu] Coordinator preparing", transaction_id);
 
-            LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-            if (ar.status == LockStatus::ACQUIRED)
+            // LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+            // if (ar.status == LockStatus::ACQUIRED)
+            LockAcquireResult ar;
+            if (true)
             {
-                ASSERT(ar.wound_rws.size() == 0);
+                // ASSERT(ar.wound_rws.size() == 0);
                 const Timestamp prepare_ts = GetPrepareTimestamp(client_id);
-                transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
-                const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
+                // transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
+                // const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
+                const Timestamp &commit_ts = prepare_ts;
 
                 // Grab an idx
                 uint32_t idx = rw_commit_c_slots_->Alloc(transaction_id);
@@ -1680,24 +1686,29 @@ namespace strongstore
     {
         Debug("[%lu] Commiting", transaction_id);
 
-        const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        // const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        const Timestamp nonblock_ts = commit_ts;
 
         // Commit writes
-        const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-        for (auto &write : transaction.getWriteSet())
+        std::vector<std::pair<std::string, std::string>> write_set;
+        // const Transaction &transaction = transactions_.GetTransaction(transaction_id);
+        // for (auto &write : transaction.getWriteSet())
+        for (auto &write : write_set)
         {
             // apply all the buffered writes to the store!
             store_.put(write.first, write.second, {commit_ts, transaction_id});
         }
 
-        if (transaction.getWriteSet().size() > 0)
+        // if (transaction.getWriteSet().size() > 0)
+        if (write_set.size() > 0)
         {
             min_prepare_timestamp_ = std::max(min_prepare_timestamp_, commit_ts);
         }
 
-        LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
-        auto prevHolderWriteSet = std::move(transaction.getWriteSet());
-        TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
+        // LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
+        // auto prevHolderWriteSet = std::move(transaction.getWriteSet());
+        auto prevHolderWriteSet = std::move(write_set);
+        // TransactionFinishResult fr = transactions_.Commit(transaction_id); // transaction object doesn't exist after this point!!
 
         if (replica_idx_ != 0) return;
         // Reply to client
@@ -1707,7 +1718,8 @@ namespace strongstore
         SendPrepareOKRepliesOK(transaction_id, commit_ts);
 
         // Continue waiting RW transactions
-        NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+        // NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
+        NotifyPendingRWs(transaction_id, {}, prevHolderWriteSet); // don't need to notify any RWs here because locks are still held until the participants reply to the commit replication, at which point they will be released and the waiting RWs will be notified
 
         // Continue waiting RO transactions
         // FOW NOW WE DEPRECATE!!
@@ -1856,8 +1868,10 @@ namespace strongstore
             { // Coordinator commit
                 // Debug("[%lu] Coordinator commit", transaction_id);
 
-                if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+                // if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
+                if (replica_idx_ != 0)
                 {
+                    // Replicas
                     const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
                     const std::unordered_set<int> participants{msg.prepare().participants().begin(),
@@ -1867,25 +1881,25 @@ namespace strongstore
 
                     ASSERT(coordinator == shard_idx_);
 
-                    TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
-                                                                               participants, transaction, nonblock_ts);
+                    // TransactionState s = transactions_.StartCoordinatorPrepare(transaction_id, start_ts, coordinator,
+                    //                                                            participants, transaction, nonblock_ts);
                     for (int p : participants)
                     {
                         if (p != coordinator)
                         {
-                            s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
+                            // s = transactions_.CoordinatorReceivePrepareOK(transaction_id, p, commit_ts, nonblock_ts);
                         }
                     }
-                    ASSERT(s == PREPARING);
+                    // ASSERT(s == PREPARING);
 
-                    LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
-                    //WHY DOES THIS FAIL!?!?
-                    if (ar.status != LockStatus::ACQUIRED) {
-                        Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
-                    }
-                    ASSERT(ar.status == LockStatus::ACQUIRED);
+                    // LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
+                    // //WHY DOES THIS FAIL!?!?
+                    // if (ar.status != LockStatus::ACQUIRED) {
+                    //     Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                    // }
+                    // ASSERT(ar.status == LockStatus::ACQUIRED);
 
-                    transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
+                    // transactions_.FinishCoordinatorPrepare(transaction_id, commit_ts);
                 }
                 else
                 {
@@ -1893,7 +1907,8 @@ namespace strongstore
                 }
 
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
-                if (commit_wait_us > 0) {
+                // if (commit_wait_us > 0) {
+                if (false) {
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
                 } else {
