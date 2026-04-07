@@ -465,7 +465,7 @@ namespace strongstore
 
     void ShardClient::RWCommitCoordinator(
         uint64_t transaction_id,
-        const std::set<int> participants, Timestamp &nonblock_timestamp,
+        const std::unordered_set<int> participants, Timestamp &nonblock_timestamp,
         rw_coord_commit_callback ccb, rw_coord_commit_timeout_callback ctcb, uint32_t timeout)
     {
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);

@@ -33,7 +33,7 @@
 #include "lib/message.h"
 
 uint64_t Partitioner::operator()(const std::string &key, uint64_t num_shards,
-                                 int group, const std::set<int> &txn_groups)
+                                 int group, const std::unordered_set<int> &txn_groups)
 {
     std::vector<int> txn_groups_vec(txn_groups.begin(), txn_groups.end());
     return this->operator()(key, num_shards, group, txn_groups_vec);

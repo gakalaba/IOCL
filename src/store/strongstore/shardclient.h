@@ -45,7 +45,7 @@
 #define OPERATION_TIMEOUT 1000
 #define OPERATION_RETRIES 5
 
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include "lib/assert.h"
@@ -150,7 +150,7 @@ namespace strongstore
                       ro_commit_timeout_callback ctcb, uint32_t timeout);
 
         void RWCommitCoordinator(uint64_t transaction_id,
-                                 const std::set<int> participants,
+                                 const std::unordered_set<int> participants,
                                  Timestamp &nonblock_timestamp,
                                  rw_coord_commit_callback ccb,
                                  rw_coord_commit_timeout_callback ctcb, uint32_t timeout);

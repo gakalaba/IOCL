@@ -70,7 +70,7 @@ namespace strongstore
         const Timestamp &min_read_ts() const { return min_read_ts_; }
         void advance_min_read_ts(const Timestamp &ts) { min_read_ts_ = std::max(min_read_ts_, ts); }
 
-        const std::set<int> &participants() const { return participants_; }
+        const std::unordered_set<int> &participants() const { return participants_; }
         const std::unordered_set<int> &parallel_gets_participants() const { return parallel_gets_participants_; }
         const std::unordered_map<uint64_t, PreparedTransaction> prepares() const { return prepares_; }
 
@@ -158,7 +158,7 @@ namespace strongstore
         void set_needs_abort() { state_ = NEEDS_ABORT; }
         void set_aborting() { state_ = ABORTING; }
 
-        std::set<int> &mutable_participants() { return participants_; }
+        std::unordered_set<int> &mutable_participants() { return participants_; }
         void add_participant(int p) { participants_.insert(p); }
         void add_get_participant(int p) { parallel_gets_participants_.insert(p); }
         void clear_participants() { participants_.clear(); parallel_gets_participants_.clear(); }
@@ -173,7 +173,7 @@ namespace strongstore
         uint64_t apprequest_id_;
         Timestamp start_ts_;
         Timestamp min_read_ts_;
-        std::set<int> participants_;
+        std::unordered_set<int> participants_;
         std::unordered_set<int> parallel_gets_participants_;
         std::unordered_map<uint64_t, PreparedTransaction> prepares_;
         std::unordered_map<std::string, std::list<Value>> values_;
