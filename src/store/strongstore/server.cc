@@ -251,7 +251,7 @@ namespace strongstore
         Debug("getting Get with req_id = %lu", msg.rid().client_req_id());
         uint64_t transaction_id = msg.transaction_id();
         const std::string &key = msg.key();
-        const Timestamp timestamp{msg.timestamp()};
+        // const Timestamp timestamp{msg.timestamp()};
         bool for_update = msg.has_for_update() && msg.for_update();
 
         Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
@@ -275,14 +275,14 @@ namespace strongstore
 
             std::pair<TimestampID, std::string> value;
             // read the value from the store! this doesn't need to be replicated
-            // ASSERT(store_.get(key, value));
+            ASSERT(store_.get(key, value));
 
             get_reply_.Clear();
             get_reply_.mutable_rid()->CopyFrom(msg.rid());
             get_reply_.set_status(REPLY_OK);
 
             get_reply_.set_val(value.second);
-            value.first.timestamp.serialize(get_reply_.mutable_timestamp());
+            // value.first.timestamp.serialize(get_reply_.mutable_timestamp());
 
             // respond back to the client (shard client)
             transport_->SendMessage(this, remote, MsgType::GET_REPLY_TYPE, get_reply_);
@@ -761,7 +761,7 @@ namespace strongstore
         commit_op.Clear();
         commit_op.set_request_type(replication::LinearizeableOperation::COMMIT);
         commit_op.set_transaction_id(transaction_id);
-        commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
+        // commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
         commit_op.mutable_rid()->set_client_id(client_id);
         commit_op.mutable_rid()->set_client_req_id(client_req_id);
 
@@ -784,16 +784,16 @@ namespace strongstore
 
         auto prepare = commit_op.mutable_prepare();
 
-        transaction.serialize(prepare->mutable_txn());
-        start_ts.serialize(prepare->mutable_timestamp());
+        // transaction.serialize(prepare->mutable_txn());
+        // start_ts.serialize(prepare->mutable_timestamp());
         prepare->set_coordinator(shard_idx_);
-        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+        // nonblock_ts.serialize(prepare->mutable_nonblock_ts());
         for (int p : participants)
         {
             prepare->add_participants(p);
         }
 
-        commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
+        // commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
 
         transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
             this->replica_->HandleRequest(m);
@@ -812,11 +812,11 @@ namespace strongstore
 
         auto prepare = prepare_op.mutable_prepare();
 
-        transaction.serialize(prepare->mutable_txn());
-        prepare_ts.serialize(prepare->mutable_timestamp());
+        // transaction.serialize(prepare->mutable_txn());
+        // prepare_ts.serialize(prepare->mutable_timestamp());
         prepare->set_coordinator(shard_idx_);
-        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
-
+        // nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+// 
         transport_->TimerMicro(0, [this, m = std::move(prepare_op)]() mutable {
             this->replica_->HandleRequest(m);
         });
@@ -832,8 +832,10 @@ namespace strongstore
         std::unordered_set<int> participants{msg.participants().begin(),
                                              msg.participants().end()};
 
-        const Transaction transaction{msg.transaction()};
-        const Timestamp nonblock_ts{msg.nonblock_timestamp()};
+        // const Transaction transaction{msg.transaction()};
+        const Transaction transaction;
+        const Timestamp nonblock_ts;
+        // const Timestamp nonblock_ts{msg.nonblock_timestamp()};
 
         Debug("[%lu] Coordinator for transaction", transaction_id);
 
@@ -1000,8 +1002,8 @@ namespace strongstore
         rw_commit_c_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
         rw_commit_c_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
         rw_commit_c_reply_.set_status(REPLY_OK);
-        commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
-        nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
+        // commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
+        // nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
         Debug("Sending commit reply to client with req_id = %lu", transaction_id);
         transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
@@ -1016,8 +1018,8 @@ namespace strongstore
         rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
         rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
         rw_commit_c_reply_.set_status(REPLY_FAIL);
-        rw_commit_c_reply_.clear_commit_timestamp();
-        rw_commit_c_reply_.clear_nonblock_timestamp();
+        // rw_commit_c_reply_.clear_commit_timestamp();
+        // rw_commit_c_reply_.clear_nonblock_timestamp();
 
         transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
     }
@@ -1816,10 +1818,13 @@ namespace strongstore
             else if (s == NOT_FOUND)
             { // Participant Shard Replica Upcall for Prepare
                 // should these values come from the message itself because already picked by leader?
-                const Timestamp prepare_ts{msg.prepare().timestamp()};
+                // const Timestamp prepare_ts{msg.prepare().timestamp()};
+                const Timestamp prepare_ts;
                 int coordinator = msg.prepare().coordinator();
-                const Transaction transaction{msg.prepare().txn()};
-                const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
+                // const Transaction transaction{msg.prepare().txn()};
+                const Transaction transaction;
+                const Timestamp nonblock_ts;
+                // const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
 
                 s = transactions_.StartParticipantPrepare(transaction_id, coordinator, transaction, nonblock_ts);
                 ASSERT(s == PREPARING);
@@ -1862,7 +1867,8 @@ namespace strongstore
         {
             // Debug("[%lu] Received COMMIT", transaction_id);
 
-            const Timestamp commit_ts{msg.commit().commit_timestamp()};
+            const Timestamp commit_ts;
+            // const Timestamp commit_ts{msg.commit().commit_timestamp()};
 
             if (msg.has_prepare())
             { // Coordinator commit
@@ -1872,12 +1878,13 @@ namespace strongstore
                 if (replica_idx_ != 0)
                 {
                     // Replicas
-                    const Timestamp start_ts{msg.prepare().timestamp()};
+                    // const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
                     const std::unordered_set<int> participants{msg.prepare().participants().begin(),
                                                                msg.prepare().participants().end()};
-                    const Transaction transaction{msg.prepare().txn()};
-                    const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
+                    // const Transaction transaction{msg.prepare().txn()};
+                    const Transaction transaction;
+                    // const Timestamp nonblock_ts{msg.prepare().nonblock_ts()};
 
                     ASSERT(coordinator == shard_idx_);
 

@@ -86,10 +86,10 @@ namespace strongstore
 
         auto prepare = request.mutable_prepare();
 
-        transaction.serialize(prepare->mutable_txn());
-        prepare_ts.serialize(prepare->mutable_timestamp());
+        // transaction.serialize(prepare->mutable_txn());
+        // prepare_ts.serialize(prepare->mutable_timestamp());
         prepare->set_coordinator(coordinator);
-        nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+        // nonblock_ts.serialize(prepare->mutable_nonblock_ts());
 
         request.SerializeToString(&request_str);
 
@@ -146,8 +146,8 @@ namespace strongstore
         replication::LinearizeableOperation request;
         request.set_request_type(replication::LinearizeableOperation::COMMIT);
         request.set_transaction_id(transaction_id);
-        commit_timestamp.serialize(
-            request.mutable_commit()->mutable_commit_timestamp());
+        // commit_timestamp.serialize(
+        //     request.mutable_commit()->mutable_commit_timestamp());
         request.SerializeToString(&request_str);
 
         uint64_t reqId = lastReqId++;

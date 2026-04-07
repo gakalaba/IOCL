@@ -1,0 +1,22 @@
+set datafile separator ','
+set key top left
+set xlabel 'Throughput (ops/sec)'
+set ylabel 'Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-04-07-13-49-19/plots/tput-p50-lat.png'
+set style line 1 linetype 1 linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+set style line 4 linetype 4 linewidth 2
+set style line 5 linetype 5 linewidth 2
+set style line 6 linetype 8 linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/dummy_spanner/2026-04-03-11-29-49/plots/tput-p50-lat.csv' title 'Dummy Spanner' ls 1 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/spanner_dummy__shard_client_w_otpimizations/2026-04-04-14-02-11/plots/tput-p50-lat.csv' title 'Dummy Spanner - client side only' ls 2 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/spanner_full_w_remaining_fixes/2026-04-07-08-52-11/plots/tput-p50-lat.csv' title 'Spanner full optimized' ls 3 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_locks/2026-04-07-12-14-25/plots/tput-p50-lat.csv' title 'Spanner - no locks' ls 4 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_transactionstore/2026-04-07-12-53-06/plots/tput-p50-lat.csv' title 'Spanner - no transaction\_store' ls 5 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_get_execution/2026-04-07-13-06-21/plots/tput-p50-lat.csv' title 'Spanner - No Get execution' ls 6 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_get_timestamps/2026-04-07-13-20-56/plots/tput-p50-lat.csv' title 'Spanner - no GET timestamps (back with get execution)' ls 7 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_commit_timestamps/2026-04-07-13-29-43/plots/tput-p50-lat.csv' title 'Spanner - no COMMIT timestamps' ls 8 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_commit_transactionMessage/2026-04-07-13-35-34/plots/tput-p50-lat.csv' title 'Spanner - no COMMIT transactions' ls 9 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-04-07-13-49-19/2026-04-07-13-49-19/plots/tput-p50-lat.csv' title 'Spanner - no replicated COMMIT timestamps' ls 11 with linespoint
