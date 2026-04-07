@@ -196,22 +196,31 @@ namespace strongstore
             break;
         }
         case MsgType::TXN_COMMIT_TYPE: {
-            Debug("Server got commit");
             rw_commit_c_.ParseFromString(data);
             HandleRWCommitCoordinator(remote, rw_commit_c_);
             break;
         }
-        /*
-        else if (type == rw_commit_p_.GetTypeName())
-        {
+        case MsgType::TXN_COMMIT_PART_TYPE: {
             rw_commit_p_.ParseFromString(data);
             HandleRWCommitParticipant(remote, rw_commit_p_);
+            break;
         }
-        else if (type == prepare_ok_.GetTypeName())
-        {
+        case MsgType::TXN_PREPARE_OK_TYPE: {
             prepare_ok_.ParseFromString(data);
             HandlePrepareOK(remote, prepare_ok_);
+            break;
         }
+        case MsgType::TXN_ABORT_TYPE: {
+            abort_.ParseFromString(data);
+            HandleAbort(remote, abort_);
+            break;
+        }
+        case MsgType::TXN_WOUND_TYPE: {
+            wound_.ParseFromString(data);
+            HandleWound(remote, wound_);
+            break;
+        }
+        /*
         else if (type == prepare_abort_.GetTypeName())
         {
             prepare_abort_.ParseFromString(data);
@@ -221,16 +230,6 @@ namespace strongstore
         {
             ro_commit_.ParseFromString(data);
             HandleROCommit(remote, ro_commit_);
-        }
-        else if (type == abort_.GetTypeName())
-        {
-            abort_.ParseFromString(data);
-            HandleAbort(remote, abort_);
-        }
-        else if (type == wound_.GetTypeName())
-        {
-            wound_.ParseFromString(data);
-            HandleWound(remote, wound_);
         }
         else if (type == ping_.GetTypeName())
         {
@@ -479,7 +478,7 @@ namespace strongstore
                 // Send wound to client
                 std::shared_ptr<TransportAddress> remote = transactions_.GetClientAddr(rw);
                 wound_.set_transaction_id(rw);
-                transport_->SendMessage(this, *remote, wound_);
+                transport_->SendMessage(this, *remote, MsgType::TXN_WOUND_TYPE, wound_);
             }
             else if (s == PREPARING || s == WAIT_PARTICIPANTS || s == PREPARE_WAIT || s == PREPARED)
             {
@@ -1030,7 +1029,7 @@ namespace strongstore
             prepare_ok_reply_.mutable_rid()->set_client_id(prid.client_id);
             prepare_ok_reply_.mutable_rid()->set_client_req_id(prid.client_req_id);
 
-            transport_->SendMessage(this, *prid.remote, prepare_ok_reply_);
+            transport_->SendMessage(this, *prid.remote, MsgType::TXN_PREPARE_OK_REPLY_TYPE, prepare_ok_reply_);
         }
 
         prepare_ok_slots_->FreeByKey(transaction_id);
@@ -1047,7 +1046,7 @@ namespace strongstore
             prepare_ok_reply_.mutable_rid()->set_client_id(prid.client_id);
             prepare_ok_reply_.mutable_rid()->set_client_req_id(prid.client_req_id);
 
-            transport_->SendMessage(this, *prid.remote, prepare_ok_reply_);
+            transport_->SendMessage(this, *prid.remote, MsgType::TXN_PREPARE_OK_REPLY_TYPE, prepare_ok_reply_);
         }
     }
 
@@ -1061,7 +1060,7 @@ namespace strongstore
         rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
         rw_commit_p_reply_.set_status(REPLY_OK);
 
-        transport_->SendMessage(this, *pending_reply.remote, rw_commit_p_reply_);
+        transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
         rw_commit_p_slots_->FreeByKey(transaction_id);
         pending_reply.remote = nullptr;
     }
@@ -1076,7 +1075,7 @@ namespace strongstore
         rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
         rw_commit_p_reply_.set_status(REPLY_FAIL);
 
-        transport_->SendMessage(this, *pending_reply.remote, rw_commit_p_reply_);
+        transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
         rw_commit_p_slots_->FreeByKey(transaction_id);
         pending_reply.remote = nullptr;
     }
@@ -1089,7 +1088,7 @@ namespace strongstore
         rw_commit_p_reply_.mutable_rid()->set_client_req_id(client_req_id);
         rw_commit_p_reply_.set_status(REPLY_FAIL);
 
-        transport_->SendMessage(this, remote, rw_commit_p_reply_);
+        transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
     }
 
     void Server::HandleRWCommitParticipant(const TransportAddress &remote, proto::RWCommitParticipant &msg)
@@ -1597,7 +1596,7 @@ namespace strongstore
         {
             // Debug("[%lu] Transaction already aborted", transaction_id);
             abort_reply_.set_status(REPLY_OK);
-            transport_->SendMessage(this, remote, abort_reply_);
+            transport_->SendMessage(this, remote, MsgType::TXN_ABORT_REPLY_TYPE, abort_reply_);
             return;
         }
 
@@ -1605,7 +1604,7 @@ namespace strongstore
         {
             // Debug("[%lu] Transaction already committing", transaction_id);
             abort_reply_.set_status(REPLY_FAIL);
-            transport_->SendMessage(this, remote, abort_reply_);
+            transport_->SendMessage(this, remote, MsgType::TXN_ABORT_REPLY_TYPE, abort_reply_);
             return;
         }
 
@@ -1633,7 +1632,7 @@ namespace strongstore
         }
 
         abort_reply_.set_status(REPLY_OK);
-        transport_->SendMessage(this, remote, abort_reply_);
+        transport_->SendMessage(this, remote, MsgType::TXN_ABORT_REPLY_TYPE, abort_reply_);
 
         // Reply to client for any ongoing GETs
         ContinueGetAbort(transaction_id);

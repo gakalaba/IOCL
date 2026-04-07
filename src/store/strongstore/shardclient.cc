@@ -93,17 +93,27 @@ namespace strongstore
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
             break;
         }
-        /*
-        else if (type == rw_commit_p_reply_.GetTypeName())
-        {
+        case MsgType::TXN_COMMIT_PART_REPLY_TYPE: {
             rw_commit_p_reply_.ParseFromString(data);
             HandleRWCommitParticipantReply(rw_commit_p_reply_);
+            break;
         }
-        else if (type == prepare_ok_reply_.GetTypeName())
-        {
+        case MsgType::TXN_PREPARE_OK_REPLY_TYPE: {
             prepare_ok_reply_.ParseFromString(data);
             HandlePrepareOKReply(prepare_ok_reply_);
+            break;
         }
+        case MsgType::TXN_ABORT_REPLY_TYPE: {
+            abort_reply_.ParseFromString(data);
+            HandleAbortReply(abort_reply_);
+            break;
+        }
+        case MsgType::TXN_WOUND_TYPE: {
+            wound_.ParseFromString(data);
+            HandleWound(wound_);
+            break;
+        }
+        /*
         else if (type == prepare_abort_reply_.GetTypeName())
         {
             prepare_abort_reply_.ParseFromString(data);
@@ -118,16 +128,6 @@ namespace strongstore
         {
             ro_commit_slow_reply_.ParseFromString(data);
             HandleROCommitSlowReply(ro_commit_slow_reply_);
-        }
-        else if (type == abort_reply_.GetTypeName())
-        {
-            abort_reply_.ParseFromString(data);
-            HandleAbortReply(abort_reply_);
-        }
-        else if (type == wound_.GetTypeName())
-        {
-            wound_.ParseFromString(data);
-            HandleWound(wound_);
         }
         */
         default:
@@ -531,7 +531,7 @@ namespace strongstore
         rw_commit_p_.set_coordinator_shard(coordinator_shard);
         nonblock_timestamp.serialize((rw_commit_p_.mutable_nonblock_timestamp()));
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_p_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_PART_TYPE, rw_commit_p_);
     }
 
     void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
@@ -579,7 +579,7 @@ namespace strongstore
         prepare_timestamp.serialize(prepare_ok_.mutable_prepare_timestamp());
         nonblock_ts.serialize(prepare_ok_.mutable_nonblock_timestamp());
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, prepare_ok_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_PREPARE_OK_TYPE, prepare_ok_);
     }
 
     void ShardClient::HandlePrepareOKReply(const proto::PrepareOKReply &reply)
@@ -667,7 +667,7 @@ namespace strongstore
         abort_.mutable_rid()->set_client_req_id(req_id);
         abort_.set_transaction_id(transaction_id);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, abort_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_ABORT_TYPE, abort_);
     }
 
     void ShardClient::Wound(uint64_t transaction_id)
@@ -676,7 +676,7 @@ namespace strongstore
 
         wound_.set_transaction_id(transaction_id);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, wound_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_WOUND_TYPE, wound_);
     }
 
     void ShardClient::AbortGet(uint64_t transaction_id)
