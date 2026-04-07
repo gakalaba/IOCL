@@ -71,6 +71,8 @@ namespace replication
             this->lastCommitted = 0;
             lastBatchEnd = 0;
 
+            vectorClock.assign(configuration.g, 0);
+
             if (batchSize > 1)
             {
                 Notice("Batching enabled; batch size %d", batchSize);
@@ -166,6 +168,68 @@ namespace replication
             return linRequest;
         }
 
+        void IOCL_CRAQReplica::SyncVC(const google::protobuf::RepeatedField<google::protobuf::uint64> &remoteVC)
+        {
+            Debug("Syncing Vc");
+            for (int i = 0; i < remoteVC.size() && i < (int)vectorClock.size(); ++i)
+            {
+                if (remoteVC[i] > vectorClock[i])
+                {
+                    vectorClock[i] = remoteVC[i];
+                }
+            }
+        }
+
+        void IOCL_CRAQReplica::SendCoordResponseMsg(const proto::SuccessorRequestMessage &coordReq)
+        {
+            Debug("Sending coordination response");
+            PredecessorReplyMessage preply;
+            preply.set_s(coordReq.s());
+            for (uint64_t v : vectorClock)
+            {
+                preply.add_vector_clock(v);
+            }
+            if (!transport->SendMessageToReplica(this, coordReq.succ_groupidx(),
+                                                  coordReq.succ_replicaidx(), preply))
+            {
+                RWarning("Failed to send CoordResponse for successor shardtag %lu", coordReq.s());
+            }
+        }
+
+        void IOCL_CRAQReplica::DrainPendingCoordRequests()
+        {
+            for (uint64_t shardTag : pendingCoordDrain_)
+            {
+                auto pendIt = pendingCoordRequests.find(shardTag);
+                if (pendIt != pendingCoordRequests.end())
+                {
+                    for (const auto &coordReq : pendIt->second)
+                    {
+                        SendCoordResponseMsg(coordReq);
+                    }
+                    pendingCoordRequests.erase(pendIt);
+                }
+            }
+            pendingCoordDrain_.clear();
+        }
+
+        void IOCL_CRAQReplica::BroadcastCommit(const string &key)
+        {
+            ASSERT(AmTail());
+            CommitMessage cm;
+            cm.set_view(this->view);
+            cm.set_opnum(this->lastCommitted);
+            cm.set_key(key);
+            for (uint64_t v : vectorClock)
+            {
+                cm.add_vector_clock(v);
+            }
+            if (!SendMessageToAllPreviousReplicasInChain(cm))
+            {
+                RWarning("Failed to send CommitMessage from tail");
+            }
+        }
+
         void IOCL_CRAQReplica::ExecuteWriteOperation(const LinearizeableOperation &linRequest)
         {
             RDebug("Executing write request " FMT_OPNUM, lastCommitted);
@@ -201,7 +265,6 @@ namespace replication
             reply.set_opnum(lastCommitted);
             reply.set_clientreqid(request.rid().client_req_id());
 
-            // Store reply in the client table
             ClientTableEntry &cte = clientTable[request.rid().client_id()];
             if (cte.lastReqId <= request.rid().client_req_id())
             {
@@ -213,7 +276,6 @@ namespace replication
                 cte.reply = reply;
             }
 
-            /* Send reply */
             auto iter = clientAddresses.find(request.rid().client_id());
             if (iter != clientAddresses.end())
             {
@@ -227,11 +289,8 @@ namespace replication
             auto it = pendingWrites.begin();
             while (it != pendingWrites.end() && it->first <= upto)
             {
-                // Monotonicity: commitLogOpnum must strictly increase on every
-                // append, and must never be less than what is already in commitLog.
                 ASSERT(++commitLogOpnum > 0);
                 ASSERT(commitLogOpnum > commitLog.LastOpnum());
-                // pendingWrites now stores LinearizeableOperation; convert once here.
                 commitLog.Append(
                     viewstamp_t(view, commitLogOpnum),
                     ToRequest(it->second),
@@ -246,7 +305,6 @@ namespace replication
             {
                 lastCommitted++;
 
-                /* Find operation in log */
                 const LogEntry *entry = log.Find(lastCommitted);
                 if (entry == nullptr)
                 {
@@ -254,11 +312,9 @@ namespace replication
                            lastCommitted);
                 }
 
-                /* Mark it as committed */
                 bool status = log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
                 Debug("Status is %d", status);
 
-                // Use cached LinearizeableOperation — avoids deserialization.
                 auto cacheIt = linOpCache_.find(lastCommitted);
                 ASSERT(cacheIt != linOpCache_.end());
                 const LinearizeableOperation &linRequest = cacheIt->second;
@@ -268,15 +324,72 @@ namespace replication
 
                 if (op == PUT_OPERATION)
                 {
+                    // IOCL gate: at the tail, a write with a predecessor must
+                    // wait for its CoordResponse before it can commit.
+                    if (AmTail() && linRequest.predlist_size() > 0 &&
+                        linRequest.predlist(0) != 0)
+                    {
+                        uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
+                        if (myShardTag != 0)
+                        {
+                            auto it = pendingCoordResponses.find(myShardTag);
+                            if (it == pendingCoordResponses.end())
+                            {
+                                lastCommitted--;
+                                return;
+                            }
+                            SyncVC(it->second.vector_clock());
+                            pendingCoordResponses.erase(it);
+                        }
+                    }
+
                     ExecuteWriteOperation(linRequest);
 
-                    // Commit ack received — flush this write from pendingWrites
-                    // into commitLog now that it is known to be committed.
+                    // After committing a write at the tail: update VC and record
+                    // in committedForCoord. Defer draining pendingCoordRequests
+                    // into pendingCoordDrain_ so the caller can send CoordResponses
+                    // AFTER BroadcastCommit (ensuring CommitMessages are queued
+                    // before CoordResponses in SimulatedTransport's FIFO queue).
+                    if (AmTail() && linRequest.has_shardtag() && linRequest.shardtag() != 0)
+                    {
+                        vectorClock[groupIdx]++;
+
+                        uint64_t myShardTag = linRequest.shardtag();
+                        committedForCoord[myShardTag] = true;
+
+                        if (pendingCoordRequests.count(myShardTag))
+                        {
+                            pendingCoordDrain_.push_back(myShardTag);
+                        }
+                    }
+
                     FlushWritesUpTo(lastCommitted);
                 }
 
-                // Remove from cache once committed and executed.
                 linOpCache_.erase(cacheIt);
+            }
+        }
+
+        void IOCL_CRAQReplica::TryServeWaitingReads()
+        {
+            auto it = readsWaitingForVC.begin();
+            while (it != readsWaitingForVC.end())
+            {
+                if (lastCommitted >= it->first)
+                {
+                    ExecuteReadOperation(it->second);
+                    ASSERT(++commitLogOpnum > 0);
+                    ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                    commitLog.Append(
+                        viewstamp_t(view, commitLogOpnum),
+                        ToRequest(it->second),
+                        LOG_STATE_CLEAN);
+                    it = readsWaitingForVC.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
             }
         }
 
@@ -288,7 +401,8 @@ namespace replication
             msg.set_clientreqid(request.rid().client_req_id());
             msg.set_replicaidx(myIdx);
 
-            Debug("Sending version request for key %s for client %d and client request id %d", request.key().c_str(), request.rid().client_id(), request.rid().client_req_id());
+            Debug("Sending version request for key %s for client %d and client request id %d",
+                  request.key().c_str(), request.rid().client_id(), request.rid().client_req_id());
 
             pendingReads[{request.rid().client_id(), request.rid().client_req_id()}] = request;
 
@@ -299,7 +413,8 @@ namespace replication
         {
             ClientTableEntry &entry = clientTable[req.rid().client_id()];
 
-            Debug("for clientid %d, last req id is %d while current req id is %d", req.rid().client_id(), entry.lastReqId, req.rid().client_req_id());
+            Debug("for clientid %d, last req id is %d while current req id is %d",
+                  req.rid().client_id(), entry.lastReqId, req.rid().client_req_id());
             ASSERT(entry.lastReqId <= req.rid().client_req_id());
 
             if (entry.lastReqId == req.rid().client_req_id())
@@ -311,9 +426,9 @@ namespace replication
             entry.reply.Clear();
         }
 
-        bool IOCL_CRAQReplica::IsDuplicateRequest(const TransportAddress &remote, const LinearizeableOperation &linRequest)
+        bool IOCL_CRAQReplica::IsDuplicateRequest(const TransportAddress &remote,
+                                                    const LinearizeableOperation &linRequest)
         {
-            // Check the client table to see if this is a duplicate request
             auto kv = clientTable.find(linRequest.rid().client_id());
             if (kv != clientTable.end())
             {
@@ -325,10 +440,6 @@ namespace replication
                 }
                 if (linRequest.rid().client_req_id() == entry.lastReqId)
                 {
-                    // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
-                    // waiting for the other replicas; in that case, just
-                    // discard the request.
                     if (entry.replied)
                     {
                         RNotice("Received duplicate request; resending reply");
@@ -340,9 +451,7 @@ namespace replication
                     }
                     else
                     {
-                        RNotice(
-                            "Received duplicate request but no reply available; "
-                            "ignoring");
+                        RNotice("Received duplicate request but no reply available; ignoring");
                         return true;
                     }
                 }
@@ -351,7 +460,8 @@ namespace replication
             return false;
         }
 
-        void IOCL_CRAQReplica::UpdateClientAddresses(const TransportAddress &remote, const LinearizeableOperation &linRequest)
+        void IOCL_CRAQReplica::UpdateClientAddresses(const TransportAddress &remote,
+                                                      const LinearizeableOperation &linRequest)
         {
             clientAddresses.erase(linRequest.rid().client_id());
             clientAddresses.insert(
@@ -369,7 +479,6 @@ namespace replication
 
             RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
                    batchStart, lastOp);
-            /* Send prepare messages */
             PrepareMessage p;
             p.set_view(view);
             p.set_opnum(lastOp);
@@ -409,6 +518,8 @@ namespace replication
             CommitMessage commit;
             VersionRequestMessage versionRequest;
             VersionResponseMessage versionResponse;
+            SuccessorRequestMessage coordReq;
+            PredecessorReplyMessage coordResp;
 
             if (type == request.GetTypeName())
             {
@@ -435,6 +546,16 @@ namespace replication
                 versionResponse.ParseFromString(data);
                 HandleVersionResponse(remote, versionResponse);
             }
+            else if (type == coordReq.GetTypeName())
+            {
+                coordReq.ParseFromString(data);
+                HandleCoordination(remote, coordReq);
+            }
+            else if (type == coordResp.GetTypeName())
+            {
+                coordResp.ParseFromString(data);
+                HandleCoordinationReply(remote, coordResp);
+            }
             else
             {
                 RPanic("Received unexpected message type in IOCL_CRAQ proto: %s",
@@ -457,14 +578,15 @@ namespace replication
             }
             else
             {
-                RPanic("Received unexpected op in IOCL_CRAQ proto: %s",
-                       op);
+                RPanic("Received unexpected op in IOCL_CRAQ proto: %s", op.c_str());
             }
         }
 
-        void IOCL_CRAQReplica::HandleReadRequest(const TransportAddress &remote, const LinearizeableOperation &linRequest)
+        void IOCL_CRAQReplica::HandleReadRequest(const TransportAddress &remote,
+                                                  const LinearizeableOperation &linRequest)
         {
-            Debug("Handling read request for client id %lu and client request id %lu", linRequest.rid().client_id(), linRequest.rid().client_req_id());
+            Debug("Handling read request for client id %lu and client request id %lu",
+                  linRequest.rid().client_id(), linRequest.rid().client_req_id());
             if (status != STATUS_NORMAL)
             {
                 RNotice("Ignoring request due to abnormal status");
@@ -478,15 +600,24 @@ namespace replication
 
             UpdateClientTable(linRequest);
 
-            // Leader Upcall
+            // If this read has a predecessor, buffer until CoordResponse arrives.
+            if (linRequest.predlist_size() > 0 && linRequest.predlist(0) != 0)
+            {
+                uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
+                if (myShardTag != 0)
+                {
+                    Debug("Buffering read shardtag %lu waiting for CoordResponse", myShardTag);
+                    readsWaitingForCoord[myShardTag] = linRequest;
+                    return;
+                }
+            }
+
             bool replicate = false;
             string res;
             string messageString;
             linRequest.SerializeToString(&messageString);
             LeaderUpcall(lastCommitted, messageString, replicate, res);
-            ClientTableEntry &cte = clientTable[linRequest.rid().client_id()];
 
-            // Check whether this request should be committed to replicas
             if (!replicate)
             {
                 RPanic("Should always replicate when using IOCL_CRAQ");
@@ -500,9 +631,6 @@ namespace replication
 
             ExecuteReadOperation(linRequest);
 
-            // Clean read (chain is clean or we are the tail) — append to
-            // commitLog immediately since all writes up to lastCommitted
-            // are already flushed.
             ASSERT(++commitLogOpnum > 0);
             ASSERT(commitLogOpnum > commitLog.LastOpnum());
             commitLog.Append(
@@ -514,8 +642,8 @@ namespace replication
         void IOCL_CRAQReplica::HandleWriteRequest(const TransportAddress &remote,
                                              const LinearizeableOperation &linRequest)
         {
-            // Latency_Start(&rec_to_upcall_lat_);
-            Debug("Handling write request for client id %lu and client request id %lu", linRequest.rid().client_id(), linRequest.rid().client_req_id());
+            Debug("Handling write request for client id %lu and client request id %lu",
+                  linRequest.rid().client_id(), linRequest.rid().client_req_id());
             viewstamp_t v;
 
             if (status != STATUS_NORMAL)
@@ -524,28 +652,25 @@ namespace replication
                 return;
             }
 
+            UpdateClientAddresses(remote, linRequest);
+
             if (!AmHead())
             {
                 RDebug("Ignoring write request because I'm not the head");
                 return;
             }
 
-            UpdateClientAddresses(remote, linRequest);
-
             if (IsDuplicateRequest(remote, linRequest))
                 return;
 
             UpdateClientTable(linRequest);
 
-            // Leader Upcall: will always be true, can comment out
             bool replicate = false;
             string res;
             string messageString;
             linRequest.SerializeToString(&messageString);
             LeaderUpcall(lastCommitted, messageString, replicate, res);
-            ClientTableEntry &cte = clientTable[linRequest.rid().client_id()];
 
-            // Check whether this request should be committed to replicas
             if (!replicate)
             {
                 RPanic("Should always replicate when using IOCL_CRAQ");
@@ -556,24 +681,16 @@ namespace replication
             request.set_clientid(linRequest.rid().client_id());
             request.set_clientreqid(linRequest.rid().client_req_id());
 
-            /* Assign it an opnum */
             ++this->lastOp;
             v.view = this->view;
             v.opnum = this->lastOp;
 
             RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
 
-            /* Add the request to my log */
             log.Append(v, request, LOG_STATE_DIRTY);
 
-            // Cache the already-deserialized form — avoids ToLinearizableRequest
-            // in CommitUpTo later.
             linOpCache_[this->lastOp] = linRequest;
 
-            // Buffer write in pendingWrites (stores LinearizeableOperation directly)
-            // — will be flushed to commitLog when the commit ack arrives. Invariant:
-            // new opnum must be strictly greater than anything already buffered since
-            // lastOp is monotonically increasing.
             ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
             pendingWrites[this->lastOp] = linRequest;
 
@@ -596,8 +713,6 @@ namespace replication
         {
             if (status != STATUS_NORMAL)
             {
-                // Not clear if we should ignore this or just let the request
-                // go ahead, but this seems reasonable.
                 RNotice("Ignoring unlogged request due to abnormal status");
                 return;
             }
@@ -643,13 +758,11 @@ namespace replication
             if (msg.batchstart() > this->lastOp + 1)
             {
                 Debug("Calling state transfer due to gap between last operation seen and start of batch received");
-                // RequestStateTransfer();
                 pendingPrepares.push_back(
                     std::pair<TransportAddress *, PrepareMessage>(remote.clone(), msg));
                 return;
             }
 
-            /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
             for (const auto &req : msg.request())
             {
@@ -659,16 +772,11 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                // TODO: if tail and write (prepare only sent for write), then we can just set the state to committed since its event driven and no locks i believe
                 log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_DIRTY);
 
-                // Deserialize once here and cache — avoids repeated ToLinearizableRequest
-                // calls in CommitUpTo.
                 LinearizeableOperation linRequest = ToLinearizableRequest(req);
                 linOpCache_[this->lastOp] = linRequest;
 
-                // Buffer write in pendingWrites (stores LinearizeableOperation directly)
-                // — non-head replicas buffer here since they receive writes via prepare.
                 ASSERT(pendingWrites.empty() || this->lastOp > pendingWrites.rbegin()->first);
                 pendingWrites[this->lastOp] = linRequest;
 
@@ -679,14 +787,14 @@ namespace replication
             if (!AmTail())
             {
                 ForwardPropagateMessageInChain(msg);
-                // CloseBatch();
             }
             else
             {
-                // Save the key before CommitUpTo erases linOpCache_ entries.
+                // Capture the key of the last op in this batch before CommitUpTo
+                // erases it from linOpCache_. Used only for the CommitMessage key
+                // field (informational, not functionally required).
                 string lastKey = "";
-                auto requestCount = msg.request_size();
-                if (requestCount > 0)
+                if (msg.request_size() > 0)
                 {
                     auto keyIt = linOpCache_.find(this->lastOp);
                     if (keyIt != linOpCache_.end())
@@ -697,23 +805,17 @@ namespace replication
 
                 CommitUpTo(lastOp);
 
-                CommitMessage cm;
-                cm.set_view(this->view);
-                cm.set_opnum(this->lastCommitted);
-                cm.set_key(lastKey);
+                BroadcastCommit(lastKey);
 
-                if (!SendMessageToAllPreviousReplicasInChain(cm))
-                {
-                    RWarning("Failed to backward propagate COMMIT message from tail");
-                }
-                Debug("Sending commit for write from tail");
+                DrainPendingCoordRequests();
             }
         }
 
         void IOCL_CRAQReplica::HandleCommit(const TransportAddress &remote,
                                        const CommitMessage &msg)
         {
-            RDebug("Received COMMIT " FMT_VIEWSTAMP " with key %s", msg.view(), msg.opnum(), msg.key().c_str());
+            RDebug("Received COMMIT " FMT_VIEWSTAMP " with key %s",
+                   msg.view(), msg.opnum(), msg.key().c_str());
 
             if (this->status != STATUS_NORMAL)
             {
@@ -728,20 +830,25 @@ namespace replication
 
             if (msg.opnum() <= this->lastCommitted)
             {
-                RDebug("Ignoring COMMIT; already committed that operation, opnum is %lu and lastCommitted is %lu", msg.opnum(), this->lastCommitted);
+                RDebug("Ignoring COMMIT; already committed that operation, opnum is %lu and lastCommitted is %lu",
+                       msg.opnum(), this->lastCommitted);
                 return;
             }
 
             if (msg.opnum() > this->lastOp)
             {
-                // RequestStateTransfer();
                 return;
             }
 
+            SyncVC(msg.vector_clock());
+
             CommitUpTo(msg.opnum());
+
+            TryServeWaitingReads();
         }
 
-        void IOCL_CRAQReplica::HandleVersionRequest(const TransportAddress &remote, const VersionRequestMessage &msg)
+        void IOCL_CRAQReplica::HandleVersionRequest(const TransportAddress &remote,
+                                                      const VersionRequestMessage &msg)
         {
             if (!AmTail())
             {
@@ -754,43 +861,151 @@ namespace replication
             response.set_clientreqid(msg.clientreqid());
             response.set_opnum(keyToVersionNumber[msg.key()]);
 
-            Notice("Sending message to replica via version response, timestamp to read is %d", keyToVersionNumber[msg.key()]);
+            for (uint64_t v : vectorClock)
+            {
+                response.add_vector_clock(v);
+            }
+
+            Notice("Sending version response to replica %d, timestamp to read is %lu, VC[%d]=%lu",
+                   msg.replicaidx(), keyToVersionNumber[msg.key()], groupIdx, vectorClock[groupIdx]);
             transport->SendMessageToReplica(this, msg.replicaidx(), response);
         }
 
-        void IOCL_CRAQReplica::HandleVersionResponse(const TransportAddress &remote, const VersionResponseMessage &msg)
+        void IOCL_CRAQReplica::HandleVersionResponse(const TransportAddress &remote,
+                                                       const VersionResponseMessage &msg)
         {
             std::pair<uint64_t, uint64_t> requestClientId = {msg.clientid(), msg.clientreqid()};
             auto it = pendingReads.find(requestClientId);
             if (it == pendingReads.end())
             {
-                Debug("Old version request for clientid %d and client request id %d, no longer pending", msg.clientid(), msg.clientreqid());
+                Debug("Old version request for clientid %d and client request id %d, no longer pending",
+                      msg.clientid(), msg.clientreqid());
                 return;
             }
 
             LinearizeableOperation linRequest = it->second;
-            Debug("Handling version response for key %s and opnum %d", linRequest.key().c_str(), msg.opnum());
+            pendingReads.erase(it);
 
-            keyToVersionNumber[linRequest.key()] = std::max(keyToVersionNumber[linRequest.key()], msg.opnum());
+            Debug("Handling version response for key %s and opnum %d",
+                  linRequest.key().c_str(), msg.opnum());
 
-            // The version response tells us the tail has committed up to
-            // msg.opnum(). Flush any buffered writes up to that point into
-            // commitLog before appending the read — this preserves execution
-            // order: all writes the dirty read observed appear before it.
+            keyToVersionNumber[linRequest.key()] =
+                std::max(keyToVersionNumber[linRequest.key()], msg.opnum());
+
+            uint64_t requiredVC = 0;
+            if (msg.vector_clock_size() > groupIdx)
+            {
+                requiredVC = msg.vector_clock(groupIdx);
+            }
+
+            SyncVC(msg.vector_clock());
+
             FlushWritesUpTo(msg.opnum());
+
+            // If we haven't committed up to the tail's VC[groupIdx], buffer
+            // the read until HandleCommit catches us up.
+            if (lastCommitted < requiredVC)
+            {
+                Debug("Buffering read for key %s waiting for VC threshold %lu (lastCommitted=%lu)",
+                      linRequest.key().c_str(), requiredVC, lastCommitted);
+                readsWaitingForVC.push_back({requiredVC, linRequest});
+                return;
+            }
 
             ExecuteReadOperation(linRequest);
 
-            // Dirty read — append to commitLog after writes are flushed so
-            // the log reflects the order in which operations were observed.
             ASSERT(++commitLogOpnum > 0);
             ASSERT(commitLogOpnum > commitLog.LastOpnum());
             commitLog.Append(
                 viewstamp_t(view, commitLogOpnum),
                 ToRequest(linRequest),
                 LOG_STATE_CLEAN);
+        }
 
-            pendingReads.erase({msg.clientid(), msg.clientreqid()});
+        void IOCL_CRAQReplica::HandleCoordination(const TransportAddress &remote,
+                                                   const proto::SuccessorRequestMessage &msg)
+        {
+            if (!AmTail())
+            {
+                RWarning("Received CoordRequest at a non-tail replica; ignoring");
+                return;
+            }
+
+            uint64_t p = msg.p();  // predecessor's shardtag
+
+            // Sync client's VC.
+            SyncVC(msg.vector_clock());
+
+            Debug("Received CoordRequest: p=%lu s=%lu succ_groupidx=%d succ_replicaidx=%d",
+                  p, msg.s(), msg.succ_groupidx(), msg.succ_replicaidx());
+
+            if (committedForCoord.count(p))
+            {
+                // Predecessor already committed: send CoordResponse immediately.
+                SendCoordResponseMsg(msg);
+            }
+            else
+            {
+                // Buffer until predecessor commits.
+                pendingCoordRequests[p].push_back(msg);
+            }
+        }
+
+        void IOCL_CRAQReplica::HandleCoordinationReply(const TransportAddress &remote,
+                                                        const proto::PredecessorReplyMessage &msg)
+        {
+            uint64_t successorShardTag = msg.s();  
+
+            Debug("Received CoordResponse: s=%lu", successorShardTag);
+
+            // Sync VC from the predecessor's handler.
+            SyncVC(msg.vector_clock());
+
+            // Check if a READ is waiting for this CoordResponse.
+            auto readIt = readsWaitingForCoord.find(successorShardTag);
+            if (readIt != readsWaitingForCoord.end())
+            {
+                LinearizeableOperation linRequest = readIt->second;
+                readsWaitingForCoord.erase(readIt);
+
+                Debug("Unblocking read shardtag %lu", successorShardTag);
+
+                // Now proceed with the normal read logic: dirty check.
+                if (this->lastOp != lastCommitted && !AmTail())
+                {
+                    SendVersionRequest(linRequest);
+                }
+                else
+                {
+                    ExecuteReadOperation(linRequest);
+                    ASSERT(++commitLogOpnum > 0);
+                    ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                    commitLog.Append(
+                        viewstamp_t(view, commitLogOpnum),
+                        ToRequest(linRequest),
+                        LOG_STATE_CLEAN);
+                }
+                return;
+            }
+
+            if (!AmTail())
+            {
+                RWarning("Received CoordResponse for unknown shardtag %lu at non-tail replica", successorShardTag);
+                return;
+            }
+
+            // Store the CoordResponse so CommitUpTo can consume it.
+            pendingCoordResponses[successorShardTag] = msg;
+
+            // Try to advance CommitUpTo (may now be unblocked).
+            CommitUpTo(lastOp);
+
+            // Broadcast updated commit state to non-tail replicas.
+            BroadcastCommit();
+
+            // Drain CoordRequests for writes newly unblocked by this CoordResponse.
+            // Done AFTER BroadcastCommit so CommitMessages are queued first.
+            DrainPendingCoordRequests();
         }
 
         void IOCL_CRAQReplica::Close()

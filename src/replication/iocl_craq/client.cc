@@ -31,8 +31,6 @@
 
 #include "replication/common/client.h"
 
-#include <chrono>
-
 #include "lib/assert.h"
 #include "lib/message.h"
 #include "lib/transport.h"
@@ -45,11 +43,17 @@ namespace replication
     namespace iocl_craq
     {
 
-        IOCL_CRAQClient::IOCL_CRAQClient(const transport::Configuration &config, Transport *transport,
-                               int group, uint64_t clientid)
-            : Client(config, transport, group, clientid) 
+        IOCL_CRAQClient::IOCL_CRAQClient(const transport::Configuration &config,
+                                          Transport *transport,
+                                          int group, uint64_t clientid)
+            : Client(config, transport, group, clientid),
+              lastReqId(0),
+              shardTagCounter(0),
+              lastIssuedShardTag(0),
+              lastIssuedGroupIdx(group),
+              lastIssuedReplicaIdx(0)
         {
-            lastReqId = 0;
+            clientVectorClock.assign(config.g, 0);
         }
 
         IOCL_CRAQClient::~IOCL_CRAQClient()
@@ -75,25 +79,69 @@ namespace replication
         void IOCL_CRAQClient::InvokeHelper(const string &request, continuation_t continuation, int replicaIndex,
                                 error_continuation_t error_continuation)
         {
-            // TODO: Currently, invocations never timeout and error_continuation is
-            // never called. It may make sense to set a timeout on the invocation.
             (void)error_continuation;
 
-            uint64_t reqId = ++lastReqId;
-            // Timeout *timer =
-            //     new Timeout(transport, 500, [this, reqId]()
-            //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request, reqId, continuation, replicaIndex);
+            LinearizeableOperation linOp;
+            linOp.ParseFromString(request);
 
+            uint64_t shardtag = ++shardTagCounter;
+            linOp.set_shardtag(shardtag);
+
+            bool isWrite = (linOp.op() == PUT_OPERATION);
+
+            // For write successors, the gate is at the tail (numReplicas-1).
+            // For read successors, the gate is at the read-serving replica.
+            int gateReplicaIdx = isWrite ? (config.n - 1) : replicaIndex;
+
+            // If we have a predecessor, send a CoordRequest to its handler and
+            // record the predecessor in the linOp for the replica's gate check.
+            if (lastIssuedShardTag != 0)
+            {
+                proto::SuccessorRequestMessage coordReq;
+                coordReq.set_p(lastIssuedShardTag);
+                coordReq.set_s(shardtag);
+                coordReq.set_succ_groupidx(group);
+                coordReq.set_succ_replicaidx(gateReplicaIdx);
+                for (uint64_t v : clientVectorClock)
+                {
+                    coordReq.add_vector_clock(v);
+                }
+
+                Notice("Sending CoordRequest: p=%lu s=%lu to group=%d replica=%d",
+                       lastIssuedShardTag, shardtag, lastIssuedGroupIdx, lastIssuedReplicaIdx);
+
+                if (!transport->SendMessageToReplica(this, lastIssuedGroupIdx,
+                                                      lastIssuedReplicaIdx, coordReq))
+                {
+                    Warning("Could not send CoordRequest to predecessor's handler.");
+                }
+
+                // Record predecessor shardtag in the operation so the tail can
+                // identify that this write needs a CoordResponse before committing.
+                linOp.clear_predlist();
+                linOp.add_predlist(lastIssuedShardTag);
+            }
+
+            // Update predecessor tracking for the next operation.
+            lastIssuedShardTag   = shardtag;
+            lastIssuedGroupIdx   = group;
+            lastIssuedReplicaIdx = gateReplicaIdx;
+
+            // Re-serialize the modified linOp (with shardtag and predlist set).
+            string modifiedRequest;
+            linOp.SerializeToString(&modifiedRequest);
+
+            uint64_t reqId = ++lastReqId;
+            PendingRequest *req =
+                new PendingRequest(modifiedRequest, reqId, continuation, replicaIndex);
             pendingReqs[reqId] = req;
             SendRequest(req);
         }
 
         void IOCL_CRAQClient::InvokeUnlogged(int replicaIdx, const string &request,
-                                        continuation_t continuation,
-                                        error_continuation_t error_continuation,
-                                        uint32_t timeout)
+                                              continuation_t continuation,
+                                              error_continuation_t error_continuation,
+                                              uint32_t timeout)
         {
             uint64_t reqId = ++lastReqId;
             proto::UnloggedRequestMessage reqMsg;
@@ -103,12 +151,9 @@ namespace replication
 
             if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
             {
-                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                //                              { UnloggedRequestTimeoutCallback(reqId); });
                 PendingUnloggedRequest *req = new PendingUnloggedRequest(
                     request, reqId, continuation, error_continuation);
                 pendingReqs[reqId] = req;
-                // req->timer->Start();
             }
             else
             {
@@ -117,12 +162,11 @@ namespace replication
         }
 
         void IOCL_CRAQClient::InvokeUnloggedAll(const string &request,
-                                           continuation_t continuation,
-                                           error_continuation_t error_continuation,
-                                           uint32_t timeout)
+                                                  continuation_t continuation,
+                                                  error_continuation_t error_continuation,
+                                                  uint32_t timeout)
         {
             Panic("Unimplemented.");
-            return;
         }
 
         void IOCL_CRAQClient::SendRequest(const PendingRequest *req)
@@ -133,18 +177,31 @@ namespace replication
             linRequest.set_origin_client_req_id(linRequest.rid().client_req_id());
             linRequest.mutable_rid()->set_client_id(clientid);
             linRequest.mutable_rid()->set_client_req_id(req->clientReqId);
-            string op = linRequest.op();
-            Notice("Sending client request with id %d", req->clientReqId);
 
-            if (transport->SendMessageToReplica(this, group, req->replicaIndex, linRequest))
+            Notice("Sending client request with id %lu (shardtag=%lu predlist_size=%d)",
+                   req->clientReqId,
+                   linRequest.has_shardtag() ? linRequest.shardtag() : 0,
+                   linRequest.predlist_size());
+
+            if (!transport->SendMessageToReplica(this, group, req->replicaIndex, linRequest))
             {
-                // req->timer->Reset();
-            }
-            else
-            {
-                Warning("Could not send request to replicas.");
+                Warning("Could not send request to replica.");
                 pendingReqs.erase(req->clientReqId);
                 delete req;
+                return;
+            }
+
+            // For writes, also send to the tail so it can register the client
+            // address. The tail calls UpdateClientAddresses then returns early
+            // (since it's not the head). Without this, the tail cannot reply
+            // to the client after committing.
+            if (linRequest.op() == PUT_OPERATION)
+            {
+                int tailIdx = config.n - 1;
+                if (req->replicaIndex != tailIdx)
+                {
+                    transport->SendMessageToReplica(this, group, tailIdx, linRequest);
+                }
             }
         }
 
@@ -156,14 +213,13 @@ namespace replication
                 Debug("Received resend request when no request was pending");
                 return;
             }
-
             Warning("Client timeout; resending request: %lu", reqId);
             SendRequest(pendingReqs[reqId]);
         }
 
         void IOCL_CRAQClient::ReceiveMessage(const TransportAddress &remote,
-                                        const string &type, const string &data,
-                                        void *meta_data)
+                                              const string &type, const string &data,
+                                              void *meta_data)
         {
             proto::ReplyMessage reply;
             proto::UnloggedReplyMessage unloggedReply;
@@ -185,7 +241,7 @@ namespace replication
         }
 
         void IOCL_CRAQClient::HandleReply(const TransportAddress &remote,
-                                     const proto::ReplyMessage &msg)
+                                           const proto::ReplyMessage &msg)
         {
             uint64_t reqId = msg.clientreqid();
             auto it = pendingReqs.find(reqId);
@@ -196,15 +252,14 @@ namespace replication
             }
 
             PendingRequest *req = it->second;
-            Debug("CRAQ Client received reply: %lu", reqId);
-            // req->timer->Stop();
+            Debug("IOCL_CRAQ Client received reply: %lu", reqId);
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
         }
 
         void IOCL_CRAQClient::HandleUnloggedReply(const TransportAddress &remote,
-                                             const proto::UnloggedReplyMessage &msg)
+                                                    const proto::UnloggedReplyMessage &msg)
         {
             uint64_t reqId = msg.clientreqid();
             auto it = pendingReqs.find(reqId);
@@ -218,7 +273,6 @@ namespace replication
                 static_cast<PendingUnloggedRequest *>(it->second);
 
             Debug("Client received unloggedReply %lu", reqId);
-            // req->timer->Stop();
             pendingReqs.erase(it);
             req->continuation(req->request, msg.reply());
             delete req;
@@ -235,7 +289,6 @@ namespace replication
             Warning("Unlogged request timed out");
             PendingUnloggedRequest *req =
                 static_cast<PendingUnloggedRequest *>(it->second);
-            // req->timer->Stop();
             pendingReqs.erase(it);
             if (req->error_continuation)
             {
@@ -244,5 +297,5 @@ namespace replication
             delete req;
         }
 
-    } // namespace craq
+    } // namespace iocl_craq
 } // namespace replication

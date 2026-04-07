@@ -31,15 +31,17 @@ message PrepareMessage {
     repeated Request request = 4;
 }
 
+// Extended with vector_clock for IOCL-CRAQ
 message CommitMessage {
     required uint64 view = 1;
-    required uint64 opnum = 2;    
+    required uint64 opnum = 2;
     required string key = 3;
+    repeated uint64 vector_clock = 4;
 }
 
 message RequestStateTransferMessage {
     required uint64 view = 1;
-    required uint64 opnum = 2;    
+    required uint64 opnum = 2;
 }
 
 message StateTransferMessage {
@@ -62,8 +64,27 @@ message VersionRequestMessage {
     required uint32 replicaIdx = 4;
 }
 
+// Extended with vector_clock for IOCL-CRAQ
 message VersionResponseMessage {
     required uint64 clientid = 1;
     required uint64 clientreqid = 2;
     required uint64 opnum = 3;
+    repeated uint64 vector_clock = 4;
+}
+
+// CoordRequest: client -> predecessor's handler (tail for writes)
+// Informs the predecessor that a successor is waiting.
+message SuccessorRequestMessage {
+    required uint64 p = 1;           // predecessor's shardtag
+    required uint64 s = 2;           // successor's shardtag
+    required int32  succ_groupidx = 3;   // successor's shard group index
+    required int32  succ_replicaidx = 4; // replica to send CoordResponse to
+    repeated uint64 vector_clock = 5;    // client's current VC for sync
+}
+
+// CoordResponse: predecessor's handler -> successor's handler
+// Unblocks the successor write/read.
+message PredecessorReplyMessage {
+    required uint64 s = 1;            // successor's shardtag (for matching)
+    repeated uint64 vector_clock = 2; // predecessor handler's VC at commit time
 }

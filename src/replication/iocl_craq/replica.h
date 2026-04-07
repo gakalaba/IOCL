@@ -36,6 +36,8 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 
 #include "lib/configuration.h"
 #include "lib/latency.h"
@@ -110,13 +112,42 @@ namespace replication
                 {
                     uint64_t h1 = std::hash<uint64_t>()(p.first);
                     uint64_t h2 = std::hash<uint64_t>()(p.second);
-
-                    // Very good hash mixing (from boost::hash_combine)
                     return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
                 }
             };
 
-            std::unordered_map<std::pair<uint64_t, uint64_t>, replication::LinearizeableOperation, PairHash> pendingReads; // contain reads waiting on version responses
+            std::unordered_map<std::pair<uint64_t, uint64_t>, replication::LinearizeableOperation, PairHash> pendingReads;
+
+            std::vector<uint64_t> vectorClock;
+
+            // Tail-side: predecessor shardtag -> list of CoordRequests from successors
+            // that arrived before the predecessor committed.
+            std::map<uint64_t, std::vector<proto::SuccessorRequestMessage>> pendingCoordRequests;
+
+            // Tail-side: successor shardtag -> CoordResponse that arrived before
+            // the successor write reached the tail (or before it could commit).
+            std::map<uint64_t, proto::PredecessorReplyMessage> pendingCoordResponses;
+
+            // Tail-side: shardtag -> true for writes that have committed.
+            // Used to answer late CoordRequests immediately.
+            std::unordered_map<uint64_t, bool> committedForCoord;
+
+            // Shardtags of writes that committed at the tail during the current
+            // CommitUpTo call, whose pendingCoordRequests should be drained
+            // AFTER BroadcastCommit (so CommitMessages are queued first).
+            std::vector<uint64_t> pendingCoordDrain_;
+
+            // Any replica: read's shardtag -> linOp, for reads awaiting their
+            // CoordResponse before they can proceed.
+            std::map<uint64_t, LinearizeableOperation> readsWaitingForCoord;
+
+            // Non-tail: reads that have gotten their CoordResponse (or have no
+            // predecessor) and sent a VersionRequest, then received a VersionResponse,
+            // but are waiting for lastCommitted to reach the VC threshold.
+            // Pair: (required_vc_threshold, linOp).
+            std::vector<std::pair<uint64_t, LinearizeableOperation>> readsWaitingForVC;
+
+            // ---------------------------------
 
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
@@ -147,6 +178,25 @@ namespace replication
                                 const replication::LinearizeableOperation &linRequest);
             void CloseBatch();
 
+            // Sync vectorClock component-wise max from a remote VC.
+            void SyncVC(const google::protobuf::RepeatedField<google::protobuf::uint64> &remoteVC);
+
+            // After CommitUpTo advances lastCommitted, serve any reads in
+            // readsWaitingForVC whose VC threshold is now satisfied.
+            void TryServeWaitingReads();
+
+            // Send a CoordResponse (PredecessorReplyMessage) to the successor
+            // identified in coordReq. Uses current vectorClock.
+            void SendCoordResponseMsg(const proto::SuccessorRequestMessage &coordReq);
+
+            // Drain pendingCoordRequests for shardtags collected in pendingCoordDrain_.
+            // Must be called AFTER BroadcastCommit so CommitMessages are queued first.
+            void DrainPendingCoordRequests();
+
+            // Send CommitMessage to all non-tail replicas, carrying the current
+            // vectorClock and lastCommitted.
+            void BroadcastCommit(const string &key = "");
+
             void HandleRequest(const TransportAddress &remote,
                                const replication::LinearizeableOperation &linRequest);
             void HandleWriteRequest(const TransportAddress &remote,
@@ -163,6 +213,12 @@ namespace replication
                                 const proto::VersionRequestMessage &msg);
             void HandleVersionResponse(const TransportAddress &remote,
                                 const proto::VersionResponseMessage &msg);
+
+            void HandleCoordination(const TransportAddress &remote,
+                                    const proto::SuccessorRequestMessage &msg);
+
+            void HandleCoordinationReply(const TransportAddress &remote,
+                                         const proto::PredecessorReplyMessage &msg);
         };
 
     } // namespace iocl_craq
