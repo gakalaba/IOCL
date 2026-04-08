@@ -39,8 +39,6 @@ message RWCommitCoordinator {
 message RWCommitCoordinatorReply {
     required RequestIDMessage rid = 1;
     required int32 status = 2;
-    optional TimestampMessage commit_timestamp = 3;
-    optional TimestampMessage nonblock_timestamp = 4;
 }
 
 message RWCommitParticipant {

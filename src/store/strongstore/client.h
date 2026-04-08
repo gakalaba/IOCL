@@ -280,7 +280,7 @@ namespace strongstore
         void ContinueRetry(Session &session, begin_callback bcb);
 
         // local Prepare function
-        void CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts);
+        void CommitCallback(StrongSession &session, uint64_t req_id, int status);
 
         void AbortCallback(StrongSession &session, uint64_t req_id);
 

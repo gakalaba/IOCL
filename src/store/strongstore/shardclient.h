@@ -89,7 +89,7 @@ namespace strongstore
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
 
-    typedef std::function<void(int, Timestamp, Timestamp)> rw_coord_commit_callback;
+    typedef std::function<void(int)> rw_coord_commit_callback;
     typedef std::function<void(int)> rw_coord_commit_timeout_callback;
 
     typedef std::function<void(int)> rw_part_commit_callback;

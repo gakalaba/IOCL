@@ -506,9 +506,7 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
 
-        Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
-              reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
+        ccb(reply.status());
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,

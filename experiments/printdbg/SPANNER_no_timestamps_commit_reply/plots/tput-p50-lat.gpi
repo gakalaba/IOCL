@@ -3,7 +3,7 @@ set key top left
 set xlabel 'Throughput (ops/sec)'
 set ylabel 'Latency (ms)'
 set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
-set output '/users/akalaba/IOCL/experiments/printdbg/SPANNER_TXNSTORE_better_parallel_gets/plots/tput-p50-lat.png'
+set output '/users/akalaba/IOCL/experiments/printdbg/2026-04-07-21-42-02/plots/tput-p50-lat.png'
 set style line 1 linetype 1 linewidth 2
 set style line 2 linetype 1 linecolor "green" linewidth 2
 set style line 3 linetype 1 linecolor "blue" linewidth 2
@@ -21,4 +21,5 @@ plot '/users/akalaba/IOCL/experiments/printdbg/dummy_spanner/2026-04-03-11-29-49
 '/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_commit_transactionMessage/2026-04-07-13-35-34/plots/tput-p50-lat.csv' title 'Spanner - no COMMIT transactions' ls 9 with linespoint, \
 '/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_replicated_commit_timestamps/2026-04-07-13-49-19/plots/tput-p50-lat.csv' title 'Spanner - no replicated COMMIT timestamps' ls 11 with linespoint, \
 '/users/akalaba/IOCL/experiments/printdbg/SPANNER_no_replicated_commit_transactionMessage/2026-04-07-13-57-11/plots/tput-p50-lat.csv' title 'Spanner - no replicated COMMIT transactions' ls 12 with linespoint, \
-'/users/akalaba/IOCL/experiments/printdbg/SPANNER_TXNSTORE_better_parallel_gets/2026-04-07-20-51-18/plots/tput-p50-lat.csv' title 'Spanner - better parallel gets' ls 5 with linespoint
+'/users/akalaba/IOCL/experiments/printdbg/SPANNER_TXNSTORE_better_parallel_gets/2026-04-07-20-51-18/plots/tput-p50-lat.csv' title 'Spanner - better parallel gets' ls 13 with linespoint, \
+'/users/akalaba/IOCL/experiments/printdbg/2026-04-07-21-42-02/2026-04-07-21-42-02/plots/tput-p50-lat.csv' title 'Final Spanner' ls 14 with linespoint

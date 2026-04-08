@@ -997,8 +997,6 @@ namespace strongstore
         rw_commit_c_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
         rw_commit_c_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
         rw_commit_c_reply_.set_status(REPLY_OK);
-        commit_ts.serialize(rw_commit_c_reply_.mutable_commit_timestamp());
-        nonblock_ts.serialize(rw_commit_c_reply_.mutable_nonblock_timestamp());
 
         Debug("Sending commit reply to client with req_id = %lu", transaction_id);
         transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
@@ -1013,8 +1011,6 @@ namespace strongstore
         rw_commit_c_reply_.mutable_rid()->set_client_id(client_id);
         rw_commit_c_reply_.mutable_rid()->set_client_req_id(client_req_id);
         rw_commit_c_reply_.set_status(REPLY_FAIL);
-        rw_commit_c_reply_.clear_commit_timestamp();
-        rw_commit_c_reply_.clear_nonblock_timestamp();
 
         transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_REPLY_TYPE, rw_commit_c_reply_);
     }

@@ -788,9 +788,9 @@ namespace strongstore
 
         Timestamp nonblock_timestamp = Timestamp();
 
-        auto cccb = [this, session = std::ref(session), req_id](int status, Timestamp commit_ts, Timestamp nonblock_ts)
+        auto cccb = [this, session = std::ref(session), req_id](int status)
         {
-             this->CommitCallback(session, req_id, status, commit_ts, nonblock_ts);
+             this->CommitCallback(session, req_id, status);
         };
         auto cctcb = [](int) {};
 
@@ -813,7 +813,7 @@ namespace strongstore
         }
     }
 
-    void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)
+    void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status)
     {
         auto tid = session.transaction_id();
         Debug("[%lu] COMMIT callback status %d", tid, status);
