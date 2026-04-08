@@ -121,6 +121,14 @@ namespace replication
             Timeout *resendPrepareTimeout;
             Timeout *closeBatchTimeout;
 
+            // Tail-side staggered commit state. Instead of committing all ops
+            // in a PrepareMessage in one tight loop (which sends all client replies
+            // simultaneously and re-synchronizes closed-loop clients), the TAIL
+            // commits one op per event-loop iteration via TimerMicro(0).
+            opnum_t tailCommitTarget_;
+            bool tailCommitInProgress_;
+            string tailCommitKey_;
+
             Latency_t rec_to_upcall_lat_;
             Latency_t upcall_to_exec_lat_;
             Latency_t exec_to_sent_lat_;
@@ -146,6 +154,7 @@ namespace replication
             void UpdateClientAddresses(const TransportAddress &remote, 
                                 const replication::LinearizeableOperation &linRequest);
             void CloseBatch();
+            void TailCommitNext();
 
             void HandleRequest(const TransportAddress &remote,
                                const replication::LinearizeableOperation &linRequest);

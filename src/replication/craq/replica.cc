@@ -70,6 +70,8 @@ namespace replication
             this->lastOp = 0;
             this->lastCommitted = 0;
             lastBatchEnd = 0;
+            tailCommitTarget_ = 0;
+            tailCommitInProgress_ = false;
 
             if (batchSize > 1)
             {
@@ -217,6 +219,7 @@ namespace replication
             auto iter = clientAddresses.find(request.rid().client_id());
             if (iter != clientAddresses.end())
             {
+                // never hit
                 Debug("Found message, sending to client");
                 transport->SendMessage(this, *iter->second, reply);
             }
@@ -278,6 +281,50 @@ namespace replication
                 // Remove from cache once committed and executed.
                 linOpCache_.erase(cacheIt);
             }
+        }
+
+        void CRAQReplica::TailCommitNext()
+        {
+            // Commit exactly one op.
+            lastCommitted++;
+            const LogEntry *entry = log.Find(lastCommitted);
+            ASSERT(entry != nullptr);
+            log.SetStatus(lastCommitted, LOG_STATE_CLEAN);
+
+            auto cacheIt = linOpCache_.find(lastCommitted);
+            ASSERT(cacheIt != linOpCache_.end());
+            const LinearizeableOperation &linRequest = cacheIt->second;
+
+            RDebug("TailCommitNext: committing op %lu", lastCommitted);
+
+            if (linRequest.op() == PUT_OPERATION)
+            {
+                ExecuteWriteOperation(linRequest);
+                FlushWritesUpTo(lastCommitted);
+            }
+            linOpCache_.erase(cacheIt);
+
+            if (lastCommitted >= tailCommitTarget_)
+            {
+                // Last op committed. Send CommitMessage immediately so non-tail
+                // replicas don't depend on a future timer callback (which may be
+                // cancelled by tests or client-reply processing).
+                CommitMessage cm;
+                cm.set_view(this->view);
+                cm.set_opnum(this->lastCommitted);
+                cm.set_key(tailCommitKey_);
+                if (!SendMessageToAllPreviousReplicasInChain(cm))
+                {
+                    RWarning("Failed to backward propagate COMMIT message from tail");
+                }
+                RDebug("Sending commit for write from tail");
+                tailCommitInProgress_ = false;
+                return;
+            }
+
+            // More ops to commit. Yield to the event loop to stagger client replies
+            // and break closed-loop synchronization.
+            transport->TimerMicro(0, [this]() { TailCommitNext(); });
         }
 
         void CRAQReplica::SendVersionRequest(const LinearizeableOperation &request)
@@ -695,18 +742,17 @@ namespace replication
                     }
                 }
 
-                CommitUpTo(lastOp);
-
-                CommitMessage cm;
-                cm.set_view(this->view);
-                cm.set_opnum(this->lastCommitted);
-                cm.set_key(lastKey);
-
-                if (!SendMessageToAllPreviousReplicasInChain(cm))
+                // Commit one op at a time, yielding to the event loop between each.
+                // This staggers client replies, breaking closed-loop synchronization
+                // without adding any coordination overhead.
+                tailCommitTarget_ = lastOp;
+                tailCommitKey_ = lastKey;
+                if (!tailCommitInProgress_)
                 {
-                    RWarning("Failed to backward propagate COMMIT message from tail");
+                    tailCommitInProgress_ = true;
+                    TailCommitNext();
                 }
-                Debug("Sending commit for write from tail");
+                // If already in progress, the running chain picks up tailCommitTarget_.
             }
         }
 
