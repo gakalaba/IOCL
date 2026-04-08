@@ -42,6 +42,7 @@
 #include "store/common/truetime.h"
 #include "store/strongstore/common.h"
 #include "store/strongstore/preparedtransaction.h"
+#include "store/common/slot_pool.h"
 
 namespace strongstore
 {
@@ -144,6 +145,21 @@ namespace strongstore
 
             TransactionState state() const { return state_; }
             void set_state(TransactionState s) { state_ = s; }
+            void clear() {
+                transaction_ = Transaction();
+                participants_.clear();
+                ok_participants_mask_ = 0;
+                ok_participants_count_ = 0;
+                start_ts_ = Timestamp();
+                nonblock_ts_ = Timestamp();
+                prepare_ts_ = Timestamp();
+                commit_ts_ = Timestamp();
+                client_addr_.reset();
+                coordinator_ = -1;
+                state_ = PARALLEL_READING;
+                wait_start_ = 0;
+                parallel_gets_.clear();
+                n_waiting_gets_ = 0; }
 
             const Timestamp &nonblock_ts() const { return nonblock_ts_; }
             void advance_nonblock_ts(uint64_t d) { nonblock_ts_.setTimestamp(nonblock_ts_.getTimestamp() + d); }
@@ -211,6 +227,7 @@ namespace strongstore
                 return parallel_gets_;
             }
             size_t n_waiting_gets_ = 0;
+            bool in_use = false;
 
         private:
             Transaction transaction_;
@@ -265,8 +282,7 @@ namespace strongstore
 
         // void NotifyROs(std::unordered_set<uint64_t> &ros);
 
-        std::unordered_map<uint64_t, PendingRWTransaction> pending_rw_;
-        // std::unordered_map<uint64_t, std::vector<PendingRWTransaction>> pending_rw_;
+        SlotPool<PendingRWTransaction> *pending_rw_slots_;
         // std::unordered_map<uint64_t, PendingROTransaction> pending_ro_;
         std::unordered_set<uint64_t> committed_;
         std::unordered_set<uint64_t> aborted_;

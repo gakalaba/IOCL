@@ -33,9 +33,13 @@ namespace strongstore
 {
 
     TransactionStore::TransactionStore(int this_shard, Consistency c, const TrueTime &tt)
-        : this_shard_{this_shard}, consistency_{c}, tt_{tt} {}
+        : this_shard_{this_shard}, consistency_{c}, tt_{tt} {
+            pending_rw_slots_ = new SlotPool<PendingRWTransaction>(30000);
+        }
 
-    TransactionStore::~TransactionStore() {}
+    TransactionStore::~TransactionStore() {
+        delete pending_rw_slots_;
+    }
 
     bool TransactionStore::PendingRWTransaction::HasParticipantOK(int participant) const {
         return (ok_participants_mask_ & (1ULL << participant)) != 0;
@@ -190,7 +194,8 @@ namespace strongstore
 
     size_t TransactionStore::StartGet(uint64_t transaction_id, const TransportAddress &remote, const std::string &key, bool for_update)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        uint32_t slot_idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
+        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(slot_idx);
         size_t idx = pt.AddNewParallelGetKey(key);
         // the parallel get is initialized as READING, the transaction overall is initialized as PARALLEL_READING
 
@@ -202,7 +207,7 @@ namespace strongstore
 
     void TransactionStore::FinishGet(uint64_t transaction_id, size_t idx)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING);
         auto &parallel_get = pt.ParallelGets()[idx];
         ASSERT(parallel_get.state == READING);
@@ -212,24 +217,25 @@ namespace strongstore
     {
         Panic("Don't think we should be able to enter this case without WaitDie implemented??");
         (void)key;
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == READING ||
                pt.state() == READ_WAIT);
 
-        pending_rw_.erase(transaction_id);
+        pending_rw_slots_->FreeByKey(transaction_id);
+        pt.clear();
         aborted_.insert(transaction_id);
     }
 
     void TransactionStore::ShowAllTxns()
     {
         Notice("---- Showing all transactions in TransactionStore ----");
-        for (auto &p : pending_rw_)
-        {
-            Notice("RW Transaction %lu: state %d", p.first, p.second.state());
-            for (auto &q : p.second.ParallelGets()) {
-                Notice("    Key %s: state %d", q.key.c_str(), q.state);
-            }
-        }
+        // for (auto &p : pending_rw_)
+        // {
+        //     Notice("RW Transaction %lu: state %d", p.first, p.second.state());
+        //     for (auto &q : p.second.ParallelGets()) {
+        //         Notice("    Key %s: state %d", q.key.c_str(), q.state);
+        //     }
+        // }
         // for (auto &p : pending_ro_)
         // {
         //     Notice("RO Transaction %lu: state %d", p.first, p.second.state());
@@ -249,7 +255,7 @@ namespace strongstore
 
     void TransactionStore::PauseGet(uint64_t transaction_id, size_t idx)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING);
         auto &parallel_get = pt.ParallelGets()[idx];
         ASSERT(parallel_get.state == READING);
@@ -263,7 +269,7 @@ namespace strongstore
         {
             return ABORTED;
         }
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING);
         auto &parallel_get = pt.ParallelGets()[idx];
         ASSERT(parallel_get.state == READ_WAIT);
@@ -282,7 +288,8 @@ namespace strongstore
             return ABORTED;
         }
 
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
+        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
         ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);
@@ -296,7 +303,7 @@ namespace strongstore
 
     void TransactionStore::FinishCoordinatorPrepare(uint64_t transaction_id, const Timestamp &prepare_ts)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARING);
         pt.FinishCoordinatorPrepare(prepare_ts);
     }
@@ -309,7 +316,8 @@ namespace strongstore
             return ABORTED;
         }
 
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
+        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
         ASSERT(pt.state() == PARALLEL_READING);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);
@@ -323,7 +331,7 @@ namespace strongstore
 
     void TransactionStore::SetParticipantPrepareTimestamp(uint64_t transaction_id, const Timestamp &prepare_ts)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARING);
 
         pt.SetParticipantPrepareTimestamp(prepare_ts);
@@ -336,7 +344,7 @@ namespace strongstore
             return ABORTED;
         }
 
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARING);
 
         pt.FinishParticipantPrepare();
@@ -356,14 +364,11 @@ namespace strongstore
             return ABORTED;
         }
 
-        auto search = pending_rw_.find(transaction_id);
-        if (search == pending_rw_.end())
+        if (!pending_rw_slots_->ContainsKey(transaction_id))
         {
             return NOT_FOUND;
-        }
-        else
-        {
-            return search->second.state();
+        } else {
+            return pending_rw_slots_->GetByKey(transaction_id).state();
         }
     }
 
@@ -391,56 +396,49 @@ namespace strongstore
 
     const Timestamp &TransactionStore::GetStartTimestamp(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.start_ts();
+        return pending_rw_slots_->GetByKey(transaction_id).start_ts();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     const std::vector<int> &TransactionStore::GetParticipants(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.participants();
+        return pending_rw_slots_->GetByKey(transaction_id).participants();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     const Timestamp &TransactionStore::GetNonBlockTimestamp(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.nonblock_ts();
+        return pending_rw_slots_->GetByKey(transaction_id).nonblock_ts();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     const Transaction &TransactionStore::GetTransaction(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.transaction();
+        return pending_rw_slots_->GetByKey(transaction_id).transaction();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     int TransactionStore::GetCoordinator(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.coordinator();
+        return pending_rw_slots_->GetByKey(transaction_id).coordinator();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     std::shared_ptr<TransportAddress> TransactionStore::GetClientAddr(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.client_addr();
+        return pending_rw_slots_->GetByKey(transaction_id).client_addr();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     const Timestamp &TransactionStore::GetPrepareTimestamp(uint64_t transaction_id)
     {
-        auto search = pending_rw_.find(transaction_id);
-        ASSERT(search != pending_rw_.end());
-        return search->second.prepare_ts();
+        return pending_rw_slots_->GetByKey(transaction_id).prepare_ts();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
     const Timestamp &TransactionStore::GetRWCommitTimestamp(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == COMMITTING);
         return pt.commit_ts();
     }
@@ -463,18 +461,19 @@ namespace strongstore
 
     void TransactionStore::AbortPrepare(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARING ||
                pt.state() == PREPARE_WAIT ||
                pt.state() == WAIT_PARTICIPANTS);
 
-        pending_rw_.erase(transaction_id);
+        pending_rw_slots_->FreeByKey(transaction_id);
+        pt.clear();
         aborted_.insert(transaction_id);
     }
 
     void TransactionStore::PausePrepare(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARING);
         ASSERT(pt.wait_start() == 0);
 
@@ -489,7 +488,7 @@ namespace strongstore
             return ABORTED;
         }
 
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         if (pt.state() == PREPARE_WAIT)
         {
             pt.set_state(PREPARING);
@@ -512,7 +511,8 @@ namespace strongstore
             return ABORTED;
         }
 
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
+        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
         ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);
@@ -523,7 +523,7 @@ namespace strongstore
 
     TransactionState TransactionStore::ParticipantReceivePrepareOK(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == PREPARED);
 
         pt.set_state(COMMITTING);
@@ -533,21 +533,23 @@ namespace strongstore
 
     void TransactionStore::Commit(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() == COMMITTING);
 
-        pending_rw_.erase(transaction_id);
+        pending_rw_slots_->FreeByKey(transaction_id);
+        pt.clear();
         committed_.insert(transaction_id);
     }
 
     void TransactionStore::Abort(uint64_t transaction_id)
     {
-        PendingRWTransaction &pt = pending_rw_[transaction_id];
+        PendingRWTransaction &pt = pending_rw_slots_->GetByKey(transaction_id);
         ASSERT(pt.state() != COMMITTING &&
                pt.state() != COMMITTED &&
                pt.state() != ABORTED);
 
-        pending_rw_.erase(transaction_id); // delete the underlying transaction object
+        pending_rw_slots_->FreeByKey(transaction_id); // delete the underlying transaction object
+        pt.clear();
         aborted_.insert(transaction_id);
     }
 

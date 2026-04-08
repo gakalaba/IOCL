@@ -67,6 +67,15 @@ public:
         return idx;
     }
 
+    uint32_t AllocIfNotPresent(Key key) {
+        auto it = key_to_idx_.find(key);
+        if (it != key_to_idx_.end()) {
+            return it->second;
+        } else {
+            return Alloc(key);
+        }
+    }
+
     Slot &GetByKey(Key key) {
         auto it = key_to_idx_.find(key);
         ASSERT(it != key_to_idx_.end());
