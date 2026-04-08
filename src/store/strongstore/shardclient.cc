@@ -50,7 +50,7 @@ namespace strongstore
 
         // TODO: Remove hardcoding
         replica_ = 0;
-        seqno = 0;
+        seqno = 1;
 
         register_client_.set_client_id(client_id_);
         for (int i = 0; i < config_.n; i++) {
@@ -302,6 +302,8 @@ namespace strongstore
         op_.mutable_rid()->set_client_id(client_id_);
         op_.mutable_rid()->set_client_req_id(req_id);
         op_.set_transaction_id(app_request_id);
+        op_.set_origin_client_id(client_id_);
+        op_.set_origin_client_req_id(req_id);
         op_.set_key(key);
         op_.set_value(value);
         op_.set_op(op);

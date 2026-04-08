@@ -2014,6 +2014,12 @@ namespace strongstore
             Panic("Implementation is for linearizable version store");
         }
 
+        bool is_tail = (replica_idx_ == replica_config_.n - 1);
+        if ((linproto_ == PROTO_CRAQ || linproto_ == PROTO_IOCL_CRAQ) && !is_tail)
+        {
+            return;
+        }
+
         LinearizeableOperation req;
         req.ParseFromString(op);
         uint64_t transaction_id = req.transaction_id();
@@ -2054,12 +2060,11 @@ namespace strongstore
 
         if (linproto_ == PROTO_CRAQ || linproto_ == PROTO_IOCL_CRAQ)
         {
-            bool is_tail = (replica_idx_ == replica_config_.n - 1);
             if (req.op() == "get" || is_tail && req.op() == "put") {
                 auto client_it = registered_client_addrs_.find(req.origin_client_id());
 
                 if (client_it != registered_client_addrs_.end()) {
-                    Notice("CRAQ tail responding directly to client %lu", req.rid().client_id());
+                    Debug("CRAQ tail responding directly to client %lu", req.rid().client_id());
                     op_reply_.Clear();
                     op_reply_.mutable_rid()->set_client_id(req.origin_client_id());
                     op_reply_.mutable_rid()->set_client_req_id(req.origin_client_req_id());
