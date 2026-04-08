@@ -23,11 +23,15 @@ message KVOpMessage {
 }
 
 message PrepareMessage {
-    required int32 coordinator = 1;
-    repeated int32 participants = 2;
+    required TransactionMessage txn = 1;
+    required TimestampMessage timestamp = 2;
+    required int32 coordinator = 3;
+    required TimestampMessage nonblock_ts = 5;
+    repeated int32 participants = 4;
 }
 
 message CommitMessage {
+    required TimestampMessage commit_timestamp = 1;
 }
 
 message RequestIDMessage {

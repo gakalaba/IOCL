@@ -218,7 +218,7 @@ namespace strongstore
         get_.mutable_rid()->set_client_id(client_id_);
         get_.mutable_rid()->set_client_req_id(req_id);
         get_.set_transaction_id(transaction_id);
-        // start_ts.serialize(get_.mutable_timestamp());
+        start_ts.serialize(get_.mutable_timestamp());
         get_.set_key(key);
         get_.set_for_update(for_update);
 
@@ -483,8 +483,8 @@ namespace strongstore
         rw_commit_c_.mutable_rid()->set_client_id(client_id_);
         rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
         rw_commit_c_.set_transaction_id(transaction_id);
-        // the_transaction_.serialize(rw_commit_c_.mutable_transaction());
-        // nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
+        the_transaction_.serialize(rw_commit_c_.mutable_transaction());
+        nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
 
         for (int p : participants)
         {
@@ -506,11 +506,9 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
 
-        // Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
-        //       reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        const Timestamp nonblock_ts;
-        const Timestamp commit_ts;
-        ccb(reply.status(), commit_ts, nonblock_ts);
+        Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
+              reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
+        ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,

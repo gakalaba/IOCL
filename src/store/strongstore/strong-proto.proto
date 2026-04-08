@@ -31,12 +31,16 @@ message GetReply {
 message RWCommitCoordinator {
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
-    repeated int32 participants = 3;
+    required TransactionMessage transaction = 3;
+    required TimestampMessage nonblock_timestamp = 4;
+    repeated int32 participants = 5;
 }
 
 message RWCommitCoordinatorReply {
     required RequestIDMessage rid = 1;
     required int32 status = 2;
+    optional TimestampMessage commit_timestamp = 3;
+    optional TimestampMessage nonblock_timestamp = 4;
 }
 
 message RWCommitParticipant {
