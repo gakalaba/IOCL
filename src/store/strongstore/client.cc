@@ -126,7 +126,7 @@ namespace strongstore
 
     bool Client::IsIOCL()
     {
-        return (replication_proto_ == PROTO_IOCL_CT);
+        return (replication_proto_ == PROTO_IOCL_CT || replication_proto_ == PROTO_IOCL_CRAQ);
     }
 
     void Client::CalculateCoordinatorChoices()
