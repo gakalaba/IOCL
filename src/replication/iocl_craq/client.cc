@@ -84,8 +84,17 @@ namespace replication
             LinearizeableOperation linOp;
             linOp.ParseFromString(request);
 
-            uint64_t shardtag = ++shardTagCounter;
-            linOp.set_shardtag(shardtag);
+            // If the store layer (ShardClient) already assigned a shardtag, honor it
+            // so that predlist entries (which reference ShardClient's CreateTag values)
+            // match committedForCoord on the replica.  Only fall back to our own counter
+            // when no shardtag has been assigned (e.g. unit-test ops).
+            uint64_t shardtag;
+            if (linOp.shardtag() != 0) {
+                shardtag = linOp.shardtag();
+            } else {
+                shardtag = ++shardTagCounter;
+                linOp.set_shardtag(shardtag);
+            }
 
             bool isWrite = (linOp.op() == PUT_OPERATION);
 
@@ -93,12 +102,31 @@ namespace replication
             // For read successors, the gate is at the read-serving replica.
             int gateReplicaIdx = isWrite ? (config.n - 1) : replicaIndex;
 
-            // If we have a predecessor, send a CoordRequest to its handler and
-            // record the predecessor in the linOp for the replica's gate check.
-            if (lastIssuedShardTag != 0)
+            // If shardclient.cc did not set a predecessor (predlist empty) and this
+            // is a write, chain it onto the last write issued on this shard so
+            // invocation order is preserved within a single shard.
+            if (isWrite && linOp.predlist_size() == 0 && lastIssuedShardTag != 0)
             {
+                linOp.add_predlist(lastIssuedShardTag);
+                linOp.add_shardlist(group);
+            }
+
+            // Track this write as the predecessor for the next write on this shard.
+            if (isWrite)
+            {
+                lastIssuedShardTag = shardtag;
+            }
+
+            // Send CoordRequests to all predecessor shards' TAILs.
+            for (int i = 0; i < linOp.predlist_size() && i < linOp.shardlist_size(); i++)
+            {
+                uint64_t predShardtag = linOp.predlist(i);
+                if (predShardtag == 0) continue;
+                int predGroupIdx = (int)linOp.shardlist(i);
+                int predTailIdx = config.n - 1;
+
                 proto::SuccessorRequestMessage coordReq;
-                coordReq.set_p(lastIssuedShardTag);
+                coordReq.set_p(predShardtag);
                 coordReq.set_s(shardtag);
                 coordReq.set_succ_groupidx(group);
                 coordReq.set_succ_replicaidx(gateReplicaIdx);
@@ -108,24 +136,13 @@ namespace replication
                 }
 
                 Notice("Sending CoordRequest: p=%lu s=%lu to group=%d replica=%d",
-                       lastIssuedShardTag, shardtag, lastIssuedGroupIdx, lastIssuedReplicaIdx);
+                       predShardtag, shardtag, predGroupIdx, predTailIdx);
 
-                if (!transport->SendMessageToReplica(this, lastIssuedGroupIdx,
-                                                      lastIssuedReplicaIdx, coordReq))
+                if (!transport->SendMessageToReplica(this, predGroupIdx, predTailIdx, coordReq))
                 {
                     Warning("Could not send CoordRequest to predecessor's handler.");
                 }
-
-                // Record predecessor shardtag in the operation so the tail can
-                // identify that this write needs a CoordResponse before committing.
-                linOp.clear_predlist();
-                linOp.add_predlist(lastIssuedShardTag);
             }
-
-            // Update predecessor tracking for the next operation.
-            lastIssuedShardTag   = shardtag;
-            lastIssuedGroupIdx   = group;
-            lastIssuedReplicaIdx = gateReplicaIdx;
 
             // Re-serialize the modified linOp (with shardtag and predlist set).
             string modifiedRequest;
@@ -189,6 +206,19 @@ namespace replication
                 pendingReqs.erase(req->clientReqId);
                 delete req;
                 return;
+            }
+
+            // Also send directly to the tail so it can register the client address
+            // via UpdateClientAddresses. The tail returns early (AmHead() false) without
+            // processing the write, but clientAddresses is populated so SendReplyToClient
+            // can reply after commit.
+            if (linRequest.op() == PUT_OPERATION)
+            {
+                int tailIdx = config.n - 1;
+                if (req->replicaIndex != tailIdx)
+                {
+                    transport->SendMessageToReplica(this, group, tailIdx, linRequest);
+                }
             }
         }
 
