@@ -251,8 +251,6 @@ namespace strongstore
         void HandlePrepareAbort(const TransportAddress &remote,
                                 proto::PrepareAbort &msg);
 
-        void PrepareCallback(uint64_t transaction_id, int status,
-                             Timestamp timestamp);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,

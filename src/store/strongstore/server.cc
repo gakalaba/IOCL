@@ -1253,36 +1253,6 @@ namespace strongstore
         }
     }
 
-    void Server::PrepareCallback(uint64_t transaction_id, int status, Timestamp timestamp)
-    {
-        // Only ever run on leader!!! Replicas don't have a back path to the callback
-        TransactionState s = transactions_.FinishParticipantPrepare(transaction_id);
-        if (s == PREPARED)
-        {
-            int coordinator = transactions_.GetCoordinator(transaction_id);
-            const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
-            const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
-            // TODO: Handle timeout
-            shard_clients_[coordinator]->PrepareOK(
-                transaction_id, shard_idx_, prepare_ts, nonblock_ts,
-                std::bind(&Server::PrepareOKCallback, this, transaction_id,
-                          placeholders::_1, placeholders::_2),
-                [](int, Timestamp) {}, PREPARE_TIMEOUT);
-
-            // Reply to client
-            SendRWCommmitParticipantReplyOK(transaction_id);
-        }
-        else if (s == ABORTED)
-        { // Already aborted
-
-            SendRWCommmitParticipantReplyFail(transaction_id);
-        }
-        else
-        {
-            NOT_REACHABLE();
-        }
-    }
-
     // What a Participant runs when the coordinator responds to it after it has prepared (heard from all participants)
     void Server::PrepareOKCallback(uint64_t transaction_id, int status, Timestamp commit_ts)
     {
@@ -1781,22 +1751,27 @@ namespace strongstore
             return;
         }
 
-        int status = REPLY_OK;
         uint64_t transaction_id = msg.transaction_id();
 
         if (msg.request_type() == replication::LinearizeableOperation::PREPARE)
         {
             // Debug("[%lu] Received PREPARE", transaction_id);
+            // Participant Shard Replica Upcall for Prepare
 
             TransactionState s = transactions_.GetRWTransactionState(transaction_id);
             if (s == ABORTED)
             {
                 // Debug("[%lu] Already aborted", transaction_id);
-                status = REPLY_FAIL;
+                if (replica_idx_ == 0)
+                {
+                    // Have only the leader issue these messages
+                    SendRWCommmitParticipantReplyFail(transaction_id);
+                }
             }
             else if (s == NOT_FOUND)
-            { // Participant Shard Replica Upcall for Prepare
-                // should these values come from the message itself because already picked by leader?
+            {
+                ASSERT(replica_idx_ != 0);
+                // Participant Replica prepare
                 const Timestamp prepare_ts{msg.prepare().timestamp()};
                 int coordinator = msg.prepare().coordinator();
                 const Transaction transaction{msg.prepare().txn()};
@@ -1816,22 +1791,27 @@ namespace strongstore
 
                 transactions_.FinishParticipantPrepare(transaction_id);
             }
-            else if (s == PREPARING || s == PREPARED)
+            else if (s == PREPARING)
             {
-                // Debug("[%lu] Already prepared", transaction_id);
-                // should this just run for PREPARED and not PREPARING like OG callback?
-                // int coordinator = transactions_.GetCoordinator(transaction_id);
-                // const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
-                // const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
-                // // TODO: Handle timeout
-                // shard_clients_[coordinator]->PrepareOK(
-                //     transaction_id, shard_idx_, prepare_ts, nonblock_ts,
-                //     std::bind(&Server::PrepareOKCallback, this, transaction_id,
-                //             placeholders::_1, placeholders::_2),
-                //     [](int, Timestamp) {}, PREPARE_TIMEOUT);
+                ASSERT(replica_idx_ == 0);
+                // Participant Leader prepare
+                TransactionState s = transactions_.FinishParticipantPrepare(transaction_id);
+                ASSERT(s == PREPARED);
+                int coordinator = transactions_.GetCoordinator(transaction_id);
+                const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
+                const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+                // TODO: Handle timeout
+                shard_clients_[coordinator]->PrepareOK(
+                    transaction_id, shard_idx_, prepare_ts, nonblock_ts,
+                    std::bind(&Server::PrepareOKCallback, this, transaction_id,
+                            placeholders::_1, placeholders::_2),
+                    [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
-                // // Reply to client
-                // SendRWCommmitParticipantReplyOK(transaction_id);
+                // Reply to client
+                SendRWCommmitParticipantReplyOK(transaction_id);
+            }
+            else if (s == PREPARED) {
+                Panic("How did this happen?");
             }
             else
             {
@@ -1851,6 +1831,8 @@ namespace strongstore
 
                 if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
                 {
+                    // Coordinator Replica Commit
+                    ASSERT(replica_idx_ != 0);
                     const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
                     const std::vector<int> participants{msg.prepare().participants().begin(),
@@ -1882,6 +1864,8 @@ namespace strongstore
                 }
                 else
                 {
+                    // Coordinator Leader Commit
+                    ASSERT(replica_idx_ == 0);
                     Debug("[%lu] Already prepared", transaction_id);
                 }
 
