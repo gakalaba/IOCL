@@ -2015,10 +2015,6 @@ namespace strongstore
         }
 
         bool is_tail = (replica_idx_ == replica_config_.n - 1);
-        if ((linproto_ == PROTO_CRAQ || linproto_ == PROTO_IOCL_CRAQ) && !is_tail)
-        {
-            return;
-        }
 
         LinearizeableOperation req;
         req.ParseFromString(op);
@@ -2160,7 +2156,7 @@ namespace strongstore
     void Server::Load(const string &key, const string &value,
                       const Timestamp timestamp)
     {
-        if (consistency_ == LIN && (linproto_ != PROTO_CRAQ || linproto_ != PROTO_IOCL_CRAQ))
+        if (consistency_ == LIN && (linproto_ != PROTO_CRAQ && linproto_ != PROTO_IOCL_CRAQ))
         {
             linearizeable_kv_store_.put(key, value);
         }
