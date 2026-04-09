@@ -82,6 +82,15 @@ public:
         return slots_[it->second];
     }
 
+    Slot *GetByKeyIfPresent(Key key) {
+        auto it = key_to_idx_.find(key);
+        if (it != key_to_idx_.end()) {
+            return &slots_[it->second];
+        } else {
+            return nullptr;
+        }
+    }
+
     bool ContainsKey(Key key) const {
         return key_to_idx_.find(key) != key_to_idx_.end();
     }

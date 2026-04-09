@@ -935,8 +935,11 @@ namespace strongstore
 
     void Server::ContinueCoordinatorPrepare(uint64_t transaction_id)
     {
-        // This should never hit an assertion error?? although i guess we'll see when we start aborting
-        PendingRWCommitCoordinatorReplySlot &pending_reply = rw_commit_c_slots_->GetByKey(transaction_id);
+        PendingRWCommitCoordinatorReplySlot *pending_reply = rw_commit_c_slots_->GetByKeyIfPresent(transaction_id);
+        if (pending_reply == nullptr)
+        {
+            return;
+        }
 
         TransactionState s = transactions_.ContinuePrepare(transaction_id);
         if (s == PREPARING)
@@ -946,7 +949,7 @@ namespace strongstore
             if (ar.status == LockStatus::ACQUIRED)
             {
                 ASSERT(ar.wound_rws.size() == 0);
-                const Timestamp prepare_ts = GetPrepareTimestamp(pending_reply.client_id);
+                const Timestamp prepare_ts = GetPrepareTimestamp(pending_reply->client_id);
                 transactions_.FinishCoordinatorPrepare(transaction_id, prepare_ts);
                 const Timestamp &commit_ts = transactions_.GetRWCommitTimestamp(transaction_id);
 
@@ -954,7 +957,7 @@ namespace strongstore
                 const std::vector<int> &participants = transactions_.GetParticipants(transaction_id);
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
-                ReplicateCoordinatorCommit(pending_reply.client_id, pending_reply.client_req_id,
+                ReplicateCoordinatorCommit(pending_reply->client_id, pending_reply->client_req_id,
                         transaction_id, transaction, start_ts, nonblock_ts, commit_ts, participants);
             }
             else if (ar.status == LockStatus::FAIL)
@@ -964,7 +967,7 @@ namespace strongstore
                 // Debug("[%lu] Coordinator prepare failed", transaction_id);
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
-                SendRWCommmitCoordinatorReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+                SendRWCommmitCoordinatorReplyFail(*pending_reply->remote, pending_reply->client_id, pending_reply->client_req_id);
                 rw_commit_c_slots_->FreeByKey(transaction_id);
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws);
@@ -1196,7 +1199,11 @@ namespace strongstore
 
     void Server::ContinueParticipantPrepare(uint64_t transaction_id)
     {
-        PendingRWCommitParticipantReplySlot &pending_reply = rw_commit_p_slots_->GetByKey(transaction_id);
+        PendingRWCommitParticipantReplySlot *pending_reply = rw_commit_p_slots_->GetByKeyIfPresent(transaction_id);
+        if (pending_reply == nullptr)
+        {
+            return;
+        }
 
         TransactionState s = transactions_.ContinuePrepare(transaction_id);
         if (s == PREPARING)
@@ -1208,13 +1215,13 @@ namespace strongstore
             if (ar.status == LockStatus::ACQUIRED)
             {
                 ASSERT(ar.wound_rws.size() == 0);
-                const Timestamp prepare_ts = GetPrepareTimestamp(pending_reply.client_id);
+                const Timestamp prepare_ts = GetPrepareTimestamp(pending_reply->client_id);
 
                 transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
 
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
-                ReplicatePrepare(pending_reply.client_id, pending_reply.client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
+                ReplicatePrepare(pending_reply->client_id, pending_reply->client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
                 rw_commit_p_slots_->FreeByKey(transaction_id);
             }
             else if (ar.status == LockStatus::FAIL)
