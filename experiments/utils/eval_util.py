@@ -739,10 +739,22 @@ def generate_plots(config, base_out_directory, out_dirs):
             plot_out_file = os.path.join(
                 plots_directory, '%s-%d.png' % (csv_class, j))
             series = []
+            read_pct_raw = config.get('client_read_percentage', 0)
+            read_pct = int(read_pct_raw / 10)  # config scale is 0-1000; display as 0-100
+            fanout = config.get('client_fanout', None)
+            # Always use replication_protocol for the per-series label; fall back to
+            # the first independent-var key only if replication_protocol isn't a list.
+            proto_key = 'replication_protocol'
+            if not isinstance(config.get(proto_key), list):
+                proto_key = config['experiment_independent_vars_unused'][0][0]
             for i in range(len(csv_files)):
                 if csv_class in csv_files[i] and len(csv_files[i][csv_class]) > j:
-                    series.append(('%s=%s' % (config['experiment_independent_vars_unused'][0][0],
-                                              config[config['experiment_independent_vars_unused'][0][0]][i]), csv_files[i][csv_class][j]))
+                    proto_label = str(config[proto_key][i])
+                    if fanout is not None:
+                        label = '%s (%d%% reads, fanout=%s)' % (proto_label, read_pct, fanout)
+                    else:
+                        label = '%s (%d%% reads)' % (proto_label, read_pct)
+                    series.append((label, csv_files[i][csv_class][j]))
             if 'lot-' in csv_class:
                 if not 'lot_plots' in config:
                     config['lot_plots'] = {
