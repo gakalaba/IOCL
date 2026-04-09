@@ -600,15 +600,29 @@ namespace replication
 
             UpdateClientTable(linRequest);
 
-            // If this read has a predecessor, buffer until CoordResponse arrives.
+            // If this read has a predecessor, ensure its CoordResponse has arrived.
             if (linRequest.predlist_size() > 0 && linRequest.predlist(0) != 0)
             {
                 uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
                 if (myShardTag != 0)
                 {
-                    Debug("Buffering read shardtag %lu waiting for CoordResponse", myShardTag);
-                    readsWaitingForCoord[myShardTag] = linRequest;
-                    return;
+                    // CoordResponse may have arrived before this read (race: predecessor
+                    // was already committed when the CoordRequest arrived, so the reply
+                    // was sent immediately and stored in pendingCoordResponses).
+                    auto coordIt = pendingCoordResponses.find(myShardTag);
+                    if (coordIt != pendingCoordResponses.end())
+                    {
+                        Debug("CoordResponse already arrived for read shardtag %lu, serving immediately", myShardTag);
+                        SyncVC(coordIt->second.vector_clock());
+                        pendingCoordResponses.erase(coordIt);
+                        // Fall through to serve the read normally.
+                    }
+                    else
+                    {
+                        Debug("Buffering read shardtag %lu waiting for CoordResponse", myShardTag);
+                        readsWaitingForCoord[myShardTag] = linRequest;
+                        return;
+                    }
                 }
             }
 
@@ -990,7 +1004,11 @@ namespace replication
 
             if (!AmTail())
             {
-                RWarning("Received CoordResponse for unknown shardtag %lu at non-tail replica", successorShardTag);
+                // CoordResponse arrived before the read was buffered in readsWaitingForCoord
+                // (race: predecessor was already committed when CoordRequest arrived).
+                // Store it so HandleReadRequest can consume it when the read arrives.
+                RDebug("Buffering CoordResponse for shardtag %lu at non-tail (read not yet arrived)", successorShardTag);
+                pendingCoordResponses[successorShardTag] = msg;
                 return;
             }
 
