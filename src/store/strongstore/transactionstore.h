@@ -85,6 +85,7 @@ namespace strongstore
         const Timestamp &GetRWCommitTimestamp(uint64_t transaction_id);
         const Timestamp &GetStartTimestamp(uint64_t transaction_id);
         const std::vector<int> &GetParticipants(uint64_t transaction_id);
+        const size_t GetNumParticipants(uint64_t transaction_id);
         const Timestamp &GetNonBlockTimestamp(uint64_t transaction_id);
         int GetCoordinator(uint64_t transaction_id);
         std::shared_ptr<TransportAddress> GetClientAddr(uint64_t transaction_id);

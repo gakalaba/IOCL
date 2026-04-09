@@ -112,6 +112,10 @@ public:
         free_.push_back(idx);
     }
 
+    size_t Size() const {
+        return slots_.size();
+    }
+
 private:
     std::vector<Slot> slots_;
     std::vector<uint32_t> free_;

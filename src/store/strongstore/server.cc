@@ -64,9 +64,11 @@ namespace strongstore
     {
         transport_->Register(this, shard_config_, shard_idx_, replica_idx_);
 
+        auto pokcb = std::bind(&Server::PrepareOKCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         for (int i = 0; i < shard_config_.g; i++)
         {
-            shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i, 0)); // passing in dummy fanout for now, since not used by these shard clients
+            // passing in dummy fanout for now, since not used by these shard clients
+            shard_clients_.push_back(new ShardClient(shard_config_, transport, server_id_, i, 0, [](uint64_t) {}, pokcb));
         }
 
         if (debug_stats_)
@@ -146,6 +148,12 @@ namespace strongstore
     {
         transactions_.ShowAllTxns();
     }
+
+    void Server::PrintAFewThings() {
+        Notice("Printing a few things...");
+        Notice("size of _op_slots is %lu, rw_commit_c_slots_ is %lu and rw_commit_p_slots_ is %lu and prepare_ok_slots_ is %lu", op_slots_->Size(), rw_commit_c_slots_->Size(), rw_commit_p_slots_->Size(), prepare_ok_slots_->Size());
+    }
+
 
     void Server::DelayOnEventLoop()
     {
@@ -254,7 +262,7 @@ namespace strongstore
         const Timestamp timestamp{msg.timestamp()};
         bool for_update = msg.has_for_update() && msg.for_update();
 
-        Debug("[%lu] Received GET request: %s %d", transaction_id, key.c_str(), for_update);
+        Debug("[%lu] Received GET request: %s %d and from clientid %lu", transaction_id, key.c_str(), for_update, msg.rid().client_id());
 
         size_t get_idx = transactions_.StartGet(transaction_id, remote, key, for_update);
 
@@ -373,7 +381,7 @@ namespace strongstore
             auto &reply = get_slots_[idx];
             ASSERT(reply.in_use);
 
-            // Debug("[%lu] Aborting GET request %s", transaction_id, key.c_str());
+            // Debug("[%lu] Aborting GET request", transaction_id);
 
             get_reply_.Clear();
             get_reply_.mutable_rid()->set_client_id(reply.client_id);
@@ -745,6 +753,7 @@ namespace strongstore
 
     void Server::ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id)
     {
+        // Debug("replicating an ABORT message! for TID %lu", transaction_id);
         replication::LinearizeableOperation abort_op;
         abort_op.Clear();
         abort_op.set_request_type(replication::LinearizeableOperation::ABORT);
@@ -759,6 +768,7 @@ namespace strongstore
 
     void Server::ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts)
     {
+        // Debug("replicating a commit message! for TID %lu", transaction_id);
         replication::LinearizeableOperation commit_op;
         commit_op.Clear();
         commit_op.set_request_type(replication::LinearizeableOperation::COMMIT);
@@ -777,6 +787,7 @@ namespace strongstore
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
                 const std::vector<int> &participants)
     {
+        // Debug("replicating a coordinator commit message! for TID %lu", transaction_id);
         LinearizeableOperation commit_op;
         commit_op.Clear();
         commit_op.set_request_type(replication::LinearizeableOperation::COMMIT);
@@ -805,6 +816,7 @@ namespace strongstore
     void Server::ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
                 const Transaction &transaction, const Timestamp &prepare_ts, const Timestamp &nonblock_ts)
     {
+        // Debug("Replicating a prepare message! for TID", transaction_id);
         LinearizeableOperation prepare_op;
         prepare_op.Clear();
         prepare_op.set_request_type(replication::LinearizeableOperation::PREPARE);
@@ -837,7 +849,7 @@ namespace strongstore
         const Transaction transaction{msg.transaction()};
         const Timestamp nonblock_ts{msg.nonblock_timestamp()};
 
-        Debug("[%lu] Coordinator for transaction", transaction_id);
+        Debug("[%lu] Coordinator for transaction with %u participants", transaction_id, participants.size());
 
         const TrueTimeInterval now = tt_.Now();
         const Timestamp start_ts{now.latest(), client_id};
@@ -862,7 +874,6 @@ namespace strongstore
                 reply.remote = &remote;
                 reply.client_id = client_id;
                 reply.client_req_id = client_req_id;
-                Debug("sending commit with req_id = %lu to replica_client and it was put in slot idx = %u", client_req_id, idx);
                 ReplicateCoordinatorCommit(client_id, client_req_id,
                         transaction_id, transaction, start_ts, nonblock_ts, commit_ts, participants);
             }
@@ -1019,6 +1030,7 @@ namespace strongstore
     {
         if (!prepare_ok_slots_->ContainsKey(transaction_id))
         {
+            Panic("YO for tid %lu", transaction_id);
             return;
         }
         PendingPrepareOKReplySlot &reply = prepare_ok_slots_->GetByKey(transaction_id);
@@ -1027,12 +1039,14 @@ namespace strongstore
         commit_ts.serialize(prepare_ok_reply_.mutable_commit_timestamp());
 
 
+        // now that we removed callback with binding, put TID here (we weren't using req_id_)
+        prepare_ok_reply_.mutable_rid()->set_client_req_id(transaction_id);
         for (auto &prid : reply.participant_rids)
         {
             prepare_ok_reply_.mutable_rid()->set_client_id(prid.client_id);
-            prepare_ok_reply_.mutable_rid()->set_client_req_id(prid.client_req_id);
 
             transport_->SendMessage(this, *prid.remote, MsgType::TXN_PREPARE_OK_REPLY_TYPE, prepare_ok_reply_);
+            prid.remote = nullptr;
         }
 
         prepare_ok_slots_->FreeByKey(transaction_id);
@@ -1053,46 +1067,46 @@ namespace strongstore
         }
     }
 
-    void Server::SendRWCommmitParticipantReplyOK(uint64_t transaction_id)
-    {
-        // This one should be safe to keep assert, but will need to push to outside if we start aborting transactions and have to worry about cleaning up pending replies and stuff
-        PendingRWCommitParticipantReplySlot &pending_reply = rw_commit_p_slots_->GetByKey(transaction_id);
-        // ASSERT(search != pending_rw_commit_p_replies_.end());
+    // void Server::SendRWCommmitParticipantReplyOK(uint64_t transaction_id)
+    // {
+    //     // This one should be safe to keep assert, but will need to push to outside if we start aborting transactions and have to worry about cleaning up pending replies and stuff
+    //     PendingRWCommitParticipantReplySlot &pending_reply = rw_commit_p_slots_->GetByKey(transaction_id);
+    //     // ASSERT(search != pending_rw_commit_p_replies_.end());
 
-        rw_commit_p_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
-        rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
-        rw_commit_p_reply_.set_status(REPLY_OK);
+    //     rw_commit_p_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
+    //     rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
+    //     rw_commit_p_reply_.set_status(REPLY_OK);
 
-        transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
-        rw_commit_p_slots_->FreeByKey(transaction_id);
-        pending_reply.remote = nullptr;
-    }
+    //     transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
+    //     rw_commit_p_slots_->FreeByKey(transaction_id);
+    //     pending_reply.remote = nullptr;
+    // }
 
-    void Server::SendRWCommmitParticipantReplyFail(uint64_t transaction_id)
-    {
-        // This one should be safe to keep assert, but will need to push to outside if we start aborting transactions and have to worry about cleaning up pending replies and stuff
-        PendingRWCommitParticipantReplySlot &pending_reply = rw_commit_p_slots_->GetByKey(transaction_id);
-        // ASSERT(search != pending_rw_commit_p_replies_.end());
+    // void Server::SendRWCommmitParticipantReplyFail(uint64_t transaction_id)
+    // {
+    //     // This one should be safe to keep assert, but will need to push to outside if we start aborting transactions and have to worry about cleaning up pending replies and stuff
+    //     PendingRWCommitParticipantReplySlot &pending_reply = rw_commit_p_slots_->GetByKey(transaction_id);
+    //     // ASSERT(search != pending_rw_commit_p_replies_.end());
 
-        rw_commit_p_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
-        rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
-        rw_commit_p_reply_.set_status(REPLY_FAIL);
+    //     rw_commit_p_reply_.mutable_rid()->set_client_id(pending_reply.client_id);
+    //     rw_commit_p_reply_.mutable_rid()->set_client_req_id(pending_reply.client_req_id);
+    //     rw_commit_p_reply_.set_status(REPLY_FAIL);
 
-        transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
-        rw_commit_p_slots_->FreeByKey(transaction_id);
-        pending_reply.remote = nullptr;
-    }
+    //     transport_->SendMessage(this, *pending_reply.remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
+    //     rw_commit_p_slots_->FreeByKey(transaction_id);
+    //     pending_reply.remote = nullptr;
+    // }
 
-    void Server::SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
-                                                   uint64_t client_id,
-                                                   uint64_t client_req_id)
-    {
-        rw_commit_p_reply_.mutable_rid()->set_client_id(client_id);
-        rw_commit_p_reply_.mutable_rid()->set_client_req_id(client_req_id);
-        rw_commit_p_reply_.set_status(REPLY_FAIL);
+    // void Server::SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
+    //                                                uint64_t client_id,
+    //                                                uint64_t client_req_id)
+    // {
+    //     rw_commit_p_reply_.mutable_rid()->set_client_id(client_id);
+    //     rw_commit_p_reply_.mutable_rid()->set_client_req_id(client_req_id);
+    //     rw_commit_p_reply_.set_status(REPLY_FAIL);
 
-        transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
-    }
+    //     transport_->SendMessage(this, remote, MsgType::TXN_COMMIT_PART_REPLY_TYPE, rw_commit_p_reply_);
+    // }
 
     void Server::HandleRWCommitParticipant(const TransportAddress &remote, proto::RWCommitParticipant &msg)
     {
@@ -1119,11 +1133,11 @@ namespace strongstore
                 transactions_.SetParticipantPrepareTimestamp(transaction_id, prepare_ts);
 
                 // Grab an idx
-                uint32_t idx = rw_commit_p_slots_->Alloc(transaction_id);
-                PendingRWCommitParticipantReplySlot &reply = rw_commit_p_slots_->GetByIdx(idx);
-                reply.remote = &remote;
-                reply.client_id = client_id;
-                reply.client_req_id = client_req_id;
+                // uint32_t idx = rw_commit_p_slots_->Alloc(transaction_id);
+                // PendingRWCommitParticipantReplySlot &reply = rw_commit_p_slots_->GetByIdx(idx);
+                // reply.remote = &remote;
+                // reply.client_id = client_id;
+                // reply.client_req_id = client_req_id;
                 ReplicatePrepare(client_id, client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
             }
             else if (ar.status == LockStatus::FAIL)
@@ -1141,7 +1155,7 @@ namespace strongstore
                     [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
                 // Reply to client
-                SendRWCommmitParticipantReplyFail(remote, client_id, client_req_id);
+                // SendRWCommmitParticipantReplyFail(remote, client_id, client_req_id);
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws);
 
@@ -1154,7 +1168,7 @@ namespace strongstore
                 // Grab an idx
                 uint32_t idx = rw_commit_p_slots_->Alloc(transaction_id);
                 PendingRWCommitParticipantReplySlot &reply = rw_commit_p_slots_->GetByIdx(idx);
-                reply.remote = &remote;
+                // reply.remote = &remote;
                 reply.client_id = client_id;
                 reply.client_req_id = client_req_id;
 
@@ -1172,7 +1186,7 @@ namespace strongstore
             // Debug("[%lu] Already aborted", transaction_id);
 
             // Reply to client
-            SendRWCommmitParticipantReplyFail(remote, client_id, client_req_id);
+            // SendRWCommmitParticipantReplyFail(remote, client_id, client_req_id);
         }
         else
         {
@@ -1200,8 +1214,8 @@ namespace strongstore
 
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
-                // TODO: Handle timeout
                 ReplicatePrepare(pending_reply.client_id, pending_reply.client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
+                rw_commit_p_slots_->FreeByKey(transaction_id);
             }
             else if (ar.status == LockStatus::FAIL)
             {
@@ -1218,9 +1232,9 @@ namespace strongstore
                     [](int, Timestamp) {}, PREPARE_TIMEOUT);
 
                 // Reply to client
-                SendRWCommmitParticipantReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
-                rw_commit_p_slots_->FreeByKey(transaction_id);
-                pending_reply.remote = nullptr;
+                // SendRWCommmitParticipantReplyFail(*pending_reply.remote, pending_reply.client_id, pending_reply.client_req_id);
+                // rw_commit_p_slots_->FreeByKey(transaction_id);
+                // pending_reply.remote = nullptr;
 
                 NotifyPendingRWs(transaction_id, rr.notify_rws);
 
@@ -1306,6 +1320,7 @@ namespace strongstore
         // Debug("[%lu] Received PREPARE_ABORT callback: %d %d", transaction_id, shard_idx_, status);
     }
 
+    // Coordinator processes PrepareOK from a participant shard leader
     void Server::HandlePrepareOK(const TransportAddress &remote, proto::PrepareOK &msg)
     {
         uint64_t client_id = msg.rid().client_id();
@@ -1319,27 +1334,25 @@ namespace strongstore
 
         // Debug("[%lu] Received Prepare OK from participant shard %d", transaction_id, participant_shard);
 
-        if (!prepare_ok_slots_->ContainsKey(transaction_id))
-        {
-            prepare_ok_slots_->Alloc(transaction_id);
-        }
-        PendingPrepareOKReplySlot &reply = prepare_ok_slots_->GetByKey(transaction_id);
+        uint32_t idx = prepare_ok_slots_->AllocIfNotPresent(transaction_id);
+        PendingPrepareOKReplySlot &reply = prepare_ok_slots_->GetByIdx(idx);
 
         // Check for duplicate Prepare OKs from the same participant (shouldn't happen)
-        // bool is_dup = false;
-        // for (auto &prid : reply.participant_rids)
-        // {
-        //     if (prid.client_id == client_id && prid.client_req_id == client_req_id)
-        //     {
-        //         is_dup = true;
-        //         break;
-        //     }
-        // }
-        // if (!is_dup)
-        // {
-        //     reply.participant_rids.push_back({client_id, client_req_id, &remote});
-        // }
-        reply.participant_rids.push_back(PendingPrepareOKReplySlot::Rid{&remote, client_id, client_req_id});
+        bool is_dup = false;
+        for (auto &prid : reply.participant_rids)
+        {
+            if (prid.client_id == client_id && prid.client_req_id == client_req_id)
+            {
+                is_dup = true;
+                Panic("WE HAVE A DUP???");
+                break;
+            }
+        }
+        if (!is_dup)
+        {
+            reply.participant_rids.push_back(PendingPrepareOKReplySlot::Rid{&remote, client_id, client_req_id});
+        }
+        // reply.participant_rids.push_back(PendingPrepareOKReplySlot::Rid{&remote, client_id, client_req_id});
 
         TransactionState s = transactions_.CoordinatorReceivePrepareOK(transaction_id, participant_shard, prepare_ts, nonblock_ts);
         if (s == PREPARING)
@@ -1645,6 +1658,7 @@ namespace strongstore
         Debug("[%lu] Commiting", transaction_id);
 
         const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
+        size_t n_participants = transactions_.GetNumParticipants(transaction_id);
 
         // Commit writes
         const Transaction &transaction = transactions_.GetTransaction(transaction_id);
@@ -1668,7 +1682,9 @@ namespace strongstore
         SendRWCommmitCoordinatorReplyOK(transaction_id, commit_ts, nonblock_ts);
 
         // Reply to participants
-        SendPrepareOKRepliesOK(transaction_id, commit_ts);
+        if (n_participants > 1) {
+            SendPrepareOKRepliesOK(transaction_id, commit_ts);
+        }
 
         // Continue waiting RW transactions
         NotifyPendingRWs(transaction_id, rr.notify_rws, prevHolderWriteSet);
@@ -1765,7 +1781,7 @@ namespace strongstore
                 if (replica_idx_ == 0)
                 {
                     // Have only the leader issue these messages
-                    SendRWCommmitParticipantReplyFail(transaction_id);
+                    // SendRWCommmitParticipantReplyFail(transaction_id);
                 }
             }
             else if (s == NOT_FOUND)
@@ -1801,14 +1817,12 @@ namespace strongstore
                 const Timestamp &prepare_ts = transactions_.GetPrepareTimestamp(transaction_id);
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
                 // TODO: Handle timeout
+                // Debug("Particiant leader on shard %d is sending PrepareOK to coordinator shard %d", shard_idx_, coordinator);
                 shard_clients_[coordinator]->PrepareOK(
-                    transaction_id, shard_idx_, prepare_ts, nonblock_ts,
-                    std::bind(&Server::PrepareOKCallback, this, transaction_id,
-                            placeholders::_1, placeholders::_2),
-                    [](int, Timestamp) {}, PREPARE_TIMEOUT);
+                    transaction_id, shard_idx_, prepare_ts, nonblock_ts);
 
                 // Reply to client
-                SendRWCommmitParticipantReplyOK(transaction_id);
+                // SendRWCommmitParticipantReplyOK(transaction_id);
             }
             else if (s == PREPARED) {
                 Panic("How did this happen?");

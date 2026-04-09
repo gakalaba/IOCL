@@ -43,6 +43,7 @@ public:
 
   virtual void SeeAllTxns() = 0;
   virtual void SetReplica(class replication::Replica *replica) = 0;
+  virtual void PrintAFewThings() = 0;
 };
 
 #endif /* STORE_SERVER_H */

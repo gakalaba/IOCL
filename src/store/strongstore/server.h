@@ -144,6 +144,7 @@ namespace strongstore
                   const Timestamp timestamp) override;
 
         void SeeAllTxns() override;
+        void PrintAFewThings() override;
 
     private:
         class PendingROCommitReply
@@ -176,7 +177,6 @@ namespace strongstore
         };
         struct PendingRWCommitParticipantReplySlot {
             bool in_use = false;
-            const TransportAddress *remote = nullptr;
             uint64_t client_id;
             uint64_t client_req_id;
         };
@@ -185,7 +185,7 @@ namespace strongstore
 
             // Nested key type for set semantics
             struct Rid {
-                const TransportAddress *remote;
+                const TransportAddress *remote = nullptr;
                 uint64_t client_id;
                 uint64_t client_req_id;
             };
@@ -228,12 +228,12 @@ namespace strongstore
                                                uint64_t client_id,
                                                uint64_t client_req_id);
 
-        void SendRWCommmitParticipantReplyOK(uint64_t transaction_id);
-        void SendRWCommmitParticipantReplyFail(uint64_t transaction_id);
+        // void SendRWCommmitParticipantReplyOK(uint64_t transaction_id);
+        // void SendRWCommmitParticipantReplyFail(uint64_t transaction_id);
 
-        void SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
-                                               uint64_t client_id,
-                                               uint64_t client_req_id);
+        // void SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
+        //                                        uint64_t client_id,
+        //                                        uint64_t client_req_id);
 
         void SendPrepareOKRepliesOK(uint64_t transaction_id, const Timestamp &commit_ts);
         void SendPrepareOKRepliesFail(PendingPrepareOKReplySlot &reply);

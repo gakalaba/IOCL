@@ -406,6 +406,12 @@ namespace strongstore
         // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
     }
 
+    const size_t TransactionStore::GetNumParticipants(uint64_t transaction_id)
+    {
+        return pending_rw_slots_->GetByKey(transaction_id).participants().size();
+        // THIS IS A CASE WHERE WE WANT THE EXISTENCE ASSERTS!!
+    }
+
     const Timestamp &TransactionStore::GetNonBlockTimestamp(uint64_t transaction_id)
     {
         return pending_rw_slots_->GetByKey(transaction_id).nonblock_ts();

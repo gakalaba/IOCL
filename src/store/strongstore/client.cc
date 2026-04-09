@@ -794,12 +794,6 @@ namespace strongstore
         };
         auto cctcb = [](int) {};
 
-        auto pccb = [transaction_id = tid](int status)
-        {
-            Debug("[%lu] PREPARE callback status %d", transaction_id, status);
-        };
-        auto pctcb = [](int) {};
-
         for (auto p : participants)
         {
             if (p == coordinator_shard)
@@ -808,7 +802,7 @@ namespace strongstore
             }
             else
             {
-                sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
+                sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp);
             }
         }
     }

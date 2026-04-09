@@ -38,13 +38,14 @@ namespace strongstore
 
     ShardClient::ShardClient(const transport::Configuration &config,
                              Transport *transport, uint64_t client_id, int shard, uint64_t fanout,
-                             wound_callback wcb)
+                             wound_callback wcb, prepare_ok_callback pokcb)
         : last_req_id_{0},
           config_{config},
           transport_{transport},
           client_id_{client_id},
           shard_idx_{shard},
           wcb_{wcb},
+          pokcb_{pokcb},
           fanout_{fanout}
     {
         transport_->Register(this, config_, -1, -1);
@@ -52,14 +53,13 @@ namespace strongstore
         // TODO: Remove hardcoding
         replica_ = 0;
         seqno = 0;
-        dummyTimestamp = Timestamp(0, 0);
         slots_.resize(fanout);
         // set all the objects in slots pred_list to size fanout
         for (auto &slot : slots_) {
             slot.pred_list.reserve(fanout);
         }
         get_slots_.resize(fanout);
-        pending_prepare_ok_slot_.resize(fanout);
+        // pending_prepare_ok_slot_.resize(fanout);
     }
 
     ShardClient::~ShardClient() {}
@@ -77,7 +77,7 @@ namespace strongstore
                                      MsgType type,
                                      const std::string &data, void *meta_data)
     {
-        Debug("Got message wahoo");
+        Debug("Got message wahoo of type %u", (uint32_t)type);
         switch (type) {
         case MsgType::GET_REPLY_TYPE: {
             get_reply_.ParseFromString(data);
@@ -94,11 +94,11 @@ namespace strongstore
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
             break;
         }
-        case MsgType::TXN_COMMIT_PART_REPLY_TYPE: {
-            rw_commit_p_reply_.ParseFromString(data);
-            HandleRWCommitParticipantReply(rw_commit_p_reply_);
-            break;
-        }
+        // case MsgType::TXN_COMMIT_PART_REPLY_TYPE: {
+        //     rw_commit_p_reply_.ParseFromString(data);
+        //     HandleRWCommitParticipantReply(rw_commit_p_reply_);
+        //     break;
+        // }
         case MsgType::TXN_PREPARE_OK_REPLY_TYPE: {
             prepare_ok_reply_.ParseFromString(data);
             HandlePrepareOKReply(prepare_ok_reply_);
@@ -510,19 +510,17 @@ namespace strongstore
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,
-                                          int coordinator_shard, Timestamp &nonblock_timestamp,
-                                          rw_part_commit_callback ccb, rw_part_commit_timeout_callback ctcb,
-                                          uint32_t timeout)
+                                          int coordinator_shard, Timestamp &nonblock_timestamp)
     {
         Debug("[%lu] [shard %i] Sending RWCommitParticipant", transaction_id, shard_idx_);
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        ASSERT(!pending_rw_part_commit_slot_.in_use);
-        pending_rw_part_commit_slot_.ccb = ccb;
-        pending_rw_part_commit_slot_.in_use = true;
-        pending_rw_part_commit_slot_.transaction_id = transaction_id;
+        // ASSERT(!pending_rw_part_commit_slot_.in_use);
+        // pending_rw_part_commit_slot_.ccb = ccb;
+        // pending_rw_part_commit_slot_.in_use = true;
+        // pending_rw_part_commit_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_p_.Clear();
@@ -536,35 +534,36 @@ namespace strongstore
         transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_PART_TYPE, rw_commit_p_);
     }
 
-    void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
-    {
-        Debug("[shard %i] Received RWCommitParticipant", shard_idx_);
-        uint64_t req_id = reply.rid().client_req_id();
+    // void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
+    // {
+    //     Debug("[shard %i] Received RWCommitParticipant", shard_idx_);
+    //     uint64_t req_id = reply.rid().client_req_id();
 
-        ASSERT(pending_rw_part_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
-        rw_part_commit_callback ccb = pending_rw_part_commit_slot_.ccb;
-        uint64_t transaction_id = pending_rw_part_commit_slot_.transaction_id;
-        pending_rw_part_commit_slot_.in_use = false;
+    //     ASSERT(pending_rw_part_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
+    //     rw_part_commit_callback ccb = pending_rw_part_commit_slot_.ccb;
+    //     uint64_t transaction_id = pending_rw_part_commit_slot_.transaction_id;
+    //     pending_rw_part_commit_slot_.in_use = false;
 
-        ASSERT(transaction_id == the_transaction_.transaction_id());
-        the_transaction_.clear();
+    //     Debug("Got response fro mPARTICIPANT for TID %lu --> CLEARNIG IT", transaction_id);
+    //     ASSERT(transaction_id == the_transaction_.transaction_id());
+    //     the_transaction_.clear();
 
-        ccb(reply.status());
-    }
+    //     ccb(reply.status());
+    // }
 
+    // Participant Leader wants to send out PrepareOK to Coordinator Leader
     void ShardClient::PrepareOK(uint64_t transaction_id, int participant_shard,
-                                const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts,
-                                prepare_callback pcb,
-                                prepare_timeout_callback ptcb, uint32_t timeout)
+                                const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts)
     {
         Debug("[shard %i] Sending PrepareOK [%lu]", shard_idx_, transaction_id);
 
         uint64_t req_id = last_req_id_++;
-        uint64_t idx = req_id % fanout_;
-        auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
-        ASSERT(!pendingPrepareOKSlot.in_use);
-        pendingPrepareOKSlot.in_use = true;
-        pendingPrepareOKSlot.pcb = pcb;
+        // uint64_t idx = req_id % fanout_;
+        // Debug("PrepareOK req_id %lu goes to slot %lu for fanout %lu", req_id, idx, fanout_);
+        // auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
+        // ASSERT(!pendingPrepareOKSlot.in_use);
+        // pendingPrepareOKSlot.in_use = true;
+        // pendingPrepareOKSlot.pcb = pcb;
 
         // TODO: Setup timeout
         prepare_ok_.mutable_rid()->set_client_id(client_id_);
@@ -579,17 +578,19 @@ namespace strongstore
 
     void ShardClient::HandlePrepareOKReply(const proto::PrepareOKReply &reply)
     {
-        Debug("[shard %i] Received PrepareOKReply", shard_idx_);
+        Debug("[shard %i] Received PrepareOKReply for TID %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
-        uint32_t idx = req_id % fanout_;
-        auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
-        ASSERT(pendingPrepareOKSlot.in_use);
-        prepare_callback pcb = pendingPrepareOKSlot.pcb;
+        // uint32_t idx = req_id % fanout_;
+        // auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
+        // ASSERT(pendingPrepareOKSlot.in_use);
+        // prepare_callback pcb = pendingPrepareOKSlot.pcb;
+        // pendingPrepareOKSlot.in_use = false;
+        // Debug("Just set pendingPrepareOKSlot for req_id %lu idx %u to fALSE", req_id, idx);
 
         Debug("[shard %i] COMMIT timestamp [%lu.%lu]", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        pcb(reply.status(), Timestamp(reply.commit_timestamp()));
+        pokcb_(reply.rid().client_req_id(), reply.status(), Timestamp(reply.commit_timestamp()));
     }
 
     void ShardClient::PrepareAbort(uint64_t transaction_id, int participant_shard,

@@ -89,6 +89,8 @@ namespace strongstore
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
 
+    typedef std::function<void(uint64_t, int, Timestamp)> prepare_ok_callback;
+
     typedef std::function<void(int)> rw_coord_commit_callback;
     typedef std::function<void(int)> rw_coord_commit_timeout_callback;
 
@@ -110,7 +112,7 @@ namespace strongstore
         /* Constructor needs path to shard config. */
         ShardClient(
             const transport::Configuration &config, Transport *transport, uint64_t client_id,
-            int shard, uint64_t fanout, wound_callback wcb = [](uint64_t transaction_id) {});
+            int shard, uint64_t fanout, wound_callback wcb = [](uint64_t transaction_id) {}, prepare_ok_callback pokcb = [](uint64_t transaction_id, int participant_shard, Timestamp prepare_timestamp) {});
 
         ~ShardClient();
 
@@ -156,14 +158,10 @@ namespace strongstore
                                  rw_coord_commit_timeout_callback ctcb, uint32_t timeout);
         void RWCommitParticipant(uint64_t transaction_id,
                                  int coordinator_shard,
-                                 Timestamp &nonblock_timestamp,
-                                 rw_part_commit_callback ccb,
-                                 rw_part_commit_timeout_callback ctcb, uint32_t timeout);
+                                 Timestamp &nonblock_timestamp);
 
         void PrepareOK(uint64_t transaction_id, int participant_shard,
-                       const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts,
-                       prepare_callback pcb,
-                       prepare_timeout_callback ptcb, uint32_t timeout);
+                       const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts);
 
         void PrepareAbort(uint64_t transaction_id, int participant_shard,
                           prepare_callback pcb, prepare_timeout_callback ptcb,
@@ -207,7 +205,7 @@ namespace strongstore
         void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
-        void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
+        // void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
         void HandlePrepareAbortReply(const proto::PrepareAbortReply &reply);
         void HandleROCommitReply(const proto::ROCommitReply &reply);
@@ -249,11 +247,11 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+        prepare_ok_callback pokcb_;
         uint64_t fanout_;
 
         // IOCL Operation Metadata
         uint64_t seqno;
-        Timestamp dummyTimestamp;
 
         struct PendingReplySlot {
             bool in_use = false;
@@ -277,18 +275,18 @@ namespace strongstore
         };
         PendingRWCoordCommitSlot pending_rw_coord_commit_slot_;
 
-        struct PendingRWPartCommitSlot {
-            bool in_use = false;
-            rw_part_commit_callback ccb;
-            uint64_t transaction_id;
-        };
-        PendingRWPartCommitSlot pending_rw_part_commit_slot_;
+        // struct PendingRWPartCommitSlot {
+        //     bool in_use = false;
+        //     rw_part_commit_callback ccb;
+        //     uint64_t transaction_id;
+        // };
+        // PendingRWPartCommitSlot pending_rw_part_commit_slot_;
 
-        struct PendingPrepareOKSlot {
-            bool in_use = false;
-            prepare_callback pcb;
-        };
-        std::vector<PendingPrepareOKSlot> pending_prepare_ok_slot_;
+        // struct PendingPrepareOKSlot {
+        //     bool in_use = false;
+        //     prepare_callback pcb;
+        // };
+        // std::vector<PendingPrepareOKSlot> pending_prepare_ok_slot_;
 
         struct PendingAbortSlot {
             bool in_use = false;
