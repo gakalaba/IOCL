@@ -720,7 +720,11 @@ namespace strongstore
         // Contact the appropriate shard to set the value.
         int i = (*part_)(key, nshards_, -1, session.participants());
         ASSERT(i >= 0);
-        bool isIOCL = IsIOCL();
+        // Reads do not modify state and never commit at TAIL, so they cannot
+        // generate a PredecessorReply for downstream CoordRequests.  Exclude
+        // reads from IOCL coordination so they never appear in predlists and
+        // never block behind read predecessors that would never reply.
+        bool isIOCL = IsIOCL() && (op == "put");
 
         auto ocb1 = [this, ocb,
                           isIOCL,
@@ -815,7 +819,7 @@ namespace strongstore
             otcb(s, v, p);
         };
 
-        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL(), replicaIndex);
+        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, isIOCL, replicaIndex);
     }
 
     /* Attempts to commit the ongoing transaction. */
