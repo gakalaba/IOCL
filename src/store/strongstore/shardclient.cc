@@ -312,8 +312,12 @@ namespace strongstore
         if (isIOCL)
         {
             Debug("IT IS IOCL!!! Setting myshardtag and pred_list");
-            uint64_t myshardtag = CreateTag(client_id_, seqno);
-            Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
+            // Encode shard_idx_ into the tag to ensure uniqueness across all shards
+            // sharing the same client_id_. Without this, shard 0 and shard 1 with the
+            // same seqno produce identical tags, causing pendingCoordResponses collisions
+            // on the replica that permanently block the gate check.
+            uint64_t myshardtag = CreateTag(client_id_ * 4 + (uint64_t)shard_idx_, seqno);
+            Debug("this client_id_ = %lu, shard_idx_ = %d, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, shard_idx_, seqno, myshardtag);
             seqno++;
             op_.set_shardtag(myshardtag);
             op_.set_intkey(std::stoull(key)); // for iocl optimization
