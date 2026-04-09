@@ -545,7 +545,8 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
             if (!cooldownStarted)
             {
                 Debug("next arrival in session %d us", 0);
-                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextAppRequestInSession, this, session_id));
+                std::uniform_int_distribution<uint64_t> jitter(0, 2000);
+                transport_.TimerMicro(jitter(rand_), std::bind(&BenchmarkClient::SendNextAppRequestInSession, this, session_id));
                 OnReply(session_id, 0, false);
             }
             else
