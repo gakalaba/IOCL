@@ -767,7 +767,7 @@ int main(int argc, char **argv)
 
     uint32_t seed = FLAGS_client_id << 4;
     BenchmarkClient *bench;
-    bool to_issue_concurrent = (FLAGS_client_issue_concurrent && (mode != strongstore::LinearizableProtocol::PROTO_VR));
+    bool to_issue_concurrent = (FLAGS_client_issue_concurrent && (mode != strongstore::LinearizableProtocol::PROTO_VR) && (mode != strongstore::LinearizableProtocol::PROTO_CRAQ));
     if (to_issue_concurrent)
     {
         Debug("Clients will issue concurrent requests.");
@@ -776,7 +776,7 @@ int main(int argc, char **argv)
     {
         Debug("Clients will issue sequential requests.");
     }
-    if (mode == strongstore::LinearizableProtocol::PROTO_VR) {
+    if (mode == strongstore::LinearizableProtocol::PROTO_VR || mode == strongstore::LinearizableProtocol::PROTO_CRAQ) {
         ASSERT(to_issue_concurrent == false);
     }
     switch (benchMode)
