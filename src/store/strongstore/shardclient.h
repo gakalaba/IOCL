@@ -214,6 +214,7 @@ namespace strongstore
         void HandleWound(const proto::Wound &wound);
 
         Transaction the_transaction_;
+        bool server_shard_client_;
         std::unordered_map<std::string, std::string> the_read_set_;
 
         std::unordered_map<uint64_t, PendingPrepareAbort *> pendingPrepareAborts;

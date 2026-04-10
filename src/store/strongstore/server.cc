@@ -1056,15 +1056,15 @@ namespace strongstore
         reply.participant_rids.clear();
     }
 
-    void Server::SendPrepareOKRepliesFail(PendingPrepareOKReplySlot &reply)
+    void Server::SendPrepareOKRepliesFail(uint64_t transaction_id, PendingPrepareOKReplySlot &reply)
     {
         prepare_ok_reply_.set_status(REPLY_FAIL);
         prepare_ok_reply_.clear_commit_timestamp();
 
+        prepare_ok_reply_.mutable_rid()->set_client_req_id(transaction_id);
         for (auto &prid : reply.participant_rids)
         {
             prepare_ok_reply_.mutable_rid()->set_client_id(prid.client_id);
-            prepare_ok_reply_.mutable_rid()->set_client_req_id(prid.client_req_id);
 
             transport_->SendMessage(this, *prid.remote, MsgType::TXN_PREPARE_OK_REPLY_TYPE, prepare_ok_reply_);
         }
@@ -1392,7 +1392,7 @@ namespace strongstore
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
 
                 // Reply to participants
-                SendPrepareOKRepliesFail(reply);
+                SendPrepareOKRepliesFail(transaction_id, reply);
                 prepare_ok_slots_->FreeByKey(transaction_id);
                 reply.participant_rids.clear();
 
@@ -1428,7 +1428,7 @@ namespace strongstore
             // Debug("[%lu] Already aborted", transaction_id);
 
             // Reply to participants
-            SendPrepareOKRepliesFail(reply);
+            SendPrepareOKRepliesFail(transaction_id, reply);
             prepare_ok_slots_->FreeByKey(transaction_id);
             reply.participant_rids.clear();
         }
@@ -1492,7 +1492,7 @@ namespace strongstore
         if (prepare_ok_slots_->ContainsKey(transaction_id))
         {
             PendingPrepareOKReplySlot &reply = prepare_ok_slots_->GetByKey(transaction_id);
-            SendPrepareOKRepliesFail(reply);
+            SendPrepareOKRepliesFail(transaction_id, reply);
             prepare_ok_slots_->FreeByKey(transaction_id);
             reply.participant_rids.clear();
         }
@@ -1543,7 +1543,7 @@ namespace strongstore
             if (prepare_ok_slots_->ContainsKey(transaction_id))
             {
                 PendingPrepareOKReplySlot &reply = prepare_ok_slots_->GetByKey(transaction_id);
-                SendPrepareOKRepliesFail(reply);
+                SendPrepareOKRepliesFail(transaction_id, reply);
                 prepare_ok_slots_->FreeByKey(transaction_id);
                 reply.participant_rids.clear();
             }
@@ -1576,7 +1576,7 @@ namespace strongstore
     {
         uint64_t transaction_id = msg.transaction_id();
 
-        Debug("[%lu] Received Abort request", transaction_id);
+        Debug("[%lu] Received Abort request on shard %d", transaction_id, shard_idx_);
 
         abort_reply_.mutable_rid()->CopyFrom(msg.rid());
 

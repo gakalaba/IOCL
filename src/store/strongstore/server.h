@@ -236,7 +236,7 @@ namespace strongstore
         //                                        uint64_t client_req_id);
 
         void SendPrepareOKRepliesOK(uint64_t transaction_id, const Timestamp &commit_ts);
-        void SendPrepareOKRepliesFail(PendingPrepareOKReplySlot &reply);
+        void SendPrepareOKRepliesFail(uint64_t transaction_id, PendingPrepareOKReplySlot &reply);
 
         void HandleRWCommitParticipant(const TransportAddress &remote,
                                        proto::RWCommitParticipant &msg);

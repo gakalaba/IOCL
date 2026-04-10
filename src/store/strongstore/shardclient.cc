@@ -59,6 +59,11 @@ namespace strongstore
             slot.pred_list.reserve(fanout);
         }
         get_slots_.resize(fanout);
+        if (fanout == 0) {
+            server_shard_client_ = true;
+        } else {
+            server_shard_client_ = false;
+        }
         // pending_prepare_ok_slot_.resize(fanout);
     }
 
@@ -232,7 +237,10 @@ namespace strongstore
 
         uint32_t idx = req_id % fanout_;
         auto &pendingGet = get_slots_[idx];
-        ASSERT(pendingGet.in_use);
+        if (!pendingGet.in_use) {
+            Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+            return; // stale request
+        }
         get_callback &gcb = pendingGet.gcb;
         std::string &key = pendingGet.key;
         uint64_t transaction_id = pendingGet.transaction_id;
@@ -581,6 +589,7 @@ namespace strongstore
         Debug("[shard %i] Received PrepareOKReply for TID %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
+        // USED TO BE DEDUP HERE!!
         // uint32_t idx = req_id % fanout_;
         // auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
         // ASSERT(pendingPrepareOKSlot.in_use);
@@ -641,9 +650,8 @@ namespace strongstore
     void ShardClient::Abort(uint64_t transaction_id, abort_callback acb,
                             abort_timeout_callback atcb, uint32_t timeout)
     {
-        Debug("[%lu] [shard %i] Sending Abort", transaction_id, shard_idx_);
-
         uint64_t req_id = last_req_id_++;
+        Debug("[%lu] [shard %i] Sending Abort with req_id %lu", transaction_id, shard_idx_, req_id);
         ASSERT(!pending_abort_slot_.in_use);
         pending_abort_slot_.in_use = true;
         pending_abort_slot_.acb = acb;
@@ -699,15 +707,20 @@ namespace strongstore
         Debug("[shard %i] Received HandleAbortReply for req_id %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
-        ASSERT(pending_abort_slot_.in_use);
+        ASSERT(pending_abort_slot_.in_use); // MIGHT BE TOO CONSERVATIVE
         uint64_t transaction_id = pending_abort_slot_.transaction_id;
         abort_callback acb = pending_abort_slot_.acb;
         pending_abort_slot_.in_use = false;
 
         if (reply.status() == REPLY_OK)
         {
-            ASSERT(transaction_id == the_transaction_.transaction_id());
-            the_transaction_.clear();
+            if (transaction_id != the_transaction_.transaction_id())
+            {
+                ASSERT(server_shard_client_);
+            } else {
+                ASSERT(!server_shard_client_);
+                the_transaction_.clear();
+            }
         }
 
         acb();
