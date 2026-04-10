@@ -214,8 +214,7 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        uint32_t idx = get_slots_->Alloc(req_id);
-        PendingGetSlot &pendingGet = get_slots_->GetByIdx(idx);
+        PendingGetSlot &pendingGet = get_slots_->Alloc(req_id);
         pendingGet.gcb = gcb;
         pendingGet.key = key;
         pendingGet.transaction_id = transaction_id;
@@ -485,8 +484,7 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        uint32_t idx = pending_rw_coord_commit_slot_->Alloc(req_id);
-        PendingRWCoordCommitSlot &pendingRWCommitC = pending_rw_coord_commit_slot_->GetByIdx(idx);
+        PendingRWCoordCommitSlot &pendingRWCommitC = pending_rw_coord_commit_slot_->Alloc(req_id);
         pendingRWCommitC.ccb = ccb;
         pendingRWCommitC.transaction_id = transaction_id;
 
@@ -653,8 +651,7 @@ namespace strongstore
         uint64_t req_id = last_req_id_++;
         Debug("[%lu] [shard %i] Sending Abort with req_id %lu", transaction_id, shard_idx_, req_id);
 
-        uint32_t idx = pending_abort_slot_->Alloc(req_id);
-        PendingAbortSlot &pendingAbort = pending_abort_slot_->GetByIdx(idx);
+        PendingAbortSlot &pendingAbort = pending_abort_slot_->Alloc(req_id);
         pendingAbort.acb = acb;
         pendingAbort.transaction_id = transaction_id;
 

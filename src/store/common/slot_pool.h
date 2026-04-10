@@ -48,14 +48,15 @@ public:
         }
     }
 
-    uint32_t Alloc(Key key) {
+    Slot &Alloc(Key key) {
         ASSERT(!free_.empty());
         uint32_t idx = free_.back();
         free_.pop_back();
         ASSERT(key_to_idx_.find(key) == key_to_idx_.end());
         key_to_idx_.emplace(key, idx);
+        ASSERT(!slots_[idx].in_use);
         slots_[idx].in_use = true;
-        return idx;
+        return slots_[idx];
     }
 
     uint32_t Alloc() {
@@ -67,10 +68,10 @@ public:
         return idx;
     }
 
-    uint32_t AllocIfNotPresent(Key key) {
+    Slot &AllocIfNotPresent(Key key) {
         auto it = key_to_idx_.find(key);
         if (it != key_to_idx_.end()) {
-            return it->second;
+            return slots_[it->second];
         } else {
             return Alloc(key);
         }
@@ -118,6 +119,7 @@ public:
         ASSERT(it != key_to_idx_.end());
         uint32_t idx = it->second;
         key_to_idx_.erase(it);
+        ASSERT(slots_[idx].in_use);
         slots_[idx].in_use = false;
         free_.push_back(idx);
     }

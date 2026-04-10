@@ -194,8 +194,7 @@ namespace strongstore
 
     size_t TransactionStore::StartGet(uint64_t transaction_id, const TransportAddress &remote, const std::string &key, bool for_update)
     {
-        uint32_t slot_idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
-        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(slot_idx);
+        PendingRWTransaction &pt = pending_rw_slots_->AllocIfNotPresent(transaction_id);
         size_t idx = pt.AddNewParallelGetKey(key);
         // the parallel get is initialized as READING, the transaction overall is initialized as PARALLEL_READING
 
@@ -288,8 +287,7 @@ namespace strongstore
             return ABORTED;
         }
 
-        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
-        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
+        PendingRWTransaction &pt = pending_rw_slots_->AllocIfNotPresent(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);
@@ -316,8 +314,7 @@ namespace strongstore
             return ABORTED;
         }
 
-        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
-        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
+        PendingRWTransaction &pt = pending_rw_slots_->AllocIfNotPresent(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);
@@ -517,8 +514,7 @@ namespace strongstore
             return ABORTED;
         }
 
-        uint32_t idx = pending_rw_slots_->AllocIfNotPresent(transaction_id);
-        PendingRWTransaction &pt = pending_rw_slots_->GetByIdx(idx);
+        PendingRWTransaction &pt = pending_rw_slots_->AllocIfNotPresent(transaction_id);
         ASSERT(pt.state() == PARALLEL_READING || pt.state() == WAIT_PARTICIPANTS);
         // Also want to make sure all the reads are done
         ASSERT(pt.n_waiting_gets_ == 0);

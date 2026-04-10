@@ -228,8 +228,8 @@ namespace strongstore
                                                uint64_t client_id,
                                                uint64_t client_req_id);
 
-        // void SendRWCommmitParticipantReplyOK(uint64_t transaction_id);
-        // void SendRWCommmitParticipantReplyFail(uint64_t transaction_id);
+        void SendRWCommmitParticipantReplyOK(uint64_t transaction_id);
+        void SendRWCommmitParticipantReplyFail(uint64_t transaction_id);
 
         // void SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
         //                                        uint64_t client_id,
@@ -342,7 +342,7 @@ namespace strongstore
         SlotPool<PendingRWCommitCoordinatorReplySlot> *rw_commit_c_slots_ = nullptr;
         SlotPool<PendingRWCommitParticipantReplySlot> *rw_commit_p_slots_ = nullptr;
         SlotPool<PendingPrepareOKReplySlot> *prepare_ok_slots_ = nullptr;
-        // Gets will use opened slot pool structure
+        // Gets will use opened slot pool structure - so we can store vector of GetReplySlots
         std::vector<PendingGetReplySlot> get_slots_;
         std::vector<uint32_t> free_get_slots_;
         std::unordered_map<uint64_t, std::vector<uint32_t>> transaction_id_to_get_slots_;
