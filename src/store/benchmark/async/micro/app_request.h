@@ -33,6 +33,7 @@
 #include "store/common/frontend/async_apprequest.h"
 #include "store/benchmark/async/common/key_selector.h"
 
+#include <random> 
 #include <gsl/span>
 
 namespace micro

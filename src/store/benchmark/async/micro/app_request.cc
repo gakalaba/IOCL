@@ -54,8 +54,11 @@ namespace micro
         Debug("BASIC_APP_REQUEST with %lu subops: currently on op_index = %lu; read_percentage = %d", fanout_, op_index, read_percentage_);
 
         if (0 <= op_index && op_index < fanout_) {
-            srand(time(0));
-            if ((rand() % 100) < read_percentage_)
+            std::random_device rd;
+            std::mt19937 mt(rd());
+            std::uniform_real_distribution<double> dist(0.0, 100.0);
+            // srand(time(0));
+            if (dist(mt) < read_percentage_)
             {
                 Debug("sending Get on key = %s", GetKey(op_index).c_str());
                 return Get(GetKey(op_index));
