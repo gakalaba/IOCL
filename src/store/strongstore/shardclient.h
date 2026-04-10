@@ -58,6 +58,7 @@
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "replication/common/request.pb.h"
+#include "store/common/slot_pool.h"
 
 namespace strongstore
 {
@@ -267,34 +268,26 @@ namespace strongstore
             get_callback gcb;
             std::string key;
         };
-        std::vector<PendingGetSlot> get_slots_;
+        SlotPool<PendingGetSlot> *get_slots_ = nullptr;
 
         struct PendingRWCoordCommitSlot {
             bool in_use = false;
             rw_coord_commit_callback ccb;
             uint64_t transaction_id;
         };
-        PendingRWCoordCommitSlot pending_rw_coord_commit_slot_;
+        SlotPool<PendingRWCoordCommitSlot> *pending_rw_coord_commit_slot_ = nullptr;
 
-        // struct PendingRWPartCommitSlot {
-        //     bool in_use = false;
-        //     rw_part_commit_callback ccb;
-        //     uint64_t transaction_id;
-        // };
-        // PendingRWPartCommitSlot pending_rw_part_commit_slot_;
-
-        // struct PendingPrepareOKSlot {
-        //     bool in_use = false;
-        //     prepare_callback pcb;
-        // };
-        // std::vector<PendingPrepareOKSlot> pending_prepare_ok_slot_;
+        struct PendingPrepareOKSlot {
+            bool in_use = false;
+        };
+        SlotPool<PendingPrepareOKSlot> *pending_prepare_ok_slot_ = nullptr;
 
         struct PendingAbortSlot {
             bool in_use = false;
             abort_callback acb;
             uint64_t transaction_id;
         };
-        PendingAbortSlot pending_abort_slot_;
+        SlotPool<PendingAbortSlot> *pending_abort_slot_ = nullptr;
     };
 
 } // namespace strongstore

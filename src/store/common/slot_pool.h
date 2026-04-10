@@ -95,6 +95,13 @@ public:
         return key_to_idx_.find(key) != key_to_idx_.end();
     }
 
+    bool ContainsIdx(uint32_t idx) const {
+        if (idx >= slots_.size()) {
+            return false;
+        }
+        return slots_[idx].in_use;
+    }
+
     Slot &GetByIdx(uint32_t idx) {
         ASSERT(idx < slots_.size());
         return slots_[idx];

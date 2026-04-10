@@ -58,16 +58,23 @@ namespace strongstore
         for (auto &slot : slots_) {
             slot.pred_list.reserve(fanout);
         }
-        get_slots_.resize(fanout);
         if (fanout == 0) {
             server_shard_client_ = true;
+            pending_prepare_ok_slot_ = new SlotPool<PendingPrepareOKSlot>(100);
         } else {
             server_shard_client_ = false;
+            get_slots_ = new SlotPool<PendingGetSlot>(fanout);
+            pending_rw_coord_commit_slot_ = new SlotPool<PendingRWCoordCommitSlot>(1);
         }
-        // pending_prepare_ok_slot_.resize(fanout);
+        pending_abort_slot_ = new SlotPool<PendingAbortSlot>(100);
     }
 
-    ShardClient::~ShardClient() {}
+    ShardClient::~ShardClient() {
+        delete get_slots_;
+        delete pending_rw_coord_commit_slot_;
+        delete pending_abort_slot_;
+        delete pending_prepare_ok_slot_;
+    }
     void ShardClient::Close()
     {
     }
@@ -207,10 +214,8 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        uint32_t idx = req_id % fanout_;
-        auto &pendingGet = get_slots_[idx];
-        ASSERT(!pendingGet.in_use);
-        pendingGet.in_use = true;
+        uint32_t idx = get_slots_->Alloc(req_id);
+        PendingGetSlot &pendingGet = get_slots_->GetByIdx(idx);
         pendingGet.gcb = gcb;
         pendingGet.key = key;
         pendingGet.transaction_id = transaction_id;
@@ -235,15 +240,14 @@ namespace strongstore
         uint64_t req_id = reply.rid().client_req_id();
         int status = reply.status();
 
-        uint32_t idx = req_id % fanout_;
-        auto &pendingGet = get_slots_[idx];
-        if (!pendingGet.in_use) {
+        PendingGetSlot *pendingGet = get_slots_->GetByKeyIfPresent(req_id);
+        if (pendingGet == nullptr) {
             Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
-        get_callback &gcb = pendingGet.gcb;
-        std::string &key = pendingGet.key;
-        uint64_t transaction_id = pendingGet.transaction_id;
+        get_callback gcb = std::move(pendingGet->gcb);
+        std::string key = std::move(pendingGet->key);
+        uint64_t transaction_id = pendingGet->transaction_id;
 
         Debug("[%lu] [shard %i] Received GET reply: %s %d",
               transaction_id, shard_idx_, key.c_str(), status);
@@ -259,7 +263,7 @@ namespace strongstore
         ASSERT(the_transaction_.transaction_id() == transaction_id);
         the_transaction_.addReadSet(key, ts);
 
-        pendingGet.in_use = false;
+        get_slots_->FreeByKey(req_id);
         gcb(status, key, val, ts);
     }
 
@@ -481,10 +485,10 @@ namespace strongstore
         ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        ASSERT(!pending_rw_coord_commit_slot_.in_use);
-        pending_rw_coord_commit_slot_.ccb = ccb;
-        pending_rw_coord_commit_slot_.in_use = true;
-        pending_rw_coord_commit_slot_.transaction_id = transaction_id;
+        uint32_t idx = pending_rw_coord_commit_slot_->Alloc(req_id);
+        PendingRWCoordCommitSlot &pendingRWCommitC = pending_rw_coord_commit_slot_->GetByIdx(idx);
+        pendingRWCommitC.ccb = ccb;
+        pendingRWCommitC.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_c_.Clear();
@@ -506,14 +510,18 @@ namespace strongstore
     {
         uint64_t req_id = reply.rid().client_req_id();
 
-        ASSERT(pending_rw_coord_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
-        rw_coord_commit_callback &ccb = pending_rw_coord_commit_slot_.ccb;
-        uint64_t transaction_id = pending_rw_coord_commit_slot_.transaction_id;
-        pending_rw_coord_commit_slot_.in_use = false;
+        PendingRWCoordCommitSlot *pendingRWCommitC = pending_rw_coord_commit_slot_->GetByKeyIfPresent(req_id);
+        if (pendingRWCommitC == nullptr) {
+            Debug("[%d][%lu] RWCommitCoordinatorReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+            return; // stale request
+        }
+        rw_coord_commit_callback ccb = std::move(pendingRWCommitC->ccb);
+        uint64_t transaction_id = pendingRWCommitC->transaction_id;
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         the_transaction_.clear();
 
+        pending_rw_coord_commit_slot_->FreeByKey(req_id);
         ccb(reply.status());
     }
 
@@ -566,12 +574,7 @@ namespace strongstore
         Debug("[shard %i] Sending PrepareOK [%lu]", shard_idx_, transaction_id);
 
         uint64_t req_id = last_req_id_++;
-        // uint64_t idx = req_id % fanout_;
-        // Debug("PrepareOK req_id %lu goes to slot %lu for fanout %lu", req_id, idx, fanout_);
-        // auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
-        // ASSERT(!pendingPrepareOKSlot.in_use);
-        // pendingPrepareOKSlot.in_use = true;
-        // pendingPrepareOKSlot.pcb = pcb;
+        pending_prepare_ok_slot_->Alloc(req_id); // just used for dedup of prepareOkCallback
 
         // TODO: Setup timeout
         prepare_ok_.mutable_rid()->set_client_id(client_id_);
@@ -588,17 +591,14 @@ namespace strongstore
     {
         Debug("[shard %i] Received PrepareOKReply for TID %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
-
-        // USED TO BE DEDUP HERE!!
-        // uint32_t idx = req_id % fanout_;
-        // auto &pendingPrepareOKSlot = pending_prepare_ok_slot_[idx];
-        // ASSERT(pendingPrepareOKSlot.in_use);
-        // prepare_callback pcb = pendingPrepareOKSlot.pcb;
-        // pendingPrepareOKSlot.in_use = false;
-        // Debug("Just set pendingPrepareOKSlot for req_id %lu idx %u to fALSE", req_id, idx);
+        if (!pending_prepare_ok_slot_->ContainsKey(req_id)) {
+            Debug("[%d][%lu] Stale PrepareOKReply for req_id %lu.", shard_idx_, req_id, req_id);
+            return; // stale reply, just ignore
+        }
 
         Debug("[shard %i] COMMIT timestamp [%lu.%lu]", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
+        pending_prepare_ok_slot_->FreeByKey(req_id);
         pokcb_(reply.rid().client_req_id(), reply.status(), Timestamp(reply.commit_timestamp()));
     }
 
@@ -652,10 +652,11 @@ namespace strongstore
     {
         uint64_t req_id = last_req_id_++;
         Debug("[%lu] [shard %i] Sending Abort with req_id %lu", transaction_id, shard_idx_, req_id);
-        ASSERT(!pending_abort_slot_.in_use);
-        pending_abort_slot_.in_use = true;
-        pending_abort_slot_.acb = acb;
-        pending_abort_slot_.transaction_id = transaction_id;
+
+        uint32_t idx = pending_abort_slot_->Alloc(req_id);
+        PendingAbortSlot &pendingAbort = pending_abort_slot_->GetByIdx(idx);
+        pendingAbort.acb = acb;
+        pendingAbort.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         abort_.Clear();
@@ -682,15 +683,16 @@ namespace strongstore
         // Loop through pending get slots
         for (uint32_t idx = 0; idx < fanout_; idx++)
         {
-            auto &pendingGet = get_slots_[idx];
-            if (pendingGet.in_use && pendingGet.transaction_id == transaction_id)
-            {
-                get_callback &gcb = pendingGet.gcb;
-                std::string &key = pendingGet.key;
+            if (get_slots_->ContainsIdx(idx)) {
+                auto &pendingGet = get_slots_->GetByIdx(idx);
+                if (pendingGet.transaction_id == transaction_id)
+                {
+                    get_callback gcb = std::move(pendingGet.gcb);
+                    std::string key = std::move(pendingGet.key);
 
-                pendingGet.in_use = false;
-
-                gcb(REPLY_FAIL, key, "", {});
+                    get_slots_->FreeByIdx(idx);
+                    gcb(REPLY_FAIL, key, "", {});
+                }
             }
         }
     }
@@ -707,10 +709,13 @@ namespace strongstore
         Debug("[shard %i] Received HandleAbortReply for req_id %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
-        ASSERT(pending_abort_slot_.in_use); // MIGHT BE TOO CONSERVATIVE
-        uint64_t transaction_id = pending_abort_slot_.transaction_id;
-        abort_callback acb = pending_abort_slot_.acb;
-        pending_abort_slot_.in_use = false;
+        PendingAbortSlot *pendingAbort = pending_abort_slot_->GetByKeyIfPresent(req_id);
+        if (pendingAbort == nullptr) {
+            Debug("[%d][%lu] HandleAbortReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
+            return; // stale request
+        }
+        uint64_t transaction_id = pendingAbort->transaction_id;
+        abort_callback acb = std::move(pendingAbort->acb);
 
         if (reply.status() == REPLY_OK)
         {
@@ -723,6 +728,7 @@ namespace strongstore
             }
         }
 
+        pending_abort_slot_->FreeByKey(req_id);
         acb();
     }
 
