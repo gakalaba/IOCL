@@ -151,7 +151,18 @@ namespace strongstore
 
     void Server::PrintAFewThings() {
         Notice("Printing a few things...");
-        Notice("size of _op_slots is %lu, rw_commit_c_slots_ is %lu and rw_commit_p_slots_ is %lu and prepare_ok_slots_ is %lu", op_slots_->Size(), rw_commit_c_slots_->Size(), rw_commit_p_slots_->Size(), prepare_ok_slots_->Size());
+        if (op_slots_) {
+            Notice("size of _op_slots is %lu", op_slots_->Size());
+        }
+        if (rw_commit_c_slots_) {
+            Notice("rw_commit_c_slots_ is %lu", rw_commit_c_slots_->Size());
+        }
+        if (rw_commit_p_slots_) {
+            Notice("rw_commit_p_slots_ is %lu", rw_commit_p_slots_->Size());
+        }
+        if (prepare_ok_slots_) {
+            Notice("prepare_ok_slots_ is %lu", prepare_ok_slots_->Size());
+        }
     }
 
 
@@ -1067,6 +1078,7 @@ namespace strongstore
             prepare_ok_reply_.mutable_rid()->set_client_id(prid.client_id);
 
             transport_->SendMessage(this, *prid.remote, MsgType::TXN_PREPARE_OK_REPLY_TYPE, prepare_ok_reply_);
+            prid.remote = nullptr;
         }
     }
 
