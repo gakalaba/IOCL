@@ -131,7 +131,7 @@ public:
     }
 
     size_t Size() const {
-        return slots_.size();
+        return key_to_idx_.size();
     }
 
 private:
