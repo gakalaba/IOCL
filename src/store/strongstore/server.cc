@@ -1238,7 +1238,6 @@ namespace strongstore
                 const Timestamp &nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
 
                 ReplicatePrepare(pending_reply->client_id, pending_reply->client_req_id, transaction_id, transaction, prepare_ts, nonblock_ts);
-                rw_commit_p_slots_->FreeByKey(transaction_id);
             }
             else if (ar.status == LockStatus::FAIL)
             {
