@@ -658,9 +658,11 @@ def generate_plot(plot, plots_directory, x_vars, y_vars):
     subprocess.call(['gnuplot', plot_script_file])
 
 
-def generate_gnuplot_script_agg(plot, plot_script_file, plot_out_file, series):
+def generate_gnuplot_script_agg(plot, plot_script_file, plot_out_file, series, title=''):
     with open(plot_script_file, 'w') as f:
         write_gpi_header(f)
+        if title:
+            f.write("set title \"%s\"\n" % title)
         f.write("set key top left\n")
         f.write("set xlabel '%s'\n" % plot['x_label'])
         f.write("set ylabel '%s'\n" % plot['y_label'])
@@ -742,6 +744,18 @@ def generate_plots(config, base_out_directory, out_dirs):
             read_pct_raw = config.get('client_read_percentage', 0)
             read_pct = int(read_pct_raw / 10)  # config scale is 0-1000; display as 0-100
             fanout = config.get('client_fanout', None)
+            num_shards = config.get('num_shards', None)
+            # Build subtitle for the CDF title: shards, fanout, read%
+            subtitle_parts = []
+            if num_shards is not None:
+                subtitle_parts.append('%d shards' % num_shards)
+            if fanout is not None:
+                subtitle_parts.append('fanout=%s' % fanout)
+            subtitle_parts.append('%d%% reads' % read_pct)
+            if title:
+                title += '\\n' + ', '.join(subtitle_parts)
+            else:
+                title = ', '.join(subtitle_parts)
             # Always use replication_protocol for the per-series label; fall back to
             # the first independent-var key only if replication_protocol isn't a list.
             proto_key = 'replication_protocol'
@@ -749,11 +763,7 @@ def generate_plots(config, base_out_directory, out_dirs):
                 proto_key = config['experiment_independent_vars_unused'][0][0]
             for i in range(len(csv_files)):
                 if csv_class in csv_files[i] and len(csv_files[i][csv_class]) > j:
-                    proto_label = str(config[proto_key][i])
-                    if fanout is not None:
-                        label = '%s (%d%% reads, fanout=%s)' % (proto_label, read_pct, fanout)
-                    else:
-                        label = '%s (%d%% reads)' % (proto_label, read_pct)
+                    label = str(config[proto_key][i])
                     series.append((label, csv_files[i][csv_class][j]))
             if 'lot-' in csv_class:
                 if not 'lot_plots' in config:
@@ -848,8 +858,19 @@ def generate_plots(config, base_out_directory, out_dirs):
                 plots_directory, '%s.gpi' % plot['name'])
             plot_out_file = os.path.join(
                 plots_directory, '%s.png' % plot['name'])
+            read_pct_raw = config.get('client_read_percentage', 0)
+            read_pct = int(read_pct_raw / 10)
+            fanout = config.get('client_fanout', None)
+            num_shards = config.get('num_shards', None)
+            agg_title_parts = []
+            if num_shards is not None:
+                agg_title_parts.append('%d shards' % num_shards)
+            if fanout is not None:
+                agg_title_parts.append('fanout=%s' % fanout)
+            agg_title_parts.append('%d%% reads' % read_pct)
+            agg_title = ', '.join(agg_title_parts)
             generate_gnuplot_script_agg(
-                plot, plot_script_file, plot_out_file, csv_files)
+                plot, plot_script_file, plot_out_file, csv_files, agg_title)
             subprocess.call(['gnuplot', plot_script_file])
             # subprocesses.append(subprocess.Popen(['gnuplot', plot_script_file]))
 
