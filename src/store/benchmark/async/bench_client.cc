@@ -52,7 +52,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  uint32_t abortBackoff, bool retryAborted,
                                  uint32_t maxBackoff, uint32_t maxAttempts,
                                  uint64_t fanout, bool issueConcurrent,
-                                 const std::string &latencyFilename)
+                                 const std::string &latencyFilename,
+                                 strongstore::LinearizableProtocol protocol)
     : transport_(transport),
       session_states_{},
       clients_{clients},
@@ -76,7 +77,8 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
       cooldownStarted{false},
       mode_{mode},
       fanout{fanout},
-      issueConcurrent{issueConcurrent}
+      issueConcurrent{issueConcurrent},
+      protocol_{protocol}
 {
     Notice("starting benchclient, issueConcurrent: %d; fanout: %lu", issueConcurrent, fanout);
     if (arrival_rate <= 0)
@@ -391,8 +393,8 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     {
     case GET:
         op_str = "get";
-        // some randomization/distance logic here
-        replicaIndex = 1;
+        // VR leader is replica 0; CRAQ/IOCL_CRAQ reads go to MIDDLE (replica 1)
+        replicaIndex = (protocol_ == strongstore::LinearizableProtocol::PROTO_VR) ? 0 : 1;
         break;
 
     case PUT:
@@ -402,6 +404,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     default:
         Panic("unsupported opeartion type %d", op.type);
     }
+    Notice("Sending op with proto %d and index %d", protocol_, replicaIndex);
     client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, replicaIndex, timeout_);
 
     if (issueConcurrent)

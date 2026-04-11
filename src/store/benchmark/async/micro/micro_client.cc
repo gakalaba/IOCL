@@ -32,6 +32,7 @@
 
 #include "store/benchmark/async/micro/big_transaction.h"
 #include "store/benchmark/async/micro/app_request.h"
+#include "store/strongstore/common.h"
 
 namespace micro
 {
@@ -46,14 +47,14 @@ namespace micro
                              bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, uint64_t fanout, bool issueConcurrent,
                              uint32_t read_percentage,
                              bool wo_replacement,
-                             const std::string &latencyFilename)
+                             strongstore::LinearizableProtocol protocol)
         : BenchmarkClient(clients, timeout, transport, id,
                           mode,
                           switch_probability,
                           arrival_rate, think_time, stay_probability,
                           mpl,
                           expDuration, warmupSec, cooldownSec, abortBackoff,
-                          retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, latencyFilename),
+                          retryAborted, maxBackoff, maxAttempts, fanout, issueConcurrent, "", protocol),
           keySelector(keySelector),
           fanout_{fanout},
           read_percentage_{read_percentage},

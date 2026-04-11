@@ -36,6 +36,7 @@
 #include "store/benchmark/async/common/key_selector.h"
 #include "store/benchmark/async/micro/app_request.h"
 #include "store/common/frontend/client.h"
+#include "store/strongstore/common.h"
 
 namespace micro
 {
@@ -61,7 +62,7 @@ namespace micro
                     bool issueConcurrent,
                     uint32_t read_percentage,
                     bool wo_replacement,
-                    const std::string &latencyFilename = "latency");
+                    strongstore::LinearizableProtocol protocol = strongstore::LinearizableProtocol::PROTO_UNKNOWN);
 
         virtual ~MicroClient();
 

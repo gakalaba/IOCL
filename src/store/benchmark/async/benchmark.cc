@@ -810,7 +810,8 @@ int main(int argc, char **argv)
             FLAGS_client_fanout,
             to_issue_concurrent,
             FLAGS_client_read_percentage,
-            FLAGS_wo_replacement);
+            FLAGS_wo_replacement,
+            mode);
         break;
 
     default:

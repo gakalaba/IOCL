@@ -42,6 +42,7 @@
 #include "store/common/frontend/client.h"
 #include "store/common/stats.h"
 #include "store/common/transaction.h"
+#include "store/strongstore/common.h"
 
 typedef std::function<void(transaction_status_t)> execute_callback;
 
@@ -67,7 +68,8 @@ public:
                     uint32_t abortBackoff, bool retryAborted,
                     uint32_t maxBackoff, uint32_t maxAttempts,
                     uint64_t fanout, bool issueConcurrent,
-                    const std::string &latencyFilename = "");
+                    const std::string &latencyFilename = "",
+                    strongstore::LinearizableProtocol protocol = strongstore::LinearizableProtocol::PROTO_UNKNOWN);
     virtual ~BenchmarkClient();
 
     void Start(bench_done_callback bdcb);
@@ -249,6 +251,7 @@ private:
     // IOCL Project stuff
     bool issueConcurrent = false;
     uint64_t fanout = 0;
+    strongstore::LinearizableProtocol protocol_ = strongstore::LinearizableProtocol::PROTO_UNKNOWN;
 };
 
 #endif /* OPEN_BENCHMARK_CLIENT_H */
