@@ -60,13 +60,13 @@ namespace strongstore
         }
         if (fanout == 0) {
             server_shard_client_ = true;
-            pending_prepare_ok_slot_ = new SlotPool<PendingPrepareOKSlot>(100);
+            pending_prepare_ok_slot_ = new SlotPool<PendingPrepareOKSlot>(30000);
         } else {
             server_shard_client_ = false;
             get_slots_ = new SlotPool<PendingGetSlot>(fanout);
             pending_rw_coord_commit_slot_ = new SlotPool<PendingRWCoordCommitSlot>(1);
         }
-        pending_abort_slot_ = new SlotPool<PendingAbortSlot>(100);
+        pending_abort_slot_ = new SlotPool<PendingAbortSlot>(30000);
     }
 
     ShardClient::~ShardClient() {
@@ -546,6 +546,7 @@ namespace strongstore
         nonblock_timestamp.serialize((rw_commit_p_.mutable_nonblock_timestamp()));
 
         transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_PART_TYPE, rw_commit_p_);
+        the_transaction_.clear();
     }
 
     // void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
@@ -572,7 +573,11 @@ namespace strongstore
         Debug("[shard %i] Sending PrepareOK [%lu]", shard_idx_, transaction_id);
 
         uint64_t req_id = last_req_id_++;
-        pending_prepare_ok_slot_->Alloc(req_id); // just used for dedup of prepareOkCallback
+        if (pending_prepare_ok_slot_->ContainsKey(transaction_id)) {
+            Panic("i was hoping tid was uniqe enough!");
+            return; // already have pending prepare ok for this transaction, just ignore
+        }
+        pending_prepare_ok_slot_->Alloc(transaction_id); // just used for dedup of prepareOkCallback
 
         // TODO: Setup timeout
         prepare_ok_.mutable_rid()->set_client_id(client_id_);
