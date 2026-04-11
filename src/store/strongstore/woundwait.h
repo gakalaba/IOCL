@@ -74,6 +74,8 @@ namespace strongstore
         void ReleaseForWrite(const std::string &lock, uint64_t holder,
                              std::unordered_set<uint64_t> &notify);
 
+        std::vector<uint64_t> WhoHolds(const std::string &lock);
+
     private:
         class Waiter
         {
@@ -131,6 +133,7 @@ namespace strongstore
                                     std::unordered_set<uint64_t> &wound);
             void ReleaseWriteLock(uint64_t holder,
                                   std::unordered_set<uint64_t> &notify);
+            std::vector<uint64_t> WhoHoldsLock();
 
             const LockState state() const { return state_; }
 

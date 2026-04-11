@@ -468,6 +468,27 @@ namespace strongstore
         return true;
     }
 
+    std::vector<uint64_t> WoundWait::Lock::WhoHoldsLock()
+    {
+        if (state_ == UNLOCKED)
+        {
+            return {};
+        }
+        if (state_ == LOCKED_FOR_WRITE || state_ == LOCKED_FOR_READ_WRITE)
+        {
+            ASSERT(holders_.size() == 1);
+            return {holders_.begin()->first};
+        }
+        ASSERT(state_ == LOCKED_FOR_READ);
+        // return vector of holders
+        std::vector<uint64_t> holders;
+        for (auto h : holders_)
+        {
+            holders.push_back(h.first);
+        }
+        return holders;
+    }
+
     int WoundWait::Lock::TryAcquireWriteLock(uint64_t requester,
                                              const Timestamp &ts,
                                              std::unordered_set<uint64_t> &wound)
@@ -546,6 +567,20 @@ namespace strongstore
         }
 
         return l.holders().count(requester) > 0;
+    }
+
+    std::vector<uint64_t> WoundWait::WhoHolds(const std::string &lock)
+    {
+        auto search = locks_.find(lock);
+        if (search == locks_.end())
+        {
+            {};
+        }
+
+        Lock &l = search->second;
+        std::vector<uint64_t> results = l.WhoHoldsLock();
+
+        return results;
     }
 
     int WoundWait::LockForRead(const std::string &lock, uint64_t requester,
