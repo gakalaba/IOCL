@@ -1815,6 +1815,7 @@ namespace strongstore
             {
                 ASSERT(replica_idx_ != 0);
                 // Participant Replica prepare
+                Debug("TID is %lu", transaction_id);
                 const Timestamp prepare_ts{msg.prepare().timestamp()};
                 int coordinator = msg.prepare().coordinator();
                 const Transaction transaction{msg.prepare().txn()};
@@ -1874,6 +1875,7 @@ namespace strongstore
                 {
                     // Coordinator Replica Commit
                     ASSERT(replica_idx_ != 0);
+                    Debug("TID is %lu", transaction_id);
                     const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
                     const std::unordered_set<int> participants{msg.prepare().participants().begin(),
@@ -1932,12 +1934,17 @@ namespace strongstore
         else if (msg.request_type() == replication::LinearizeableOperation::ABORT)
         {
             // Debug("[%lu] Received ABORT", transaction_id);
+            TransactionState s = transactions_.GetRWTransactionState(transaction_id);
 
-            if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
+            if (s != ABORTED)
             { // replica abort
-                Notice("yup i'm here!");
+                ASSERT(replica_idx_ != 0);
+                if (s == NOT_FOUND) {
+                    Warning("[%lu] Replica received ABORT for unknown txn on shard %d replica %d",
+                        transaction_id, shard_idx_, replica_idx_);
+                    return;
+                }
                 const Transaction &transaction = transactions_.GetTransaction(transaction_id);
-                Notice("and that worked");
 
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);
                 auto prevHolderWriteSet = std::move(transaction.getWriteSet());
