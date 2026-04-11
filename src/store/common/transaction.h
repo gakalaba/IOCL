@@ -13,8 +13,8 @@
 
 #include "lib/assert.h"
 #include "lib/message.h"
-#include "store/common/timestamp.h"
 #include "replication/common/common-proto.pb.h"
+#include "store/common/timestamp.h"
 
 // Reply types
 #define REPLY_OK 0
@@ -32,10 +32,10 @@ class Transaction {
     // map between key and timestamp at
     // which the read happened and how
     // many times this key has been read
-    std::vector<std::pair<std::string, Timestamp>> readSet;
+    std::unordered_map<std::string, Timestamp> readSet;
 
     // map between key and value(s)
-    std::vector<std::pair<std::string, std::string>> writeSet;
+    std::unordered_map<std::string, std::string> writeSet;
 
     // Start time (used for deadlock prevention)
     Timestamp start_time_;
@@ -46,14 +46,14 @@ class Transaction {
     Transaction();
     Transaction(const TransactionMessage &msg);
     ~Transaction();
-
-    const Timestamp &start_time() const;
-    void clear();
     void set_transaction_id(uint64_t transaction_id);
     uint64_t transaction_id();
-    const std::vector<std::pair<std::string, Timestamp>> &getReadSet() const;
-    const std::vector<std::pair<std::string, std::string>> &getWriteSet() const;
-    std::vector<std::pair<std::string, std::string>> &getWriteSet();
+    void clear();
+
+    const Timestamp &start_time() const;
+    const std::unordered_map<std::string, Timestamp> &getReadSet() const;
+    const std::unordered_map<std::string, std::string> &getWriteSet() const;
+    std::unordered_map<std::string, std::string> &getWriteSet();
     void serialize(TransactionMessage *msg) const;
 
     void addReadSet(const std::string &key, const Timestamp &readTime);

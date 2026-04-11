@@ -245,7 +245,7 @@ namespace strongstore
         void HandleWound(const TransportAddress &remote, proto::Wound &msg);
 
         void SendAbortParticipants(uint64_t transaction_id,
-                                   const std::vector<int> &participants);
+                                   const std::unordered_set<int> &participants);
 
         void HandlePrepareOK(const TransportAddress &remote, proto::PrepareOK &msg);
         void HandlePrepareAbort(const TransportAddress &remote,
@@ -258,9 +258,9 @@ namespace strongstore
 
         void WoundPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
 
-        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
+        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& prevHolderWriteSet);
         void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
-        void ContinueGet(uint64_t transaction_id, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
+        void ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& prevHolderWriteSet);
         void ContinueGetAbort(uint64_t transaction_id);
         void ContinueCoordinatorPrepare(uint64_t transaction_id);
         void ContinueParticipantPrepare(uint64_t transaction_id);
@@ -282,7 +282,7 @@ namespace strongstore
         void ReplicateCoordinatorCommit(uint64_t client_id,
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
                 const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
-                const std::vector<int> &participant);
+                const std::unordered_set<int> &participant);
         void ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts);
         void ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id);
         void ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
