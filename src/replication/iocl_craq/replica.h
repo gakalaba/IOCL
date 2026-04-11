@@ -128,6 +128,19 @@ namespace replication
             // the successor write reached the tail (or before it could commit).
             std::map<uint64_t, proto::PredecessorReplyMessage> pendingCoordResponses;
 
+            // Tail-side: count of CoordResponses received per successor shardtag.
+            // A write's gate opens when this count reaches its predlist_size().
+            std::map<uint64_t, int> coordResponseCount_;
+
+            // Tail-side: writes whose store commit is done but whose client reply
+            // is deferred pending all CoordResponses.  Keyed by the write's shardtag.
+            struct DeferredGateReply {
+                LinearizeableOperation linRequest;
+                opnum_t                opnum;   // lastCommitted captured at commit time
+                int                    expectedCount;
+            };
+            std::map<uint64_t, DeferredGateReply> pendingGateReplies_;
+
             // Tail-side: shardtag -> true for writes that have committed.
             // Used to answer late CoordRequests immediately.
             std::unordered_map<uint64_t, bool> committedForCoord;
@@ -167,7 +180,10 @@ namespace replication
             replication::LinearizeableOperation ToLinearizableRequest(const Request &request);
             void ExecuteWriteOperation(const replication::LinearizeableOperation &linRequest);
             void ExecuteReadOperation(const replication::LinearizeableOperation &linRequest);
-            void SendReplyToClient(const replication::LinearizeableOperation &entry, proto::ReplyMessage &reply);
+            // opnum defaults to 0, which means "use current lastCommitted".
+            // Pass the opnum captured at commit time for deferred gate replies.
+            void SendReplyToClient(const replication::LinearizeableOperation &entry,
+                                   proto::ReplyMessage &reply, opnum_t opnum = 0);
             void CommitUpTo(opnum_t upto);
             void FlushWritesUpTo(opnum_t upto);
             void SendVersionRequest(const replication::LinearizeableOperation &linRequest);

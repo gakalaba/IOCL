@@ -259,10 +259,11 @@ namespace replication
             SendReplyToClient(linRequest, reply);
         }
 
-        void IOCL_CRAQReplica::SendReplyToClient(const LinearizeableOperation &request, ReplyMessage &reply)
+        void IOCL_CRAQReplica::SendReplyToClient(const LinearizeableOperation &request,
+                                                   ReplyMessage &reply, opnum_t opnum)
         {
             reply.set_view(this->view);
-            reply.set_opnum(lastCommitted);
+            reply.set_opnum(opnum != 0 ? opnum : lastCommitted);
             reply.set_clientreqid(request.rid().client_req_id());
 
             ClientTableEntry &cte = clientTable[request.rid().client_id()];
@@ -324,22 +325,87 @@ namespace replication
 
                 if (op == PUT_OPERATION)
                 {
-                    // IOCL gate: at the tail, a write with a predecessor must
-                    // wait for its CoordResponse before it can commit.
+                    // IOCL gate: at the tail, a write with predecessors must
+                    // wait for all CoordResponses before sending its client reply.
+                    //
+                    // FIX: Never block CommitUpTo. Apply the write to the store
+                    // immediately (preserving log-order store consistency) and
+                    // mark committedForCoord so cross-shard CoordResponses can
+                    // flow.  If not all CoordResponses have arrived yet, defer
+                    // the client reply in pendingGateReplies_ until they do.
+                    // This breaks the deadlock where blocking the log at position N
+                    // prevents later-positioned ops (needed to unblock N) from
+                    // committing.
                     if (AmTail() && linRequest.predlist_size() > 0 &&
                         linRequest.predlist(0) != 0)
                     {
                         uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
                         if (myShardTag != 0)
                         {
-                            auto it = pendingCoordResponses.find(myShardTag);
-                            if (it == pendingCoordResponses.end())
+                            // Count non-zero predlist entries: one CoordRequest is
+                            // sent (and one CoordResponse expected) per entry.
+                            int expected = 0;
+                            for (int pi = 0; pi < linRequest.predlist_size(); pi++)
                             {
-                                lastCommitted--;
-                                return;
+                                if (linRequest.predlist(pi) != 0) expected++;
                             }
-                            SyncVC(it->second.vector_clock());
-                            pendingCoordResponses.erase(it);
+
+                            int received = 0;
+                            auto cntIt = coordResponseCount_.find(myShardTag);
+                            if (cntIt != coordResponseCount_.end())
+                                received = cntIt->second;
+
+                            // Update version index eagerly for VersionRequest correctness.
+                            keyToVersionNumber[linRequest.key()] =
+                                std::max(keyToVersionNumber[linRequest.key()], lastCommitted);
+
+                            // Do NOT set committedForCoord eagerly here.
+                            // committedForCoord must be set only when Execute fires so that
+                            // the cascade is preserved: a successor's CoordResponse arrives
+                            // only after this write's Execute (its gate-fire), not as soon
+                            // as its PrepareMessage chain completes.  Setting it early causes
+                            // all CoordResponses to arrive at ~300ms regardless of predlist
+                            // depth, collapsing the 400/500/600/700ms staircase to flat ~500ms.
+                            //
+                            // NOTE: this means circular cross-shard deps can deadlock at the
+                            // gate level (not the log level, since the log is non-blocking).
+                            // Avoid circular deps by keeping client count low relative to the
+                            // number of shards, or by limiting predlist depth.
+                            vectorClock[groupIdx]++;
+
+                            if (received >= expected)
+                            {
+                                // All CoordResponses already arrived: open gate now.
+                                auto vcIt = pendingCoordResponses.find(myShardTag);
+                                if (vcIt != pendingCoordResponses.end())
+                                {
+                                    SyncVC(vcIt->second.vector_clock());
+                                    pendingCoordResponses.erase(vcIt);
+                                }
+                                coordResponseCount_.erase(myShardTag);
+                                // Execute applies store write AND sends reply to ShardClient.
+                                // Set committedForCoord AFTER Execute so downstream CoordRequests
+                                // are drained only after this write is truly visible.
+                                ReplyMessage reply;
+                                Request request = ToRequest(linRequest);
+                                Execute(Timestamp{lastCommitted}, request, reply);
+                                committedForCoord[myShardTag] = true;
+                                if (pendingCoordRequests.count(myShardTag))
+                                    pendingCoordDrain_.push_back(myShardTag);
+                                SendReplyToClient(linRequest, reply, lastCommitted);
+                            }
+                            else
+                            {
+                                // Defer Execute (and thus the ShardClient reply) until
+                                // all CoordResponses arrive in HandleCoordinationReply.
+                                // committedForCoord set there, after Execute.
+                                pendingGateReplies_[myShardTag] =
+                                    {linRequest, lastCommitted, expected};
+                            }
+
+                            FlushWritesUpTo(lastCommitted);
+                            linOpCache_.erase(cacheIt);
+                            continue;
                         }
                     }
 
@@ -1009,20 +1075,52 @@ namespace replication
                 // Store it so HandleReadRequest can consume it when the read arrives.
                 RDebug("Buffering CoordResponse for shardtag %lu at non-tail (read not yet arrived)", successorShardTag);
                 pendingCoordResponses[successorShardTag] = msg;
+                coordResponseCount_[successorShardTag]++;
                 return;
             }
 
-            // Store the CoordResponse so CommitUpTo can consume it.
-            pendingCoordResponses[successorShardTag] = msg;
+            // At tail: record the response and count it.
+            pendingCoordResponses[successorShardTag] = msg;  // kept for VC sync
+            int nowReceived = ++coordResponseCount_[successorShardTag];
 
-            // Try to advance CommitUpTo (may now be unblocked).
+            // If a write is waiting for its deferred reply, check whether all
+            // expected CoordResponses have now arrived.
+            auto deferIt = pendingGateReplies_.find(successorShardTag);
+            if (deferIt != pendingGateReplies_.end())
+            {
+                DeferredGateReply &deferred = deferIt->second;
+                if (nowReceived >= deferred.expectedCount)
+                {
+                    // All predecessors have committed.  Fire the deferred gate.
+                    SyncVC(msg.vector_clock());
+                    // Execute applies the store write AND sends the direct ShardClient
+                    // reply via ReplicaUpcall.  opnum captured at commit time is used
+                    // so the reply carries the correct version number.
+                    ReplyMessage reply;
+                    Request req = ToRequest(deferred.linRequest);
+                    Execute(Timestamp{deferred.opnum}, req, reply);
+                    // Set committedForCoord AFTER Execute so that downstream CoordRequests
+                    // (from ops that depend on this write) see it as visible only now.
+                    // This is what creates the staircase: each step's CoordResponse is sent
+                    // only after that step's own gate fires (its Execute runs).
+                    committedForCoord[successorShardTag] = true;
+                    if (pendingCoordRequests.count(successorShardTag))
+                        pendingCoordDrain_.push_back(successorShardTag);
+                    SendReplyToClient(deferred.linRequest, reply, deferred.opnum);
+                    pendingGateReplies_.erase(deferIt);
+                    pendingCoordResponses.erase(successorShardTag);
+                    coordResponseCount_.erase(successorShardTag);
+                    DrainPendingCoordRequests();
+                }
+            }
+
+            // Advance commit state (may commit newly-prepared ops).
             CommitUpTo(lastOp);
 
             // Broadcast updated commit state to non-tail replicas.
             BroadcastCommit();
 
-            // Drain CoordRequests for writes newly unblocked by this CoordResponse.
-            // Done AFTER BroadcastCommit so CommitMessages are queued first.
+            // Drain CoordRequests for writes newly committed.
             DrainPendingCoordRequests();
         }
 
