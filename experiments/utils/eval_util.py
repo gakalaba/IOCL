@@ -145,7 +145,10 @@ def calculate_statistics_for_run(config, local_out_directory, run):
         op_latency_counts = {}
         op_tputs = {}
         op_times = {}
-        for client in config["clients"]:
+        ppn = config.get("client_processes_per_client_node", 1)
+        num_active_clients = config["client_total"] // ppn
+        active_clients = config["clients"][:num_active_clients]
+        for client in active_clients:
             if get_region(config, client) != region:
                 continue
 
