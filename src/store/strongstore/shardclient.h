@@ -267,6 +267,7 @@ namespace strongstore
             uint64_t transaction_id;
             get_callback gcb;
             std::string key;
+            uint64_t req_id;
         };
         SlotPool<PendingGetSlot> *get_slots_ = nullptr;
 

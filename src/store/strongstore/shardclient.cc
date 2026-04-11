@@ -218,6 +218,7 @@ namespace strongstore
         pendingGet.gcb = gcb;
         pendingGet.key = key;
         pendingGet.transaction_id = transaction_id;
+        pendingGet.req_id = req_id;
 
         ASSERT(transaction_id == the_transaction_.transaction_id());
         auto &start_ts = the_transaction_.start_time();
@@ -692,7 +693,7 @@ namespace strongstore
                     get_callback gcb = std::move(pendingGet.gcb);
                     std::string key = std::move(pendingGet.key);
 
-                    get_slots_->FreeByIdx(idx);
+                    get_slots_->FreeByKey(pendingGet.req_id);
                     gcb(REPLY_FAIL, key, "", {});
                 }
             }
