@@ -127,6 +127,16 @@ namespace replication
 
             bool debug_stats_;
 
+            // Tail queueing instrumentation
+            uint64_t tailTotalOps_{0};
+            uint64_t tailTotalBatches_{0};
+
+            // Middle read-outcome counters (accumulated, dumped in Close())
+            uint64_t cleanReadCount_{0};
+            uint64_t dirtyReadCount_{0};
+            std::map<uint64_t, uint64_t> dirtyDepthHist_;        // depth -> count
+            std::map<uint64_t, std::pair<uint64_t,uint64_t>> perClientReads_; // client_id -> {clean, dirty}
+
             [[nodiscard]] inline bool AmHead() const {return myIdx == 0;}
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);

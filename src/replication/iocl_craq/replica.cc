@@ -705,10 +705,16 @@ namespace replication
 
             if (this->lastOp != lastCommitted && !AmTail())
             {
+                uint64_t depth = this->lastOp - lastCommitted;
+                dirtyReadCount_++;
+                dirtyDepthHist_[depth]++;
+                perClientReads_[linRequest.rid().client_id()].second++;
                 SendVersionRequest(linRequest);
                 return;
             }
 
+            cleanReadCount_++;
+            perClientReads_[linRequest.rid().client_id()].first++;
             ExecuteReadOperation(linRequest);
 
             ASSERT(++commitLogOpnum > 0);
@@ -882,6 +888,13 @@ namespace replication
                         lastKey = keyIt->second.key();
                     }
                 }
+
+                tailTotalOps_ += msg.request_size();
+                tailTotalBatches_++;
+                RNotice("Tail batch: size=%d pending_ooo=%lu avg_batch_size=%.2f total_ops=%lu",
+                        msg.request_size(), pendingPrepares.size(),
+                        (double)tailTotalOps_ / tailTotalBatches_,
+                        tailTotalOps_);
 
                 CommitUpTo(lastOp);
 
@@ -1126,6 +1139,17 @@ namespace replication
 
         void IOCL_CRAQReplica::Close()
         {
+            if (!AmTail() && (cleanReadCount_ > 0 || dirtyReadCount_ > 0))
+            {
+                uint64_t total = cleanReadCount_ + dirtyReadCount_;
+                Notice("[%d] ReadStatsSummary clean=%lu dirty=%lu total=%lu",
+                       myIdx, cleanReadCount_, dirtyReadCount_, total);
+                for (auto &kv : dirtyDepthHist_)
+                    Notice("[%d] ReadStatsDepth depth=%lu count=%lu", myIdx, kv.first, kv.second);
+                for (auto &kv : perClientReads_)
+                    Notice("[%d] ReadStatsClient client=%lu clean=%lu dirty=%lu",
+                           myIdx, kv.first, kv.second.first, kv.second.second);
+            }
         }
 
     } // namespace iocl_craq
