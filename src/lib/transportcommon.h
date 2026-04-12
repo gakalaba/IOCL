@@ -91,11 +91,7 @@ public:
             LookupAddresses();
         }
 
-        Notice("sending message to replica, len of replicaaddr is %d", replicaAddresses[cfg][groupIdx].size());
-        for (auto &kv : replicaAddresses[cfg][groupIdx])
-        {
-            Notice("key is %d, value is %d", kv.first, kv.second);
-        }
+        Debug("sending message to replica, len of replicaaddr is %d", replicaAddresses[cfg][groupIdx].size());
         auto kv = replicaAddresses[cfg][groupIdx].find(replicaIdx);
         ASSERT(kv != replicaAddresses[cfg][groupIdx].end());
 
