@@ -70,6 +70,47 @@ def change_mounted_fs_permissions(remote_group, remote_user, remote_host, remote
         remote_user, remote_path, remote_path), remote_user, remote_host)
 
 
+def push_binary_sudo(local_bin_path, remote_user, remote_host, remote_bin_path):
+    """Push a single binary using sudo on the remote side.
+
+    Uses cat-over-ssh + sudo mv so it works even when the destination is
+    root-owned and rsync's atomic-write (mkstemp) would be denied.
+    """
+    remote_tmp = remote_bin_path + '.new'
+    cmd = "sudo bash -c 'cat > {tmp} && chmod +x {tmp} && mv {tmp} {dst}'".format(
+        tmp=remote_tmp, dst=remote_bin_path)
+    with open(local_bin_path, 'rb') as f:
+        result = subprocess.run(
+            ['ssh', '%s@%s' % (remote_user, remote_host), cmd],
+            stdin=f)
+    if result.returncode != 0:
+        print('WARNING: push_binary_sudo failed for %s -> %s:%s' % (
+            local_bin_path, remote_host, remote_bin_path))
+
+
+def push_binaries_sudo(config, hosts):
+    """Push all make_collect_bins to each host in hosts using sudo."""
+    import concurrent.futures
+    bin_dir = os.path.join(config['base_remote_bin_directory_nfs'],
+                           config['bin_directory_name'])
+    local_bin_dir = os.path.join(config['src_directory'],
+                                 config['bin_directory_name'])
+    bin_names = [os.path.basename(b) for b in config.get('make_collect_bins', [])]
+    if not bin_names:
+        bin_names = [config['server_bin_name'], config['client_bin_name']]
+
+    futures = []
+    with concurrent.futures.ThreadPoolExecutor() as ex:
+        for host in hosts:
+            for name in bin_names:
+                local_path = os.path.join(local_bin_dir, name)
+                remote_path = os.path.join(bin_dir, name)
+                if os.path.exists(local_path):
+                    futures.append(ex.submit(push_binary_sudo, local_path,
+                                             config['emulab_user'], host, remote_path))
+        concurrent.futures.wait(futures)
+
+
 def copy_path_to_remote_host(local_path, remote_user,
                              remote_host, remote_path, exclude_paths=[]):
     print('%s:%s' % (remote_host, remote_path))

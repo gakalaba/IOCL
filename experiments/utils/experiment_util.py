@@ -404,6 +404,15 @@ def copy_binaries_to_nfs(config, executor):
         SERVERS_SETUP['remade_binaries'] = True
     nfs_enabled = not 'remote_bin_directory_nfs_enabled' in config or config[
         'remote_bin_directory_nfs_enabled']
+
+    if config.get('push_binaries_sudo'):
+        # Root-owned bin/ on each node: use cat-over-ssh + sudo mv instead of rsync.
+        hosts = [get_server_host(config, i) for i in range(len(config['server_names']))]
+        if not nfs_enabled:
+            hosts += [get_client_host(config, c) for c in config['clients']]
+        push_binaries_sudo(config, hosts)
+        return
+
     n = 1 if nfs_enabled else len(config['server_names'])
     futures = []
     for i in range(n):
