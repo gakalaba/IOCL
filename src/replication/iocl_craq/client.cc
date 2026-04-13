@@ -50,7 +50,8 @@ namespace replication
               shardTagCounter(0),
               lastIssuedShardTag(0),
               lastIssuedGroupIdx(group),
-              lastIssuedReplicaIdx(0)
+              lastIssuedReplicaIdx(0),
+              sendCoordRequests(true)
         {
             clientVectorClock.assign(config.g, 0);
         }
@@ -110,7 +111,9 @@ namespace replication
             // Preserve explicit predecessors already attached by the caller and
             // send the matching CoordRequests. This is still required for the
             // embedded server-side IOCL_CRAQClient path.
-            for (int i = 0; i < linOp.predlist_size() && i < linOp.shardlist_size(); i++)
+            for (int i = 0; sendCoordRequests &&
+                            i < linOp.predlist_size() &&
+                            i < linOp.shardlist_size(); i++)
             {
                 uint64_t predShardtag = linOp.predlist(i);
                 if (predShardtag == 0) continue;

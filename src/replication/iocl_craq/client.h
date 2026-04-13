@@ -64,6 +64,8 @@ namespace replication
             void Invoke(const string &request, continuation_t continuation, int replicaIndex,
                         error_continuation_t error_continuation = nullptr);
 
+            void SetSendCoordRequests(bool enabled) { sendCoordRequests = enabled; }
+
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -88,6 +90,7 @@ namespace replication
             int      lastIssuedReplicaIdx;  // handler replica of last issued op
                                             //   (tail for writes, read-replica for reads)
             std::vector<uint64_t> clientVectorClock;  // synced from ReplyMessage.vector_clock
+            bool sendCoordRequests;
 
             struct PendingRequest
             {

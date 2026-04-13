@@ -31,7 +31,6 @@
 
 namespace strongstore
 {
-
     using namespace std;
     using namespace proto;
 
@@ -63,6 +62,8 @@ namespace strongstore
             case LinearizableProtocol::PROTO_IOCL_CRAQ:
                 client = new replication::iocl_craq::IOCL_CRAQClient(config_, transport_, shard_idx_,
                                                     client_id_);
+                static_cast<replication::iocl_craq::IOCL_CRAQClient *>(client)
+                    ->SetSendCoordRequests(false);
                 break;
             default:
                 Panic("Invalid linearizable protocol");
