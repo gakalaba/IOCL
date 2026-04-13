@@ -457,6 +457,27 @@ void TCPTransport::Register(TransportReceiver *receiver,
 
     Debug("Accepting connections on TCP port %hu", ntohs(sin.sin_port));
 
+    const uint64_t prewarmDelayMs = 5000;
+    transport::Configuration prewarmConfig = config;
+    Timer(prewarmDelayMs, [this, receiver, prewarmConfig, groupIdx, replicaIdx]() {
+        for (int g = 0; g < prewarmConfig.g; ++g)
+        {
+            for (int r = 0; r < prewarmConfig.n; ++r)
+            {
+                if (g == groupIdx && r == replicaIdx)
+                {
+                    continue;
+                }
+
+                TCPTransportAddress dst = LookupAddress(prewarmConfig, g, r);
+                if (tcpOutgoing.find(dst) == tcpOutgoing.end())
+                {
+                    ConnectTCP(dst, receiver);
+                }
+            }
+        }
+    });
+
 }
 
 bool TCPTransport::SendMessageInternal(TransportReceiver *src,
