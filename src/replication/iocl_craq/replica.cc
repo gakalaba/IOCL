@@ -489,6 +489,13 @@ namespace replication
             auto it = readsWaitingForVC.begin();
             while (it != readsWaitingForVC.end())
             {
+                uint64_t shardTag = it->second.has_shardtag() ? it->second.shardtag() : 0;
+                if (shardTag != 0 && readsWaitingForCoord.count(shardTag))
+                {
+                    ++it;
+                    continue;
+                }
+
                 if (lastCommitted >= it->first)
                 {
                     ExecuteReadOperation(it->second);
@@ -706,7 +713,7 @@ namespace replication
         }
 
         void IOCL_CRAQReplica::HandleReadRequest(const TransportAddress &remote,
-                                                  const LinearizeableOperation &linRequest)
+                                            const LinearizeableOperation &linRequest)
         {
             Debug("Handling read request for client id %lu and client request id %lu",
                   linRequest.rid().client_id(), linRequest.rid().client_req_id());
@@ -722,6 +729,10 @@ namespace replication
                 return;
 
             UpdateClientTable(linRequest);
+
+            const bool dirtyOnArrival = (this->lastOp != lastCommitted && !AmTail());
+            const auto requestKey =
+                std::make_pair(linRequest.rid().client_id(), linRequest.rid().client_req_id());
 
             // If this read has predecessors, ensure all CoordResponses have arrived.
             if (linRequest.predlist_size() > 0 && linRequest.predlist(0) != 0)
@@ -751,6 +762,16 @@ namespace replication
                     }
                     else
                     {
+                        if (dirtyOnArrival && pendingReads.find(requestKey) == pendingReads.end())
+                        {
+                            uint64_t depth = this->lastOp - lastCommitted;
+                            dirtyReadCount_++;
+                            dirtyDepthHist_[depth]++;
+                            perClientReads_[linRequest.rid().client_id()].second++;
+                            // Speculatively send the VR now so its RTT overlaps the
+                            // CoordResponse wait for dirty predecessor-gated reads.
+                            SendVersionRequest(linRequest);
+                        }
                         Debug("Buffering read shardtag %lu waiting for CoordResponses (%d/%d)", myShardTag, received, expected);
                         readsWaitingForCoord[myShardTag] = linRequest;
                         readsExpectedCoordCount_[myShardTag] = expected;
@@ -770,7 +791,7 @@ namespace replication
                 RPanic("Should always replicate when using IOCL_CRAQ");
             }
 
-            if (this->lastOp != lastCommitted && !AmTail())
+            if (dirtyOnArrival)
             {
                 uint64_t depth = this->lastOp - lastCommitted;
                 dirtyReadCount_++;
@@ -1061,10 +1082,21 @@ namespace replication
             SyncVC(msg.vector_clock());
             FlushWritesUpTo(msg.opnum());
 
+            uint64_t shardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
+            bool waitingForCoord = (shardTag != 0 && readsWaitingForCoord.count(shardTag));
+
             if (lastCommitted < requiredVC)
             {
                 Debug("Buffering read for key %s waiting for VC threshold %lu (lastCommitted=%lu)",
                       linRequest.key().c_str(), requiredVC, lastCommitted);
+                readsWaitingForVC.push_back({requiredVC, linRequest});
+                return;
+            }
+
+            if (waitingForCoord)
+            {
+                Debug("Version ready for read shardtag %lu, still waiting on CoordResponse(s)",
+                      shardTag);
                 readsWaitingForVC.push_back({requiredVC, linRequest});
                 return;
             }
@@ -1140,6 +1172,37 @@ namespace replication
                 pendingCoordResponses.erase(successorShardTag);
 
                 Debug("Unblocking read shardtag %lu (%d/%d CoordResponses)", successorShardTag, nowReceived, expected);
+                auto waitVcIt = std::find_if(
+                    readsWaitingForVC.begin(), readsWaitingForVC.end(),
+                    [successorShardTag](const std::pair<uint64_t, LinearizeableOperation> &entry) {
+                        return entry.second.has_shardtag() &&
+                               entry.second.shardtag() == successorShardTag;
+                    });
+                if (waitVcIt != readsWaitingForVC.end())
+                {
+                    if (lastCommitted >= waitVcIt->first)
+                    {
+                        ExecuteReadOperation(waitVcIt->second);
+                        ASSERT(++commitLogOpnum > 0);
+                        ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                        commitLog.Append(
+                            viewstamp_t(view, commitLogOpnum),
+                            ToRequest(waitVcIt->second),
+                            LOG_STATE_CLEAN);
+                        readsWaitingForVC.erase(waitVcIt);
+                    }
+                    return;
+                }
+
+                auto requestKey =
+                    std::make_pair(linRequest.rid().client_id(), linRequest.rid().client_req_id());
+                if (pendingReads.find(requestKey) != pendingReads.end())
+                {
+                    Debug("Read shardtag %lu still waiting on speculative VersionResponse",
+                          successorShardTag);
+                    return;
+                }
+
                 if (this->lastOp != lastCommitted && !AmTail())
                 {
                     uint64_t depth = this->lastOp - lastCommitted;
