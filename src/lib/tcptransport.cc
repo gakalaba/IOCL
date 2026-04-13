@@ -457,41 +457,6 @@ void TCPTransport::Register(TransportReceiver *receiver,
 
     Debug("Accepting connections on TCP port %hu", ntohs(sin.sin_port));
 
-    // Eagerly establish outbound replica channels so first coordination hops
-    // do not pay TCP handshake latency on the critical path.
-    if (!replicaAddressesInitialized)
-    {
-        LookupAddresses();
-    }
-
-    const transport::Configuration *cfg = configurations[receiver];
-    ASSERT(cfg != NULL);
-    for (int g = 0; g < cfg->g; ++g)
-    {
-        for (int r = 0; r < cfg->n; ++r)
-        {
-            if (g == groupIdx && r == replicaIdx)
-            {
-                continue;
-            }
-
-            auto groupIt = replicaAddresses[cfg].find(g);
-            if (groupIt == replicaAddresses[cfg].end())
-            {
-                continue;
-            }
-            auto addrIt = groupIt->second.find(r);
-            if (addrIt == groupIt->second.end())
-            {
-                continue;
-            }
-
-            if (tcpOutgoing.find(addrIt->second) == tcpOutgoing.end())
-            {
-                ConnectTCP(addrIt->second, receiver);
-            }
-        }
-    }
 }
 
 bool TCPTransport::SendMessageInternal(TransportReceiver *src,

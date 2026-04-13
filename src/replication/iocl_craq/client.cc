@@ -42,7 +42,6 @@ namespace replication
 {
     namespace iocl_craq
     {
-
         IOCL_CRAQClient::IOCL_CRAQClient(const transport::Configuration &config,
                                           Transport *transport,
                                           int group, uint64_t clientid)
@@ -102,34 +101,23 @@ namespace replication
             // For read successors, the gate is at the read-serving replica.
             int gateReplicaIdx = isWrite ? (config.n - 1) : replicaIndex;
 
-            // If shardclient.cc did not set a predecessor (predlist empty) and this
-            // is a write, chain it onto the last write issued on this shard so
-            // invocation order is preserved within a single shard.
-            if (isWrite && linOp.predlist_size() == 0 && lastIssuedShardTag != 0)
-            {
-                linOp.add_predlist(lastIssuedShardTag);
-                linOp.add_shardlist(group);
-                // Auto-chained predecessor was always a write, served at tail.
-                linOp.add_pred_replicalist(config.n - 1);
-            }
+            // Do not auto-chain writes here. For StrongStore/IOCL_CRAQ, cross-op
+            // dependencies are built in ShardClient, which also sends the matching
+            // CoordRequests. Adding an implicit predecessor here creates a gate
+            // dependency with no corresponding CoordRequest, so the tail waits
+            // forever for a CoordResponse that will never arrive.
 
-            // Track this write as the predecessor for the next write on this shard.
-            if (isWrite)
-            {
-                lastIssuedShardTag = shardtag;
-            }
-
-            // Send CoordRequests to each predecessor's serving replica.
-            // Writes are served at TAIL (config.n - 1); reads are served at
-            // the replica index recorded in pred_replicalist.
+            // Preserve explicit predecessors already attached by the caller and
+            // send the matching CoordRequests. This is still required for the
+            // embedded server-side IOCL_CRAQClient path.
             for (int i = 0; i < linOp.predlist_size() && i < linOp.shardlist_size(); i++)
             {
                 uint64_t predShardtag = linOp.predlist(i);
                 if (predShardtag == 0) continue;
                 int predGroupIdx = (int)linOp.shardlist(i);
-                int predTailIdx = (i < linOp.pred_replicalist_size())
-                                  ? linOp.pred_replicalist(i)
-                                  : (config.n - 1);
+                int predReplicaIdx = (i < linOp.pred_replicalist_size())
+                                     ? linOp.pred_replicalist(i)
+                                     : (config.n - 1);
 
                 proto::SuccessorRequestMessage coordReq;
                 coordReq.set_p(predShardtag);
@@ -142,9 +130,9 @@ namespace replication
                 }
 
                 Notice("Sending CoordRequest: p=%lu s=%lu to group=%d replica=%d",
-                       predShardtag, shardtag, predGroupIdx, predTailIdx);
+                       predShardtag, shardtag, predGroupIdx, predReplicaIdx);
 
-                if (!transport->SendMessageToReplica(this, predGroupIdx, predTailIdx, coordReq))
+                if (!transport->SendMessageToReplica(this, predGroupIdx, predReplicaIdx, coordReq))
                 {
                     Warning("Could not send CoordRequest to predecessor's handler.");
                 }

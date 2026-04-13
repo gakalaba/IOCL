@@ -50,7 +50,6 @@ namespace replication
 {
     namespace iocl_craq
     {
-
         using namespace proto;
 
         IOCL_CRAQReplica::IOCL_CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
@@ -88,6 +87,41 @@ namespace replication
                 _Latency_Init(&upcall_to_exec_lat_, "upcall_to_exec");
                 _Latency_Init(&exec_to_sent_lat_, "exec_to_sent");
             }
+
+            // Pre-warm TCP connections to all other groups' MIDDLE (replicaIdx=1)
+            // and TAIL (replicaIdx=n-1) replicas.  PredReplies from this replica
+            // can be sent to any group's MIDDLE (read predecessor) or TAIL (write
+            // predecessor).  Without pre-warming, the first PredReply to each new
+            // destination opens a TCP connection on demand, incurring a full WAN
+            // RTT (200ms under netem) before the message leaves the wire.  This
+            // adds 200ms to the cascade step for every novel predecessor→successor
+            // pair encountered.  p=UINT64_MAX is a harmless sentinel: no real
+            // shardtag (CreateTag(small_pid, small_seqno)) ever reaches this value,
+            // so the warmup sits in pendingCoordRequests[UINT64_MAX] forever.
+            //
+            // IMPORTANT: the warmup must be delayed so that all peer servers have
+            // had time to bind their replica ports (7087/7089/7091).  Each server
+            // binds its shard port first, then ~2 seconds later binds its replica
+            // port.  If the warmup fires before those ports are listening, every
+            // connection gets ECONNREFUSED (lifetime=200ms under netem) and the
+            // tcpOutgoing entry is destroyed — leaving no pre-warmed connection for
+            // later PredReply sends (which then each pay the full 200ms handshake).
+            // A 5-second delay ensures all servers are fully listening before the
+            // warmup runs; clients don't connect until ~20s after server start so
+            // this delay is invisible to benchmark latency.
+            transport->Timer(5000, [this, transport]() {
+                proto::SuccessorRequestMessage warmup;
+                warmup.set_p(UINT64_MAX);
+                int middle_idx = 1;
+                int tail_idx = configuration.n - 1;
+                for (int g = 0; g < configuration.g; g++) {
+                    if (g == this->groupIdx) continue;  // no need to warm our own group
+                    transport->SendMessageToReplica(this, g, middle_idx, warmup);
+                    if (tail_idx != middle_idx) {
+                        transport->SendMessageToReplica(this, g, tail_idx, warmup);
+                    }
+                }
+            });
         }
 
         IOCL_CRAQReplica::~IOCL_CRAQReplica()
@@ -593,6 +627,7 @@ namespace replication
                                          void *meta_data)
         {
             LinearizeableOperation request;
+            ReplyMessage reply;
             UnloggedRequestMessage unloggedRequest;
             PrepareMessage prepare;
             CommitMessage commit;
@@ -635,6 +670,14 @@ namespace replication
             {
                 coordResp.ParseFromString(data);
                 HandleCoordinationReply(remote, coordResp);
+            }
+            else if (type == reply.GetTypeName())
+            {
+                // ReplyMessage is a client-side artifact. During large runs, a
+                // delayed/stale TCP reply can occasionally land on a replica
+                // listener after the original client-side connection is gone.
+                // Treat it as ignorable noise instead of crashing the server.
+                RWarning("Ignoring stray ReplyMessage delivered to replica listener");
             }
             else
             {
@@ -1016,11 +1059,8 @@ namespace replication
             }
 
             SyncVC(msg.vector_clock());
-
             FlushWritesUpTo(msg.opnum());
 
-            // If we haven't committed up to the tail's VC[groupIdx], buffer
-            // the read until HandleCommit catches us up.
             if (lastCommitted < requiredVC)
             {
                 Debug("Buffering read for key %s waiting for VC threshold %lu (lastCommitted=%lu)",
@@ -1100,8 +1140,6 @@ namespace replication
                 pendingCoordResponses.erase(successorShardTag);
 
                 Debug("Unblocking read shardtag %lu (%d/%d CoordResponses)", successorShardTag, nowReceived, expected);
-
-                // Now proceed with the normal read logic: dirty check.
                 if (this->lastOp != lastCommitted && !AmTail())
                 {
                     uint64_t depth = this->lastOp - lastCommitted;
