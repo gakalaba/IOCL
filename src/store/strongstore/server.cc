@@ -1684,6 +1684,9 @@ namespace strongstore
     void Server::CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts)
     {
         Debug("[%lu] Commiting", transaction_id);
+        // if (replica_idx_ != 0) {
+        //     Notice("[%lu] Commiting", transaction_id);
+        // }
 
         const Timestamp nonblock_ts = transactions_.GetNonBlockTimestamp(transaction_id);
         size_t n_participants = transactions_.GetNumParticipants(transaction_id);
@@ -1799,13 +1802,13 @@ namespace strongstore
 
         if (msg.request_type() == replication::LinearizeableOperation::PREPARE)
         {
-            // Debug("[%lu] Received PREPARE", transaction_id);
+            Notice("[%lu] Received Participant PREPARE", transaction_id);
             // Participant Shard Replica Upcall for Prepare
 
             TransactionState s = transactions_.GetRWTransactionState(transaction_id);
             if (s == ABORTED)
             {
-                // Debug("[%lu] Already aborted", transaction_id);
+                Notice("[%lu] Already aborted", transaction_id);
                 if (replica_idx_ == 0)
                 {
                     // Have only the leader issue these messages
@@ -1816,7 +1819,6 @@ namespace strongstore
             {
                 ASSERT(replica_idx_ != 0);
                 // Participant Replica prepare
-                Debug("TID is %lu", transaction_id);
                 const Timestamp prepare_ts{msg.prepare().timestamp()};
                 int coordinator = msg.prepare().coordinator();
                 const Transaction transaction{msg.prepare().txn()};
@@ -1828,7 +1830,12 @@ namespace strongstore
                 LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
                 //WHY DOES THIS FAIL!?!?
                 if (ar.status != LockStatus::ACQUIRED) {
-                    Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                    std::vector<uint64_t> holders = locks_.WhoHolds(transaction);
+                    Warning("I'm replica %d on shard %d and lock acquire failed during Participant Shard Replica replicating Prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                    Notice("Holders are....");
+                    for (uint64_t h : holders) {
+                        Notice("%lu", h);
+                    }
                 }
                 ASSERT(ar.status == LockStatus::ACQUIRED);
 
@@ -1870,13 +1877,12 @@ namespace strongstore
 
             if (msg.has_prepare())
             { // Coordinator commit
-                // Debug("[%lu] Coordinator commit", transaction_id);
+                Notice("[%lu] Coordinator commit", transaction_id);
 
                 if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
                 {
                     // Coordinator Replica Commit
                     ASSERT(replica_idx_ != 0);
-                    Debug("TID is %lu", transaction_id);
                     const Timestamp start_ts{msg.prepare().timestamp()};
                     int coordinator = msg.prepare().coordinator();
                     const std::vector<int> participants{msg.prepare().participants().begin(),
@@ -1900,7 +1906,12 @@ namespace strongstore
                     LockAcquireResult ar = locks_.AcquireLocks(transaction_id, transaction);
                     //WHY DOES THIS FAIL!?!?
                     if (ar.status != LockStatus::ACQUIRED) {
-                        Warning("I'm replica %d on shard %d and lock acquire failed during prepare for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                        std::vector<uint64_t> holders = locks_.WhoHolds(transaction);
+                        Warning("I'm replica %d on shard %d and lock acquire failed during Coordinator Shard Replica replicating Commit for transaction %lu | I got status %d instead", replica_idx_, shard_idx_, transaction_id, ar.status);
+                        Notice("Holders are....");
+                        for (uint64_t h : holders) {
+                            Notice("%lu", h);
+                        }
                     }
                     ASSERT(ar.status == LockStatus::ACQUIRED);
 
@@ -1916,6 +1927,9 @@ namespace strongstore
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
                 if (commit_wait_us > 0) {
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
+                    if (replica_idx_ != 0) {
+                        Warning("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
+                    }
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
                 } else {
                     CoordinatorCommitTransaction(transaction_id, commit_ts);
@@ -1923,9 +1937,10 @@ namespace strongstore
             }
             else
             { // Participant commit
-                // Debug("[%lu] Participant commit", transaction_id);
+                Notice("[%lu] Participant commit", transaction_id);
                 if (transactions_.GetRWTransactionState(transaction_id) != COMMITTING)
                 {
+                    ASSERT(replica_idx_ != 0);
                     transactions_.ParticipantReceivePrepareOK(transaction_id);
                 }
 
@@ -1934,7 +1949,7 @@ namespace strongstore
         }
         else if (msg.request_type() == replication::LinearizeableOperation::ABORT)
         {
-            // Debug("[%lu] Received ABORT", transaction_id);
+            Notice("[%lu] Received ABORT", transaction_id);
             TransactionState s = transactions_.GetRWTransactionState(transaction_id);
 
             if (s != ABORTED)
