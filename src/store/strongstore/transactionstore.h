@@ -136,6 +136,7 @@ namespace strongstore
         void Commit (uint64_t transaction_id);
         // TransactionFinishResult Abort(uint64_t transaction_id);
         void Abort(uint64_t transaction_id);
+        void AbortTombstone(uint64_t transaction_id);
 
     private:
         class PendingRWTransaction
