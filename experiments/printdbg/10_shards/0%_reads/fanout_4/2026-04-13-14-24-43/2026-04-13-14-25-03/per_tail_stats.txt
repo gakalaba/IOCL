@@ -1,0 +1,110 @@
+=== Per-Shard Coordination Queueing ===
+(coord_wait_ms: time a read spent buffered at the middle waiting for CoordResponses)
+(queue_depth: number of buffered coord-waiting reads outstanding on that shard)
+(tail batch_size/pending_ooo kept below as secondary transport/tail signals)
+
+[shard-0]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-1]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=137  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=137  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-2]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=148  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=148  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-3]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=111  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=111  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-4]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=122  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=122  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-5]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=133  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=133  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-6]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=122  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=122  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-7]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=142  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=142  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-8]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=153  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=153  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-9]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=122  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=122  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[AGGREGATE across all shards]
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  tail batch_size  : n=1324  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=1324  avg=0.00  min=0  p50=0  p95=0  max=0
+
+
+=== Per-Shard Middle Read Outcomes ===
+(clean: served directly; dirty: required VersionRequest to TAIL (+200ms))
+(dirty_depth = lastOp - lastCommitted when read arrived dirty)
+
+[AGGREGATE across all shards]
+  clean reads       : 0
+  dirty reads       : 0
+  total reads       : 0  (n/a)

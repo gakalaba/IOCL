@@ -1,0 +1,240 @@
+=== Per-Shard Coordination Queueing ===
+(coord_wait_ms: time a read spent buffered at the middle waiting for CoordResponses)
+(queue_depth: number of buffered coord-waiting reads outstanding on that shard)
+(tail batch_size/pending_ooo kept below as secondary transport/tail signals)
+
+[shard-0]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=38  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=38  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-1]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=35  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=35  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-2]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=39  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=39  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-3]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=30  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=30  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-4]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=31  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=31  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-5]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=30  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=30  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-6]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=35  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=35  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-7]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=35  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=35  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-8]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=28  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=28  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-9]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=38  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=38  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[AGGREGATE across all shards]
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  tail batch_size  : n=339  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=339  avg=0.00  min=0  p50=0  p95=0  max=0
+
+
+=== Per-Shard Middle Read Outcomes ===
+(clean: served directly; dirty: required VersionRequest to TAIL (+200ms))
+(dirty_depth = lastOp - lastCommitted when read arrived dirty)
+
+[shard-0 MIDDLE]
+  clean reads  : 26
+  dirty reads  : 3
+  total reads  : 29  (89.7% clean)
+  depth histogram:
+  all=1 (n=3)
+  total latency   : n=29  avg=20.79ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=29  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=29  avg=20.79ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=29  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-1 MIDDLE]
+  clean reads  : 25
+  dirty reads  : 5
+  total reads  : 30  (83.3% clean)
+  depth histogram:
+  all=1 (n=5)
+  total latency   : n=30  avg=33.40ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  coord wait      : n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=30  avg=33.40ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  ready->exec wait: n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-2 MIDDLE]
+  clean reads  : 24
+  dirty reads  : 6
+  total reads  : 30  (80.0% clean)
+  depth histogram:
+       1-1       ##### (5)
+       2-2       # (1)
+  total latency   : n=30  avg=40.13ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=30  avg=40.13ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-3 MIDDLE]
+  clean reads  : 28
+  dirty reads  : 4
+  total reads  : 32  (87.5% clean)
+  depth histogram:
+  all=1 (n=4)
+  total latency   : n=32  avg=25.06ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  coord wait      : n=32  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=32  avg=25.06ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  ready->exec wait: n=32  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-4 MIDDLE]
+  clean reads  : 23
+  dirty reads  : 7
+  total reads  : 30  (76.7% clean)
+  depth histogram:
+       1-1       ###### (6)
+       2-2       # (1)
+  total latency   : n=30  avg=46.87ms  min=0ms  p50=0ms  p95=201ms  max=202ms
+  coord wait      : n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=30  avg=46.87ms  min=0ms  p50=0ms  p95=201ms  max=202ms
+  ready->exec wait: n=30  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-5 MIDDLE]
+  clean reads  : 31
+  dirty reads  : 9
+  total reads  : 40  (77.5% clean)
+  depth histogram:
+       1-1       ####### (7)
+       2-2       ## (2)
+  total latency   : n=40  avg=45.15ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=40  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=40  avg=45.15ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=40  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-6 MIDDLE]
+  clean reads  : 31
+  dirty reads  : 10
+  total reads  : 41  (75.6% clean)
+  depth histogram:
+       1-1       ######### (9)
+       2-2       # (1)
+  total latency   : n=41  avg=49.02ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=41  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=41  avg=49.02ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=41  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-7 MIDDLE]
+  clean reads  : 29
+  dirty reads  : 11
+  total reads  : 40  (72.5% clean)
+  depth histogram:
+       1-1       ########## (10)
+       2-2       # (1)
+  total latency   : n=40  avg=55.23ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=40  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=40  avg=55.23ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=40  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-8 MIDDLE]
+  clean reads  : 31
+  dirty reads  : 5
+  total reads  : 36  (86.1% clean)
+  depth histogram:
+       1-1       #### (4)
+       2-2       # (1)
+  total latency   : n=36  avg=27.89ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  coord wait      : n=36  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=36  avg=27.89ms  min=0ms  p50=0ms  p95=201ms  max=201ms
+  ready->exec wait: n=36  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-9 MIDDLE]
+  clean reads  : 25
+  dirty reads  : 3
+  total reads  : 28  (89.3% clean)
+  depth histogram:
+  all=1 (n=3)
+  total latency   : n=28  avg=21.50ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  coord wait      : n=28  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait         : n=28  avg=21.50ms  min=0ms  p50=0ms  p95=200ms  max=201ms
+  ready->exec wait: n=28  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[AGGREGATE across all shards]
+  clean reads       : 273
+  dirty reads       : 63
+  total reads       : 336  (81.2% clean)
+  depth histogram:
+       1-1       ######################################## (56)
+       2-2       ####### (7)
+  total latency     : n=336  avg=37.64ms  min=0ms  p50=0ms  p95=201ms  max=202ms
+  coord wait        : n=336  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  vr wait           : n=336  avg=37.64ms  min=0ms  p50=0ms  p95=201ms  max=202ms
+  ready->exec wait  : n=336  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+=== Aggregate Read Timeline By Position ===
+  pos=0  total=336  total_ms=n=336  avg=37.64ms  min=0ms  p50=0ms  p95=201ms  max=202ms coord_wait_ms=n=336  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms vr_wait_ms=n=336  avg=37.64ms  min=0ms  p50=0ms  p95=201ms  max=202ms ready_wait_ms=n=336  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+=== Aggregate Read Timeline By Path ===
+  path=clean total=273  total_ms=n=273  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms coord_wait_ms=n=273  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms vr_wait_ms=n=273  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms ready_wait_ms=n=273  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  path=vr    total=63   total_ms=n=63  avg=200.76ms  min=200ms  p50=201ms  p95=201ms  max=202ms coord_wait_ms=n=63  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms vr_wait_ms=n=63  avg=200.76ms  min=200ms  p50=201ms  p95=201ms  max=202ms ready_wait_ms=n=63  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms

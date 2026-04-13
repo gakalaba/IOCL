@@ -1,0 +1,862 @@
+20260313-151226-8706 01587 * main            (benchmark.cc:405): Starting benchmark.
+20260313-151227-6750 01587 * main            (benchmark.cc:624): Creating a default paritioner!
+20260313-151227-6759 01587 * Client          (client.cc:76):     Initializing StrongStore client with id [1]
+20260313-151227-6777 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6778 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6778 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6790 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6791 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6791 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6801 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6802 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6802 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6812 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6813 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6813 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6823 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6824 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6825 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6835 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6836 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6836 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6846 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6847 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6847 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6857 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6858 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6858 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6868 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6869 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6869 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6879 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6879 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6880 01587 * ShardClient     (shardclient.cc:62): success in sending register client: for client id 1 1
+20260313-151227-6880 01587 * BenchmarkClient (bench_client.cc:90): starting benchclient, issueConcurrent: 1; fanout: 4
+Session created: 0
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+20260313-151227-7266 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151227-7268 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151227-7268 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803777 s=21474836481 to group=2 replica=1
+20260313-151227-7270 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151227-7271 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836481 s=25769803778 to group=1 replica=1
+20260313-151227-7272 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151227-7272 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151227-7272 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803778 s=17179869185 to group=2 replica=1
+20260313-151228-0819 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=355 batch_age_ms=355
+20260313-151228-2284 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=502 batch_age_ms=502
+20260313-151228-3289 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=602 batch_age_ms=602
+20260313-151228-4294 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=703 batch_age_ms=703
+20260313-151228-4295 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=703
+20260313-151228-4299 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151228-4300 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151228-4301 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869186 s=17179869187 to group=0 replica=1
+20260313-151228-4304 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151228-4305 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869187 s=21474836482 to group=0 replica=1
+20260313-151228-4307 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151228-4307 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151228-4308 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836482 s=51539607553 to group=1 replica=1
+20260313-151228-6320 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151228-8315 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=402 batch_age_ms=402
+20260313-151228-9321 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=501 batch_age_ms=502
+20260313-151229-0325 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=602 batch_age_ms=603
+20260313-151229-0325 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=603
+20260313-151229-0342 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-0344 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-0345 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640257 s=30064771073 to group=7 replica=1
+20260313-151229-0348 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-0349 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771073 s=51539607554 to group=3 replica=1
+20260313-151229-0351 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151229-0352 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-0353 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607554 s=25769803779 to group=8 replica=1
+20260313-151229-2364 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151229-5362 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=501 batch_age_ms=501
+20260313-151229-6367 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=602 batch_age_ms=602
+20260313-151229-7373 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=703 batch_age_ms=703
+20260313-151229-7373 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=703
+20260313-151229-7378 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-7380 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-7380 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574849 s=42949672961 to group=9 replica=1
+20260313-151229-7384 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-7385 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672961 s=25769803780 to group=6 replica=1
+20260313-151229-7387 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151229-7388 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151229-7388 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803780 s=42949672962 to group=2 replica=1
+20260313-151229-9399 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151230-2397 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=502 batch_age_ms=502
+20260313-151230-3403 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=601 batch_age_ms=602
+20260313-151230-4407 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=702 batch_age_ms=703
+20260313-151230-4408 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=703
+20260313-151230-4429 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-4431 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-4432 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771074 s=30064771075 to group=3 replica=1
+20260313-151230-4434 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-4434 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771075 s=21474836483 to group=3 replica=1
+20260313-151230-4436 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151230-4436 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-4437 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836483 s=55834574850 to group=1 replica=1
+20260313-151230-6451 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151230-6453 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151230-7460 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151230-8465 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151230-8466 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=404
+20260313-151230-8472 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-8474 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-8475 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574851 s=25769803781 to group=9 replica=1
+20260313-151230-8476 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-8477 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803781 s=34359738369 to group=2 replica=1
+20260313-151230-8479 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151230-8479 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151230-8480 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738369 s=42949672963 to group=4 replica=1
+20260313-151231-0493 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151231-1499 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151231-2504 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151231-3510 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151231-3510 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151231-3530 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-3532 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-3533 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738370 s=42949672964 to group=4 replica=1
+20260313-151231-3535 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-3535 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672964 s=51539607555 to group=6 replica=1
+20260313-151231-3537 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151231-3537 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-3538 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607555 s=25769803782 to group=8 replica=1
+20260313-151231-5551 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151231-6556 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151231-7268 01587 * WarmupDone      (bench_client.cc:744): Completed warmup period of 4 seconds with 6 requests
+20260313-151231-7561 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151231-8566 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151231-8567 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151231-8582 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-8585 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-8586 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640258 s=17179869188 to group=7 replica=1
+20260313-151231-8587 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-8588 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869188 s=34359738371 to group=0 replica=1
+20260313-151231-8589 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151231-8590 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151231-8590 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738371 s=55834574852 to group=4 replica=1
+20260313-151232-0603 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151232-1608 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151232-2614 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151232-3619 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151232-3620 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151232-3631 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-3634 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-3635 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803783 s=42949672965 to group=2 replica=1
+20260313-151232-3636 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-3637 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672965 s=34359738372 to group=6 replica=1
+20260313-151232-3638 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151232-3639 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-3639 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738372 s=25769803784 to group=4 replica=1
+20260313-151232-5654 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151232-6660 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151232-7664 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151232-8669 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151232-8670 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151232-8681 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-8683 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-8684 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869189 s=38654705665 to group=0 replica=1
+20260313-151232-8686 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-8686 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705665 s=17179869190 to group=5 replica=1
+20260313-151232-8688 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151232-8688 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151232-8689 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869190 s=51539607556 to group=0 replica=1
+20260313-151233-0702 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151233-1788 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=310 batch_age_ms=311
+20260313-151233-2792 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=410 batch_age_ms=411
+20260313-151233-3799 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=511 batch_age_ms=512
+20260313-151233-3800 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=512
+20260313-151233-3812 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-3813 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-3814 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836484 s=51539607557 to group=1 replica=1
+20260313-151233-3815 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-3816 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607557 s=34359738373 to group=8 replica=1
+20260313-151233-3817 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151233-3817 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-3818 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738373 s=38654705666 to group=4 replica=1
+20260313-151233-5829 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151233-6832 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=301 batch_age_ms=302
+20260313-151233-7838 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151233-8843 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151233-8844 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151233-8846 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-8848 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-8849 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607558 s=30064771076 to group=8 replica=1
+20260313-151233-8851 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-8851 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771076 s=30064771077 to group=3 replica=1
+20260313-151233-8853 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151233-8854 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151233-8854 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771077 s=25769803785 to group=3 replica=1
+20260313-151234-0867 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151234-1870 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151234-1873 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151234-2879 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151234-2880 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151234-2900 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-2903 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-2904 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607559 s=25769803786 to group=8 replica=1
+20260313-151234-2905 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-2906 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803786 s=17179869191 to group=2 replica=1
+20260313-151234-2908 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151234-2908 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-2909 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869191 s=42949672966 to group=0 replica=1
+20260313-151234-4922 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151234-5927 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151234-6931 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151234-7936 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151234-7937 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151234-7939 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-7941 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-7942 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803787 s=30064771078 to group=2 replica=1
+20260313-151234-7944 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-7945 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771078 s=42949672967 to group=3 replica=1
+20260313-151234-7946 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151234-7947 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151234-7947 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672967 s=34359738374 to group=6 replica=1
+20260313-151234-9960 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151235-0966 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151235-1970 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151235-2974 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151235-2975 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151235-2983 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-2985 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-2986 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738375 s=25769803788 to group=4 replica=1
+20260313-151235-2987 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-2988 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803788 s=34359738376 to group=2 replica=1
+20260313-151235-2990 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151235-2990 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-2991 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738376 s=38654705667 to group=4 replica=1
+20260313-151235-5005 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151235-6010 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151235-7015 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151235-8023 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=504 batch_age_ms=504
+20260313-151235-8024 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151235-8036 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-8038 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-8039 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672968 s=55834574853 to group=6 replica=1
+20260313-151235-8041 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-8041 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574853 s=55834574854 to group=9 replica=1
+20260313-151235-8043 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151235-8043 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151235-8044 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574854 s=34359738377 to group=9 replica=1
+20260313-151236-0055 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151236-1060 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151236-1063 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151236-2069 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151236-2069 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151236-2085 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-2088 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-2088 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640259 s=42949672969 to group=7 replica=1
+20260313-151236-2090 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-2091 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672969 s=55834574855 to group=6 replica=1
+20260313-151236-2092 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151236-2093 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-2093 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574855 s=21474836485 to group=9 replica=1
+20260313-151236-4105 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151236-5111 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151236-6116 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151236-7121 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151236-7122 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151236-7131 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-7133 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-7134 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869192 s=55834574856 to group=0 replica=1
+20260313-151236-7135 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-7136 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574856 s=47244640260 to group=9 replica=1
+20260313-151236-7138 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151236-7138 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151236-7139 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640260 s=42949672970 to group=7 replica=1
+20260313-151236-9152 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151237-0157 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151237-1162 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151237-2167 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151237-2167 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151237-2187 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-2189 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-2190 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869193 s=42949672971 to group=0 replica=1
+20260313-151237-2192 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-2193 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672971 s=51539607560 to group=6 replica=1
+20260313-151237-2194 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151237-2195 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-2195 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607560 s=34359738378 to group=8 replica=1
+20260313-151237-4208 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151237-5213 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151237-6218 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151237-7222 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151237-7223 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151237-7240 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-7243 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-7243 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836486 s=55834574857 to group=1 replica=1
+20260313-151237-7245 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-7246 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574857 s=21474836487 to group=9 replica=1
+20260313-151237-7247 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151237-7248 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151237-7248 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836487 s=21474836488 to group=1 replica=1
+20260313-151237-9264 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151238-0269 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151238-1274 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151238-1276 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151238-1277 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=404
+20260313-151238-1282 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-1284 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-1285 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607561 s=38654705668 to group=8 replica=1
+20260313-151238-1286 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-1287 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705668 s=51539607562 to group=5 replica=1
+20260313-151238-1288 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151238-1289 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-1289 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607562 s=25769803789 to group=8 replica=1
+20260313-151238-3304 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151238-4309 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151238-5315 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151238-6319 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151238-6320 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151238-6323 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-6325 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-6326 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771079 s=34359738379 to group=3 replica=1
+20260313-151238-6328 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-6328 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738379 s=34359738380 to group=4 replica=1
+20260313-151238-6330 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151238-6330 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151238-6331 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738380 s=21474836489 to group=4 replica=1
+20260313-151238-8343 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=201 batch_age_ms=201
+20260313-151238-9346 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151238-9348 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151239-0355 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151239-0355 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151239-0364 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-0366 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-0367 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607563 s=34359738381 to group=8 replica=1
+20260313-151239-0369 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-0369 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738381 s=30064771080 to group=4 replica=1
+20260313-151239-0371 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151239-0371 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-0372 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771080 s=38654705669 to group=3 replica=1
+20260313-151239-2385 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151239-3389 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151239-4395 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151239-5401 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151239-5402 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151239-5416 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-5419 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-5419 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640261 s=47244640262 to group=7 replica=1
+20260313-151239-5421 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-5422 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640262 s=30064771081 to group=7 replica=1
+20260313-151239-5423 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151239-5424 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-5424 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771081 s=21474836490 to group=3 replica=1
+20260313-151239-7439 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151239-7440 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151239-8447 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151239-9452 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151239-9453 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151239-9475 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-9477 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-9478 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836491 s=38654705670 to group=1 replica=1
+20260313-151239-9480 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-9480 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705670 s=51539607564 to group=5 replica=1
+20260313-151239-9482 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151239-9482 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151239-9483 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607564 s=25769803790 to group=8 replica=1
+20260313-151240-1492 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=201 batch_age_ms=201
+20260313-151240-2498 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151240-3502 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=402
+20260313-151240-4507 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151240-4508 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151240-4518 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-4521 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-4522 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738382 s=30064771082 to group=4 replica=1
+20260313-151240-4523 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-4524 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771082 s=38654705671 to group=3 replica=1
+20260313-151240-4525 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151240-4526 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-4526 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705671 s=38654705672 to group=5 replica=1
+20260313-151240-6539 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151240-7544 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151240-8549 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151240-8551 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151240-8551 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151240-8571 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-8574 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-8574 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771083 s=47244640263 to group=3 replica=1
+20260313-151240-8576 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-8577 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640263 s=47244640264 to group=7 replica=1
+20260313-151240-8578 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151240-8579 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151240-8579 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640264 s=34359738383 to group=7 replica=1
+20260313-151241-0592 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151241-1597 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151241-1599 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151241-2605 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151241-2605 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=404
+20260313-151241-2625 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-2628 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-2629 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705673 s=47244640265 to group=5 replica=1
+20260313-151241-2630 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-2631 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640265 s=55834574858 to group=7 replica=1
+20260313-151241-2632 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151241-2633 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-2634 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574858 s=47244640266 to group=9 replica=1
+20260313-151241-4647 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151241-5651 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151241-6657 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151241-7661 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151241-7662 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151241-7667 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-7669 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-7669 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803791 s=55834574859 to group=2 replica=1
+20260313-151241-7671 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-7671 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574859 s=38654705674 to group=9 replica=1
+20260313-151241-7673 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151241-7673 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151241-7674 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705674 s=51539607565 to group=5 replica=1
+20260313-151241-9687 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151242-0696 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151242-1701 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151242-2706 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151242-2706 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151242-2717 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-2719 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-2720 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672972 s=38654705675 to group=6 replica=1
+20260313-151242-2721 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-2722 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705675 s=25769803792 to group=5 replica=1
+20260313-151242-2723 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151242-2724 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-2724 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803792 s=17179869194 to group=2 replica=1
+20260313-151242-4736 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151242-5741 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151242-6747 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151242-7750 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151242-7751 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151242-7771 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-7774 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-7774 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640267 s=30064771084 to group=7 replica=1
+20260313-151242-7776 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-7777 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771084 s=47244640268 to group=3 replica=1
+20260313-151242-7778 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151242-7779 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151242-7779 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640268 s=55834574860 to group=7 replica=1
+20260313-151242-9798 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151243-0798 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151243-1804 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151243-2809 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151243-2810 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151243-2826 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-2828 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-2829 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771085 s=51539607566 to group=3 replica=1
+20260313-151243-2831 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-2832 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607566 s=17179869195 to group=8 replica=1
+20260313-151243-2833 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151243-2833 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-2834 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869195 s=42949672973 to group=0 replica=1
+20260313-151243-4848 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151243-5853 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151243-6858 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151243-7862 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151243-7864 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151243-7885 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-7887 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-7888 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672974 s=42949672975 to group=6 replica=1
+20260313-151243-7890 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-7890 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672975 s=34359738384 to group=6 replica=1
+20260313-151243-7892 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151243-7892 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151243-7893 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738384 s=38654705676 to group=4 replica=1
+20260313-151243-9907 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151243-9909 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151244-0913 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151244-1918 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151244-1919 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151244-1926 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-1928 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-1929 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738385 s=55834574861 to group=4 replica=1
+20260313-151244-1930 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-1931 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574861 s=30064771086 to group=9 replica=1
+20260313-151244-1932 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151244-1933 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-1933 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771086 s=34359738386 to group=3 replica=1
+20260313-151244-3948 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151244-4953 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151244-5958 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151244-6964 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151244-6965 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151244-6974 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-6977 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-6977 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869196 s=25769803793 to group=0 replica=1
+20260313-151244-6979 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-6980 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803793 s=21474836492 to group=2 replica=1
+20260313-151244-6981 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151244-6982 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151244-6982 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836492 s=51539607567 to group=1 replica=1
+20260313-151244-8996 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151245-0001 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151245-1006 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151245-2010 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151245-2011 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151245-2021 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-2024 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-2024 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738387 s=25769803794 to group=4 replica=1
+20260313-151245-2026 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-2027 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803794 s=21474836493 to group=2 replica=1
+20260313-151245-2028 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151245-2029 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-2029 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836493 s=25769803795 to group=1 replica=1
+20260313-151245-4042 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151245-5047 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151245-6052 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151245-7057 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151245-7058 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151245-7072 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-7074 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-7075 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869197 s=17179869198 to group=0 replica=1
+20260313-151245-7077 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-7077 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869198 s=47244640269 to group=0 replica=1
+20260313-151245-7079 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151245-7079 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151245-7080 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640269 s=21474836494 to group=7 replica=1
+20260313-151245-9095 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151245-9096 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151246-0104 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151246-1109 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151246-1110 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151246-1114 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-1116 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-1116 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672976 s=34359738388 to group=6 replica=1
+20260313-151246-1118 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-1119 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738388 s=42949672977 to group=4 replica=1
+20260313-151246-1120 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151246-1121 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-1121 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672977 s=42949672978 to group=6 replica=1
+20260313-151246-3136 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151246-4141 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151246-5146 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151246-5148 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151246-5149 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151246-5168 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-5170 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-5171 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574862 s=42949672979 to group=9 replica=1
+20260313-151246-5172 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-5173 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672979 s=25769803796 to group=6 replica=1
+20260313-151246-5174 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151246-5175 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151246-5176 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803796 s=34359738389 to group=2 replica=1
+20260313-151246-7188 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151246-8193 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151246-9199 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151247-0204 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151247-0205 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151247-0228 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-0230 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-0231 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836495 s=47244640270 to group=1 replica=1
+20260313-151247-0232 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-0233 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640270 s=30064771087 to group=7 replica=1
+20260313-151247-0234 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151247-0235 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-0235 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771087 s=25769803797 to group=3 replica=1
+20260313-151247-2247 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151247-3252 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151247-4258 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151247-5263 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151247-5264 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151247-5286 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-5288 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-5289 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771088 s=17179869199 to group=3 replica=1
+20260313-151247-5291 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-5291 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869199 s=17179869200 to group=0 replica=1
+20260313-151247-5293 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151247-5293 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-5294 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869200 s=17179869201 to group=0 replica=1
+20260313-151247-7307 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151247-8312 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151247-8315 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151247-8317 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151247-8317 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=303
+20260313-151247-8338 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-8340 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-8341 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607568 s=47244640271 to group=8 replica=1
+20260313-151247-8343 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-8344 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640271 s=17179869202 to group=7 replica=1
+20260313-151247-8345 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151247-8346 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151247-8346 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869202 s=55834574863 to group=0 replica=1
+20260313-151248-0359 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151248-1366 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151248-2371 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151248-3376 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151248-3377 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151248-3387 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-3389 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-3390 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705677 s=17179869203 to group=5 replica=1
+20260313-151248-3392 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-3392 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=17179869203 s=55834574864 to group=0 replica=1
+20260313-151248-3394 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151248-3394 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-3395 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574864 s=34359738390 to group=9 replica=1
+20260313-151248-5408 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151248-6412 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151248-7418 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151248-8422 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151248-8423 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151248-8427 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-8429 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-8430 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738391 s=30064771089 to group=4 replica=1
+20260313-151248-8432 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-8432 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771089 s=51539607569 to group=3 replica=1
+20260313-151248-8434 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151248-8434 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151248-8435 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607569 s=55834574865 to group=8 replica=1
+20260313-151249-0447 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151249-1453 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151249-2458 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151249-3463 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151249-3464 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151249-3480 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-3483 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-3483 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607570 s=55834574866 to group=8 replica=1
+20260313-151249-3485 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-3486 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574866 s=42949672980 to group=9 replica=1
+20260313-151249-3487 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151249-3487 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-3488 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672980 s=42949672981 to group=6 replica=1
+20260313-151249-5500 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151249-6505 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151249-7510 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151249-7512 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151249-7513 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151249-7528 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-7530 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-7531 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607571 s=25769803798 to group=8 replica=1
+20260313-151249-7533 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-7533 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803798 s=38654705678 to group=2 replica=1
+20260313-151249-7535 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151249-7535 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151249-7536 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705678 s=25769803799 to group=5 replica=1
+20260313-151249-9549 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151250-0555 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151250-1560 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151250-2565 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151250-2566 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151250-2577 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-2579 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-2580 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640272 s=21474836496 to group=7 replica=1
+20260313-151250-2582 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-2582 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836496 s=34359738392 to group=1 replica=1
+20260313-151250-2584 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151250-2584 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-2585 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738392 s=38654705679 to group=4 replica=1
+20260313-151250-4598 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151250-5603 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151250-6609 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151250-7614 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151250-7615 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151250-7619 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-7621 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-7622 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738393 s=51539607572 to group=4 replica=1
+20260313-151250-7624 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-7624 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607572 s=34359738394 to group=8 replica=1
+20260313-151250-7626 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151250-7626 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151250-7627 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738394 s=30064771090 to group=4 replica=1
+20260313-151250-9642 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151251-0647 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151251-1651 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151251-2657 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151251-2658 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151251-2665 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-2667 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-2668 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803800 s=47244640273 to group=2 replica=1
+20260313-151251-2669 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-2670 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640273 s=38654705680 to group=7 replica=1
+20260313-151251-2672 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151251-2672 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-2673 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705680 s=25769803801 to group=5 replica=1
+20260313-151251-4687 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151251-5692 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151251-6698 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151251-7704 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=504 batch_age_ms=504
+20260313-151251-7705 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151251-7724 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-7726 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-7727 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771091 s=30064771092 to group=3 replica=1
+20260313-151251-7728 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-7729 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771092 s=34359738395 to group=3 replica=1
+20260313-151251-7730 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151251-7731 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151251-7731 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=34359738395 s=51539607573 to group=4 replica=1
+20260313-151251-9750 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151251-9752 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151252-0757 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151252-1761 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151252-1762 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=403
+20260313-151252-1769 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-1771 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-1771 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836497 s=21474836498 to group=1 replica=1
+20260313-151252-1773 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-1774 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=21474836498 s=25769803802 to group=1 replica=1
+20260313-151252-1775 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151252-1776 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-1776 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803802 s=21474836499 to group=2 replica=1
+20260313-151252-3792 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151252-3794 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=203 batch_age_ms=203
+20260313-151252-4801 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151252-5805 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=403 batch_age_ms=404
+20260313-151252-5806 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=404
+20260313-151252-5820 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-5822 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-5823 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672982 s=25769803803 to group=6 replica=1
+20260313-151252-5825 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-5826 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803803 s=30064771093 to group=2 replica=1
+20260313-151252-5827 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151252-5828 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151252-5828 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771093 s=34359738396 to group=3 replica=1
+20260313-151252-7840 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151252-8846 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=303
+20260313-151252-9851 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151253-0854 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151253-0855 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151253-0864 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-0866 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-0867 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640274 s=38654705681 to group=7 replica=1
+20260313-151253-0868 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-0869 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705681 s=25769803804 to group=5 replica=1
+20260313-151253-0871 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151253-0871 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-0872 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803804 s=17179869204 to group=2 replica=1
+20260313-151253-2884 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151253-3889 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151253-4894 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151253-5898 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151253-5899 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151253-5918 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-5921 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-5922 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803805 s=55834574867 to group=2 replica=1
+20260313-151253-5923 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-5924 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574867 s=38654705682 to group=9 replica=1
+20260313-151253-5925 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151253-5926 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151253-5926 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=38654705682 s=55834574868 to group=5 replica=1
+20260313-151253-7939 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151253-8944 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151253-9949 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151254-0954 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=504
+20260313-151254-0955 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=504
+20260313-151254-0958 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-0960 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-0961 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=42949672983 s=55834574869 to group=6 replica=1
+20260313-151254-0963 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-0963 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574869 s=51539607574 to group=9 replica=1
+20260313-151254-0965 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151254-0965 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-0966 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607574 s=34359738397 to group=8 replica=1
+20260313-151254-2977 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151254-3983 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=303 batch_age_ms=303
+20260313-151254-4988 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=402 batch_age_ms=403
+20260313-151254-5992 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151254-5993 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151254-6012 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-6015 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-6015 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=47244640275 s=30064771094 to group=7 replica=1
+20260313-151254-6017 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-6018 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771094 s=25769803806 to group=3 replica=1
+20260313-151254-6019 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151254-6020 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151254-6020 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=25769803806 s=42949672984 to group=2 replica=1
+20260313-151254-8033 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151254-9039 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151255-0043 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151255-1046 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=503 batch_age_ms=503
+20260313-151255-1047 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+20260313-151255-1048 01587 * Finish          (bench_client.cc:938): Completed 49 requests in 23.751880 seconds
+20260313-151255-1049 01587 * Finish          (bench_client.cc:939): 1 outstanding transactions.
+20260313-151255-1067 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151255-1070 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151255-1070 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=51539607575 s=55834574870 to group=8 replica=1
+20260313-151255-1072 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151255-1073 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=55834574870 s=30064771095 to group=9 replica=1
+20260313-151255-1074 01587 * GetNextOperation (app_request.cc:76): AppRequest batch composition: fanout=4 reads=4 writes=0
+20260313-151255-1075 01587 * ExecuteNextAppRequestOperation (bench_client.cc:414): Sending op with proto 5 and index 1
+20260313-151255-1075 01587 * SendOperation   (shardclient.cc:377): Client-side CoordRequest: p=30064771095 s=21474836500 to group=3 replica=1
+20260313-151255-3088 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=0 status=0 issue_to_reply_ms=202 batch_age_ms=202
+20260313-151255-4092 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=1 status=0 issue_to_reply_ms=302 batch_age_ms=302
+20260313-151255-5097 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=2 status=0 issue_to_reply_ms=403 batch_age_ms=403
+20260313-151255-6102 01587 * ReceiveOperationResponse (bench_client.cc:547): AppRequest reply timeline: pos=3 status=0 issue_to_reply_ms=502 batch_age_ms=503
+20260313-151255-6103 01587 * ReceiveOperationResponse (bench_client.cc:562): AppRequest batch done: fanout=4 total_reply_ms=503
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session continued: 0
+last_service: , current_state: 0
+Session destroyed: 18446744073709551615
+last_service: , current_state: 0
+Session destroyed: 0
+last_service: , current_state: 0
+20260313-151256-7271 01587 * FlushStats      (benchmark.cc:916): Flushing stats to /mnt/extra/experiments/2026-04-13-15-11-56/out/client-0-1-0-stats-0.json.
+20260313-151256-7274 01587 * FlushStats      (benchmark.cc:928): All done!
+20260313-151259-1050 01587 * Cleanup         (bench_client.cc:766): Aborting 0 outstanding transactions.
+20260313-151259-1051 01587 * CooldownDone    (bench_client.cc:796): Finished cooldown period.
+20260313-151259-1052 01587 * CooldownDone    (bench_client.cc:803): Median latency is 503793481 ns (503 ms)
+20260313-151259-1052 01587 * CooldownDone    (bench_client.cc:812): Average latency is 473940783 ns (473 ms)
+20260313-151259-1053 01587 * CooldownDone    (bench_client.cc:816): 90th percentile latency is 504021025 ns (504 ms)
+20260313-151259-1053 01587 * CooldownDone    (bench_client.cc:820): 95th percentile latency is 504155516 ns (504 ms)
+20260313-151259-1054 01587 * CooldownDone    (bench_client.cc:824): 99th percentile latency is 512063794 ns (512 ms)
+20260313-151259-1054 01587 * LATENCY total: 303 ms 473 ms/268 ms 512 ms (50 samples, 23 s total)
+20260313-151259-1055 01587 *     268 ms |         50 | ==================================================
+20260313-151259-1056 01587 * Stop            (tcptransport.cc:601): [TCP SUMMARY] outgoingCreated=50 outgoingClosed=0 incomingCreated=0 incomingClosed=0 outgoingPeak=50 incomingPeak=0
+Inserted events:
+  0x56348ee7e390 [fd  7] Read Persist Internal
+  0x56348eea9df0 [fd  9] Read Persist
+  0x56348eeae6f0 [fd  10] Read Persist
+  0x56348eeaa7b0 [fd  11] Read Persist
+  0x56348eea48d0 [fd  12] Read Persist
+  0x56348eea4530 [fd  13] Read Persist
+  0x56348eea4d40 [fd  14] Read Persist
+  0x56348eec79f0 [fd  15] Read Persist
+  0x56348eec61a0 [fd  16] Read Persist
+  0x56348eec66b0 [fd  17] Read Persist
+  0x56348eec77c0 [fd  18] Read Persist
+  0x56348eeccac0 [fd  19] Read Persist
+  0x56348eec6bf0 [fd  20] Read Persist
+  0x56348eecc890 [fd  21] Read Persist
+  0x56348eed1af0 [fd  22] Read Persist
+  0x56348eed07b0 [fd  23] Read Persist
+  0x56348eed18c0 [fd  24] Read Persist
+  0x56348eed6b30 [fd  25] Read Persist
+  0x56348eecb7c0 [fd  26] Read Persist
+  0x56348eed6900 [fd  27] Read Persist
+  0x56348eedbe10 [fd  28] Read Persist
+  0x56348eed5f20 [fd  29] Read Persist
+  0x56348eedbbe0 [fd  30] Read Persist
+  0x56348eee0ed0 [fd  31] Read Persist
+  0x56348eedfb90 [fd  32] Read Persist
+  0x56348eee0ca0 [fd  33] Read Persist
+  0x56348eee6290 [fd  34] Read Persist
+  0x56348eee0220 [fd  35] Read Persist
+  0x56348eee6060 [fd  36] Read Persist
+  0x56348eeeb4e0 [fd  37] Read Persist
+  0x56348eee5020 [fd  38] Read Persist
+  0x56348eef6ab0 [fd  39] Read Persist
+  0x56348eef0fe0 [fd  40] Read Persist
+  0x56348eef7160 [fd  41] Read Persist
+  0x56348eecab40 [fd  42] Read Persist
+  0x56348eecc3b0 [fd  43] Read Persist
+  0x56348eed13e0 [fd  44] Read Persist
+  0x56348eed5810 [fd  45] Read Persist
+  0x56348eedb700 [fd  46] Read Persist
+  0x56348eee07c0 [fd  47] Read Persist
+  0x56348eee42e0 [fd  48] Read Persist
+  0x56348eee5c50 [fd  49] Read Persist
+  0x56348eeeaea0 [fd  50] Read Persist
+  0x56348eef0cc0 [fd  51] Read Persist
+  0x56348eef7920 [fd  52] Read Persist
+  0x56348eedeb10 [fd  53] Read Persist
+  0x56348eedef50 [fd  54] Read Persist
+  0x56348eeee750 [fd  55] Read Persist
+  0x56348ef027b0 [fd  56] Read Persist
+  0x56348ef03350 [fd  57] Read Persist
+  0x56348ef03f80 [fd  58] Read Persist
+Active events:
+20260313-151259-1066 01587 * main            (benchmark.cc:875): Cleaning up after experiment.
+20260313-151259-1066 01587 * FlushStats      (benchmark.cc:916): Flushing stats to /mnt/extra/experiments/2026-04-13-15-11-56/out/client-0-1-0-stats-0.json.
+20260313-151259-1069 01587 * FlushStats      (benchmark.cc:928): All done!

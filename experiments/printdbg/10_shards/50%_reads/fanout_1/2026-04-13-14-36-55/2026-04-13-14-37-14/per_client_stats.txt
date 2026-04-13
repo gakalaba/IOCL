@@ -1,0 +1,119 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 81
+  reads   : n=81  avg=0.47  min=0  p50=0  p95=1  max=1
+  writes  : n=81  avg=0.53  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (43)
+       1-1       ###################################### (38)
+  batch total reply ms : n=81  avg=337.31ms  min=200ms  p50=402ms  p95=402ms  max=588ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=81  avg=337.31ms  min=200ms  p50=402ms  p95=402ms  max=588ms batch_age_ms=n=81  avg=337.31ms  min=200ms  p50=402ms  p95=402ms  max=588ms
+
+[client-0-1]
+  batches : 84
+  reads   : n=84  avg=0.49  min=0  p50=0  p95=1  max=1
+  writes  : n=84  avg=0.51  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (43)
+       1-1       ######################################## (41)
+  batch total reply ms : n=84  avg=325.19ms  min=201ms  p50=402ms  p95=402ms  max=585ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=84  avg=325.19ms  min=201ms  p50=402ms  p95=402ms  max=585ms batch_age_ms=n=84  avg=325.19ms  min=201ms  p50=402ms  p95=402ms  max=585ms
+
+[client-1-0]
+  batches : 82
+  reads   : n=82  avg=0.51  min=0  p50=1  p95=1  max=1
+  writes  : n=82  avg=0.49  min=0  p50=0  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (40)
+       1-1       ######################################## (42)
+  batch total reply ms : n=82  avg=335.50ms  min=200ms  p50=402ms  p95=402ms  max=408ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=82  avg=335.50ms  min=200ms  p50=402ms  p95=402ms  max=408ms batch_age_ms=n=82  avg=335.50ms  min=200ms  p50=402ms  p95=402ms  max=408ms
+
+[client-1-1]
+  batches : 85
+  reads   : n=85  avg=0.49  min=0  p50=0  p95=1  max=1
+  writes  : n=85  avg=0.51  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (43)
+       1-1       ######################################## (42)
+  batch total reply ms : n=85  avg=323.60ms  min=200ms  p50=401ms  p95=402ms  max=578ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=85  avg=323.60ms  min=200ms  p50=401ms  p95=402ms  max=578ms batch_age_ms=n=85  avg=323.60ms  min=200ms  p50=401ms  p95=402ms  max=578ms
+
+[client-2-0]
+  batches : 85
+  reads   : n=85  avg=0.49  min=0  p50=0  p95=1  max=1
+  writes  : n=85  avg=0.51  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (43)
+       1-1       ######################################## (42)
+  batch total reply ms : n=85  avg=321.54ms  min=200ms  p50=402ms  p95=402ms  max=411ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=85  avg=321.54ms  min=200ms  p50=402ms  p95=402ms  max=411ms batch_age_ms=n=85  avg=321.54ms  min=200ms  p50=402ms  p95=402ms  max=411ms
+
+[client-2-1]
+  batches : 81
+  reads   : n=81  avg=0.47  min=0  p50=0  p95=1  max=1
+  writes  : n=81  avg=0.53  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (43)
+       1-1       ###################################### (38)
+  batch total reply ms : n=81  avg=334.85ms  min=200ms  p50=402ms  p95=403ms  max=585ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=81  avg=334.85ms  min=200ms  p50=402ms  p95=403ms  max=585ms batch_age_ms=n=81  avg=334.85ms  min=200ms  p50=402ms  p95=403ms  max=585ms
+
+[client-3-0]
+  batches : 87
+  reads   : n=87  avg=0.57  min=0  p50=1  p95=1  max=1
+  writes  : n=87  avg=0.43  min=0  p50=0  p95=1  max=1
+  reads histogram:
+       0-0       ##################################### (37)
+       1-1       ######################################## (50)
+  batch total reply ms : n=87  avg=311.59ms  min=200ms  p50=402ms  p95=402ms  max=402ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=87  avg=311.59ms  min=200ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=87  avg=311.59ms  min=200ms  p50=402ms  p95=402ms  max=402ms
+
+[client-3-1]
+  batches : 85
+  reads   : n=85  avg=0.45  min=0  p50=0  p95=1  max=1
+  writes  : n=85  avg=0.55  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (47)
+       1-1       ###################################### (38)
+  batch total reply ms : n=85  avg=323.75ms  min=201ms  p50=402ms  p95=402ms  max=411ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=85  avg=323.75ms  min=201ms  p50=402ms  p95=402ms  max=411ms batch_age_ms=n=85  avg=323.75ms  min=201ms  p50=402ms  p95=402ms  max=411ms
+
+[AGGREGATE batch composition across all clients]
+  total batches : 670
+  reads         : n=670  avg=0.49  min=0  p50=0  p95=1  max=1
+  writes        : n=670  avg=0.51  min=0  p50=1  p95=1  max=1
+  reads histogram:
+       0-0       ######################################## (339)
+       1-1       ######################################## (331)
+  batch total reply ms : n=670  avg=326.47ms  min=200ms  p50=402ms  p95=402ms  max=588ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=670  avg=326.47ms  min=200ms  p50=402ms  p95=402ms  max=588ms batch_age_ms=n=670  avg=326.47ms  min=200ms  p50=402ms  p95=402ms  max=588ms
+
+
+=== Per-Client Clean/Dirty Read Counts (from MIDDLE server logs) ===
+(client_id is the raw C++ uint64; matches rid().client_id() in server logs)
+
+  client_id=9       clean=20     dirty=8      total=28      (71.4% clean)
+  client_id=12      clean=24     dirty=4      total=28      (85.7% clean)
+  client_id=15      clean=31     dirty=9      total=40      (77.5% clean)
+  client_id=18      clean=23     dirty=11     total=34      (67.6% clean)
+  client_id=21      clean=21     dirty=11     total=32      (65.6% clean)
+  client_id=24      clean=23     dirty=4      total=27      (85.2% clean)
+  client_id=27      clean=29     dirty=4      total=33      (87.9% clean)
+  client_id=30      clean=32     dirty=11     total=43      (74.4% clean)
+  client_id=33      clean=30     dirty=3      total=33      (90.9% clean)
+  client_id=36      clean=26     dirty=7      total=33      (78.8% clean)
+
+  TOTAL            clean=259    dirty=72     total=331     (78.2% clean)

@@ -1,0 +1,64 @@
+=== Per-Shard Coordination Queueing ===
+(coord_wait_ms: time a read spent buffered at the middle waiting for CoordResponses)
+(queue_depth: number of buffered coord-waiting reads outstanding on that shard)
+(tail batch_size/pending_ooo kept below as secondary transport/tail signals)
+
+
+=== Per-Shard Middle Read Outcomes ===
+(clean: served directly; dirty: required VersionRequest to TAIL (+200ms))
+(dirty_depth = lastOp - lastCommitted when read arrived dirty)
+
+[shard-0 MIDDLE]
+  clean reads  : 111
+  dirty reads  : 0
+  total reads  : 111  (100.0% clean)
+
+[shard-1 MIDDLE]
+  clean reads  : 118
+  dirty reads  : 0
+  total reads  : 118  (100.0% clean)
+
+[shard-2 MIDDLE]
+  clean reads  : 139
+  dirty reads  : 0
+  total reads  : 139  (100.0% clean)
+
+[shard-3 MIDDLE]
+  clean reads  : 109
+  dirty reads  : 0
+  total reads  : 109  (100.0% clean)
+
+[shard-4 MIDDLE]
+  clean reads  : 105
+  dirty reads  : 0
+  total reads  : 105  (100.0% clean)
+
+[shard-5 MIDDLE]
+  clean reads  : 98
+  dirty reads  : 0
+  total reads  : 98  (100.0% clean)
+
+[shard-6 MIDDLE]
+  clean reads  : 108
+  dirty reads  : 0
+  total reads  : 108  (100.0% clean)
+
+[shard-7 MIDDLE]
+  clean reads  : 121
+  dirty reads  : 0
+  total reads  : 121  (100.0% clean)
+
+[shard-8 MIDDLE]
+  clean reads  : 101
+  dirty reads  : 0
+  total reads  : 101  (100.0% clean)
+
+[shard-9 MIDDLE]
+  clean reads  : 110
+  dirty reads  : 0
+  total reads  : 110  (100.0% clean)
+
+[AGGREGATE across all shards]
+  clean reads       : 1120
+  dirty reads       : 0
+  total reads       : 1120  (100.0% clean)

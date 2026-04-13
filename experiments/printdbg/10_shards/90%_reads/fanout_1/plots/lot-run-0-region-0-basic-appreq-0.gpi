@@ -4,13 +4,13 @@ set key bottom right
 set xlabel 'Time'
 set ylabel 'Latency'
 set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
-set output '/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-06-06-08/plots/lot-run-0-region-0-basic-appreq-0.png'
+set output '/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-14-50-48/plots/lot-run-0-region-0-basic-appreq-0.png'
 set style line 1 linetype 1 linewidth 2
 set style line 2 linetype 1 linecolor "green" linewidth 2
 set style line 3 linetype 1 linecolor "blue" linewidth 2
 set style line 4 linetype 4 linewidth 2
 set style line 5 linetype 5 linewidth 2
 set style line 6 linetype 8 linewidth 2
-plot '/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-06-06-08/2026-04-13-06-06-08/2026-04-13-06-06-26/out/plots/lot-run-0-region-0-basic-appreq.csv' title "iocl\\\_craq" ls 1 with lines, \
-'/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-06-06-08/2026-04-13-06-07-49/2026-04-13-06-08-07/out/plots/lot-run-0-region-0-basic-appreq.csv' title "craq" ls 2 with lines, \
-'/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-06-06-08/2026-04-13-06-09-29/2026-04-13-06-09-47/out/plots/lot-run-0-region-0-basic-appreq.csv' title "vr" ls 3 with lines
+plot '/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-14-50-48/2026-04-13-14-50-48/2026-04-13-14-51-08/out/plots/lot-run-0-region-0-basic-appreq.csv' title "iocl\\\_craq" ls 1 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-14-50-48/2026-04-13-14-52-31/2026-04-13-14-52-48/out/plots/lot-run-0-region-0-basic-appreq.csv' title "craq" ls 2 with lines, \
+'/users/akalaba/IOCL/experiments/printdbg/10_shards/90%_reads/2026-04-13-14-50-48/2026-04-13-14-54-10/2026-04-13-14-54-27/out/plots/lot-run-0-region-0-basic-appreq.csv' title "vr" ls 3 with lines

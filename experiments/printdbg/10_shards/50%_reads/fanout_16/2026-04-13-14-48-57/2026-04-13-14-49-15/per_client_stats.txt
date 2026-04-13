@@ -1,0 +1,261 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 6
+  reads   : n=6  avg=8.33  min=6  p50=9  p95=10  max=11
+  writes  : n=6  avg=7.67  min=5  p50=9  p95=9  max=10
+  reads histogram:
+       6-6       # (1)
+       7-7       ## (2)
+       9-9       # (1)
+      10-10      # (1)
+      11-11      # (1)
+  batch total reply ms : n=6  avg=6445.67ms  min=6432ms  p50=6432ms  p95=6432ms  max=6514ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=415.33ms  min=401ms  p50=402ms  p95=402ms  max=484ms batch_age_ms=n=6  avg=415.33ms  min=401ms  p50=402ms  p95=402ms  max=484ms
+    pos=1  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=817.17ms  min=803ms  p50=804ms  p95=804ms  max=886ms
+    pos=2  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1219.17ms  min=1205ms  p50=1206ms  p95=1206ms  max=1288ms
+    pos=3  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1621.33ms  min=1607ms  p50=1608ms  p95=1608ms  max=1690ms
+    pos=4  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2023.33ms  min=2009ms  p50=2010ms  p95=2010ms  max=2091ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=2425.67ms  min=2412ms  p50=2412ms  p95=2412ms  max=2494ms
+    pos=6  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2827.67ms  min=2814ms  p50=2814ms  p95=2814ms  max=2896ms
+    pos=7  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3229.50ms  min=3216ms  p50=3216ms  p95=3216ms  max=3297ms
+    pos=8  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3631.50ms  min=3618ms  p50=3618ms  p95=3618ms  max=3699ms
+    pos=9  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4033.50ms  min=4020ms  p50=4020ms  p95=4020ms  max=4101ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4435.50ms  min=4422ms  p50=4422ms  p95=4422ms  max=4503ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4837.50ms  min=4824ms  p50=4824ms  p95=4824ms  max=4905ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5239.50ms  min=5225ms  p50=5226ms  p95=5226ms  max=5308ms
+    pos=13 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5641.67ms  min=5628ms  p50=5628ms  p95=5628ms  max=5710ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6043.50ms  min=6029ms  p50=6030ms  p95=6030ms  max=6112ms
+    pos=15 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6445.67ms  min=6432ms  p50=6432ms  p95=6432ms  max=6514ms
+
+[client-0-1]
+  batches : 6
+  reads   : n=6  avg=8.50  min=6  p50=9  p95=9  max=12
+  writes  : n=6  avg=7.50  min=4  p50=8  p95=9  max=10
+  reads histogram:
+       6-6       # (1)
+       7-7       # (1)
+       8-8       # (1)
+       9-9       ## (2)
+      12-12      # (1)
+  batch total reply ms : n=6  avg=6447.00ms  min=6431ms  p50=6433ms  p95=6433ms  max=6521ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=416.17ms  min=402ms  p50=402ms  p95=402ms  max=487ms batch_age_ms=n=6  avg=416.17ms  min=402ms  p50=402ms  p95=402ms  max=487ms
+    pos=1  issue_to_reply_ms=n=6  avg=402.33ms  min=402ms  p50=402ms  p95=402ms  max=404ms batch_age_ms=n=6  avg=818.67ms  min=804ms  p50=804ms  p95=804ms  max=892ms
+    pos=2  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1220.67ms  min=1206ms  p50=1206ms  p95=1206ms  max=1294ms
+    pos=3  issue_to_reply_ms=n=6  avg=401.50ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1622.33ms  min=1607ms  p50=1608ms  p95=1608ms  max=1696ms
+    pos=4  issue_to_reply_ms=n=6  avg=402.17ms  min=402ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=2025.00ms  min=2010ms  p50=2010ms  p95=2011ms  max=2099ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2427.00ms  min=2412ms  p50=2412ms  p95=2413ms  max=2501ms
+    pos=6  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2828.83ms  min=2814ms  p50=2814ms  p95=2814ms  max=2903ms
+    pos=7  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3230.83ms  min=3216ms  p50=3216ms  p95=3216ms  max=3305ms
+    pos=8  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3632.83ms  min=3617ms  p50=3618ms  p95=3619ms  max=3707ms
+    pos=9  issue_to_reply_ms=n=6  avg=402.17ms  min=402ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=4035.00ms  min=4019ms  p50=4021ms  p95=4021ms  max=4109ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4437.00ms  min=4421ms  p50=4423ms  p95=4423ms  max=4511ms
+    pos=11 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4839.00ms  min=4823ms  p50=4825ms  p95=4825ms  max=4913ms
+    pos=12 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5241.00ms  min=5225ms  p50=5227ms  p95=5227ms  max=5315ms
+    pos=13 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5643.00ms  min=5627ms  p50=5629ms  p95=5629ms  max=5717ms
+    pos=14 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6045.00ms  min=6029ms  p50=6031ms  p95=6031ms  max=6119ms
+    pos=15 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6447.00ms  min=6431ms  p50=6433ms  p95=6433ms  max=6521ms
+
+[client-1-0]
+  batches : 6
+  reads   : n=6  avg=9.00  min=5  p50=9  p95=11  max=11
+  writes  : n=6  avg=7.00  min=5  p50=7  p95=7  max=11
+  reads histogram:
+       5-5       # (1)
+       9-9       ### (3)
+      11-11      ## (2)
+  batch total reply ms : n=6  avg=6446.33ms  min=6431ms  p50=6432ms  p95=6433ms  max=6519ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=416.33ms  min=401ms  p50=402ms  p95=402ms  max=489ms batch_age_ms=n=6  avg=416.33ms  min=401ms  p50=402ms  p95=402ms  max=489ms
+    pos=1  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=818.33ms  min=803ms  p50=804ms  p95=804ms  max=891ms
+    pos=2  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1220.50ms  min=1206ms  p50=1206ms  p95=1206ms  max=1293ms
+    pos=3  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1622.50ms  min=1608ms  p50=1608ms  p95=1608ms  max=1695ms
+    pos=4  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2024.33ms  min=2009ms  p50=2010ms  p95=2010ms  max=2097ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2426.33ms  min=2411ms  p50=2412ms  p95=2412ms  max=2499ms
+    pos=6  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2828.33ms  min=2813ms  p50=2814ms  p95=2814ms  max=2901ms
+    pos=7  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3230.17ms  min=3215ms  p50=3216ms  p95=3216ms  max=3302ms
+    pos=8  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3632.00ms  min=3617ms  p50=3618ms  p95=3618ms  max=3704ms
+    pos=9  issue_to_reply_ms=n=6  avg=402.00ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=4034.33ms  min=4019ms  p50=4020ms  p95=4021ms  max=4106ms
+    pos=10 issue_to_reply_ms=n=6  avg=402.00ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=4436.33ms  min=4421ms  p50=4422ms  p95=4423ms  max=4509ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4838.00ms  min=4823ms  p50=4824ms  p95=4824ms  max=4910ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5240.00ms  min=5225ms  p50=5226ms  p95=5226ms  max=5312ms
+    pos=13 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5642.33ms  min=5627ms  p50=5628ms  p95=5629ms  max=5715ms
+    pos=14 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6044.33ms  min=6029ms  p50=6030ms  p95=6031ms  max=6117ms
+    pos=15 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6446.33ms  min=6431ms  p50=6432ms  p95=6433ms  max=6519ms
+
+[client-1-1]
+  batches : 6
+  reads   : n=6  avg=8.00  min=5  p50=9  p95=9  max=9
+  writes  : n=6  avg=8.00  min=7  p50=8  p95=8  max=11
+  reads histogram:
+       5-5       # (1)
+       8-8       ## (2)
+       9-9       ### (3)
+  batch total reply ms : n=6  avg=6446.50ms  min=6432ms  p50=6433ms  p95=6433ms  max=6517ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=416.17ms  min=402ms  p50=402ms  p95=402ms  max=487ms batch_age_ms=n=6  avg=416.17ms  min=402ms  p50=402ms  p95=402ms  max=487ms
+    pos=1  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=818.17ms  min=804ms  p50=804ms  p95=804ms  max=889ms
+    pos=2  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1220.17ms  min=1206ms  p50=1206ms  p95=1206ms  max=1291ms
+    pos=3  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1622.17ms  min=1608ms  p50=1608ms  p95=1608ms  max=1693ms
+    pos=4  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2024.33ms  min=2010ms  p50=2010ms  p95=2011ms  max=2095ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2426.33ms  min=2412ms  p50=2412ms  p95=2413ms  max=2497ms
+    pos=6  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2828.33ms  min=2814ms  p50=2814ms  p95=2815ms  max=2899ms
+    pos=7  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3230.33ms  min=3216ms  p50=3216ms  p95=3217ms  max=3301ms
+    pos=8  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3632.50ms  min=3618ms  p50=3619ms  p95=3619ms  max=3703ms
+    pos=9  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4034.67ms  min=4020ms  p50=4021ms  p95=4021ms  max=4105ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4436.50ms  min=4422ms  p50=4423ms  p95=4423ms  max=4507ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4838.50ms  min=4824ms  p50=4825ms  p95=4825ms  max=4909ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5240.50ms  min=5226ms  p50=5227ms  p95=5227ms  max=5311ms
+    pos=13 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5642.67ms  min=5628ms  p50=5629ms  p95=5629ms  max=5713ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6044.50ms  min=6030ms  p50=6031ms  p95=6031ms  max=6115ms
+    pos=15 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6446.50ms  min=6432ms  p50=6433ms  p95=6433ms  max=6517ms
+
+[client-2-0]
+  batches : 6
+  reads   : n=6  avg=7.33  min=4  p50=8  p95=10  max=10
+  writes  : n=6  avg=8.67  min=6  p50=10  p95=10  max=12
+  reads histogram:
+       4-4       # (1)
+       6-6       ## (2)
+       8-8       # (1)
+      10-10      ## (2)
+  batch total reply ms : n=6  avg=6447.17ms  min=6432ms  p50=6432ms  p95=6432ms  max=6523ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=415.83ms  min=401ms  p50=402ms  p95=402ms  max=487ms batch_age_ms=n=6  avg=415.83ms  min=401ms  p50=402ms  p95=402ms  max=487ms
+    pos=1  issue_to_reply_ms=n=6  avg=401.50ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=817.67ms  min=803ms  p50=804ms  p95=804ms  max=889ms
+    pos=2  issue_to_reply_ms=n=6  avg=402.17ms  min=401ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=6  avg=1220.33ms  min=1205ms  p50=1206ms  p95=1206ms  max=1294ms
+    pos=3  issue_to_reply_ms=n=6  avg=402.33ms  min=401ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=6  avg=1623.00ms  min=1607ms  p50=1608ms  p95=1608ms  max=1699ms
+    pos=4  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2024.83ms  min=2009ms  p50=2010ms  p95=2010ms  max=2101ms
+    pos=5  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2426.83ms  min=2411ms  p50=2412ms  p95=2412ms  max=2503ms
+    pos=6  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2828.83ms  min=2813ms  p50=2814ms  p95=2814ms  max=2905ms
+    pos=7  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3230.83ms  min=3215ms  p50=3216ms  p95=3216ms  max=3307ms
+    pos=8  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3633.00ms  min=3617ms  p50=3618ms  p95=3618ms  max=3709ms
+    pos=9  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4034.83ms  min=4019ms  p50=4020ms  p95=4020ms  max=4111ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4437.00ms  min=4421ms  p50=4422ms  p95=4422ms  max=4513ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.50ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4838.67ms  min=4823ms  p50=4824ms  p95=4824ms  max=4915ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.17ms  min=401ms  p50=401ms  p95=401ms  max=402ms batch_age_ms=n=6  avg=5240.50ms  min=5225ms  p50=5225ms  p95=5226ms  max=5317ms
+    pos=13 issue_to_reply_ms=n=6  avg=402.00ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=6  avg=5643.17ms  min=5628ms  p50=5628ms  p95=5628ms  max=5719ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6045.00ms  min=6029ms  p50=6030ms  p95=6030ms  max=6121ms
+    pos=15 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6447.17ms  min=6432ms  p50=6432ms  p95=6432ms  max=6523ms
+
+[client-2-1]
+  batches : 6
+  reads   : n=6  avg=7.83  min=6  p50=9  p95=9  max=10
+  writes  : n=6  avg=8.17  min=6  p50=9  p95=10  max=10
+  reads histogram:
+       6-6       ## (2)
+       7-7       # (1)
+       9-9       ## (2)
+      10-10      # (1)
+  batch total reply ms : n=6  avg=6447.67ms  min=6431ms  p50=6432ms  p95=6433ms  max=6527ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=416.67ms  min=401ms  p50=402ms  p95=402ms  max=491ms batch_age_ms=n=6  avg=416.67ms  min=401ms  p50=402ms  p95=402ms  max=491ms
+    pos=1  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=818.50ms  min=803ms  p50=804ms  p95=804ms  max=892ms
+    pos=2  issue_to_reply_ms=n=6  avg=402.50ms  min=402ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=6  avg=1221.17ms  min=1205ms  p50=1206ms  p95=1206ms  max=1298ms
+    pos=3  issue_to_reply_ms=n=6  avg=402.50ms  min=402ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=6  avg=1623.83ms  min=1607ms  p50=1608ms  p95=1609ms  max=1703ms
+    pos=4  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2025.83ms  min=2009ms  p50=2010ms  p95=2011ms  max=2105ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2427.83ms  min=2411ms  p50=2412ms  p95=2413ms  max=2507ms
+    pos=6  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2829.83ms  min=2813ms  p50=2814ms  p95=2815ms  max=2909ms
+    pos=7  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3231.83ms  min=3215ms  p50=3216ms  p95=3217ms  max=3311ms
+    pos=8  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3633.83ms  min=3617ms  p50=3618ms  p95=3619ms  max=3713ms
+    pos=9  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4035.67ms  min=4019ms  p50=4020ms  p95=4021ms  max=4114ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4437.67ms  min=4421ms  p50=4422ms  p95=4423ms  max=4517ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4839.50ms  min=4823ms  p50=4824ms  p95=4825ms  max=4919ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5241.50ms  min=5225ms  p50=5226ms  p95=5227ms  max=5321ms
+    pos=13 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5643.50ms  min=5627ms  p50=5628ms  p95=5629ms  max=5723ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6045.50ms  min=6029ms  p50=6030ms  p95=6031ms  max=6125ms
+    pos=15 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6447.67ms  min=6431ms  p50=6432ms  p95=6433ms  max=6527ms
+
+[client-3-0]
+  batches : 6
+  reads   : n=6  avg=6.83  min=5  p50=7  p95=7  max=9
+  writes  : n=6  avg=9.17  min=7  p50=9  p95=10  max=11
+  reads histogram:
+       5-5       # (1)
+       6-6       # (1)
+       7-7       ### (3)
+       9-9       # (1)
+  batch total reply ms : n=6  avg=6446.33ms  min=6431ms  p50=6433ms  p95=6433ms  max=6517ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=415.67ms  min=401ms  p50=402ms  p95=402ms  max=486ms batch_age_ms=n=6  avg=415.67ms  min=401ms  p50=402ms  p95=402ms  max=486ms
+    pos=1  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=818.00ms  min=804ms  p50=804ms  p95=804ms  max=888ms
+    pos=2  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1220.00ms  min=1205ms  p50=1206ms  p95=1207ms  max=1290ms
+    pos=3  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1622.00ms  min=1607ms  p50=1608ms  p95=1609ms  max=1692ms
+    pos=4  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2024.17ms  min=2010ms  p50=2010ms  p95=2011ms  max=2094ms
+    pos=5  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2426.17ms  min=2412ms  p50=2412ms  p95=2413ms  max=2496ms
+    pos=6  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2828.17ms  min=2814ms  p50=2814ms  p95=2815ms  max=2898ms
+    pos=7  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3230.17ms  min=3216ms  p50=3216ms  p95=3217ms  max=3300ms
+    pos=8  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3632.17ms  min=3618ms  p50=3618ms  p95=3619ms  max=3702ms
+    pos=9  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4034.00ms  min=4019ms  p50=4020ms  p95=4021ms  max=4104ms
+    pos=10 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4436.00ms  min=4421ms  p50=4422ms  p95=4423ms  max=4506ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4838.33ms  min=4824ms  p50=4825ms  p95=4825ms  max=4908ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5240.17ms  min=5225ms  p50=5227ms  p95=5227ms  max=5310ms
+    pos=13 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5642.17ms  min=5627ms  p50=5629ms  p95=5629ms  max=5712ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6044.17ms  min=6029ms  p50=6031ms  p95=6031ms  max=6114ms
+    pos=15 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6446.33ms  min=6431ms  p50=6433ms  p95=6433ms  max=6517ms
+
+[client-3-1]
+  batches : 6
+  reads   : n=6  avg=7.67  min=4  p50=7  p95=9  max=12
+  writes  : n=6  avg=8.33  min=4  p50=9  p95=9  max=12
+  reads histogram:
+       4-4       # (1)
+       7-7       ### (3)
+       9-9       # (1)
+      12-12      # (1)
+  batch total reply ms : n=6  avg=6440.50ms  min=6431ms  p50=6433ms  p95=6434ms  max=6482ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=6  avg=410.33ms  min=402ms  p50=402ms  p95=402ms  max=452ms batch_age_ms=n=6  avg=410.33ms  min=402ms  p50=402ms  p95=402ms  max=452ms
+    pos=1  issue_to_reply_ms=n=6  avg=401.50ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=812.17ms  min=803ms  p50=804ms  p95=805ms  max=854ms
+    pos=2  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1214.17ms  min=1205ms  p50=1206ms  p95=1207ms  max=1256ms
+    pos=3  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=1616.33ms  min=1607ms  p50=1608ms  p95=1609ms  max=1658ms
+    pos=4  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2018.33ms  min=2009ms  p50=2010ms  p95=2011ms  max=2060ms
+    pos=5  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2420.33ms  min=2411ms  p50=2412ms  p95=2413ms  max=2462ms
+    pos=6  issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=2822.33ms  min=2813ms  p50=2814ms  p95=2815ms  max=2864ms
+    pos=7  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3224.33ms  min=3215ms  p50=3216ms  p95=3217ms  max=3266ms
+    pos=8  issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=3626.33ms  min=3617ms  p50=3618ms  p95=3619ms  max=3668ms
+    pos=9  issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4028.50ms  min=4019ms  p50=4021ms  p95=4021ms  max=4070ms
+    pos=10 issue_to_reply_ms=n=6  avg=402.00ms  min=402ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4430.50ms  min=4421ms  p50=4423ms  p95=4423ms  max=4472ms
+    pos=11 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=4832.50ms  min=4823ms  p50=4825ms  p95=4825ms  max=4874ms
+    pos=12 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5234.33ms  min=5225ms  p50=5227ms  p95=5227ms  max=5275ms
+    pos=13 issue_to_reply_ms=n=6  avg=401.67ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=5636.33ms  min=5627ms  p50=5629ms  p95=5629ms  max=5677ms
+    pos=14 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6038.50ms  min=6029ms  p50=6031ms  p95=6031ms  max=6080ms
+    pos=15 issue_to_reply_ms=n=6  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=6  avg=6440.50ms  min=6431ms  p50=6433ms  p95=6434ms  max=6482ms
+
+[AGGREGATE batch composition across all clients]
+  total batches : 48
+  reads         : n=48  avg=7.94  min=4  p50=8  p95=11  max=12
+  writes        : n=48  avg=8.06  min=4  p50=8  p95=11  max=12
+  reads histogram:
+       4-4       ## (2)
+       5-5       ### (3)
+       6-6       ####### (7)
+       7-7       ########## (10)
+       8-8       #### (4)
+       9-9       ############# (13)
+      10-10      #### (4)
+      11-11      ### (3)
+      12-12      ## (2)
+  batch total reply ms : n=48  avg=6445.90ms  min=6431ms  p50=6432ms  p95=6519ms  max=6527ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=48  avg=415.31ms  min=401ms  p50=402ms  p95=487ms  max=491ms batch_age_ms=n=48  avg=415.31ms  min=401ms  p50=402ms  p95=487ms  max=491ms
+    pos=1  issue_to_reply_ms=n=48  avg=401.81ms  min=401ms  p50=402ms  p95=402ms  max=404ms batch_age_ms=n=48  avg=817.33ms  min=803ms  p50=804ms  p95=889ms  max=892ms
+    pos=2  issue_to_reply_ms=n=48  avg=401.94ms  min=401ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=48  avg=1219.52ms  min=1205ms  p50=1206ms  p95=1293ms  max=1298ms
+    pos=3  issue_to_reply_ms=n=48  avg=401.96ms  min=401ms  p50=402ms  p95=402ms  max=405ms batch_age_ms=n=48  avg=1621.69ms  min=1607ms  p50=1608ms  p95=1695ms  max=1703ms
+    pos=4  issue_to_reply_ms=n=48  avg=401.92ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=48  avg=2023.77ms  min=2009ms  p50=2010ms  p95=2097ms  max=2105ms
+    pos=5  issue_to_reply_ms=n=48  avg=401.92ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=48  avg=2425.81ms  min=2411ms  p50=2412ms  p95=2499ms  max=2507ms
+    pos=6  issue_to_reply_ms=n=48  avg=401.90ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=2827.79ms  min=2813ms  p50=2814ms  p95=2901ms  max=2909ms
+    pos=7  issue_to_reply_ms=n=48  avg=401.85ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=3229.75ms  min=3215ms  p50=3216ms  p95=3302ms  max=3311ms
+    pos=8  issue_to_reply_ms=n=48  avg=401.88ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=3631.77ms  min=3617ms  p50=3618ms  p95=3704ms  max=3713ms
+    pos=9  issue_to_reply_ms=n=48  avg=401.90ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=48  avg=4033.81ms  min=4019ms  p50=4020ms  p95=4106ms  max=4114ms
+    pos=10 issue_to_reply_ms=n=48  avg=401.83ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=48  avg=4435.81ms  min=4421ms  p50=4422ms  p95=4509ms  max=4517ms
+    pos=11 issue_to_reply_ms=n=48  avg=401.75ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=4837.75ms  min=4823ms  p50=4824ms  p95=4910ms  max=4919ms
+    pos=12 issue_to_reply_ms=n=48  avg=401.69ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=5239.69ms  min=5225ms  p50=5226ms  p95=5312ms  max=5321ms
+    pos=13 issue_to_reply_ms=n=48  avg=401.88ms  min=401ms  p50=402ms  p95=402ms  max=403ms batch_age_ms=n=48  avg=5641.85ms  min=5627ms  p50=5628ms  p95=5715ms  max=5723ms
+    pos=14 issue_to_reply_ms=n=48  avg=401.85ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=6043.81ms  min=6029ms  p50=6030ms  p95=6117ms  max=6125ms
+    pos=15 issue_to_reply_ms=n=48  avg=401.90ms  min=401ms  p50=402ms  p95=402ms  max=402ms batch_age_ms=n=48  avg=6445.90ms  min=6431ms  p50=6432ms  p95=6519ms  max=6527ms
+

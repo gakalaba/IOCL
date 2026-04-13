@@ -1,0 +1,110 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=382ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=382ms batch_age_ms=n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=382ms
+
+[client-0-1]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=384ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=384ms batch_age_ms=n=134  avg=202.40ms  min=200ms  p50=201ms  p95=201ms  max=384ms
+
+[client-1-0]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.34ms  min=200ms  p50=201ms  p95=201ms  max=382ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.34ms  min=200ms  p50=201ms  p95=201ms  max=382ms batch_age_ms=n=134  avg=202.34ms  min=200ms  p50=201ms  p95=201ms  max=382ms
+
+[client-1-1]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.32ms  min=200ms  p50=201ms  p95=201ms  max=383ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.32ms  min=200ms  p50=201ms  p95=201ms  max=383ms batch_age_ms=n=134  avg=202.32ms  min=200ms  p50=201ms  p95=201ms  max=383ms
+
+[client-2-0]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=381ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=381ms batch_age_ms=n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=381ms
+
+[client-2-1]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=380ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=380ms batch_age_ms=n=134  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=380ms
+
+[client-3-0]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.33ms  min=200ms  p50=201ms  p95=201ms  max=378ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.33ms  min=200ms  p50=201ms  p95=201ms  max=378ms batch_age_ms=n=134  avg=202.33ms  min=200ms  p50=201ms  p95=201ms  max=378ms
+
+[client-3-1]
+  batches : 134
+  reads   : n=134  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes  : n=134  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=134)
+  batch total reply ms : n=134  avg=202.35ms  min=200ms  p50=201ms  p95=202ms  max=377ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=134  avg=202.35ms  min=200ms  p50=201ms  p95=202ms  max=377ms batch_age_ms=n=134  avg=202.35ms  min=200ms  p50=201ms  p95=202ms  max=377ms
+
+[AGGREGATE batch composition across all clients]
+  total batches : 1072
+  reads         : n=1072  avg=1.00  min=1  p50=1  p95=1  max=1
+  writes        : n=1072  avg=0.00  min=0  p50=0  p95=0  max=0
+  reads histogram:
+  all=1 (n=1072)
+  batch total reply ms : n=1072  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=384ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=1072  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=384ms batch_age_ms=n=1072  avg=202.36ms  min=200ms  p50=201ms  p95=201ms  max=384ms
+
+
+=== Per-Client Clean/Dirty Read Counts (from MIDDLE server logs) ===
+(client_id is the raw C++ uint64; matches rid().client_id() in server logs)
+
+  client_id=9       clean=109    dirty=0      total=109     (100.0% clean)
+  client_id=12      clean=102    dirty=0      total=102     (100.0% clean)
+  client_id=15      clean=105    dirty=0      total=105     (100.0% clean)
+  client_id=18      clean=120    dirty=0      total=120     (100.0% clean)
+  client_id=21      clean=103    dirty=0      total=103     (100.0% clean)
+  client_id=24      clean=118    dirty=0      total=118     (100.0% clean)
+  client_id=27      clean=112    dirty=0      total=112     (100.0% clean)
+  client_id=30      clean=107    dirty=0      total=107     (100.0% clean)
+  client_id=33      clean=98     dirty=0      total=98      (100.0% clean)
+  client_id=36      clean=98     dirty=0      total=98      (100.0% clean)
+
+  TOTAL            clean=1072   dirty=0      total=1072    (100.0% clean)

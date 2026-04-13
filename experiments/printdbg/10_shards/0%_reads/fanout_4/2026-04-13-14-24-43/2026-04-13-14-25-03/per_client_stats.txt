@@ -1,0 +1,121 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 42
+  reads   : n=42  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=42  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=42)
+  batch total reply ms : n=42  avg=672.12ms  min=504ms  p50=704ms  p95=705ms  max=847ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=42  avg=406.45ms  min=402ms  p50=403ms  p95=404ms  max=545ms batch_age_ms=n=42  avg=406.45ms  min=402ms  p50=403ms  p95=404ms  max=545ms
+    pos=1  issue_to_reply_ms=n=42  avg=489.98ms  min=403ms  p50=503ms  p95=504ms  max=645ms batch_age_ms=n=42  avg=490.19ms  min=403ms  p50=503ms  p95=504ms  max=646ms
+    pos=2  issue_to_reply_ms=n=42  avg=578.31ms  min=404ms  p50=603ms  p95=604ms  max=745ms batch_age_ms=n=42  avg=578.76ms  min=404ms  p50=604ms  p95=605ms  max=746ms
+    pos=3  issue_to_reply_ms=n=42  avg=671.36ms  min=503ms  p50=703ms  p95=704ms  max=846ms batch_age_ms=n=42  avg=672.12ms  min=504ms  p50=704ms  p95=705ms  max=847ms
+
+[client-0-1]
+  batches : 42
+  reads   : n=42  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=42  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=42)
+  batch total reply ms : n=42  avg=660.50ms  min=505ms  p50=704ms  p95=705ms  max=763ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=42  avg=406.81ms  min=402ms  p50=403ms  p95=404ms  max=561ms batch_age_ms=n=42  avg=406.81ms  min=402ms  p50=403ms  p95=404ms  max=561ms
+    pos=1  issue_to_reply_ms=n=42  avg=483.21ms  min=403ms  p50=503ms  p95=504ms  max=662ms batch_age_ms=n=42  avg=483.38ms  min=403ms  p50=503ms  p95=504ms  max=662ms
+    pos=2  issue_to_reply_ms=n=42  avg=566.74ms  min=404ms  p50=603ms  p95=604ms  max=662ms batch_age_ms=n=42  avg=567.17ms  min=404ms  p50=603ms  p95=604ms  max=662ms
+    pos=3  issue_to_reply_ms=n=42  avg=659.86ms  min=504ms  p50=703ms  p95=704ms  max=763ms batch_age_ms=n=42  avg=660.50ms  min=505ms  p50=704ms  p95=705ms  max=763ms
+
+[client-1-0]
+  batches : 42
+  reads   : n=42  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=42  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=42)
+  batch total reply ms : n=42  avg=669.83ms  min=504ms  p50=704ms  p95=705ms  max=756ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=42  avg=406.64ms  min=402ms  p50=403ms  p95=404ms  max=555ms batch_age_ms=n=42  avg=406.64ms  min=402ms  p50=403ms  p95=404ms  max=555ms
+    pos=1  issue_to_reply_ms=n=42  avg=492.48ms  min=403ms  p50=503ms  p95=504ms  max=655ms batch_age_ms=n=42  avg=492.67ms  min=403ms  p50=503ms  p95=504ms  max=655ms
+    pos=2  issue_to_reply_ms=n=42  avg=580.98ms  min=404ms  p50=603ms  p95=604ms  max=755ms batch_age_ms=n=42  avg=581.36ms  min=404ms  p50=604ms  p95=605ms  max=756ms
+    pos=3  issue_to_reply_ms=n=42  avg=669.07ms  min=503ms  p50=703ms  p95=704ms  max=755ms batch_age_ms=n=42  avg=669.83ms  min=504ms  p50=704ms  p95=705ms  max=756ms
+
+[client-1-1]
+  batches : 42
+  reads   : n=42  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=42  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=42)
+  batch total reply ms : n=42  avg=674.24ms  min=503ms  p50=704ms  p95=705ms  max=842ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=42  avg=406.38ms  min=402ms  p50=403ms  p95=404ms  max=540ms batch_age_ms=n=42  avg=406.38ms  min=402ms  p50=403ms  p95=404ms  max=540ms
+    pos=1  issue_to_reply_ms=n=42  avg=489.90ms  min=403ms  p50=503ms  p95=504ms  max=641ms batch_age_ms=n=42  avg=490.14ms  min=403ms  p50=503ms  p95=504ms  max=641ms
+    pos=2  issue_to_reply_ms=n=42  avg=587.76ms  min=503ms  p50=603ms  p95=604ms  max=741ms batch_age_ms=n=42  avg=588.19ms  min=503ms  p50=604ms  p95=605ms  max=741ms
+    pos=3  issue_to_reply_ms=n=42  avg=673.60ms  min=503ms  p50=703ms  p95=704ms  max=842ms batch_age_ms=n=42  avg=674.24ms  min=503ms  p50=704ms  p95=705ms  max=842ms
+
+[client-2-0]
+  batches : 41
+  reads   : n=41  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=41  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=41)
+  batch total reply ms : n=41  avg=683.90ms  min=604ms  p50=704ms  p95=705ms  max=866ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=41  avg=406.73ms  min=402ms  p50=403ms  p95=404ms  max=564ms batch_age_ms=n=41  avg=406.73ms  min=402ms  p50=403ms  p95=404ms  max=564ms
+    pos=1  issue_to_reply_ms=n=41  avg=499.66ms  min=403ms  p50=503ms  p95=504ms  max=664ms batch_age_ms=n=41  avg=499.95ms  min=403ms  p50=503ms  p95=504ms  max=665ms
+    pos=2  issue_to_reply_ms=n=41  avg=595.12ms  min=503ms  p50=603ms  p95=604ms  max=764ms batch_age_ms=n=41  avg=595.59ms  min=503ms  p50=604ms  p95=605ms  max=765ms
+    pos=3  issue_to_reply_ms=n=41  avg=683.29ms  min=603ms  p50=703ms  p95=704ms  max=865ms batch_age_ms=n=41  avg=683.90ms  min=604ms  p50=704ms  p95=705ms  max=866ms
+
+[client-2-1]
+  batches : 41
+  reads   : n=41  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=41  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=41)
+  batch total reply ms : n=41  avg=683.66ms  min=504ms  p50=704ms  p95=705ms  max=864ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=41  avg=406.76ms  min=402ms  p50=403ms  p95=404ms  max=563ms batch_age_ms=n=41  avg=406.76ms  min=402ms  p50=403ms  p95=404ms  max=563ms
+    pos=1  issue_to_reply_ms=n=41  avg=494.76ms  min=402ms  p50=503ms  p95=504ms  max=663ms batch_age_ms=n=41  avg=494.88ms  min=402ms  p50=503ms  p95=504ms  max=663ms
+    pos=2  issue_to_reply_ms=n=41  avg=587.80ms  min=503ms  p50=603ms  p95=604ms  max=763ms batch_age_ms=n=41  avg=588.20ms  min=503ms  p50=604ms  p95=605ms  max=764ms
+    pos=3  issue_to_reply_ms=n=41  avg=683.10ms  min=503ms  p50=703ms  p95=704ms  max=863ms batch_age_ms=n=41  avg=683.66ms  min=504ms  p50=704ms  p95=705ms  max=864ms
+
+[client-3-0]
+  batches : 40
+  reads   : n=40  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=40  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=40)
+  batch total reply ms : n=40  avg=695.88ms  min=603ms  p50=704ms  p95=705ms  max=864ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=40  avg=406.98ms  min=402ms  p50=403ms  p95=404ms  max=562ms batch_age_ms=n=40  avg=406.98ms  min=402ms  p50=403ms  p95=404ms  max=562ms
+    pos=1  issue_to_reply_ms=n=40  avg=502.18ms  min=403ms  p50=503ms  p95=504ms  max=663ms batch_age_ms=n=40  avg=502.38ms  min=403ms  p50=503ms  p95=504ms  max=663ms
+    pos=2  issue_to_reply_ms=n=40  avg=599.98ms  min=503ms  p50=603ms  p95=604ms  max=763ms batch_age_ms=n=40  avg=600.40ms  min=503ms  p50=604ms  p95=605ms  max=763ms
+    pos=3  issue_to_reply_ms=n=40  avg=695.23ms  min=603ms  p50=704ms  p95=705ms  max=864ms batch_age_ms=n=40  avg=695.88ms  min=603ms  p50=704ms  p95=705ms  max=864ms
+
+[client-3-1]
+  batches : 41
+  reads   : n=41  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=41  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=41)
+  batch total reply ms : n=41  avg=678.88ms  min=503ms  p50=704ms  p95=705ms  max=861ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=41  avg=406.88ms  min=402ms  p50=403ms  p95=404ms  max=560ms batch_age_ms=n=41  avg=406.88ms  min=402ms  p50=403ms  p95=404ms  max=560ms
+    pos=1  issue_to_reply_ms=n=41  avg=494.80ms  min=403ms  p50=503ms  p95=504ms  max=660ms batch_age_ms=n=41  avg=495.00ms  min=403ms  p50=503ms  p95=504ms  max=660ms
+    pos=2  issue_to_reply_ms=n=41  avg=587.90ms  min=503ms  p50=603ms  p95=604ms  max=761ms batch_age_ms=n=41  avg=588.34ms  min=503ms  p50=604ms  p95=605ms  max=761ms
+    pos=3  issue_to_reply_ms=n=41  avg=678.17ms  min=503ms  p50=703ms  p95=704ms  max=860ms batch_age_ms=n=41  avg=678.88ms  min=503ms  p50=704ms  p95=705ms  max=861ms
+
+[AGGREGATE batch composition across all clients]
+  total batches : 331
+  reads         : n=331  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes        : n=331  avg=4.00  min=4  p50=4  p95=4  max=4
+  reads histogram:
+  all=0 (n=331)
+  batch total reply ms : n=331  avg=677.22ms  min=503ms  p50=704ms  p95=705ms  max=866ms
+  reply timeline by position:
+    pos=0  issue_to_reply_ms=n=331  avg=406.70ms  min=402ms  p50=403ms  p95=404ms  max=564ms batch_age_ms=n=331  avg=406.70ms  min=402ms  p50=403ms  p95=404ms  max=564ms
+    pos=1  issue_to_reply_ms=n=331  avg=493.29ms  min=402ms  p50=503ms  p95=504ms  max=664ms batch_age_ms=n=331  avg=493.49ms  min=402ms  p50=503ms  p95=504ms  max=665ms
+    pos=2  issue_to_reply_ms=n=331  avg=585.44ms  min=404ms  p50=603ms  p95=604ms  max=764ms batch_age_ms=n=331  avg=585.87ms  min=404ms  p50=604ms  p95=605ms  max=765ms
+    pos=3  issue_to_reply_ms=n=331  avg=676.55ms  min=503ms  p50=703ms  p95=705ms  max=865ms batch_age_ms=n=331  avg=677.22ms  min=503ms  p50=704ms  p95=705ms  max=866ms
+

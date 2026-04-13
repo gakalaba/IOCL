@@ -1,0 +1,115 @@
+=== Per-Shard Coordination Queueing ===
+(coord_wait_ms: time a read spent buffered at the middle waiting for CoordResponses)
+(queue_depth: number of buffered coord-waiting reads outstanding on that shard)
+(tail batch_size/pending_ooo kept below as secondary transport/tail signals)
+
+
+=== Per-Shard Middle Read Outcomes ===
+(clean: served directly; dirty: required VersionRequest to TAIL (+200ms))
+(dirty_depth = lastOp - lastCommitted when read arrived dirty)
+
+[shard-0 MIDDLE]
+  clean reads  : 250
+  dirty reads  : 0
+  total reads  : 250  (100.0% clean)
+  total latency   : n=250  avg=680.81ms  min=0ms  p50=703ms  p95=1308ms  max=1553ms
+  coord wait      : n=250  avg=680.81ms  min=0ms  p50=703ms  p95=1308ms  max=1553ms
+  vr wait         : n=250  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=250  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-1 MIDDLE]
+  clean reads  : 248
+  dirty reads  : 0
+  total reads  : 248  (100.0% clean)
+  total latency   : n=248  avg=704.77ms  min=0ms  p50=704ms  p95=1407ms  max=1509ms
+  coord wait      : n=248  avg=704.77ms  min=0ms  p50=704ms  p95=1407ms  max=1509ms
+  vr wait         : n=248  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=248  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-2 MIDDLE]
+  clean reads  : 245
+  dirty reads  : 0
+  total reads  : 245  (100.0% clean)
+  total latency   : n=245  avg=666.53ms  min=0ms  p50=703ms  p95=1351ms  max=1508ms
+  coord wait      : n=245  avg=666.53ms  min=0ms  p50=703ms  p95=1351ms  max=1508ms
+  vr wait         : n=245  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=245  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-3 MIDDLE]
+  clean reads  : 253
+  dirty reads  : 0
+  total reads  : 253  (100.0% clean)
+  total latency   : n=253  avg=655.26ms  min=0ms  p50=604ms  p95=1307ms  max=1508ms
+  coord wait      : n=253  avg=655.26ms  min=0ms  p50=604ms  p95=1307ms  max=1508ms
+  vr wait         : n=253  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=253  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-4 MIDDLE]
+  clean reads  : 220
+  dirty reads  : 0
+  total reads  : 220  (100.0% clean)
+  total latency   : n=220  avg=670.85ms  min=0ms  p50=699ms  p95=1307ms  max=1508ms
+  coord wait      : n=220  avg=670.85ms  min=0ms  p50=699ms  p95=1307ms  max=1508ms
+  vr wait         : n=220  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=220  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-5 MIDDLE]
+  clean reads  : 216
+  dirty reads  : 0
+  total reads  : 216  (100.0% clean)
+  total latency   : n=216  avg=744.39ms  min=0ms  p50=804ms  p95=1408ms  max=1625ms
+  coord wait      : n=216  avg=744.39ms  min=0ms  p50=804ms  p95=1408ms  max=1625ms
+  vr wait         : n=216  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=216  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-6 MIDDLE]
+  clean reads  : 229
+  dirty reads  : 0
+  total reads  : 229  (100.0% clean)
+  total latency   : n=229  avg=676.87ms  min=0ms  p50=619ms  p95=1404ms  max=1625ms
+  coord wait      : n=229  avg=676.87ms  min=0ms  p50=619ms  p95=1404ms  max=1625ms
+  vr wait         : n=229  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=229  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-7 MIDDLE]
+  clean reads  : 241
+  dirty reads  : 0
+  total reads  : 241  (100.0% clean)
+  total latency   : n=241  avg=706.29ms  min=0ms  p50=704ms  p95=1308ms  max=1605ms
+  coord wait      : n=241  avg=706.29ms  min=0ms  p50=704ms  p95=1308ms  max=1605ms
+  vr wait         : n=241  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=241  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-8 MIDDLE]
+  clean reads  : 253
+  dirty reads  : 0
+  total reads  : 253  (100.0% clean)
+  total latency   : n=253  avg=686.19ms  min=0ms  p50=703ms  p95=1407ms  max=1604ms
+  coord wait      : n=253  avg=686.19ms  min=0ms  p50=703ms  p95=1407ms  max=1604ms
+  vr wait         : n=253  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=253  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[shard-9 MIDDLE]
+  clean reads  : 229
+  dirty reads  : 0
+  total reads  : 229  (100.0% clean)
+  total latency   : n=229  avg=693.70ms  min=0ms  p50=704ms  p95=1343ms  max=1641ms
+  coord wait      : n=229  avg=693.70ms  min=0ms  p50=704ms  p95=1343ms  max=1641ms
+  vr wait         : n=229  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait: n=229  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+[AGGREGATE across all shards]
+  clean reads       : 2384
+  dirty reads       : 0
+  total reads       : 2384  (100.0% clean)
+  total latency     : n=2384  avg=687.97ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms
+  coord wait        : n=2384  avg=687.97ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms
+  vr wait           : n=2384  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  ready->exec wait  : n=2384  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+=== Aggregate Read Timeline By Position ===
+  pos=0  total=149  total_ms=n=149  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms coord_wait_ms=n=149  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms vr_wait_ms=n=149  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms ready_wait_ms=n=149  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+  pos=1  total=2235 total_ms=n=2235  avg=733.84ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms coord_wait_ms=n=2235  avg=733.84ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms vr_wait_ms=n=2235  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms ready_wait_ms=n=2235  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
+
+=== Aggregate Read Timeline By Path ===
+  path=clean total=2384 total_ms=n=2384  avg=687.97ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms coord_wait_ms=n=2384  avg=687.97ms  min=0ms  p50=704ms  p95=1407ms  max=1641ms vr_wait_ms=n=2384  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms ready_wait_ms=n=2384  avg=0.00ms  min=0ms  p50=0ms  p95=0ms  max=0ms
