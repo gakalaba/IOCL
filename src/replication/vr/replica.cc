@@ -78,7 +78,7 @@ namespace replication
             }
 
             this->viewChangeTimeout =
-                new Timeout(transport, 5000, [this]()
+                new Timeout(transport, 600000, [this]()
                             { StartViewChange(view + 1); });
             this->nullCommitTimeout =
                 new Timeout(transport, 1000, [this]()
