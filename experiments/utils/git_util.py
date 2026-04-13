@@ -13,13 +13,14 @@ def compile_make(config):
         subprocess.call(["rm", "-r", build_path])
     os.makedirs(build_path, exist_ok=True)
     subprocess.call(["cmake", ".."], cwd=build_path, env=e)
-    subprocess.call(["make", "-j", "8"], cwd=build_path, env=e)
+    subprocess.call(["sudo", "make", "-j", str(os.cpu_count() or 8)], cwd=build_path, env=e)
     bin_path = os.path.join(config['src_directory'], 'bin')
     os.makedirs(bin_path, exist_ok=True)
     if 'make_collect_bins' in config:
         for f in config['make_collect_bins']:
-            shutil.copy2(os.path.join(build_path, f),
-                         os.path.join(bin_path, os.path.basename(f)))
+            subprocess.call(["sudo", "cp",
+                             os.path.join(build_path, f),
+                             os.path.join(bin_path, os.path.basename(f))])
     return bin_path
 
 

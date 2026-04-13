@@ -333,6 +333,24 @@ def prepare_remote_exp_directories(config, local_exp_directory, executor):
     return remote_directory
 
 
+def run_parse_stats(local_out_directory):
+    """Run parse_stats.py on the run dir (parent of out/) after an experiment."""
+    import subprocess
+    run_dir = os.path.dirname(local_out_directory)
+    parse_stats_script = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'parse_stats.py'))
+    if not os.path.exists(parse_stats_script):
+        print(f'parse_stats.py not found at {parse_stats_script}, skipping.')
+        return
+    subprocess.run(['sudo', 'chmod', '-R', '777', run_dir], check=False)
+    result = subprocess.run(['python3', parse_stats_script, run_dir],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.stdout:
+        print(result.stdout.decode('utf-8', errors='replace').rstrip())
+    if result.returncode != 0 and result.stderr:
+        print('parse_stats.py error: ' + result.stderr.decode('utf-8', errors='replace').rstrip())
+
+
 def collect_and_calculate(config, client_config_idx, remote_exp_directory, local_out_directory, executor):
     if is_exp_remote(config):
         download_futures = collect_exp_data(config, remote_exp_directory,
@@ -343,6 +361,7 @@ def collect_and_calculate(config, client_config_idx, remote_exp_directory, local
     generate_cdf_plots(config, local_out_directory, stats, executor)
     generate_ot_plots(config, local_out_directory, stats, op_latencies,
                       op_times, client_op_latencies, client_op_times, executor)
+    run_parse_stats(local_out_directory)
     return local_out_directory
 
 
