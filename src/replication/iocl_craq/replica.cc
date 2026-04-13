@@ -1104,10 +1104,16 @@ namespace replication
                 // Now proceed with the normal read logic: dirty check.
                 if (this->lastOp != lastCommitted && !AmTail())
                 {
+                    uint64_t depth = this->lastOp - lastCommitted;
+                    dirtyReadCount_++;
+                    dirtyDepthHist_[depth]++;
+                    perClientReads_[linRequest.rid().client_id()].second++;
                     SendVersionRequest(linRequest);
                 }
                 else
                 {
+                    cleanReadCount_++;
+                    perClientReads_[linRequest.rid().client_id()].first++;
                     ExecuteReadOperation(linRequest);
                     ASSERT(++commitLogOpnum > 0);
                     ASSERT(commitLogOpnum > commitLog.LastOpnum());
