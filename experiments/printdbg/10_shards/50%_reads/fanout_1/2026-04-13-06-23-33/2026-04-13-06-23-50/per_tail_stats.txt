@@ -1,0 +1,188 @@
+=== Per-Shard Coordination Queueing ===
+(coord_wait_ms: time a read spent buffered at the middle waiting for CoordResponses)
+(queue_depth: number of buffered coord-waiting reads outstanding on that shard)
+(tail batch_size/pending_ooo kept below as secondary transport/tail signals)
+
+[shard-0]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=32  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=32  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-1]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=33  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=33  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-2]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=41  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=41  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-3]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=33  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=33  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-4]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=32  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=32  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-5]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=35  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=35  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-6]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=34  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=34  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-7]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=36  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=36  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-8]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=36  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=36  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[shard-9]
+  buffered reads   : 0
+  unblocked reads  : 0
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  max_queue_depth  : 0
+  tail batch_size  : n=28  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=28  avg=0.00  min=0  p50=0  p95=0  max=0
+
+[AGGREGATE across all shards]
+  coord_wait_ms    : n/a
+  queue_depth      : n/a
+  tail batch_size  : n=340  avg=1.00  min=1  p50=1  p95=1  max=1
+  tail pending_ooo : n=340  avg=0.00  min=0  p50=0  p95=0  max=0
+
+
+=== Per-Shard Middle Read Outcomes ===
+(clean: served directly; dirty: required VersionRequest to TAIL (+200ms))
+(dirty_depth = lastOp - lastCommitted when read arrived dirty)
+
+[shard-0 MIDDLE]
+  clean reads  : 31
+  dirty reads  : 7
+  total reads  : 38  (81.6% clean)
+  depth histogram:
+  all=1 (n=7)
+
+[shard-1 MIDDLE]
+  clean reads  : 30
+  dirty reads  : 2
+  total reads  : 32  (93.8% clean)
+  depth histogram:
+  all=1 (n=2)
+
+[shard-2 MIDDLE]
+  clean reads  : 25
+  dirty reads  : 5
+  total reads  : 30  (83.3% clean)
+  depth histogram:
+       1-1       ### (3)
+       2-2       ## (2)
+
+[shard-3 MIDDLE]
+  clean reads  : 25
+  dirty reads  : 9
+  total reads  : 34  (73.5% clean)
+  depth histogram:
+  all=1 (n=9)
+
+[shard-4 MIDDLE]
+  clean reads  : 25
+  dirty reads  : 8
+  total reads  : 33  (75.8% clean)
+  depth histogram:
+       1-1       ####### (7)
+       2-2       # (1)
+
+[shard-5 MIDDLE]
+  clean reads  : 28
+  dirty reads  : 5
+  total reads  : 33  (84.8% clean)
+  depth histogram:
+  all=1 (n=5)
+
+[shard-6 MIDDLE]
+  clean reads  : 26
+  dirty reads  : 7
+  total reads  : 33  (78.8% clean)
+  depth histogram:
+       1-1       ###### (6)
+       2-2       # (1)
+
+[shard-7 MIDDLE]
+  clean reads  : 26
+  dirty reads  : 9
+  total reads  : 35  (74.3% clean)
+  depth histogram:
+       1-1       ###### (6)
+       2-2       ### (3)
+
+[shard-8 MIDDLE]
+  clean reads  : 29
+  dirty reads  : 4
+  total reads  : 33  (87.9% clean)
+  depth histogram:
+       1-1       ### (3)
+       2-2       # (1)
+
+[shard-9 MIDDLE]
+  clean reads  : 30
+  dirty reads  : 7
+  total reads  : 37  (81.1% clean)
+  depth histogram:
+  all=1 (n=7)
+
+[AGGREGATE across all shards]
+  clean reads       : 275
+  dirty reads       : 63
+  total reads       : 338  (81.4% clean)
+  depth histogram:
+       1-1       ######################################## (55)
+       2-2       ######## (8)

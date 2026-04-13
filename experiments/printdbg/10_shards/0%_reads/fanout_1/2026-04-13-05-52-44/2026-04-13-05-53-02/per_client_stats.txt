@@ -1,0 +1,67 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-0-1]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-1-0]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-1-1]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-2-0]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-2-1]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-3-0]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[client-3-1]
+  batches : 68
+  reads   : n=68  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes  : n=68  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=68)
+
+[AGGREGATE batch composition across all clients]
+  total batches : 544
+  reads         : n=544  avg=0.00  min=0  p50=0  p95=0  max=0
+  writes        : n=544  avg=1.00  min=1  p50=1  p95=1  max=1
+  reads histogram:
+  all=0 (n=544)
+

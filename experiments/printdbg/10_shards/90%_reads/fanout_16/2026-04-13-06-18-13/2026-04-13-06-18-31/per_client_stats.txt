@@ -1,0 +1,107 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 9
+  reads   : n=9  avg=14.44  min=13  p50=15  p95=15  max=15
+  writes  : n=9  avg=1.56  min=1  p50=1  p95=2  max=3
+  reads histogram:
+      13-13      # (1)
+      14-14      ### (3)
+      15-15      ##### (5)
+
+[client-0-1]
+  batches : 9
+  reads   : n=9  avg=15.00  min=14  p50=15  p95=16  max=16
+  writes  : n=9  avg=1.00  min=0  p50=1  p95=2  max=2
+  reads histogram:
+      14-14      ### (3)
+      15-15      ### (3)
+      16-16      ### (3)
+
+[client-1-0]
+  batches : 9
+  reads   : n=9  avg=14.67  min=13  p50=15  p95=15  max=16
+  writes  : n=9  avg=1.33  min=0  p50=1  p95=2  max=3
+  reads histogram:
+      13-13      # (1)
+      14-14      ## (2)
+      15-15      ##### (5)
+      16-16      # (1)
+
+[client-1-1]
+  batches : 9
+  reads   : n=9  avg=14.33  min=12  p50=14  p95=16  max=16
+  writes  : n=9  avg=1.67  min=0  p50=2  p95=2  max=4
+  reads histogram:
+      12-12      # (1)
+      14-14      ##### (5)
+      15-15      # (1)
+      16-16      ## (2)
+
+[client-2-0]
+  batches : 9
+  reads   : n=9  avg=14.33  min=13  p50=14  p95=15  max=15
+  writes  : n=9  avg=1.67  min=1  p50=2  p95=2  max=3
+  reads histogram:
+      13-13      # (1)
+      14-14      #### (4)
+      15-15      #### (4)
+
+[client-2-1]
+  batches : 9
+  reads   : n=9  avg=14.11  min=13  p50=14  p95=15  max=15
+  writes  : n=9  avg=1.89  min=1  p50=2  p95=3  max=3
+  reads histogram:
+      13-13      ## (2)
+      14-14      #### (4)
+      15-15      ### (3)
+
+[client-3-0]
+  batches : 8
+  reads   : n=8  avg=13.38  min=12  p50=13  p95=14  max=15
+  writes  : n=8  avg=2.62  min=1  p50=3  p95=3  max=4
+  reads histogram:
+      12-12      # (1)
+      13-13      #### (4)
+      14-14      ## (2)
+      15-15      # (1)
+
+[client-3-1]
+  batches : 9
+  reads   : n=9  avg=14.11  min=12  p50=14  p95=15  max=16
+  writes  : n=9  avg=1.89  min=0  p50=2  p95=4  max=4
+  reads histogram:
+      12-12      ## (2)
+      14-14      ### (3)
+      15-15      ### (3)
+      16-16      # (1)
+
+[AGGREGATE batch composition across all clients]
+  total batches : 71
+  reads         : n=71  avg=14.31  min=12  p50=14  p95=16  max=16
+  writes        : n=71  avg=1.69  min=0  p50=2  p95=3  max=4
+  reads histogram:
+      12-12      #### (4)
+      13-13      ######### (9)
+      14-14      ########################## (26)
+      15-15      ######################### (25)
+      16-16      ####### (7)
+
+
+=== Per-Client Clean/Dirty Read Counts (from MIDDLE server logs) ===
+(client_id is the raw C++ uint64; matches rid().client_id() in server logs)
+
+  client_id=9       clean=89     dirty=3      total=92      (96.7% clean)
+  client_id=12      clean=97     dirty=7      total=104     (93.3% clean)
+  client_id=15      clean=87     dirty=7      total=94      (92.6% clean)
+  client_id=18      clean=87     dirty=2      total=89      (97.8% clean)
+  client_id=21      clean=103    dirty=10     total=113     (91.2% clean)
+  client_id=24      clean=98     dirty=5      total=103     (95.1% clean)
+  client_id=27      clean=92     dirty=4      total=96      (95.8% clean)
+  client_id=30      clean=103    dirty=9      total=112     (92.0% clean)
+  client_id=33      clean=94     dirty=9      total=103     (91.3% clean)
+  client_id=36      clean=108    dirty=2      total=110     (98.2% clean)
+
+  TOTAL            clean=958    dirty=58     total=1016    (94.3% clean)

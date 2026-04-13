@@ -1,0 +1,118 @@
+=== Per-Client Batch Composition ===
+(reads/writes: ops decided per fanout batch at issue time)
+(clean/dirty: read outcome at MIDDLE, aggregated across all shards)
+
+[client-0-0]
+  batches : 40
+  reads   : n=40  avg=1.73  min=0  p50=2  p95=3  max=4
+  writes  : n=40  avg=2.27  min=0  p50=2  p95=4  max=4
+  reads histogram:
+       0-0       ####### (7)
+       1-1       ########## (10)
+       2-2       ############ (12)
+       3-3       ######### (9)
+       4-4       ## (2)
+
+[client-0-1]
+  batches : 41
+  reads   : n=41  avg=2.17  min=0  p50=2  p95=3  max=4
+  writes  : n=41  avg=1.83  min=0  p50=2  p95=3  max=4
+  reads histogram:
+       0-0       # (1)
+       1-1       ######### (9)
+       2-2       ############### (15)
+       3-3       ############## (14)
+       4-4       ## (2)
+
+[client-1-0]
+  batches : 38
+  reads   : n=38  avg=2.21  min=0  p50=2  p95=4  max=4
+  writes  : n=38  avg=1.79  min=0  p50=2  p95=3  max=4
+  reads histogram:
+       0-0       # (1)
+       1-1       ####### (7)
+       2-2       ################# (17)
+       3-3       ######### (9)
+       4-4       #### (4)
+
+[client-1-1]
+  batches : 38
+  reads   : n=38  avg=1.76  min=0  p50=2  p95=3  max=4
+  writes  : n=38  avg=2.24  min=0  p50=2  p95=4  max=4
+  reads histogram:
+       0-0       #### (4)
+       1-1       ########## (10)
+       2-2       ################# (17)
+       3-3       ##### (5)
+       4-4       ## (2)
+
+[client-2-0]
+  batches : 39
+  reads   : n=39  avg=1.95  min=0  p50=2  p95=4  max=4
+  writes  : n=39  avg=2.05  min=0  p50=2  p95=4  max=4
+  reads histogram:
+       0-0       #### (4)
+       1-1       ########## (10)
+       2-2       ############# (13)
+       3-3       ######## (8)
+       4-4       #### (4)
+
+[client-2-1]
+  batches : 36
+  reads   : n=36  avg=2.03  min=1  p50=2  p95=3  max=4
+  writes  : n=36  avg=1.97  min=0  p50=2  p95=3  max=3
+  reads histogram:
+       1-1       ############# (13)
+       2-2       ########### (11)
+       3-3       ########## (10)
+       4-4       ## (2)
+
+[client-3-0]
+  batches : 40
+  reads   : n=40  avg=2.05  min=0  p50=2  p95=4  max=4
+  writes  : n=40  avg=1.95  min=0  p50=2  p95=4  max=4
+  reads histogram:
+       0-0       ### (3)
+       1-1       ####### (7)
+       2-2       ################## (18)
+       3-3       ######### (9)
+       4-4       ### (3)
+
+[client-3-1]
+  batches : 37
+  reads   : n=37  avg=1.92  min=0  p50=2  p95=4  max=4
+  writes  : n=37  avg=2.08  min=0  p50=2  p95=3  max=4
+  reads histogram:
+       0-0       # (1)
+       1-1       ############### (15)
+       2-2       ########### (11)
+       3-3       ###### (6)
+       4-4       #### (4)
+
+[AGGREGATE batch composition across all clients]
+  total batches : 309
+  reads         : n=309  avg=1.98  min=0  p50=2  p95=4  max=4
+  writes        : n=309  avg=2.02  min=0  p50=2  p95=4  max=4
+  reads histogram:
+       0-0       ##################### (21)
+       1-1       ######################################## (81)
+       2-2       ######################################## (114)
+       3-3       ######################################## (70)
+       4-4       ####################### (23)
+
+
+=== Per-Client Clean/Dirty Read Counts (from MIDDLE server logs) ===
+(client_id is the raw C++ uint64; matches rid().client_id() in server logs)
+
+  client_id=9       clean=44     dirty=24     total=68      (64.7% clean)
+  client_id=12      clean=40     dirty=16     total=56      (71.4% clean)
+  client_id=15      clean=50     dirty=19     total=69      (72.5% clean)
+  client_id=18      clean=40     dirty=20     total=60      (66.7% clean)
+  client_id=21      clean=41     dirty=21     total=62      (66.1% clean)
+  client_id=24      clean=40     dirty=20     total=60      (66.7% clean)
+  client_id=27      clean=51     dirty=20     total=71      (71.8% clean)
+  client_id=30      clean=39     dirty=18     total=57      (68.4% clean)
+  client_id=33      clean=40     dirty=16     total=56      (71.4% clean)
+  client_id=36      clean=32     dirty=20     total=52      (61.5% clean)
+
+  TOTAL            clean=417    dirty=194    total=611     (68.2% clean)
