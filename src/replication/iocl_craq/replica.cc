@@ -257,6 +257,20 @@ namespace replication
 
             Execute(Timestamp{keyToVersionNumber[linRequest.key()]}, request, reply);
             SendReplyToClient(linRequest, reply);
+
+            // Mark this read as "committed" for coordination purposes so that
+            // successor operations which declared this read as a predecessor can
+            // be unblocked via CoordResponse.
+            if (linRequest.has_shardtag() && linRequest.shardtag() != 0)
+            {
+                uint64_t myShardTag = linRequest.shardtag();
+                committedForCoord[myShardTag] = true;
+                if (pendingCoordRequests.count(myShardTag))
+                {
+                    pendingCoordDrain_.push_back(myShardTag);
+                    DrainPendingCoordRequests();
+                }
+            }
         }
 
         void IOCL_CRAQReplica::SendReplyToClient(const LinearizeableOperation &request,
@@ -666,27 +680,37 @@ namespace replication
 
             UpdateClientTable(linRequest);
 
-            // If this read has a predecessor, ensure its CoordResponse has arrived.
+            // If this read has predecessors, ensure all CoordResponses have arrived.
             if (linRequest.predlist_size() > 0 && linRequest.predlist(0) != 0)
             {
                 uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
                 if (myShardTag != 0)
                 {
-                    // CoordResponse may have arrived before this read (race: predecessor
-                    // was already committed when the CoordRequest arrived, so the reply
-                    // was sent immediately and stored in pendingCoordResponses).
-                    auto coordIt = pendingCoordResponses.find(myShardTag);
-                    if (coordIt != pendingCoordResponses.end())
+                    int expected = 0;
+                    for (int pi = 0; pi < linRequest.predlist_size(); pi++)
+                        if (linRequest.predlist(pi) != 0) expected++;
+
+                    int received = coordResponseCount_.count(myShardTag)
+                                   ? coordResponseCount_[myShardTag] : 0;
+
+                    if (received >= expected)
                     {
-                        Debug("CoordResponse already arrived for read shardtag %lu, serving immediately", myShardTag);
-                        SyncVC(coordIt->second.vector_clock());
-                        pendingCoordResponses.erase(coordIt);
+                        // All CoordResponses already arrived before this read.
+                        Debug("All %d CoordResponses already arrived for read shardtag %lu", expected, myShardTag);
+                        auto vcIt = pendingCoordResponses.find(myShardTag);
+                        if (vcIt != pendingCoordResponses.end())
+                        {
+                            SyncVC(vcIt->second.vector_clock());
+                            pendingCoordResponses.erase(vcIt);
+                        }
+                        coordResponseCount_.erase(myShardTag);
                         // Fall through to serve the read normally.
                     }
                     else
                     {
-                        Debug("Buffering read shardtag %lu waiting for CoordResponse", myShardTag);
+                        Debug("Buffering read shardtag %lu waiting for CoordResponses (%d/%d)", myShardTag, received, expected);
                         readsWaitingForCoord[myShardTag] = linRequest;
+                        readsExpectedCoordCount_[myShardTag] = expected;
                         return;
                     }
                 }
@@ -1018,12 +1042,8 @@ namespace replication
         void IOCL_CRAQReplica::HandleCoordination(const TransportAddress &remote,
                                                    const proto::SuccessorRequestMessage &msg)
         {
-            if (!AmTail())
-            {
-                RWarning("Received CoordRequest at a non-tail replica; ignoring");
-                return;
-            }
-
+            // CoordRequests may arrive at any replica: tail for write predecessors,
+            // or the read-serving replica (e.g. MIDDLE) for read predecessors.
             uint64_t p = msg.p();  // predecessor's shardtag
 
             // Sync client's VC.
@@ -1058,10 +1078,28 @@ namespace replication
             auto readIt = readsWaitingForCoord.find(successorShardTag);
             if (readIt != readsWaitingForCoord.end())
             {
+                // Count this response and check if all expected have arrived.
+                pendingCoordResponses[successorShardTag] = msg;
+                int nowReceived = ++coordResponseCount_[successorShardTag];
+
+                auto expIt = readsExpectedCoordCount_.find(successorShardTag);
+                int expected = (expIt != readsExpectedCoordCount_.end()) ? expIt->second : 1;
+
+                if (nowReceived < expected)
+                {
+                    Debug("Read shardtag %lu: %d/%d CoordResponses received, still waiting",
+                          successorShardTag, nowReceived, expected);
+                    return;
+                }
+
+                // All CoordResponses received — unblock the read.
                 LinearizeableOperation linRequest = readIt->second;
                 readsWaitingForCoord.erase(readIt);
+                readsExpectedCoordCount_.erase(successorShardTag);
+                coordResponseCount_.erase(successorShardTag);
+                pendingCoordResponses.erase(successorShardTag);
 
-                Debug("Unblocking read shardtag %lu", successorShardTag);
+                Debug("Unblocking read shardtag %lu (%d/%d CoordResponses)", successorShardTag, nowReceived, expected);
 
                 // Now proceed with the normal read logic: dirty check.
                 if (this->lastOp != lastCommitted && !AmTail())

@@ -151,8 +151,12 @@ namespace replication
             std::vector<uint64_t> pendingCoordDrain_;
 
             // Any replica: read's shardtag -> linOp, for reads awaiting their
-            // CoordResponse before they can proceed.
+            // CoordResponse(s) before they can proceed.
             std::map<uint64_t, LinearizeableOperation> readsWaitingForCoord;
+
+            // Any replica: read's shardtag -> number of CoordResponses still needed
+            // before the read can proceed (= predlist non-zero entries count).
+            std::map<uint64_t, int> readsExpectedCoordCount_;
 
             // Non-tail: reads that have gotten their CoordResponse (or have no
             // predecessor) and sent a VersionRequest, then received a VersionResponse,

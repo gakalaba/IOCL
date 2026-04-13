@@ -109,6 +109,8 @@ namespace replication
             {
                 linOp.add_predlist(lastIssuedShardTag);
                 linOp.add_shardlist(group);
+                // Auto-chained predecessor was always a write, served at tail.
+                linOp.add_pred_replicalist(config.n - 1);
             }
 
             // Track this write as the predecessor for the next write on this shard.
@@ -117,13 +119,17 @@ namespace replication
                 lastIssuedShardTag = shardtag;
             }
 
-            // Send CoordRequests to all predecessor shards' TAILs.
+            // Send CoordRequests to each predecessor's serving replica.
+            // Writes are served at TAIL (config.n - 1); reads are served at
+            // the replica index recorded in pred_replicalist.
             for (int i = 0; i < linOp.predlist_size() && i < linOp.shardlist_size(); i++)
             {
                 uint64_t predShardtag = linOp.predlist(i);
                 if (predShardtag == 0) continue;
                 int predGroupIdx = (int)linOp.shardlist(i);
-                int predTailIdx = config.n - 1;
+                int predTailIdx = (i < linOp.pred_replicalist_size())
+                                  ? linOp.pred_replicalist(i)
+                                  : (config.n - 1);
 
                 proto::SuccessorRequestMessage coordReq;
                 coordReq.set_p(predShardtag);
