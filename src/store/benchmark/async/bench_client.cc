@@ -30,6 +30,7 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <chrono>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -41,6 +42,12 @@
 #include "store/strongstore/client.h"
 
 DEFINE_LATENCY(op);
+
+uint64_t BenchmarkClient::NowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
                                  Transport &transport, uint64_t id,
@@ -370,8 +377,8 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     auto &session = ss.session();
 
     // Generic Operation Callback
-    auto ocb = std::bind(&BenchmarkClient::ReceiveOperationResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto otcb = std::bind(&BenchmarkClient::SendOperationTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
+    auto ocb = std::bind(&BenchmarkClient::ReceiveOperationResponse, this, session_id, op_index, std::placeholders::_1, std::placeholders::_2);
+    auto otcb = std::bind(&BenchmarkClient::SendOperationTimeout, this, session_id, op_index, std::placeholders::_1, std::placeholders::_2);
 
     auto client_index = ss.current_client_index();
     auto &client = *clients_[client_index];
@@ -405,6 +412,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
         Panic("unsupported opeartion type %d", op.type);
     }
     Notice("Sending op with proto %d and index %d", protocol_, replicaIndex);
+    ss.RecordAppRequestIssue(op_index, NowMs());
     client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, replicaIndex, timeout_);
 
     if (issueConcurrent)
@@ -522,7 +530,7 @@ void BenchmarkClient::PutTimeout(const uint64_t session_id, int status,
 }
 
 
-void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
+void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id, std::size_t op_index,
                                              int status, const std::string &retval)
 {
     Debug("session [%lu] running ReceiveOperationResponse callback in benchclient! status = %d and retval = %s", session_id, status, retval.c_str());
@@ -530,6 +538,13 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
+    const uint64_t now_ms = NowMs();
+    const uint64_t issue_ms = ss.AppRequestIssueMs(op_index);
+    const uint64_t batch_start_ms = ss.BatchStartMs();
+    const uint64_t issue_to_reply_ms = (issue_ms != 0 && now_ms >= issue_ms) ? (now_ms - issue_ms) : 0;
+    const uint64_t batch_age_ms = (batch_start_ms != 0 && now_ms >= batch_start_ms) ? (now_ms - batch_start_ms) : 0;
+    Notice("AppRequest reply timeline: pos=%lu status=%d issue_to_reply_ms=%lu batch_age_ms=%lu",
+           op_index, status, issue_to_reply_ms, batch_age_ms);
     ss.incr_responses();
     Debug("current number of responses recieved = %lu, looking for %lu", ss.responses(), ss.fanout());
 
@@ -543,6 +558,8 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
             auto n_attempts = ss.n_attempts();
 
             stats.Increment(ttype + "_completed", 1);
+            Notice("AppRequest batch done: fanout=%lu total_reply_ms=%lu",
+                   ss.fanout(), batch_age_ms);
 
             // Send Next App Request
             if (!cooldownStarted)
@@ -574,10 +591,10 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
     }
 }
 
-void BenchmarkClient::SendOperationTimeout(const uint64_t session_id,
+void BenchmarkClient::SendOperationTimeout(const uint64_t session_id, std::size_t op_index,
                                          int status, const std::string &retval)
 {
-    Warning("[%lu] ExecuteNextAppRequestOperation timed out :(", session_id);
+    Warning("[%lu] ExecuteNextAppRequestOperation timed out at pos %lu :(", session_id, op_index);
 }
 
 void BenchmarkClient::CommitCallback(const uint64_t session_id, transaction_status_t status)

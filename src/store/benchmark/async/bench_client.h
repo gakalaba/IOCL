@@ -112,10 +112,10 @@ private:
     {
     public:
         SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0}, batch_start_ms_{0}, appreq_issue_ms_{} {}
 
         SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
-            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0}, batch_start_ms_{0}, appreq_issue_ms_(fanout, 0) {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
@@ -161,7 +161,29 @@ private:
             n_attempts_ = 1;
             op_index_ = 0;
             responses_ = 0;
+            batch_start_ms_ = 0;
+            appreq_issue_ms_.assign(fanout_, 0);
         }
+
+        void RecordAppRequestIssue(std::size_t op_index, uint64_t now_ms)
+        {
+            if (batch_start_ms_ == 0)
+            {
+                batch_start_ms_ = now_ms;
+            }
+            if (op_index >= appreq_issue_ms_.size())
+            {
+                appreq_issue_ms_.resize(op_index + 1, 0);
+            }
+            appreq_issue_ms_[op_index] = now_ms;
+        }
+
+        uint64_t AppRequestIssueMs(std::size_t op_index) const
+        {
+            return op_index < appreq_issue_ms_.size() ? appreq_issue_ms_[op_index] : 0;
+        }
+
+        uint64_t BatchStartMs() const { return batch_start_ms_; }
 
     private:
         Latency_Frame_t lat_;
@@ -175,6 +197,8 @@ private:
         std::size_t op_index_;
         std::size_t current_client_index_;
         std::size_t current_client_txn_count_;
+        uint64_t batch_start_ms_;
+        std::vector<uint64_t> appreq_issue_ms_;
     };
 
     void ExecuteAbort(const uint64_t session_id, transaction_status_t status);
@@ -194,10 +218,10 @@ private:
                      int status, const std::string &key, const std::string &val);
     void PutTimeout(const uint64_t session_id,
                     int status, const std::string &key, const std::string &val);
-    void ReceiveOperationResponse(const uint64_t session_id,
-                                int status, const std::string &retval);
-    void SendOperationTimeout(const uint64_t session_id,
-                            int status, const std::string &retval);
+    void ReceiveOperationResponse(const uint64_t session_id, std::size_t op_index,
+                                             int status, const std::string &retval);
+    void SendOperationTimeout(const uint64_t session_id, std::size_t op_index,
+                                         int status, const std::string &retval);
 
     void CommitCallback(const uint64_t session_id, transaction_status_t status);
     void EndAppRequestCallback(const uint64_t session_id);
@@ -206,6 +230,7 @@ private:
     void AbortTimeout();
 
     inline bool IsLinearizeable() {return clients_[0]->IsLinearizeable(); };
+    static uint64_t NowMs();
 
     void Finish();
     void WarmupDone();

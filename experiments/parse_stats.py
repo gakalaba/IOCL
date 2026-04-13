@@ -61,8 +61,18 @@ DEPTH_RE = re.compile(
 CLIENT_RE = re.compile(
     r'\[(\d+)\] ReadStatsClient client=(\d+) clean=(\d+) dirty=(\d+)'
 )
+READ_TIMELINE_RE = re.compile(
+    r'\[(\d+)\] ReadTimeline pos=(\d+) vr=(\d+) '
+    r'coord_wait_ms=(\d+) vr_wait_ms=(\d+) ready_wait_ms=(\d+) total_ms=(\d+)'
+)
 APPREQ_SEND_RE = re.compile(
     r'SendOperation on AppRequest\[(\d+)\]:\s+([A-Za-z_]+)\('
+)
+APPREQ_REPLY_TIMELINE_RE = re.compile(
+    r'AppRequest reply timeline: pos=(\d+) status=(\d+) issue_to_reply_ms=(\d+) batch_age_ms=(\d+)'
+)
+APPREQ_BATCH_DONE_RE = re.compile(
+    r'AppRequest batch done: fanout=(\d+) total_reply_ms=(\d+)'
 )
 SHARD_SEND_RE = re.compile(
     r'\[shard (\d+)\] AppReqiest Sending Operation ([A-Za-z_]+)\('
@@ -178,6 +188,8 @@ def parse_client_logs(run_dir):
           'batch_sequences': [[shard, ...], ...],
           'adjacent_repeat_counts': [],
           'unique_shards_per_batch': [],
+          'reply_timeline': [sample, ...],
+          'batch_total_reply_ms': [],
       }}
     """
     stats = defaultdict(lambda: {
@@ -187,6 +199,8 @@ def parse_client_logs(run_dir):
         'batch_sequences': [],
         'adjacent_repeat_counts': [],
         'unique_shards_per_batch': [],
+        'reply_timeline': [],
+        'batch_total_reply_ms': [],
     })
     pattern = os.path.join(run_dir, 'out/client-*/*-stderr-*.log')
     for path in sorted(glob.glob(pattern)):
@@ -253,6 +267,17 @@ def parse_client_logs(run_dir):
                                 current_batch_seq.append(shard)
                             if len(current_batch_seq) == current_batch_total:
                                 flush_batch()
+                    rtm = APPREQ_REPLY_TIMELINE_RE.search(line)
+                    if rtm:
+                        stats[label]['reply_timeline'].append({
+                            'pos': int(rtm.group(1)),
+                            'status': int(rtm.group(2)),
+                            'issue_to_reply_ms': int(rtm.group(3)),
+                            'batch_age_ms': int(rtm.group(4)),
+                        })
+                    bdm = APPREQ_BATCH_DONE_RE.search(line)
+                    if bdm:
+                        stats[label]['batch_total_reply_ms'].append(int(bdm.group(2)))
                 flush_batch()
         except OSError:
             pass
@@ -268,7 +293,8 @@ def parse_server_logs(run_dir):
                                    'unblocked_reads': int}}
       middle_stats: {shard_label: {'clean': int, 'dirty': int,
                                    'depth_hist': {depth: count},
-                                   'by_client': {client_id: {'clean': int, 'dirty': int}}}}
+                                   'by_client': {client_id: {'clean': int, 'dirty': int}},
+                                   'read_timeline': [sample, ...]}}
     """
     tail_stats   = defaultdict(lambda: {
         'batch_sizes': [],
@@ -282,7 +308,8 @@ def parse_server_logs(run_dir):
     middle_stats = defaultdict(lambda: {
         'clean': 0, 'dirty': 0,
         'depth_hist': defaultdict(int),
-        'by_client': defaultdict(lambda: {'clean': 0, 'dirty': 0})
+        'by_client': defaultdict(lambda: {'clean': 0, 'dirty': 0}),
+        'read_timeline': [],
     })
 
     pattern = os.path.join(run_dir, 'out/server-*/*-stderr-*.log')
@@ -321,6 +348,17 @@ def parse_server_logs(run_dir):
                         dirty = int(cm.group(4))
                         middle_stats[shard_label]['by_client'][cid]['clean'] += clean
                         middle_stats[shard_label]['by_client'][cid]['dirty'] += dirty
+
+                    rtm = READ_TIMELINE_RE.search(line)
+                    if rtm and int(rtm.group(1)) == replica:
+                        middle_stats[shard_label]['read_timeline'].append({
+                            'pos': int(rtm.group(2)),
+                            'vr': int(rtm.group(3)),
+                            'coord_wait_ms': int(rtm.group(4)),
+                            'vr_wait_ms': int(rtm.group(5)),
+                            'ready_wait_ms': int(rtm.group(6)),
+                            'total_ms': int(rtm.group(7)),
+                        })
 
                     qm = BUFFER_RE.search(line)
                     if qm and replica == 1:
@@ -405,6 +443,16 @@ def write_client_stats(run_dir, client_stats, middle_stats):
                     for seq, count in top_combos:
                         seq_str = ','.join(str(s) for s in seq)
                         f.write(f'    [{seq_str}]  count={count}\n')
+            if d['reply_timeline']:
+                f.write(f'  batch total reply ms : {summarize(d["batch_total_reply_ms"], unit="ms")}\n')
+                by_pos = defaultdict(list)
+                for sample in d['reply_timeline']:
+                    by_pos[sample['pos']].append(sample)
+                f.write('  reply timeline by position:\n')
+                for pos in sorted(by_pos):
+                    vals = by_pos[pos]
+                    f.write(f'    pos={pos:<2} issue_to_reply_ms={summarize([t["issue_to_reply_ms"] for t in vals], unit="ms")} '
+                            f'batch_age_ms={summarize([t["batch_age_ms"] for t in vals], unit="ms")}\n')
             f.write('\n')
 
         if all_reads:
@@ -441,6 +489,21 @@ def write_client_stats(run_dir, client_stats, middle_stats):
                 for seq, count in top_combos:
                     seq_str = ','.join(str(s) for s in seq)
                     f.write(f'    [{seq_str}]  count={count}\n')
+            agg_reply_timeline = []
+            agg_batch_total_reply_ms = []
+            for d in client_stats.values():
+                agg_reply_timeline.extend(d['reply_timeline'])
+                agg_batch_total_reply_ms.extend(d['batch_total_reply_ms'])
+            if agg_reply_timeline:
+                f.write(f'  batch total reply ms : {summarize(agg_batch_total_reply_ms, unit="ms")}\n')
+                by_pos = defaultdict(list)
+                for sample in agg_reply_timeline:
+                    by_pos[sample['pos']].append(sample)
+                f.write('  reply timeline by position:\n')
+                for pos in sorted(by_pos):
+                    vals = by_pos[pos]
+                    f.write(f'    pos={pos:<2} issue_to_reply_ms={summarize([t["issue_to_reply_ms"] for t in vals], unit="ms")} '
+                            f'batch_age_ms={summarize([t["batch_age_ms"] for t in vals], unit="ms")}\n')
             f.write('\n')
 
         if cid_reads:
@@ -521,15 +584,18 @@ def write_tail_stats(run_dir, tail_stats, middle_stats):
 
         total_clean = total_dirty = 0
         all_depth_hist = defaultdict(int)
+        all_timeline = []
         for label in sorted(middle_stats):
             d = middle_stats[label]
             clean  = d['clean']
             dirty  = d['dirty']
             dh     = d['depth_hist']
+            timeline = d['read_timeline']
             total  = clean + dirty
             pct    = f'{100*clean/total:.1f}% clean' if total > 0 else 'n/a'
             total_clean += clean
             total_dirty += dirty
+            all_timeline.extend(timeline)
             for depth, cnt in dh.items():
                 all_depth_hist[depth] += cnt
 
@@ -539,6 +605,11 @@ def write_tail_stats(run_dir, tail_stats, middle_stats):
             f.write(f'  total reads  : {total}  ({pct})\n')
             if dh:
                 f.write(f'  depth histogram:\n{histogram_from_dict(dh)}\n')
+            if timeline:
+                f.write(f'  total latency   : {summarize([t["total_ms"] for t in timeline], unit="ms")}\n')
+                f.write(f'  coord wait      : {summarize([t["coord_wait_ms"] for t in timeline], unit="ms")}\n')
+                f.write(f'  vr wait         : {summarize([t["vr_wait_ms"] for t in timeline], unit="ms")}\n')
+                f.write(f'  ready->exec wait: {summarize([t["ready_wait_ms"] for t in timeline], unit="ms")}\n')
             f.write('\n')
 
         total_all = total_clean + total_dirty
@@ -549,6 +620,37 @@ def write_tail_stats(run_dir, tail_stats, middle_stats):
         f.write(f'  total reads       : {total_all}  ({pct_all})\n')
         if all_depth_hist:
             f.write(f'  depth histogram:\n{histogram_from_dict(all_depth_hist)}\n')
+        if all_timeline:
+            f.write(f'  total latency     : {summarize([t["total_ms"] for t in all_timeline], unit="ms")}\n')
+            f.write(f'  coord wait        : {summarize([t["coord_wait_ms"] for t in all_timeline], unit="ms")}\n')
+            f.write(f'  vr wait           : {summarize([t["vr_wait_ms"] for t in all_timeline], unit="ms")}\n')
+            f.write(f'  ready->exec wait  : {summarize([t["ready_wait_ms"] for t in all_timeline], unit="ms")}\n')
+
+            by_pos = defaultdict(list)
+            by_path = defaultdict(list)
+            for sample in all_timeline:
+                by_pos[sample['pos']].append(sample)
+                by_path['vr' if sample['vr'] else 'clean'].append(sample)
+
+            f.write('\n=== Aggregate Read Timeline By Position ===\n')
+            for pos in sorted(by_pos):
+                vals = by_pos[pos]
+                f.write(f'  pos={pos:<2} total={len(vals):<4} '
+                        f'total_ms={summarize([t["total_ms"] for t in vals], unit="ms")} '
+                        f'coord_wait_ms={summarize([t["coord_wait_ms"] for t in vals], unit="ms")} '
+                        f'vr_wait_ms={summarize([t["vr_wait_ms"] for t in vals], unit="ms")} '
+                        f'ready_wait_ms={summarize([t["ready_wait_ms"] for t in vals], unit="ms")}\n')
+
+            f.write('\n=== Aggregate Read Timeline By Path ===\n')
+            for path_label in ['clean', 'vr']:
+                vals = by_path.get(path_label, [])
+                if not vals:
+                    continue
+                f.write(f'  path={path_label:<5} total={len(vals):<4} '
+                        f'total_ms={summarize([t["total_ms"] for t in vals], unit="ms")} '
+                        f'coord_wait_ms={summarize([t["coord_wait_ms"] for t in vals], unit="ms")} '
+                        f'vr_wait_ms={summarize([t["vr_wait_ms"] for t in vals], unit="ms")} '
+                        f'ready_wait_ms={summarize([t["ready_wait_ms"] for t in vals], unit="ms")}\n')
 
     print(f'Wrote {final_path}')
 
