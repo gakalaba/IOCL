@@ -87,6 +87,7 @@ enum transmode_t
 DEFINE_uint64(client_id, 0, "unique identifier for client");
 DEFINE_string(client_host, "", "client host string");
 DEFINE_string(replica_config_paths, "", "paths to replication configuration files");
+DEFINE_string(coord_config_paths, "", "paths to replica-layer config files for IOCL CoordRequest sending");
 DEFINE_uint64(num_shards, 1, "number of shards in the system");
 DEFINE_bool(ping_replicas, false, "determine latency to replicas via pings");
 DEFINE_string(net_config_path, "", "path to network configuration file");
@@ -702,10 +703,10 @@ int main(int argc, char **argv)
         }
         replica_configs.emplace_back(replica_config_stream);
 
-        if (mode == strongstore::LinearizableProtocol::PROTO_STRONG || 
-            mode == strongstore::LinearizableProtocol::PROTO_VR || 
+        if (mode == strongstore::LinearizableProtocol::PROTO_STRONG ||
+            mode == strongstore::LinearizableProtocol::PROTO_VR ||
             mode == strongstore::LinearizableProtocol::PROTO_IOCL_CT ||
-            mode == strongstore::LinearizableProtocol::PROTO_CRAQ || 
+            mode == strongstore::LinearizableProtocol::PROTO_CRAQ ||
             mode == strongstore::LinearizableProtocol::PROTO_IOCL_CRAQ
             )
         {
@@ -715,6 +716,20 @@ int main(int argc, char **argv)
         }
 
         i++;
+    }
+
+    // Parse coord_config_paths (replica-layer configs for IOCL CoordRequest sending).
+    std::vector<transport::Configuration> coord_configs;
+    if (!FLAGS_coord_config_paths.empty()) {
+        std::stringstream cf{FLAGS_coord_config_paths};
+        while (std::getline(cf, buf, ',')) {
+            std::ifstream coord_config_stream{buf};
+            if (coord_config_stream.fail()) {
+                std::cerr << "Unable to read coord config file: " << buf << std::endl;
+                return -1;
+            }
+            coord_configs.emplace_back(coord_config_stream);
+        }
     }
 
     // TODO: Remove this
@@ -730,6 +745,8 @@ int main(int argc, char **argv)
     for (std::size_t i = 0; i < n_instances; ++i)
     {
         Client *client = nullptr;
+        const transport::Configuration *coord_config =
+            (i < coord_configs.size()) ? &coord_configs[i] : nullptr;
         switch (mode)
         {
         case strongstore::LinearizableProtocol::PROTO_VR:
@@ -745,7 +762,8 @@ int main(int argc, char **argv)
             client = new strongstore::Client(
                 consistency, mode, net_config, client_region, shard_config,
                 FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
-                tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha, FLAGS_ping_replicas);
+                tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha,
+                FLAGS_ping_replicas, coord_config);
             break;
         }
         default:

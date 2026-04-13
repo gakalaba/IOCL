@@ -107,6 +107,11 @@ class IOCLCodebase:
         if config['server_emulate_wan']:
             client_command += ' --ping_replicas=true'
 
+        # For IOCL_CRAQ, pass the replica-layer configs so the client can send
+        # CoordRequests directly to predecessor replicas (client-side sending).
+        if config.get('client_protocol_mode') == 'iocl_craq':
+            client_command += ' --coord_config_paths %s' % ','.join(replica_config_paths)
+
         if config['replication_protocol'] == 'tapir':
             if 'sync_commit' in config['replication_protocol_settings']:
                 client_command += ' --tapir_sync_commit=%s' % (

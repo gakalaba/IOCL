@@ -38,7 +38,8 @@ namespace strongstore
 
     ShardClient::ShardClient(const transport::Configuration &config,
                              Transport *transport, uint64_t client_id, int shard,
-                             wound_callback wcb)
+                             wound_callback wcb,
+                             const transport::Configuration *replica_config)
         : last_req_id_{0},
           config_{config},
           transport_{transport},
@@ -47,6 +48,9 @@ namespace strongstore
           wcb_{wcb}
     {
         transport_->Register(this, config_, -1, -1);
+        if (replica_config != nullptr) {
+            coord_sender_ = new CoordRequestSender(*replica_config, transport_);
+        }
 
         // TODO: Remove hardcoding
         replica_ = 0;
@@ -322,23 +326,10 @@ namespace strongstore
             op_.set_shardtag(myshardtag);
             op_.set_intkey(std::stoull(key)); // for iocl optimization
 
-            // Construct predecessor list
-            auto it1 = outstandingOperationList.begin();
-            auto it2 = outstandingOperationRefCount.begin();
-            pendingOp->pred_list.reserve(outstandingOperationList.size());
-            while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
-                // increment refcount entry
-                (*it2)++;
-                // Add this entry to predecessor list and the RPC message
-                op_.add_predlist(std::get<0>(*it1));
-                op_.add_shardlist(std::get<1>(*it1));
-                op_.add_pred_replicalist(std::get<2>(*it1));
-                pendingOp->pred_list.push_back({std::get<0>(*it1), std::get<1>(*it1)});
-                Debug("Added predecessor tag = %lu with shard idx %u replicaIdx %d",
-                      std::get<0>(*it1), std::get<1>(*it1), std::get<2>(*it1));
-                ++it1;
-                ++it2;
-            }
+            pendingOp->own_tag = myshardtag;
+            pendingOp->own_shard = static_cast<uint32_t>(shard_idx_);
+            pendingOp->pred_list.reserve(2);
+
             // Add self to outstanding operations and refcount lists.
             // Store the *coordination* replica — where a CoordRequest for this op
             // must be sent.  Writes commit at TAIL (config_.n - 1) regardless of
@@ -346,7 +337,51 @@ namespace strongstore
             // coordinated at the read-serving replica (MIDDLE = replicaIndex).
             int coordReplica = (op == "put") ? (config_.n - 1)
                                              : ((replicaIndex == -1) ? replica_ : replicaIndex);
+
+            // Chain each new operation to the most recently issued outstanding
+            // operation. This preserves the per-read coordination staircase:
+            // r2 waits on r1, r3 waits on r2, r4 waits on r3.
+            if (!outstandingOperationList.empty() && !outstandingOperationRefCount.empty()) {
+                auto predIt = std::prev(outstandingOperationList.end());
+                auto refIt = std::prev(outstandingOperationRefCount.end());
+                (*refIt)++;
+                op_.add_predlist(std::get<0>(*predIt));
+                op_.add_shardlist(std::get<1>(*predIt));
+                op_.add_pred_replicalist(std::get<2>(*predIt));
+                pendingOp->pred_list.push_back({std::get<0>(*predIt), std::get<1>(*predIt)});
+                Debug("Added predecessor tag = %lu with shard idx %u replicaIdx %d",
+                      std::get<0>(*predIt), std::get<1>(*predIt), std::get<2>(*predIt));
+            }
             outstandingOperationList.push_back(std::make_tuple(myshardtag, (uint32_t)shard_idx_, coordReplica));
+
+            // Send CoordRequests client-side to each predecessor's serving replica.
+            // Doing this here (before the op reaches the server) removes the
+            // +100ms-per-step delay caused by server-side CoordRequest sending.
+            if (coord_sender_ != nullptr && op_.predlist_size() > 0) {
+                for (int pi = 0; pi < op_.predlist_size() && pi < op_.shardlist_size(); pi++) {
+                    uint64_t predShardtag = op_.predlist(pi);
+                    if (predShardtag == 0) continue;
+                    int predGroupIdx = (int)op_.shardlist(pi);
+                    int predReplicaIdx = (pi < op_.pred_replicalist_size())
+                                        ? op_.pred_replicalist(pi)
+                                        : (config_.n - 1);
+
+                    replication::iocl_craq::proto::SuccessorRequestMessage coordReq;
+                    coordReq.set_p(predShardtag);
+                    coordReq.set_s(myshardtag);
+                    coordReq.set_succ_groupidx(shard_idx_);
+                    coordReq.set_succ_replicaidx(coordReplica);
+                    // vector_clock left empty (zeros); SyncVC with zeros is a no-op.
+
+                    Notice("Client-side CoordRequest: p=%lu s=%lu to group=%d replica=%d",
+                           predShardtag, myshardtag, predGroupIdx, predReplicaIdx);
+
+                    if (!coord_sender_->SendCoordRequest(predGroupIdx, predReplicaIdx, coordReq)) {
+                        Warning("Failed to send client-side CoordRequest for p=%lu s=%lu",
+                                predShardtag, myshardtag);
+                    }
+                }
+            }
             outstandingOperationRefCount.push_back(1);
             // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
             auto itl = outstandingOperationList.begin();
@@ -388,6 +423,7 @@ namespace strongstore
         uint64_t app_request_id = op->transaction_id;
         op_callback ocb = std::move(op->ocb); // wrapped in move to make efficient
         std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
+        pred_list.push_back({op->own_tag, op->own_shard});
         Debug("moving the pred_list of size %lu", pred_list.size());
         pendingOps.erase(itr);
         delete op;

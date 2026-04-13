@@ -60,9 +60,66 @@
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "replication/common/request.pb.h"
+#include "replication/iocl_craq/iocl_craq-proto.pb.h"
 
 namespace strongstore
 {
+
+    // Minimal TransportReceiver registered on the replica config so that
+    // SendMessageToReplica uses replica-layer ports when sending CoordRequests
+    // from the client side.  Incoming messages are silently discarded.
+    class CoordRequestSender : public TransportReceiver
+    {
+    public:
+        CoordRequestSender(const transport::Configuration &replica_config,
+                           Transport *transport)
+            : transport_(transport)
+        {
+            transport_->Register(this, replica_config, -1, -1);
+            // Pre-warm TCP connections to MIDDLE (replicaIdx=1) and TAIL (replicaIdx=n-1)
+            // for every group in the replica config.  Without this, the first CoordRequest
+            // to each destination triggers a new TCP handshake, which costs one full WAN
+            // RTT (200ms under netem emulation) before the message can be sent.  That
+            // delay adds 200ms to each cascade step instead of the expected 0ms overhead
+            // on a pre-established connection.
+            //
+            // The warmup message uses p=UINT64_MAX as a sentinel predecessor shardtag.
+            // Real tags are CreateTag(client_id*4+shard, seqno) with small high-32-bit
+            // values, so UINT64_MAX is unreachable.  HandleCoordination checks
+            // committedForCoord[UINT64_MAX] (always false) and buffers it in
+            // pendingCoordRequests[UINT64_MAX], which is never drained — harmless.
+            // The non-zero field ensures the proto serializes to non-empty bytes; a
+            // fully-zero proto3 message serializes to 0 bytes and trips an assertion
+            // in SendMessageInternal that requires dataLen > 0.
+            replication::iocl_craq::proto::SuccessorRequestMessage warmup;
+            warmup.set_p(UINT64_MAX);
+            int middle_idx = 1;
+            int tail_idx = replica_config.n - 1;
+            for (int g = 0; g < replica_config.g; g++) {
+                transport_->SendMessageToReplica(this, g, middle_idx, warmup);
+                if (tail_idx != middle_idx) {
+                    transport_->SendMessageToReplica(this, g, tail_idx, warmup);
+                }
+            }
+        }
+
+        bool SendCoordRequest(int predGroupIdx, int predReplicaIdx,
+                              const replication::iocl_craq::proto::SuccessorRequestMessage &msg)
+        {
+            return transport_->SendMessageToReplica(this, predGroupIdx, predReplicaIdx, msg);
+        }
+
+        void ReceiveMessage(const TransportAddress &, const std::string &,
+                            const std::string &, void *) override
+        {
+            // CoordResponses go to successor replicas, not back to the client.
+        }
+
+        void Close() override {};
+
+    private:
+        Transport *transport_;
+    };
 
     enum Mode
     {
@@ -104,10 +161,12 @@ namespace strongstore
     class ShardClient : public TransportReceiver
     {
     public:
-        /* Constructor needs path to shard config. */
+        /* Constructor needs path to shard config.
+         * Pass replica_config != nullptr to enable client-side CoordRequest sending. */
         ShardClient(
             const transport::Configuration &config, Transport *transport, uint64_t client_id,
-            int shard, wound_callback wcb = [](uint64_t transaction_id) {});
+            int shard, wound_callback wcb = [](uint64_t transaction_id) {},
+            const transport::Configuration *replica_config = nullptr);
 
         ~ShardClient();
 
@@ -230,6 +289,8 @@ namespace strongstore
             std::string val;
             op_callback ocb;
             op_timeout_callback otcb;
+            uint64_t own_tag{0};
+            uint32_t own_shard{0};
             std::vector<std::pair<uint64_t, uint32_t>> pred_list;
         };
 
@@ -291,6 +352,9 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+
+        // Client-side CoordRequest sender (non-null for IOCL_CRAQ).
+        CoordRequestSender *coord_sender_{nullptr};
 
         // IOCL Operation Metadata
         uint64_t seqno;

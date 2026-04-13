@@ -214,7 +214,9 @@ namespace strongstore
                uint64_t id, int nshards, int closestReplic, Transport *transport,
                Partitioner *part, TrueTime &tt, bool debug_stats,
                double nb_time_alpha,
-               bool emulate_wan = false);
+               bool emulate_wan = false,
+               const transport::Configuration *replica_config = nullptr);
+
         virtual ~Client();
 
         virtual Session &BeginSession() override;
