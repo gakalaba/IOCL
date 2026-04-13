@@ -1956,6 +1956,7 @@ namespace strongstore
             { // replica abort
                 ASSERT(replica_idx_ != 0);
                 if (s == NOT_FOUND) {
+                    transactions_.AbortTombstone(transaction_id);
                     Warning("[%lu] Replica received ABORT for unknown txn on shard %d replica %d",
                         transaction_id, shard_idx_, replica_idx_);
                     return;
