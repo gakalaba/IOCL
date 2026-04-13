@@ -32,6 +32,7 @@
 #include "replication/common/replica.h"
 
 #include <algorithm>
+#include <chrono>
 #include <unordered_set>
 
 #include "lib/assert.h"
@@ -51,6 +52,13 @@ namespace replication
     namespace iocl_craq
     {
         using namespace proto;
+
+        namespace {
+        std::pair<uint64_t, uint64_t> RequestKey(const LinearizeableOperation &linRequest)
+        {
+            return std::make_pair(linRequest.rid().client_id(), linRequest.rid().client_req_id());
+        }
+        } // namespace
 
         IOCL_CRAQReplica::IOCL_CRAQReplica(transport::Configuration config, int groupIdx, int myIdx,
                                  Transport *transport, unsigned int batchSize,
@@ -498,6 +506,7 @@ namespace replication
 
                 if (lastCommitted >= it->first)
                 {
+                    FinalizeReadTimeline(it->second, NowMs());
                     ExecuteReadOperation(it->second);
                     ASSERT(++commitLogOpnum > 0);
                     ASSERT(commitLogOpnum > commitLog.LastOpnum());
@@ -512,6 +521,124 @@ namespace replication
                     ++it;
                 }
             }
+        }
+
+        uint64_t IOCL_CRAQReplica::NowMs() const
+        {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+
+        int IOCL_CRAQReplica::CountNonZeroPreds(const LinearizeableOperation &linRequest) const
+        {
+            int expected = 0;
+            for (int pi = 0; pi < linRequest.predlist_size(); ++pi)
+            {
+                if (linRequest.predlist(pi) != 0)
+                {
+                    expected++;
+                }
+            }
+            return expected;
+        }
+
+        void IOCL_CRAQReplica::InitReadTimeline(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto &state = readTimelineStates_[RequestKey(linRequest)];
+            if (state.arrivalMs == 0)
+            {
+                state.arrivalMs = nowMs;
+                state.position = CountNonZeroPreds(linRequest);
+            }
+        }
+
+        void IOCL_CRAQReplica::MarkReadCoordBlocked(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto &state = readTimelineStates_[RequestKey(linRequest)];
+            if (state.arrivalMs == 0)
+            {
+                InitReadTimeline(linRequest, nowMs);
+            }
+            if (state.coordBlockedMs == 0)
+            {
+                state.coordBlockedMs = nowMs;
+            }
+            state.waitingForCoord = true;
+        }
+
+        void IOCL_CRAQReplica::MarkReadCoordReady(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto &state = readTimelineStates_[RequestKey(linRequest)];
+            if (state.arrivalMs == 0)
+            {
+                InitReadTimeline(linRequest, nowMs);
+            }
+            if (state.coordReadyMs == 0)
+            {
+                state.coordReadyMs = nowMs;
+            }
+            state.waitingForCoord = false;
+        }
+
+        void IOCL_CRAQReplica::MarkReadVersionSent(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto &state = readTimelineStates_[RequestKey(linRequest)];
+            if (state.arrivalMs == 0)
+            {
+                InitReadTimeline(linRequest, nowMs);
+            }
+            if (state.vrSentMs == 0)
+            {
+                state.vrSentMs = nowMs;
+            }
+            state.usedVR = true;
+        }
+
+        void IOCL_CRAQReplica::MarkReadVersionReady(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto &state = readTimelineStates_[RequestKey(linRequest)];
+            if (state.arrivalMs == 0)
+            {
+                InitReadTimeline(linRequest, nowMs);
+            }
+            if (state.vrReadyMs == 0)
+            {
+                state.vrReadyMs = nowMs;
+            }
+        }
+
+        void IOCL_CRAQReplica::FinalizeReadTimeline(const LinearizeableOperation &linRequest, uint64_t nowMs)
+        {
+            auto it = readTimelineStates_.find(RequestKey(linRequest));
+            if (it == readTimelineStates_.end())
+            {
+                return;
+            }
+
+            ReadTimelineState &state = it->second;
+            if (state.finalized || state.arrivalMs == 0)
+            {
+                return;
+            }
+
+            const uint64_t coordReadyMs = state.coordReadyMs != 0 ? state.coordReadyMs : state.arrivalMs;
+            const uint64_t vrReadyMs =
+                state.usedVR ? (state.vrReadyMs != 0 ? state.vrReadyMs : nowMs) : state.arrivalMs;
+            const uint64_t readyMs = std::max(coordReadyMs, vrReadyMs);
+
+            ReadTimelineSample sample;
+            sample.position = state.position;
+            sample.usedVR = state.usedVR;
+            sample.coordWaitMs = (state.coordBlockedMs != 0 && state.coordReadyMs >= state.coordBlockedMs)
+                ? (state.coordReadyMs - state.coordBlockedMs) : 0;
+            sample.vrWaitMs = (state.usedVR && state.vrSentMs != 0 && state.vrReadyMs >= state.vrSentMs)
+                ? (state.vrReadyMs - state.vrSentMs) : 0;
+            sample.readyWaitMs = nowMs >= readyMs ? (nowMs - readyMs) : 0;
+            sample.totalMs = nowMs >= state.arrivalMs ? (nowMs - state.arrivalMs) : 0;
+            readTimelineSamples_.push_back(sample);
+
+            state.finalized = true;
+            readTimelineStates_.erase(it);
         }
 
         void IOCL_CRAQReplica::SendVersionRequest(const LinearizeableOperation &request)
@@ -730,9 +857,11 @@ namespace replication
 
             UpdateClientTable(linRequest);
 
+            const uint64_t nowMs = NowMs();
+            InitReadTimeline(linRequest, nowMs);
+
             const bool dirtyOnArrival = (this->lastOp != lastCommitted && !AmTail());
-            const auto requestKey =
-                std::make_pair(linRequest.rid().client_id(), linRequest.rid().client_req_id());
+            const auto requestKey = RequestKey(linRequest);
 
             // If this read has predecessors, ensure all CoordResponses have arrived.
             if (linRequest.predlist_size() > 0 && linRequest.predlist(0) != 0)
@@ -740,9 +869,7 @@ namespace replication
                 uint64_t myShardTag = linRequest.has_shardtag() ? linRequest.shardtag() : 0;
                 if (myShardTag != 0)
                 {
-                    int expected = 0;
-                    for (int pi = 0; pi < linRequest.predlist_size(); pi++)
-                        if (linRequest.predlist(pi) != 0) expected++;
+                    int expected = CountNonZeroPreds(linRequest);
 
                     int received = coordResponseCount_.count(myShardTag)
                                    ? coordResponseCount_[myShardTag] : 0;
@@ -770,8 +897,10 @@ namespace replication
                             perClientReads_[linRequest.rid().client_id()].second++;
                             // Speculatively send the VR now so its RTT overlaps the
                             // CoordResponse wait for dirty predecessor-gated reads.
+                            MarkReadVersionSent(linRequest, nowMs);
                             SendVersionRequest(linRequest);
                         }
+                        MarkReadCoordBlocked(linRequest, nowMs);
                         Debug("Buffering read shardtag %lu waiting for CoordResponses (%d/%d)", myShardTag, received, expected);
                         readsWaitingForCoord[myShardTag] = linRequest;
                         readsExpectedCoordCount_[myShardTag] = expected;
@@ -797,12 +926,14 @@ namespace replication
                 dirtyReadCount_++;
                 dirtyDepthHist_[depth]++;
                 perClientReads_[linRequest.rid().client_id()].second++;
+                MarkReadVersionSent(linRequest, nowMs);
                 SendVersionRequest(linRequest);
                 return;
             }
 
             cleanReadCount_++;
             perClientReads_[linRequest.rid().client_id()].first++;
+            FinalizeReadTimeline(linRequest, nowMs);
             ExecuteReadOperation(linRequest);
 
             ASSERT(++commitLogOpnum > 0);
@@ -1066,6 +1197,8 @@ namespace replication
 
             LinearizeableOperation linRequest = it->second;
             pendingReads.erase(it);
+            const uint64_t nowMs = NowMs();
+            MarkReadVersionReady(linRequest, nowMs);
 
             Debug("Handling version response for key %s and opnum %d",
                   linRequest.key().c_str(), msg.opnum());
@@ -1101,6 +1234,7 @@ namespace replication
                 return;
             }
 
+            FinalizeReadTimeline(linRequest, nowMs);
             ExecuteReadOperation(linRequest);
 
             ASSERT(++commitLogOpnum > 0);
@@ -1150,6 +1284,7 @@ namespace replication
             auto readIt = readsWaitingForCoord.find(successorShardTag);
             if (readIt != readsWaitingForCoord.end())
             {
+                const uint64_t nowMs = NowMs();
                 // Count this response and check if all expected have arrived.
                 pendingCoordResponses[successorShardTag] = msg;
                 int nowReceived = ++coordResponseCount_[successorShardTag];
@@ -1166,6 +1301,7 @@ namespace replication
 
                 // All CoordResponses received — unblock the read.
                 LinearizeableOperation linRequest = readIt->second;
+                MarkReadCoordReady(linRequest, nowMs);
                 readsWaitingForCoord.erase(readIt);
                 readsExpectedCoordCount_.erase(successorShardTag);
                 coordResponseCount_.erase(successorShardTag);
@@ -1182,6 +1318,7 @@ namespace replication
                 {
                     if (lastCommitted >= waitVcIt->first)
                     {
+                        FinalizeReadTimeline(waitVcIt->second, nowMs);
                         ExecuteReadOperation(waitVcIt->second);
                         ASSERT(++commitLogOpnum > 0);
                         ASSERT(commitLogOpnum > commitLog.LastOpnum());
@@ -1203,26 +1340,20 @@ namespace replication
                     return;
                 }
 
-                if (this->lastOp != lastCommitted && !AmTail())
-                {
-                    uint64_t depth = this->lastOp - lastCommitted;
-                    dirtyReadCount_++;
-                    dirtyDepthHist_[depth]++;
-                    perClientReads_[linRequest.rid().client_id()].second++;
-                    SendVersionRequest(linRequest);
-                }
-                else
-                {
-                    cleanReadCount_++;
-                    perClientReads_[linRequest.rid().client_id()].first++;
-                    ExecuteReadOperation(linRequest);
-                    ASSERT(++commitLogOpnum > 0);
-                    ASSERT(commitLogOpnum > commitLog.LastOpnum());
-                    commitLog.Append(
-                        viewstamp_t(view, commitLogOpnum),
-                        ToRequest(linRequest),
-                        LOG_STATE_CLEAN);
-                }
+                // Read cleanliness is decided at arrival time. If the read was
+                // clean when it reached this replica, predecessor coordination
+                // should not retroactively force a VersionRequest just because
+                // intervening writes arrived while it was waiting.
+                cleanReadCount_++;
+                perClientReads_[linRequest.rid().client_id()].first++;
+                FinalizeReadTimeline(linRequest, nowMs);
+                ExecuteReadOperation(linRequest);
+                ASSERT(++commitLogOpnum > 0);
+                ASSERT(commitLogOpnum > commitLog.LastOpnum());
+                commitLog.Append(
+                    viewstamp_t(view, commitLogOpnum),
+                    ToRequest(linRequest),
+                    LOG_STATE_CLEAN);
                 return;
             }
 
@@ -1294,6 +1425,11 @@ namespace replication
                 for (auto &kv : perClientReads_)
                     Notice("[%d] ReadStatsClient client=%lu clean=%lu dirty=%lu",
                            myIdx, kv.first, kv.second.first, kv.second.second);
+                for (const auto &sample : readTimelineSamples_)
+                    Notice("[%d] ReadTimeline pos=%lu vr=%d coord_wait_ms=%lu vr_wait_ms=%lu ready_wait_ms=%lu total_ms=%lu",
+                           myIdx, sample.position, sample.usedVR ? 1 : 0,
+                           sample.coordWaitMs, sample.vrWaitMs,
+                           sample.readyWaitMs, sample.totalMs);
             }
         }
 

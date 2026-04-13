@@ -33,6 +33,7 @@
 #define _IOCL_CRAQ_REPLICA_H_
 
 #include <algorithm>
+#include <cstdint>
 #include <list>
 #include <map>
 #include <memory>
@@ -185,6 +186,32 @@ namespace replication
             uint64_t tailTotalOps_{0};
             uint64_t tailTotalBatches_{0};
 
+            struct ReadTimelineState
+            {
+                uint64_t arrivalMs{0};
+                uint64_t coordBlockedMs{0};
+                uint64_t coordReadyMs{0};
+                uint64_t vrSentMs{0};
+                uint64_t vrReadyMs{0};
+                bool waitingForCoord{false};
+                bool usedVR{false};
+                bool finalized{false};
+                uint64_t position{0};
+            };
+
+            struct ReadTimelineSample
+            {
+                uint64_t position{0};
+                bool usedVR{false};
+                uint64_t coordWaitMs{0};
+                uint64_t vrWaitMs{0};
+                uint64_t readyWaitMs{0};
+                uint64_t totalMs{0};
+            };
+
+            std::unordered_map<std::pair<uint64_t, uint64_t>, ReadTimelineState, PairHash> readTimelineStates_;
+            std::vector<ReadTimelineSample> readTimelineSamples_;
+
             [[nodiscard]] inline bool AmHead() const {return myIdx == 0;}
             [[nodiscard]] inline bool AmTail() const {return myIdx == numReplicas - 1;}
             [[nodiscard]] bool ForwardPropagateMessageInChain(const Message &m);
@@ -249,6 +276,14 @@ namespace replication
 
             void HandleCoordinationReply(const TransportAddress &remote,
                                          const proto::PredecessorReplyMessage &msg);
+            [[nodiscard]] uint64_t NowMs() const;
+            [[nodiscard]] int CountNonZeroPreds(const replication::LinearizeableOperation &linRequest) const;
+            void InitReadTimeline(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
+            void MarkReadCoordBlocked(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
+            void MarkReadCoordReady(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
+            void MarkReadVersionSent(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
+            void MarkReadVersionReady(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
+            void FinalizeReadTimeline(const replication::LinearizeableOperation &linRequest, uint64_t nowMs);
         };
 
     } // namespace iocl_craq

@@ -146,6 +146,7 @@ protected:
     int requestNum = 0;
     int shards;
     int clientsPerShard;
+    uint64_t manualShardTagCounter = 1000000;
 
     virtual void SetUp()
     {
@@ -254,6 +255,59 @@ protected:
             clientInfo.clientList[clientIndex]->Invoke(request_str, upcall, replicaIndex);
         }
         clientOps.push_back(request_str);
+    }
+
+    // Send an operation with an explicit IOCL predecessor edge. This is needed
+    // in unit tests because the IOCL_CRAQClient does not auto-chain writes.
+    virtual uint64_t ClientSendNextWithExplicitPred(int shard, Client::continuation_t upcall,
+                                                    std::string op,
+                                                    uint64_t predShardTag,
+                                                    int predShard,
+                                                    int predReplicaIndex,
+                                                    int clientIndex = 0,
+                                                    int replicaIndex = -1)
+    {
+        auto &clientInfo = clients[shard];
+
+        LinearizeableOperation linop;
+        linop.mutable_rid()->set_client_id(shard * clientsPerShard + clientIndex);
+        linop.mutable_rid()->set_client_req_id(requestNum);
+        linop.set_transaction_id(requestNum);
+        linop.set_op(op);
+        linop.set_key(clientInfo.key);
+        linop.set_value(std::to_string(requestNum));
+        uint64_t shardTag = ++manualShardTagCounter;
+        linop.set_shardtag(shardTag);
+        linop.add_predlist(predShardTag);
+        linop.add_shardlist(predShard);
+        linop.add_pred_replicalist(predReplicaIndex);
+
+        string request_str;
+        linop.SerializeToString(&request_str);
+
+        // Unit-test clients do not auto-chain writes, so send the matching
+        // CoordRequest explicitly for tests that model predecessor blocking.
+        SuccessorRequestMessage coordReq;
+        coordReq.set_p(predShardTag);
+        coordReq.set_s(shardTag);
+        coordReq.set_succ_groupidx(shard);
+        coordReq.set_succ_replicaidx(op == "put" ? (config->n - 1)
+                                                 : (replicaIndex == -1 ? 0 : replicaIndex));
+        static_cast<Transport *>(transport)->SendMessageToReplica(
+            clientInfo.clientList[clientIndex], predShard, predReplicaIndex, coordReq);
+
+        clientInfo.clientList[clientIndex]->SetSendCoordRequests(false);
+        if (replicaIndex == -1)
+        {
+            clientInfo.clientList[clientIndex]->Invoke(request_str, upcall);
+        }
+        else
+        {
+            clientInfo.clientList[clientIndex]->Invoke(request_str, upcall, replicaIndex);
+        }
+        clientInfo.clientList[clientIndex]->SetSendCoordRequests(true);
+        clientOps.push_back(request_str);
+        return shardTag;
     }
 
     // Drain all buffered messages into the live queue.
@@ -416,6 +470,9 @@ TEST_P(IOCL_CRAQTest, WriteBlockedByPredecessor)
 
     // op_A (requestNum=0) already committed in SetUp.
     int opAValue = requestNum;
+    // The warmup write issued in SetUp is the first request from this client,
+    // so the unit-test client deterministically assigns shardtag=1.
+    uint64_t opAShardTag = 1;
 
     // Start buffering CoordResponse messages so op_B cannot be unblocked.
     transport->SetBufferingMessage(COORD_RESPONSE_TYPE);
@@ -423,7 +480,9 @@ TEST_P(IOCL_CRAQTest, WriteBlockedByPredecessor)
     int opBCompleted = 0;
     requestNum++;
     int opBValue = requestNum;
-    ClientSendNext(0, MakeSilentPutUpcall(opBCompleted), "put");
+    ClientSendNextWithExplicitPred(0, MakeSilentPutUpcall(opBCompleted), "put",
+                                   opAShardTag, /*predShard=*/0,
+                                   /*predReplicaIndex=*/config->n - 1);
 
     // Run until the CoordResponse for op_B is intercepted.
     // This happens when the tail sees committedForCoord[opA_shardtag] and
@@ -456,6 +515,7 @@ TEST_P(IOCL_CRAQTest, ChainedBlockingWrites)
     }
 
     int opAValue = requestNum;
+    uint64_t opAShardTag = 1;
 
     // Buffer ALL CoordResponses.
     transport->SetBufferingMessage(COORD_RESPONSE_TYPE);
@@ -465,7 +525,10 @@ TEST_P(IOCL_CRAQTest, ChainedBlockingWrites)
     // op_B: predecessor = op_A
     requestNum++;
     int opBValue = requestNum;
-    ClientSendNext(0, MakeSilentPutUpcall(opBCompleted), "put");
+    uint64_t opBShardTag =
+        ClientSendNextWithExplicitPred(0, MakeSilentPutUpcall(opBCompleted), "put",
+                                       opAShardTag, /*predShard=*/0,
+                                       /*predReplicaIndex=*/config->n - 1);
     RunUntilMessageType(COORD_RESPONSE_TYPE);  // CoordResp for op_B captured
 
     // op_C: predecessor = op_B. But the client sends CoordRequest to op_B's
@@ -473,7 +536,9 @@ TEST_P(IOCL_CRAQTest, ChainedBlockingWrites)
     // at the tail in pendingCoordRequests[opB_shardtag].
     requestNum++;
     int opCValue = requestNum;
-    ClientSendNext(0, MakeSilentPutUpcall(opCCompleted), "put");
+    ClientSendNextWithExplicitPred(0, MakeSilentPutUpcall(opCCompleted), "put",
+                                   opBShardTag, /*predShard=*/0,
+                                   /*predReplicaIndex=*/config->n - 1);
     // The CoordRequest for op_C arrives at the tail (predecessor = op_B).
     // Since op_B hasn't committed, it is buffered. No CoordResp for op_C yet.
 
@@ -530,7 +595,10 @@ TEST_P(IOCL_CRAQTest, CoordRequestArrivesBeforeWrite)
     int opBCompleted = 0;
     requestNum++;
     int opBValue = requestNum;
-    ClientSendNext(0, MakeSilentPutUpcall(opBCompleted), "put");
+    uint64_t opAShardTag = 1;
+    ClientSendNextWithExplicitPred(0, MakeSilentPutUpcall(opBCompleted), "put",
+                                   opAShardTag, /*predShard=*/0,
+                                   /*predReplicaIndex=*/config->n - 1);
 
     // Run the full protocol — no interception. op_B should commit.
     transport->Run();
