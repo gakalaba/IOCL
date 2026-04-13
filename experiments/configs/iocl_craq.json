@@ -11,20 +11,19 @@
       ]
     ],
     "replication_protocol": [
-      "iocl_craq",
-      "craq"
+      "vr"
     ],
     "client_protocol_mode": [
-      "iocl_craq",
-      "craq"
+      "vr"
     ],
     "server_names": [
       "us-east-1-0",
       "us-east-1-1",
-      "us-east-1-2"
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-1"
     ],
     "consistency": [
-      "lin",
       "lin"
     ],
     "num_instances": 1,
@@ -42,33 +41,47 @@
         "us-east-1-2"
       ],
       [
-        "us-east-1-1",
-        "us-east-1-2",
+        "eu-west-1-0",
+        "eu-west-1-1",
         "us-east-1-0"
       ],
       [
+        "us-east-1-1",
         "us-east-1-2",
-        "us-east-1-0",
-        "us-east-1-1"
+        "eu-west-1-0"
       ]
     ],
-    "client_total": [
-    8
-    ],
-    "client_processes_per_client_node": 
-    [
-    8
-    ],
+    "client_total": [8, 16, 32, 48, 64, 128, 256],
+    "client_processes_per_client_node": [1, 2, 4, 6, 8, 16, 32],
     "client_threads_per_process": 1,
     "clients": [
-      "client-0-0"
+      "client-0-0",
+      "client-0-1",
+      "client-1-0",
+      "client-1-1",
+      "client-2-0",
+      "client-2-1",
+      "client-3-0",
+      "client-3-1"
     ],
+
     "server_regions": {
       "us-east-1": [
         "us-east-1-0",
         "us-east-1-1",
         "us-east-1-2",
-        "client-0-0"
+        "client-0-0",
+        "client-0-1",
+        "client-1-0",
+        "client-1-1",
+        "client-2-0",
+        "client-2-1",
+        "client-3-0",
+        "client-3-1"
+      ],
+      "eu-west-1": [
+        "eu-west-1-0",
+        "eu-west-1-1"
       ]
     },
     "server_port": 7087,
@@ -144,8 +157,8 @@
     "client_ramp_down": 4,
     "client_ramp_up": 4,
     "default_remote_shell": "bash",
-    "server_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
-    "client_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
+    "server_host_format_str": "%s",
+    "client_host_format_str": "%s",
     "project_name": "praxis-pg0",
     "region_rtt_latencies": {
       "us-east-1": {
@@ -206,8 +219,7 @@
         "width": 800,
         "series_indep_vars_idx": 0,
         "series_titles": [
-          "iocl_craq",
-          "craq"
+          "vr"
         ],
         "x_var_is_config": false,
         "y_var": [
@@ -258,7 +270,7 @@
     "bin_directory_name": "bin",
     "client_bin_name": "benchmark",
     "client_name_format_str": "%s",
-    "emulab_user": "root",
+    "emulab_user": "akalaba",
     "max_bandwidth": "10gibps",
     "max_file_descriptors": 1000000,
     "max_retries": 0,
@@ -273,6 +285,7 @@
     ],
     "make_clean": false,
     "remote_bin_directory_nfs_enabled": false,
+    "push_binaries_sudo": true,
     "client_combine_ro_ops": [
       "get_timeline"
     ],
