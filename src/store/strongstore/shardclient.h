@@ -91,16 +91,20 @@ namespace strongstore
             // The non-zero field ensures the proto serializes to non-empty bytes; a
             // fully-zero proto3 message serializes to 0 bytes and trips an assertion
             // in SendMessageInternal that requires dataLen > 0.
-            replication::iocl_craq::proto::SuccessorRequestMessage warmup;
-            warmup.set_p(UINT64_MAX);
-            int middle_idx = 1;
-            int tail_idx = replica_config.n - 1;
-            for (int g = 0; g < replica_config.g; g++) {
-                transport_->SendMessageToReplica(this, g, middle_idx, warmup);
-                if (tail_idx != middle_idx) {
-                    transport_->SendMessageToReplica(this, g, tail_idx, warmup);
+            // Delay warmup until replica ports are listening; otherwise the eager
+            // connect attempts get refused and no connection remains pre-warmed.
+            transport_->Timer(5000, [this, transport, replica_config]() {
+                replication::iocl_craq::proto::SuccessorRequestMessage warmup;
+                warmup.set_p(UINT64_MAX);
+                int middle_idx = 1;
+                int tail_idx = replica_config.n - 1;
+                for (int g = 0; g < replica_config.g; g++) {
+                    transport_->SendMessageToReplica(this, g, middle_idx, warmup);
+                    if (tail_idx != middle_idx) {
+                        transport_->SendMessageToReplica(this, g, tail_idx, warmup);
+                    }
                 }
-            }
+            });
         }
 
         bool SendCoordRequest(int predGroupIdx, int predReplicaIdx,
