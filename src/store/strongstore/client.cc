@@ -724,7 +724,7 @@ namespace strongstore
         // generate a PredecessorReply for downstream CoordRequests.  Exclude
         // reads from IOCL coordination so they never appear in predlists and
         // never block behind read predecessors that would never reply.
-        bool isIOCL = IsIOCL() && (op == "put");
+        bool isIOCL = IsIOCL();
 
         auto ocb1 = [this, ocb,
                           isIOCL,
@@ -753,11 +753,11 @@ namespace strongstore
                 }
                 // afterwards, it2 and it3 should be 
                 // pointing to the entry itself, remove it
-                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                Debug("Removing own entry with tag %lu at shard %u", std::get<0>(*it3), std::get<1>(*it3));
                 ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
                 (*it2)--;
                 if ((*it2) <= 0) {
-                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", std::get<0>(*it3), std::get<1>(*it3));
                     it2 = this->outstandingOperationRefCount_.erase(it2);
                     it3 = this->outstandingOperationList_.erase(it3);
                 }
@@ -767,7 +767,7 @@ namespace strongstore
                 for (;
                     itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
                     ++itl, ++itr) {
-                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+                    Debug("(tag %lu at shard %u) has refcount %u", std::get<0>(*itl), std::get<1>(*itl), *itr);
                 }
             }
             ocb(s, v, p);
@@ -799,11 +799,11 @@ namespace strongstore
                 }
                 // afterwards, it2 and it3 should be 
                 // pointing to the entry itself, remove it
-                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                Debug("Removing own entry with tag %lu at shard %u", std::get<0>(*it3), std::get<1>(*it3));
                 ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
                 (*it2)--;
                 if ((*it2) <= 0) {
-                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
+                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", std::get<0>(*it3), std::get<1>(*it3));
                     it2 = this->outstandingOperationRefCount_.erase(it2);
                     it3 = this->outstandingOperationList_.erase(it3);
                 }
@@ -813,7 +813,7 @@ namespace strongstore
                 for (;
                     itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
                     ++itl, ++itr) {
-                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+                    Debug("(tag %lu at shard %u) has refcount %u", std::get<0>(*itl), std::get<1>(*itl), *itr);
                 }
             }
             otcb(s, v, p);

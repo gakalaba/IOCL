@@ -65,6 +65,8 @@ namespace micro
         std::string ttype_;
         uint64_t fanout_;
         uint32_t read_percentage_;
+        uint64_t reads_{0};
+        uint64_t writes_{0};
     };
 
 } // namespace micro

@@ -29,10 +29,12 @@
 #define _STRONG_CLIENT_H_
 
 #include <bitset>
+#include <list>
 #include <memory>
 #include <set>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -398,8 +400,8 @@ namespace strongstore
         bool emulate_wan_;
 
         // IOCL specific state
-        // (shardtag, shardid) -> refcount
-        std::list<std::pair<uint64_t, uint32_t>> outstandingOperationList_;
+        // (shardtag, shardid, replicaIdx) -> refcount
+        std::list<std::tuple<uint64_t, uint32_t, int>> outstandingOperationList_;
         std::list<uint16_t> outstandingOperationRefCount_;
     };
 

@@ -280,7 +280,7 @@ namespace strongstore
                                   const std::string &key, const std::string &value,
                                   op_callback ocb, op_timeout_callback otcb,
                                   uint32_t timeout,
-                                  std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                                  std::list<std::tuple<uint64_t, uint32_t, int>> &outstandingOperationList,
                                   std::list<uint16_t> &outstandingOperationRefCount,
                                   bool isIOCL, int replicaIndex)
     {
@@ -330,15 +330,23 @@ namespace strongstore
                 // increment refcount entry
                 (*it2)++;
                 // Add this entry to predecessor list and the RPC message
-                op_.add_predlist((*it1).first);
-                op_.add_shardlist((*it1).second);
-                pendingOp->pred_list.push_back(*it1);
-                Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
+                op_.add_predlist(std::get<0>(*it1));
+                op_.add_shardlist(std::get<1>(*it1));
+                op_.add_pred_replicalist(std::get<2>(*it1));
+                pendingOp->pred_list.push_back({std::get<0>(*it1), std::get<1>(*it1)});
+                Debug("Added predecessor tag = %lu with shard idx %u replicaIdx %d",
+                      std::get<0>(*it1), std::get<1>(*it1), std::get<2>(*it1));
                 ++it1;
                 ++it2;
             }
-            // Add self to outstanding operations and refcount lists
-            outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
+            // Add self to outstanding operations and refcount lists.
+            // Store the *coordination* replica — where a CoordRequest for this op
+            // must be sent.  Writes commit at TAIL (config_.n - 1) regardless of
+            // where the op message is initially delivered (HEAD = 0).  Reads are
+            // coordinated at the read-serving replica (MIDDLE = replicaIndex).
+            int coordReplica = (op == "put") ? (config_.n - 1)
+                                             : ((replicaIndex == -1) ? replica_ : replicaIndex);
+            outstandingOperationList.push_back(std::make_tuple(myshardtag, (uint32_t)shard_idx_, coordReplica));
             outstandingOperationRefCount.push_back(1);
             // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
             auto itl = outstandingOperationList.begin();
@@ -346,7 +354,7 @@ namespace strongstore
             for (;
                  itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
                  ++itl, ++itr) {
-                Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
+                Debug("(tag %lu at shard %u) has refcount %u", std::get<0>(*itl), std::get<1>(*itl), *itr);
             }
             Debug("the size of the op is %lu", op_.ByteSizeLong());
         } else {

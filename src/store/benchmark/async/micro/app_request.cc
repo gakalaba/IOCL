@@ -58,16 +58,29 @@ namespace micro
             std::mt19937 mt(rd());
             std::uniform_real_distribution<double> dist(0.0, 100.0);
             // srand(time(0));
-            if (dist(mt) < read_percentage_)
+            bool isRead = dist(mt) < read_percentage_;
+            if (isRead)
             {
+                reads_++;
                 Debug("sending Get on key = %s", GetKey(op_index).c_str());
-                return Get(GetKey(op_index));
             }
             else
             {
+                writes_++;
                 Debug("Sending Put on key = %s", GetKey(op_index).c_str());
-                return Put(GetKey(op_index), GetKey(op_index));
             }
+            // Log batch composition at the last op so parse_stats.py can tally it.
+            if (op_index == fanout_ - 1)
+            {
+                Notice("AppRequest batch composition: fanout=%lu reads=%lu writes=%lu",
+                       fanout_, reads_, writes_);
+                reads_ = 0;
+                writes_ = 0;
+            }
+            if (isRead)
+                return Get(GetKey(op_index));
+            else
+                return Put(GetKey(op_index), GetKey(op_index));
         }
         else {
             PPanic("Not good!!! Sending operation out of bounds of app request!");

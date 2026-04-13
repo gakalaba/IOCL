@@ -45,7 +45,9 @@
 #define OPERATION_TIMEOUT 1000
 #define OPERATION_RETRIES 5
 
+#include <list>
 #include <set>
+#include <tuple>
 #include <vector>
 
 #include "lib/assert.h"
@@ -131,7 +133,7 @@ namespace strongstore
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout,
-                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
+                         std::list<std::tuple<uint64_t, uint32_t, int>> &outstandingOperationList,
                          std::list<uint16_t> &outstandingOperationRefCount,
                          bool isIOCL, int replicaIndex = -1);
 
