@@ -1,28 +1,28 @@
 set datafile separator ','
-set title "10 shards, 0% reads — CDF by fanout\n(solid=iocl\\_craq, dotted=craq, grey dash-dot=vr)" font "DejaVu Sans Bold,16"
-set key outside right center font 'DejaVu Sans,14' spacing 1.5 samplen 4
+set title "10 shards, 0% reads - CDF by fanout\n(color=fanout, line style=protocol)" font "DejaVu Sans Bold,16"
+set key outside bottom center horizontal font 'DejaVu Sans,13' spacing 1.1 samplen 3 maxrows 3
 set xlabel 'Latency (ms)' font 'DejaVu Sans,15'
 set ylabel 'Cumulative fraction of operations' font 'DejaVu Sans,15'
 set tics font 'DejaVu Sans,13'
-set terminal pngcairo size 1500,800 enhanced dashed font 'DejaVu Sans,15'
+set terminal pngcairo size 1700,900 enhanced dashed font 'DejaVu Sans,15'
 set output 'printdbg/10_shards/combined_plots/reads0_combined_cdf.png'
 set yrange [0:1]
-set grid lc rgb '#cccccc' lw 1
+set grid xtics ytics lc rgb '#d9d9d9' lw 1
 set border lw 1.5
 set logscale x
 set format x '%g'
 set xtics ("200" 200, "400" 400, "600" 600, "800" 800, "1000" 1000, "1500" 1500, "2000" 2000, "3000" 3000, "5000" 5000, "7000" 7000)
-set style line 1 linecolor rgb '#1a5276' dt (1,0) linewidth 8
-set style line 2 linecolor rgb '#784212' dt (1,0) linewidth 8
-set style line 3 linecolor rgb '#145a32' dt (1,0) linewidth 8
-set style line 4 linecolor rgb '#5dade2' dt (12,6) linewidth 6
-set style line 5 linecolor rgb '#f0b27a' dt (12,6) linewidth 6
-set style line 6 linecolor rgb '#58d68d' dt (12,6) linewidth 6
-set style line 7 linecolor rgb '#444444' dt (12,5,3,5) linewidth 6
-plot 'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-19-24/2026-04-13-14-19-58/out/plots/aggregate-combined.csv' title "iocl\\_craq fanout=1" ls 1 with lines, \
-'printdbg/10_shards/0%_reads/fanout_4/2026-04-13-14-24-43/2026-04-13-14-25-03/out/plots/aggregate-combined.csv' title "iocl\\_craq fanout=4" ls 2 with lines, \
-'printdbg/10_shards/0%_reads/fanout_16/2026-04-13-14-29-50/2026-04-13-14-30-10/out/plots/aggregate-combined.csv' title "iocl\\_craq fanout=16" ls 3 with lines, \
-'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-21-20/2026-04-13-14-21-39/out/plots/aggregate-combined.csv' title "craq fanout=1" ls 4 with lines, \
-'printdbg/10_shards/0%_reads/fanout_4/2026-04-13-14-26-26/2026-04-13-14-26-45/out/plots/aggregate-combined.csv' title "craq fanout=4" ls 5 with lines, \
-'printdbg/10_shards/0%_reads/fanout_16/2026-04-13-14-31-34/2026-04-13-14-31-52/out/plots/aggregate-combined.csv' title "craq fanout=16" ls 6 with lines, \
-'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-23-00/2026-04-13-14-23-18/out/plots/aggregate-combined.csv' title "vr fanout=1" ls 7 with lines
+set style line 1 linecolor rgb '#0072B2' dt solid linewidth 5
+set style line 2 linecolor rgb '#009E73' dt solid linewidth 5
+set style line 3 linecolor rgb '#D55E00' dt solid linewidth 5
+set style line 4 linecolor rgb '#0072B2' dt (10,6) linewidth 4
+set style line 5 linecolor rgb '#009E73' dt (10,6) linewidth 4
+set style line 6 linecolor rgb '#D55E00' dt (10,6) linewidth 4
+set style line 7 linecolor rgb '#444444' dt (10,5,2,5) linewidth 4
+plot 'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-19-24/2026-04-13-14-19-58/out/plots/aggregate-combined.csv' title "IOCL f=1" ls 1 with lines, \
+'printdbg/10_shards/0%_reads/fanout_4/2026-04-13-14-24-43/2026-04-13-14-25-03/out/plots/aggregate-combined.csv' title "IOCL f=4" ls 2 with lines, \
+'printdbg/10_shards/0%_reads/fanout_16/2026-04-13-14-29-50/2026-04-13-14-30-10/out/plots/aggregate-combined.csv' title "IOCL f=16" ls 3 with lines, \
+'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-21-20/2026-04-13-14-21-39/out/plots/aggregate-combined.csv' title "CRAQ f=1" ls 4 with lines, \
+'printdbg/10_shards/0%_reads/fanout_4/2026-04-13-14-26-26/2026-04-13-14-26-45/out/plots/aggregate-combined.csv' title "CRAQ f=4" ls 5 with lines, \
+'printdbg/10_shards/0%_reads/fanout_16/2026-04-13-14-31-34/2026-04-13-14-31-52/out/plots/aggregate-combined.csv' title "CRAQ f=16" ls 6 with lines, \
+'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-23-00/2026-04-13-14-23-18/out/plots/aggregate-combined.csv' title "VR f=1" ls 7 with lines

@@ -1,29 +1,29 @@
 set datafile separator ','
-set title "10 shards, fanout=1 — CDF by read percentage\n(solid=iocl\\_craq, dotted=craq, grey dash-dot=vr)" font "DejaVu Sans Bold,16"
-set key outside right center font 'DejaVu Sans,14' spacing 1.5 samplen 4
+set title "10 shards, fanout=1 - CDF by read percentage\n(color=read %, line style=protocol)" font "DejaVu Sans Bold,16"
+set key outside bottom center horizontal font 'DejaVu Sans,13' spacing 1.1 samplen 3 maxrows 3
 set xlabel 'Latency (ms)' font 'DejaVu Sans,15'
 set ylabel 'Cumulative fraction of operations' font 'DejaVu Sans,15'
 set tics font 'DejaVu Sans,13'
-set terminal pngcairo size 1600,800 enhanced dashed font 'DejaVu Sans,15'
+set terminal pngcairo size 1700,900 enhanced dashed font 'DejaVu Sans,15'
 set output 'printdbg/10_shards/combined_plots/fanout1_combined_cdf.png'
 set yrange [0:1]
-set grid lc rgb '#cccccc' lw 1
+set grid xtics ytics lc rgb '#d9d9d9' lw 1
 set border lw 1.5
-set style line 1 linecolor rgb '#1a5276' dt (1,0) linewidth 8
-set style line 2 linecolor rgb '#784212' dt (1,0) linewidth 8
-set style line 3 linecolor rgb '#145a32' dt (1,0) linewidth 8
-set style line 4 linecolor rgb '#4a235a' dt (1,0) linewidth 8
-set style line 5 linecolor rgb '#5dade2' dt (12,6) linewidth 6
-set style line 6 linecolor rgb '#f0b27a' dt (12,6) linewidth 6
-set style line 7 linecolor rgb '#58d68d' dt (12,6) linewidth 6
-set style line 8 linecolor rgb '#c39bd3' dt (12,6) linewidth 6
-set style line 9 linecolor rgb '#444444' dt (12,5,3,5) linewidth 6
-plot 'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-19-24/2026-04-13-14-19-58/out/plots/aggregate-combined.csv' title "iocl\\_craq 0%" ls 1 with lines, \
-'printdbg/10_shards/50%_reads/fanout_1/2026-04-13-14-35-12/2026-04-13-14-35-32/out/plots/aggregate-combined.csv' title "iocl\\_craq 50%" ls 2 with lines, \
-'printdbg/10_shards/90%_reads/fanout_1/2026-04-13-14-50-48/2026-04-13-14-51-08/out/plots/aggregate-combined.csv' title "iocl\\_craq 90%" ls 3 with lines, \
-'printdbg/10_shards/100%_reads/fanout_1/2026-04-13-15-06-20/2026-04-13-15-06-50/out/plots/aggregate-combined.csv' title "iocl\\_craq 100%" ls 4 with lines, \
-'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-21-20/2026-04-13-14-21-39/out/plots/aggregate-combined.csv' title "craq 0%" ls 5 with lines, \
-'printdbg/10_shards/50%_reads/fanout_1/2026-04-13-14-36-55/2026-04-13-14-37-14/out/plots/aggregate-combined.csv' title "craq 50%" ls 6 with lines, \
-'printdbg/10_shards/90%_reads/fanout_1/2026-04-13-14-52-31/2026-04-13-14-52-48/out/plots/aggregate-combined.csv' title "craq 90%" ls 7 with lines, \
-'printdbg/10_shards/100%_reads/fanout_1/2026-04-13-15-08-14/2026-04-13-15-08-32/out/plots/aggregate-combined.csv' title "craq 100%" ls 8 with lines, \
-'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-23-00/2026-04-13-14-23-18/out/plots/aggregate-combined.csv' title "vr 0%" ls 9 with lines
+set style line 1 linecolor rgb '#0072B2' dt solid linewidth 5
+set style line 2 linecolor rgb '#E69F00' dt solid linewidth 5
+set style line 3 linecolor rgb '#009E73' dt solid linewidth 5
+set style line 4 linecolor rgb '#CC79A7' dt solid linewidth 5
+set style line 5 linecolor rgb '#0072B2' dt (10,6) linewidth 4
+set style line 6 linecolor rgb '#E69F00' dt (10,6) linewidth 4
+set style line 7 linecolor rgb '#009E73' dt (10,6) linewidth 4
+set style line 8 linecolor rgb '#CC79A7' dt (10,6) linewidth 4
+set style line 9 linecolor rgb '#444444' dt (10,5,2,5) linewidth 4
+plot 'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-19-24/2026-04-13-14-19-58/out/plots/aggregate-combined.csv' title "IOCL 0%" ls 1 with lines, \
+'printdbg/10_shards/50%_reads/fanout_1/2026-04-13-14-35-12/2026-04-13-14-35-32/out/plots/aggregate-combined.csv' title "IOCL 50%" ls 2 with lines, \
+'printdbg/10_shards/90%_reads/fanout_1/2026-04-13-14-50-48/2026-04-13-14-51-08/out/plots/aggregate-combined.csv' title "IOCL 90%" ls 3 with lines, \
+'printdbg/10_shards/100%_reads/fanout_1/2026-04-13-15-06-20/2026-04-13-15-06-50/out/plots/aggregate-combined.csv' title "IOCL 100%" ls 4 with lines, \
+'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-21-20/2026-04-13-14-21-39/out/plots/aggregate-combined.csv' title "CRAQ 0%" ls 5 with lines, \
+'printdbg/10_shards/50%_reads/fanout_1/2026-04-13-14-36-55/2026-04-13-14-37-14/out/plots/aggregate-combined.csv' title "CRAQ 50%" ls 6 with lines, \
+'printdbg/10_shards/90%_reads/fanout_1/2026-04-13-14-52-31/2026-04-13-14-52-48/out/plots/aggregate-combined.csv' title "CRAQ 90%" ls 7 with lines, \
+'printdbg/10_shards/100%_reads/fanout_1/2026-04-13-15-08-14/2026-04-13-15-08-32/out/plots/aggregate-combined.csv' title "CRAQ 100%" ls 8 with lines, \
+'printdbg/10_shards/0%_reads/fanout_1/2026-04-13-14-23-00/2026-04-13-14-23-18/out/plots/aggregate-combined.csv' title "VR 0%" ls 9 with lines
