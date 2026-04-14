@@ -1977,6 +1977,8 @@ namespace strongstore
     void Server::ReplicaUpcallAppRequest(const LinearizeableOperation &msg)
     {
         Debug("inside ReplicaUpcall with req_id = %lu", msg.rid().client_req_id());
+        Debug("the operation is %s", msg.kv().op() == replication::KVOpMessage::GET ? "GET" : "PUT");
+        Debug("The shardtag is %lu, the key is %s, the value is %s, the idx is %d", msg.shardtag(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().idx());
 
         string retval;
         int status = REPLY_OK;

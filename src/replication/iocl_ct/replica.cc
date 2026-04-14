@@ -205,6 +205,7 @@ namespace replication
 
         void IOCL_CTReplica::CommitUpTo(opnum_t upto)
         {
+            Debug("CommitUpTo for opnum %lu!!", upto);
             while (lastCommitted < upto)
             {
                 lastCommitted++;
@@ -229,6 +230,8 @@ namespace replication
                    ACK probably via piggybacking mechanism)*/ 
                 if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) || 
                     (AmLeader() && (entry->finalAcks.size() != entry->predList.predlist_size()))) {
+                    Debug("I'm in this case where .... entry->finalAcks.size() = %lu and entry->predList.predlist_size() = %d", entry->finalAcks.size(), entry->predList.predlist_size());
+                    Debug("And existence = %d", perKeySubLogs.find(entry->intkey) != perKeySubLogs.end());
                     // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
                     //         lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
                     ASSERT(entry->finalAcks.size() <= entry->predList.predlist_size());
@@ -239,6 +242,7 @@ namespace replication
                 }
                 if (AmLeader()) {
                     /* Execute it */
+                    Debug("ACTUALLY i'm hre in this case going to call ReplicaUpcall for opnum " FMT_OPNUM, lastCommitted);
                     ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
                     ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
                     /* We can immediately execute this entry */
@@ -515,6 +519,7 @@ namespace replication
                 }
                 // Add my finalTs at the end
                 ts_chain->add_predlist(entry.finalTs);
+                Debug("Sending shardtag = %lu and opnum = %lu and finalTs = %lu", entry.myShardTag, entry.viewstamp.opnum, entry.finalTs);
             }
 
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
@@ -539,36 +544,42 @@ namespace replication
         {
             switch (type) {
             case MsgType::UNORDERED_PREPARE_TYPE: {
+                Debug("Received UNORDERED_PREPARE message");
                 unorderedPrepareRecv.Clear();
                 unorderedPrepareRecv.ParseFromString(data);
                 HandleUnorderedPrepare(remote, unorderedPrepareRecv);
                 break;
             }
             case MsgType::UNORDERED_PREPARE_OK_TYPE: {
+                Debug("Received UNORDERED_PREPARE_OK message");
                 unorderedPrepareOKRecv.Clear();
                 unorderedPrepareOKRecv.ParseFromString(data);
                 HandleUnorderedPrepareOK(remote, unorderedPrepareOKRecv);
                 break;
             }
             case MsgType::PREPARE_TYPE: {
+                Debug("Received PREPARE message");
                 prepareRecv.Clear();
                 prepareRecv.ParseFromString(data);
                 HandlePrepare(remote, prepareRecv);
                 break;
             }
             case MsgType::PREPARE_OK_TYPE: {
+                Debug("Received PREPARE_OK message");
                 prepareOKRecv.Clear();
                 prepareOKRecv.ParseFromString(data);
                 HandlePrepareOK(remote, prepareOKRecv);
                 break;
             }
             case MsgType::COMMIT_TYPE: {
+                Debug("Received COMMIT message");
                 commitRecv.Clear();
                 commitRecv.ParseFromString(data);
                 HandleCommit(remote, commitRecv);
                 break;
             }
             case MsgType::COORD_RESP_TYPE: {
+                Debug("Received COORDINATION REPLY message");
                 // Predecessor reply arrived
                 coordRespRecv.Clear();
                 coordRespRecv.ParseFromString(data);
@@ -576,6 +587,7 @@ namespace replication
                 break;
             }
             case MsgType::COORD_FINAL_TYPE: {
+                Debug("Received COORDINATION FINAL ACK message");
                 // Predecessor final ACK arrived
                 coordFinalRecv.Clear();
                 coordFinalRecv.ParseFromString(data);
@@ -622,6 +634,14 @@ namespace replication
 
         void IOCL_CTReplica::HandleRequest(LinearizeableOperation &msg)
         {
+            Debug("Received request with op %d, key %s, value %s, idx %u, shardtag %lu, inteky %lu, and rid (%lu, %lu)",
+                   msg.kv().op(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().idx(), msg.shardtag(), msg.intkey(),
+                   msg.rid().client_id(), msg.rid().client_req_id());
+            Debug("And ti has predlist %d", msg.predlist().size());
+            Debug("And the predecessor shardtags are:");
+            for (int i = 0; i < msg.predlist().size(); i++) {
+                Debug("pred %d: %lu", i, msg.predlist(i));
+            }
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
 
@@ -716,15 +736,15 @@ namespace replication
             nullCommitTimeout->Reset();
         }
 
-        uint64_t IOCL_CTReplica::FoldL(const proto::PredListHolder &pl)
+        uint64_t IOCL_CTReplica::FoldL(const std::vector<uint64_t> &pl)
         {
             // check if empty
-            if (pl.predlist_size() == 0)
+            if (pl.size() == 0)
             {
                 return 0;
             }
-            auto v = pl.predlist(0);
-            for (uint64_t e : pl.predlist())
+            auto v = pl[0];
+            for (uint64_t e : pl)
             {
                 if (e > v)
                 {
@@ -766,7 +786,11 @@ namespace replication
 
         void IOCL_CTReplica::ReadyRoutine(uint64_t intkey)
         {
-            auto &sq = perKeySubqueues[intkey];
+            Debug("hi");
+            auto it = perKeySubqueues.find(intkey);
+            ASSERT(it != perKeySubqueues.end());
+            auto &sq = it->second;
+            Debug("The subqueue length is %lu", sq.size());
 
             while (true) {
                 if (sq.empty()) {
@@ -780,6 +804,7 @@ namespace replication
                     ASSERT(head.state == IOCL_STATE_PERSISTED || head.state == IOCL_STATE_READY);
                 }
                 if (head.state != IOCL_STATE_READY) {
+                    Debug("it's not ready! it's state is %d", head.state);
                     break;
                 }
                 /* Progress to REQUEST ordered */
@@ -814,6 +839,7 @@ namespace replication
 
                 if (lastOp - lastBatchEnd + 1 > batchSize)
                 {
+                    Debug("ok, i am ready now! Adding to ordered log and replicating!");
                     CloseBatch();
                 }
                 else
@@ -825,17 +851,31 @@ namespace replication
                     }
                 }
             }
+            if (sq.empty()) {
+                /* If we've executed everything in the sublog, remove it to save space */
+                perKeySubqueues.erase(intkey);
+            }
         }
 
         void IOCL_CTReplica::InsertInSubqueue(uint64_t intkey, uint32_t idx) {
+            Debug("INSERTING into SUBQUEUE.... for idx = %u and intkey %lu and shardtag %lu and finalTs = %lu", idx, intkey, Entry(idx).myShardTag, Entry(idx).finalTs);
             auto it = perKeySubqueues.find(intkey);
+            // Create subqueue (ordered set) for this intkey if it doesn't exist yet,
+            // giving it access to entryStore for comparisons
             if (it == perKeySubqueues.end()) {
                 it = perKeySubqueues.emplace(
                     intkey,
                     std::set<uint32_t, EntryReadyCompareIdx>(EntryReadyCompareIdx{&entryStore})
                 ).first;
             }
+            // Make sure we are inserting, NOT reinserting
+            ASSERT(std::find(it->second.begin(), it->second.end(), idx) == it->second.end());
+            ASSERT(it->second.find(idx) == it->second.end());
+            // N*LogN insertion into the subqueue
             it->second.insert(idx);
+            Debug("     The length of this subqueue is now %lu", it->second.size());
+            // entry = entryStore[idx] and
+            // EntryReadyCompareIdx compare by finalTs
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
@@ -878,6 +918,7 @@ namespace replication
 
             if (entry.u_prepare_ok_count == Q)
             {
+                Debug("Got quorum!");
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
                 {
                     ASSERT(i > 0 && i <= entryStore.size());
@@ -891,14 +932,17 @@ namespace replication
                     entry.arrivalTs = std::max(shardTS, ts);
                     entry.finalTs = entry.arrivalTs; // will be updated later
                     shardTS++;
+                    Debug("After UnorderedPrepareOK, arrivalTs = %lu and finalTs = %lu for entry with shardtag %lu", entry.arrivalTs, entry.finalTs, entry.myShardTag);
 
                     /* If it has any pending successor requests in
                     outstandingCoordinationReqs, respond to them now */
                     auto it = outstandingCoordinationReqs.find(entry.myShardTag);
                     if (it != outstandingCoordinationReqs.end()) {
+                        Debug("Ih ave outstansing successors!");
                         PredecessorReplyMessage preply;
                         preply.set_arrivalts(entry.arrivalTs);
                         for (const auto& succ : it->second) {
+                            Debug("Responding to successor with shardtag %lu on shard %u", succ.s(), succ.shardidx());
                             preply.set_s(succ.s());
                             preply.set_predidx(succ.predidx());
                             if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, MsgType::COORD_RESP_TYPE, preply)))
@@ -918,11 +962,15 @@ namespace replication
                     }
 
                     bool readyNow = (entry.ACKs == entry.predList.predlist_size());
+                    Debug("Are we readyNow? ACKs = %d, predList size = %d, so readyNow = %d", entry.ACKs, entry.predList.predlist_size(), readyNow);
                     auto sq_it = perKeySubqueues.find(entry.intkey);
                     bool no_subqueue = (sq_it == perKeySubqueues.end());
                     bool insertedAtHead = false;
-                    uint64_t candidateFinalTs = readyNow ? std::max(entry.arrivalTs, FoldL(entry.predList)) : 0;
+                    uint64_t candidateFinalTs = readyNow ? std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs)) : 0;
                     if (!no_subqueue && readyNow) {
+                        // Make sure we're not in the log already (i-1 is the idx of the entry in the entryStore)
+                        ASSERT(std::find(sq_it->second.begin(), sq_it->second.end(), i-1) == sq_it->second.end());
+                        ASSERT(sq_it->second.find(i-1) == sq_it->second.end());
                         auto &sq = sq_it->second;
                         ASSERT(!sq.empty());
                         uint32_t head_idx = *sq.begin();
@@ -934,8 +982,10 @@ namespace replication
                         }
                     }
                     /* FAST PATH: Check if we should never use the subqueue structure anyway */
+                    // Coordinated < Replicated
                     if (readyNow &&
                         (no_subqueue || insertedAtHead)) {
+                        Debug("In the fast path!!!");
                         /* Assign a final TS */
                         entry.finalTs = candidateFinalTs;
                         lastReadyTS[entry.intkey] = entry.finalTs + 1;
@@ -947,6 +997,7 @@ namespace replication
                             if (kv.second > 0) {
                                 continue;
                             }
+                            Debug("Responding to FINAL to successor with shardtag %lu on shard %u", predFinalSend.s(), predFinalSend.shardidx());
                             predFinalSend.set_s(kv.first.first);
                             if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                             {
@@ -970,6 +1021,7 @@ namespace replication
 
                         if (lastOp - lastBatchEnd + 1 > batchSize)
                         {
+                            Debug("Added to ordered log and replicating to replicas!");
                             CloseBatch();
                         }
                         else
@@ -982,6 +1034,7 @@ namespace replication
                         }
                     } else { /* Otherwise, we need to wait for more ACKs before we can mark it ready */
                         /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                        Debug("in the slow path -- inserting into subqueue for HOL!");
                         InsertInSubqueue(entry.intkey, i-1);
                     }
                 }
@@ -1110,6 +1163,7 @@ namespace replication
                 entry.finalTs = ts_chain.predlist(N-1);
                 /* Add the request to my log */
                 AppendToLog(entry.viewstamp.opnum, idx);
+                Debug("Just Prepared operation with shardtag %lu and intkey %lu, and finalTs = %lu", entry.myShardTag, entry.intkey, entry.finalTs);
             }
             ASSERT(op == msg.opnum());
 
@@ -1167,7 +1221,7 @@ namespace replication
 
             if (msg.opnum() <= this->lastUnorderedOp)
             {
-                Panic("hopefully won't be going through this case");
+                Panic("hopefully won't be going through this case: msg.opnum = %lu and lastUnorderedO = %lu", msg.opnum(), this->lastUnorderedOp);
                 RDebug("Ignoring UNORDERED_PREPARE; already prepared that operation");
                 // Resend the prepareOK message
                 PrepareOKMessage reply;
@@ -1269,6 +1323,7 @@ namespace replication
 
             if (entry->prepare_ok_count == Q)
             {
+                Debug("Got quorum!");
                 /*
                  * We have a quorum of PrepareOK messages for this
                  * opnumber. Execute it and all previous operations.
@@ -1286,6 +1341,7 @@ namespace replication
                  * This can be done asynchronously, so it really ought to be
                  * piggybacked on the next PREPARE or something.
                  */
+                Debug("And now issueing Commit message to replicas for opnum " FMT_OPNUM, msg.opnum());
                 CommitMessage cm;
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
@@ -1302,6 +1358,8 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationFinal(const TransportAddress &remote,
                                                 const proto::PredecessorFinalMessage &msg)
         {
+            Debug("hadnelCoordiantonFINAL from predecessor%lu-->successor %lu",
+                msg.p(), msg.s());
             auto it = shardtagToEntryIdx.find(msg.s());
             if (it == shardtagToEntryIdx.end()) {
 
@@ -1330,12 +1388,15 @@ namespace replication
             if ((entry.state == IOCL_STATE_COMMITTED) && (entry.finalAcks.size() == entry.predList.predlist_size())) {
                 ASSERT(perKeySubLogs.find(entry.intkey) != perKeySubLogs.end());
                 // TODO ASSERT WE ARE IN THE LOG
+                Debug("All final ACKs received for entry with shardtag %lu, so now executing +ReadyFinalRoutine!", entry.myShardTag);
                 ReadyFinalRoutine(entry.intkey);
             }
         }
 
         void IOCL_CTReplica::HandleCoordination(const SuccessorRequestMessage &msg)
         {
+            Debug("Received client Coordination with msg = {succ_shardtag = %lu, shardidx = %u, predidx = %u, pred_shardtag = %lu}",
+                msg.s(), msg.shardidx(), msg.predidx(), msg.p());
             auto it = shardtagToEntryIdx.find(msg.p());
             if (it == shardtagToEntryIdx.end()) {
                 auto &vec = outstandingCoordinationReqs[msg.p()];
@@ -1390,6 +1451,8 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationReply(const TransportAddress &remote,
                                                 const proto::PredecessorReplyMessage &msg)
         {
+            Debug("Received Coordination Reply from predecessor-->successor %lu with arrivalTs = %lu and predidx = %u",
+                msg.s(), msg.arrivalts(), msg.predidx());
             // NOTE the shardidx is int32
             auto it = shardtagToEntryIdx.find(msg.s());
             if (it == shardtagToEntryIdx.end()) {
@@ -1410,9 +1473,30 @@ namespace replication
             entry.ACKs++;
             // Might remove this for dedup
             ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
+
+            // Replicated < Coordinated
             if (entry.state == IOCL_STATE_PERSISTED &&
                      entry.ACKs == entry.predList.predlist_size()) {
                 /* Now can progress to READY state */
+                Debug("Replicated < Coordinated for %lu", entry.myShardTag);
+                // ASSERT it is in here in the first place
+                auto it = perKeySubqueues.find(entry.intkey);
+                ASSERT(it != perKeySubqueues.end());
+                ASSERT(std::find(it->second.begin(), it->second.end(), idx) != it->second.end());
+                ASSERT(it->second.find(idx) != it->second.end());
+                Debug("Found it in the perKeySubqueue!");
+                // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
+                it->second.erase(idx);
+                Debug("just erased it!");
+                /* Assign a final TS */
+                entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
+                lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                /* Assign it ready state */
+                entry.state = IOCL_STATE_READY;
+                // Reinsert
+                Debug("REEinserting into SUBQUEUE.... for idx = %u and intkey %lu and shardtag %lu and finalTs = %lu", idx, entry.intkey, entry.myShardTag, entry.finalTs);
+                it->second.insert(idx);
+                Debug("All ACKs received for entry with shardtag %lu, so now ready!", entry.myShardTag);
                 ReadyRoutine(entry.intkey);
             }
 

@@ -233,7 +233,7 @@ namespace replication
             void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
-            uint64_t FoldL(const proto::PredListHolder &pl);
+            uint64_t FoldL(const std::vector<uint64_t> &pl);
             void InsertInSubqueue(uint64_t intkey, uint32_t idx);
 
             void HandleUnloggedRequest(const TransportAddress &remote,
