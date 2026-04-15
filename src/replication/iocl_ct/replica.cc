@@ -125,8 +125,6 @@ namespace replication
             log.reserve(200000);
             // shardtagToEntryIdx.reserve(200000);
             shardTS = 0;
-            predFinalSend.set_shardidx(groupIdx);
-
         }
 
         IOCL_CTReplica::~IOCL_CTReplica()
@@ -220,39 +218,37 @@ namespace replication
 
                 /* Mark it as committed */
                 entry->state = IOCL_STATE_COMMITTED;
-
-                /* If there are other ops that haven't received their 
-                   N final ACKs, then this op must block behind them.
-                   Similarly, if there is no sublog, but this op hasn't
-                   received all N final ACKs, insert it to the log and
-                   do NOT execute it (for now replicas do, since we don't
-                   track acks there, and i don't want to implement the final
-                   ACK probably via piggybacking mechanism)*/ 
-                if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) || 
-                    (AmLeader() && (entry->finalAcks.size() != entry->predList.predlist_size()))) {
-                    Debug("I'm in this case where .... entry->finalAcks.size() = %lu and entry->predList.predlist_size() = %d", entry->finalAcks.size(), entry->predList.predlist_size());
-                    Debug("And existence = %d", perKeySubLogs.find(entry->intkey) != perKeySubLogs.end());
-                    // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
-                    //         lastCommitted, entry->finalAcks.size(), entry->predList.predlist_size());
-                    ASSERT(entry->finalAcks.size() <= entry->predList.predlist_size());
-                    // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
-                    auto &sublog = perKeySubLogs[entry->intkey];
-                    sublog.ops.push_back(lastCommitted);
-                    return;
-                }
-                if (AmLeader()) {
+                if (!AmLeader()) {
+                    /* Replica path: */
                     /* Execute it */
-                    Debug("ACTUALLY i'm hre in this case going to call ReplicaUpcall for opnum " FMT_OPNUM, lastCommitted);
-                    ASSERT(entry->finalAcks.size() == entry->predList.predlist_size());
-                    ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
-                    /* We can immediately execute this entry */
                     ReplicaUpcall(entry->request);
-                    return;
+                } else {
+                    /* If there are other ops that haven't received their
+                    N final ACKs, then this op must block behind them.
+                    Similarly, if there is no sublog, but this op hasn't
+                    received all N final ACKs, insert it to the log and
+                    do NOT execute it (for now replicas do, since we don't
+                    track acks there, and i don't want to implement the final
+                    ACK probably via piggybacking mechanism)*/
+                    if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) ||
+                        (entry->final_ack_count != entry->num_predecessors)) {
+                        Debug("I'm in this case where .... entry->final_ack_count = %u and entry->num_predecessors = %u", entry->final_ack_count, entry->num_predecessors);
+                        Debug("And existence = %d", perKeySubLogs.find(entry->intkey) != perKeySubLogs.end());
+                        // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
+                        //         lastCommitted, entry->final_ack_count, entry->num_predecessors);
+                        ASSERT(entry->final_ack_count <= entry->num_predecessors);
+                        // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
+                        auto &sublog = perKeySubLogs[entry->intkey];
+                        sublog.ops.push_back(lastCommitted);
+                    } else {
+                        /* Execute it */
+                        Debug("ACTUALLY i'm hre in this case going to call ReplicaUpcall for opnum " FMT_OPNUM, lastCommitted);
+                        ASSERT(entry->final_ack_count == entry->num_predecessors);
+                        ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
+                        /* We can immediately execute this entry */
+                        ReplicaUpcall(entry->request);
+                    }
                 }
-
-                /* Replica path: */
-                /* Execute it */
-                ReplicaUpcall(entry->request);
             }
         }
 
@@ -418,7 +414,10 @@ namespace replication
             {
                 return;
             }
-            RNotice("Resending prepare");
+            uint32_t idx = log[lastPrepare.opnum()-1];
+            const IoclEntry& entry = Entry(idx);
+            RNotice("Resending prepare with opnum = " FMT_OPNUM, lastPrepare.opnum());
+            RNotice("The lastPrepare was for shardtag = %lu and clientid %lu ", entry.myShardTag, entry.request.rid().client_id());
             if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, lastPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
@@ -434,7 +433,7 @@ namespace replication
             {
                 return;
             }
-            RNotice("Resending unordered prepare for last message with shardtag = %lu", lastUnorderedPrepare.shardtags(0));
+            RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu", lastUnorderedPrepare.request(0).shardtag(), lastUnorderedPrepare.request(0).rid().client_id());
             if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, lastUnorderedPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
@@ -456,19 +455,15 @@ namespace replication
             up.set_view(view);
             up.set_opnum(lastUnorderedOp);
             up.set_batchstart(unorderedBatchStart);
+
             auto *reqs = up.mutable_request();
             reqs->Reserve(batchSize);
-            up.mutable_shardtags()->Reserve(batchSize);
-            up.mutable_predlists()->Reserve(batchSize);
 
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
                 const IoclEntry& entry = Entry(i-1);
                 ASSERT(entry.viewstamp.view == view);
-                *reqs->Add() = entry.request;
-                up.add_shardtags(entry.myShardTag);
-                PredListHolder* pl = up.add_predlists();
-                pl->CopyFrom(entry.predList);
+                reqs->Add()->CopyFrom(entry.request);
             }
 
             if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, up)))
@@ -498,10 +493,11 @@ namespace replication
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
-            auto *reqs = p.mutable_request();
-            reqs->Reserve(batchSize);
-            p.mutable_shardtags()->Reserve(batchSize);
-            p.mutable_timestamp_chains()->Reserve(batchSize);
+
+            auto *shardtags = p.mutable_shardtags();
+            auto *chains = p.mutable_timestamp_chains();
+
+            shardtags->Reserve(batchSize);
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
@@ -509,16 +505,15 @@ namespace replication
                 IoclEntry &entry = Entry(idx);
                 ASSERT(entry.viewstamp.view == view);
                 ASSERT(entry.viewstamp.opnum == i);
-                *reqs->Add() = entry.request;
-                p.add_shardtags(entry.myShardTag);
-                PredListHolder* ts_chain = p.add_timestamp_chains();
-                ts_chain->mutable_predlist()->Reserve(entry.predecessorArrivalTs.size() + 1);
-                // loop through predecessorArrivalTs and add to timestamp chain
-                for (auto ts : entry.predecessorArrivalTs) {
-                    ts_chain->add_predlist(ts);
+                ASSERT(entry.predecessorArrivalTs.size() == entry.num_predecessors);
+
+                shardtags->Add(entry.myShardTag);
+
+                chains->Reserve(chains->size() + entry.num_predecessors + 1);
+                for (uint64_t ts : entry.predecessorArrivalTs) {
+                    chains->Add(ts);
                 }
-                // Add my finalTs at the end
-                ts_chain->add_predlist(entry.finalTs);
+                chains->Add(entry.finalTs);
                 Debug("Sending shardtag = %lu and opnum = %lu and finalTs = %lu", entry.myShardTag, entry.viewstamp.opnum, entry.finalTs);
             }
 
@@ -634,8 +629,8 @@ namespace replication
 
         void IOCL_CTReplica::HandleRequest(LinearizeableOperation &msg)
         {
-            Debug("Received request with op %d, key %s, value %s, idx %u, shardtag %lu, inteky %lu, and rid (%lu, %lu)",
-                   msg.kv().op(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().idx(), msg.shardtag(), msg.intkey(),
+            Debug("Received request with op %d, key %s, value %s, server slot idx %u, shardtag %lu, inteky %lu, and rid (%lu, %lu)",
+                   msg.kv().op(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().slot_idx(), msg.shardtag(), msg.intkey(),
                    msg.rid().client_id(), msg.rid().client_req_id());
             Debug("And ti has predlist %d", msg.predlist().size());
             Debug("And the predecessor shardtags are:");
@@ -665,28 +660,15 @@ namespace replication
             v.opnum = this->lastUnorderedOp;
 
             // Add the request to the unordered bag
-            LinearizeableOperation request;
-
             ASSERT((msg.request_type() == replication::LinearizeableOperation::KV_OP) && msg.has_kv());
-            request.mutable_kv()->set_op(msg.kv().op());
-            request.mutable_kv()->set_key(msg.kv().key());
-            request.mutable_kv()->set_value(msg.kv().value());
-            // request.mutable_the_op()->swap(*msg.mutable_op());
-            // request.mutable_key()->swap(*msg.mutable_key());
-            // request.mutable_val()->swap(*msg.mutable_value());
-            request.mutable_rid()->set_client_id(msg.rid().client_id());
-            request.mutable_rid()->set_client_req_id(msg.rid().client_req_id());
-            request.mutable_kv()->set_idx(msg.kv().idx());
-
             uint64_t shardtag = msg.shardtag();
-
+            uint64_t intkey = msg.intkey();
+            uint16_t num_predecessors = msg.predlist().size();
             uint32_t idx = entryStore.size();
-            entryStore.emplace_back(v, IOCL_STATE_ARRIVED, msg, shardtag, msg.intkey());
+            entryStore.emplace_back(v, IOCL_STATE_ARRIVED, std::move(msg), shardtag, intkey, num_predecessors);
             IoclEntry &entry = Entry(idx);
             ASSERT(entry.viewstamp.opnum - 1 == idx);
-            // Grab the msg.predlist() efficiently and store
-            entry.predList.mutable_predlist()->Swap(msg.mutable_predlist());
-            entry.predecessorArrivalTs.resize(entry.predList.predlist_size());
+            entry.predecessorArrivalTs.resize(entry.num_predecessors);
 
             // Add entry to "ordered" unorderedBag (for batching)
             ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
@@ -695,11 +677,11 @@ namespace replication
             // Go through any outstanding predecessor replies and add them in
             auto pit = outstandingCoordinationResps.find(shardtag);
             if (pit != outstandingCoordinationResps.end()) {
-                auto &predAcks = pit->second;
-                for (const auto& resp : predAcks) {
-                    ASSERT(resp.predidx() < entry.predList.predlist_size());
+                std::vector<outCoordResp> &ocr = pit->second;
+                for (const auto& resp : ocr) {
+                    ASSERT(resp.predidx < entry.num_predecessors);
                     // ASSERT(entryPtr->predecessorArrivalTs[resp.predidx()] == 0);
-                    entry.predecessorArrivalTs[resp.predidx()] = resp.arrivalts();
+                    entry.predecessorArrivalTs[resp.predidx] = resp.arrivalTs;
                     entry.ACKs++;
                 }
                 outstandingCoordinationResps.erase(pit);
@@ -707,17 +689,11 @@ namespace replication
             // Also go through any outstanding predecessor final ACKs and add them in
             auto fit = outstandingCoordinationFinals.find(shardtag);
             if (fit != outstandingCoordinationFinals.end()) {
-                auto &predFinals = fit->second;
-                for (const auto& finalAck : predFinals) {
-                    auto facks_it = entry.finalAcks.find({finalAck.p(), finalAck.shardidx()});
-                    if (facks_it != entry.finalAcks.end()) {
-                        Warning("Duplicate final ACK received from predecessor with shardtag %lu and shardidx %u for my shardtag %lu",
-                            finalAck.p(), finalAck.shardidx(), entry.myShardTag);
-                    } else {
-                        // ASSERT THIS IS A LEGAL PREDECESSOR
-                        entry.finalAcks.emplace(finalAck.p(), finalAck.shardidx());
-                    }
-                }
+                uint64_t outstanding_final_mask = fit->second;
+                entry.final_ack_mask |= outstanding_final_mask;
+                // Count how many bits are set in the outstanding_final_mask and add that to the final_ack_count
+                uint8_t count = __builtin_popcountll(outstanding_final_mask);
+                entry.final_ack_count += count;
                 outstandingCoordinationFinals.erase(fit);
             }
 
@@ -768,9 +744,9 @@ namespace replication
                 const IoclEntry *head_entry = FindInLog(headOpnum);
                 ASSERT(head_entry->state == IOCL_STATE_COMMITTED);
 
-                if (head_entry->finalAcks.size() != head_entry->predList.predlist_size()) {
+                if (head_entry->final_ack_count != head_entry->num_predecessors) {
                     /* Still waiting on final ACKs, done with loop */
-                    ASSERT(head_entry->finalAcks.size() <= head_entry->predList.predlist_size());
+                    ASSERT(head_entry->final_ack_count <= head_entry->num_predecessors);
                     break;
                 }
                 /* Remove from sublog */
@@ -792,10 +768,7 @@ namespace replication
             auto &sq = it->second;
             Debug("The subqueue length is %lu", sq.size());
 
-            while (true) {
-                if (sq.empty()) {
-                    break;
-                }
+            while (!sq.empty()) {
                 uint32_t idx = *sq.begin();
                 IoclEntry &head = Entry(idx);
                 if (head.state != IOCL_STATE_PERSISTED && head.state != IOCL_STATE_READY) {
@@ -810,18 +783,19 @@ namespace replication
                 /* Progress to REQUEST ordered */
                 sq.erase(sq.begin());
                 /* Send out the Final ACK to all successors */
-                predFinalSend.set_p(head.myShardTag);
-                for (const auto& kv : head.successors) {
-                    if (kv.second > 0) {
-                        continue;
+                for (auto& kv : head.successors) {
+                    const SuccessorKey &succ = kv.first;
+                    SuccessorInfo &succ_info = kv.second;
+                    if (!succ_info.final_sent) {
+                        predFinalSend.set_s(succ.s_shardtag);
+                        predFinalSend.set_predidx(succ_info.predidx);
+                        if (!(transport->SendMessageToReplica(this, succ.s_shardidx, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
+                        {
+                            RWarning("Failed to send SuccessorRequest message to client");
+                        }
+                        // Mark that we've sent to this successor
+                        succ_info.final_sent = true;
                     }
-                    predFinalSend.set_s(kv.first.first);
-                    if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
-                    {
-                        RWarning("Failed to send SuccessorRequest message to client");
-                    }
-                    // Mark that we've sent to this successor
-                    head.successors[kv.first] = 1;
                 }
 
                 /* Assign it a real opnum for this view in the ordered log */
@@ -853,6 +827,7 @@ namespace replication
             }
             if (sq.empty()) {
                 /* If we've executed everything in the sublog, remove it to save space */
+                Debug("erasing this subqueue");
                 perKeySubqueues.erase(intkey);
             }
         }
@@ -939,30 +914,31 @@ namespace replication
                     auto it = outstandingCoordinationReqs.find(entry.myShardTag);
                     if (it != outstandingCoordinationReqs.end()) {
                         Debug("Ih ave outstansing successors!");
-                        PredecessorReplyMessage preply;
-                        preply.set_arrivalts(entry.arrivalTs);
-                        for (const auto& succ : it->second) {
-                            Debug("Responding to successor with shardtag %lu on shard %u", succ.s(), succ.shardidx());
-                            preply.set_s(succ.s());
-                            preply.set_predidx(succ.predidx());
-                            if (!(transport->SendMessageToReplica(this, succ.shardidx(), 0, MsgType::COORD_RESP_TYPE, preply)))
+                        preplySend.set_arrivalts(entry.arrivalTs);
+                        std::vector<outCoordReq> &ocr = it->second;
+                        for (const auto& succ : ocr) {
+                            Debug("Responding to successor with shardtag %lu on shard %u", succ.s, succ.shardidx);
+                            preplySend.set_s(succ.s);
+                            preplySend.set_predidx(succ.predidx);
+                            if (!(transport->SendMessageToReplica(this, succ.shardidx, 0, MsgType::COORD_RESP_TYPE, preplySend)))
                             {
                                 RWarning("Failed to send SuccessorReply message to client");
                             }
                             /* And save the successor ! */
-                            auto succ_it = entry.successors.find({succ.s(), succ.shardidx()});
-                            if (succ_it == entry.successors.end()) {
-                                // Map the successor shardtag to its shardidx
-                                entry.successors.emplace(std::make_pair(succ.s(), succ.shardidx()), 0);
-                            } else {
-                                Warning("Duplicate successor request received for successor %lu on shard %u", succ.s(), succ.shardidx());
+                            SuccessorKey succ_key{succ.s, static_cast<uint32_t>(succ.shardidx)};
+                            auto result = entry.successors.emplace(succ_key, SuccessorInfo{static_cast<uint16_t>(succ.predidx), false});
+                            auto succ_it = result.first;
+                            bool inserted = result.second;
+                            if (!inserted) {
+                                Warning("Duplicate successor request received for successor %lu on shard %u", succ.s, succ.shardidx);
+                                ASSERT(succ_it->second.predidx == succ.predidx);
                             }
                         }
                         outstandingCoordinationReqs.erase(it);
                     }
 
-                    bool readyNow = (entry.ACKs == entry.predList.predlist_size());
-                    Debug("Are we readyNow? ACKs = %d, predList size = %d, so readyNow = %d", entry.ACKs, entry.predList.predlist_size(), readyNow);
+                    bool readyNow = (entry.ACKs == entry.num_predecessors);
+                    Debug("Are we readyNow? ACKs = %d, predList size = %d, so readyNow = %d", entry.ACKs, entry.num_predecessors, readyNow);
                     auto sq_it = perKeySubqueues.find(entry.intkey);
                     bool no_subqueue = (sq_it == perKeySubqueues.end());
                     bool insertedAtHead = false;
@@ -977,7 +953,7 @@ namespace replication
                         IoclEntry &head = Entry(head_idx);
                         insertedAtHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
                         if (insertedAtHead) {
-                            ASSERT(head.ACKs < head.predList.predlist_size());
+                            ASSERT(head.ACKs < head.num_predecessors);
                             ASSERT(head.state != IOCL_STATE_READY);
                         }
                     }
@@ -992,19 +968,19 @@ namespace replication
                         /* Assign it ready state */
                         entry.state = IOCL_STATE_READY;
                         /* Send out the Final ACK to all successors */
-                        predFinalSend.set_p(entry.myShardTag);
-                        for (const auto& kv : entry.successors) {
-                            if (kv.second > 0) {
-                                continue;
+                        for (auto& kv : entry.successors) {
+                            const SuccessorKey &succ = kv.first;
+                            SuccessorInfo &succ_info = kv.second;
+                            if (!succ_info.final_sent) {
+                                predFinalSend.set_s(succ.s_shardtag);
+                                predFinalSend.set_predidx(succ_info.predidx);
+                                if (!(transport->SendMessageToReplica(this, succ.s_shardidx, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
+                                {
+                                    RWarning("Failed to send SuccessorRequest message to client");
+                                }
+                                // Mark that we've sent to this successor
+                                succ_info.final_sent = true;
                             }
-                            Debug("Responding to FINAL to successor with shardtag %lu on shard %u", predFinalSend.s(), predFinalSend.shardidx());
-                            predFinalSend.set_s(kv.first.first);
-                            if (!(transport->SendMessageToReplica(this, kv.first.second, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
-                            {
-                                RWarning("Failed to send SuccessorRequest message to client");
-                            }
-                            // Mark that we've sent to this successor
-                            entry.successors[kv.first] = 1;
                         }
                         /* Assign it a real opnum for this view in the ordered log */
                         ASSERT(entry.viewstamp.opnum - 1 == i-1);
@@ -1097,7 +1073,7 @@ namespace replication
 
             ASSERT(msg.batchstart() <= msg.opnum());
             ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
+                   (unsigned int)msg.shardtags_size());
 
             viewChangeTimeout->Reset();
             int leaderIdx = configuration.GetLeaderIndex(view);
@@ -1128,16 +1104,10 @@ namespace replication
 
             /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
-            int i = 0;
-            for (auto &req : msg.request())
+            size_t chain_idx = 0;
+            for (auto &shardtag : msg.shardtags())
             {
                 op++;
-                if (op <= lastOp)
-                {
-                    continue;
-                }
-                this->lastOp++;
-                uint64_t shardtag = msg.shardtags(i);
 
                 /* Find the entry */
                 auto it = shardtagToEntryIdx.find(shardtag);
@@ -1147,25 +1117,34 @@ namespace replication
                 }
                 uint32_t idx = it->second;
                 IoclEntry &entry = Entry(idx);
+                size_t N = entry.num_predecessors + 1;
+
+                if (op <= lastOp)
+                {
+                    chain_idx += N;
+                    continue;
+                }
+                this->lastOp++;
+
                 /* Update its state */
                 ASSERT(entry.viewstamp.opnum - 1 == idx);
                 entry.viewstamp.view = msg.view();
                 entry.viewstamp.opnum = op;
                 entry.state = IOCL_STATE_PREPARED;
                 // loop through timestamp_chains and add to predecessorArrivalTs
-                const proto::PredListHolder& ts_chain = msg.timestamp_chains(i);
-                uint64_t N = ts_chain.predlist_size();
-                entry.predecessorArrivalTs.resize(N);
-                for (int j = 0; j < (N-1); j++) {
-                    uint64_t ts = ts_chain.predlist(j);
-                    entry.predecessorArrivalTs[j] = ts;
+                ASSERT(chain_idx + N <= msg.timestamp_chains_size());
+                for (size_t j = 0; j < (N-1); j++) {
+                    entry.predecessorArrivalTs[j] = msg.timestamp_chains(chain_idx);
+                    chain_idx++;
                 }
-                entry.finalTs = ts_chain.predlist(N-1);
+                entry.finalTs = msg.timestamp_chains(chain_idx); // last one is the final TS of the predecessor chain, which is the one we use for ordering in the log and comparing against other entries
+                chain_idx++;
                 /* Add the request to my log */
                 AppendToLog(entry.viewstamp.opnum, idx);
                 Debug("Just Prepared operation with shardtag %lu and intkey %lu, and finalTs = %lu", entry.myShardTag, entry.intkey, entry.finalTs);
             }
             ASSERT(op == msg.opnum());
+            ASSERT(chain_idx == msg.timestamp_chains_size());
 
             /* Build reply and send it to the leader */
             PrepareOKMessage reply;
@@ -1221,13 +1200,13 @@ namespace replication
 
             if (msg.opnum() <= this->lastUnorderedOp)
             {
-                Panic("hopefully won't be going through this case: msg.opnum = %lu and lastUnorderedO = %lu", msg.opnum(), this->lastUnorderedOp);
                 RDebug("Ignoring UNORDERED_PREPARE; already prepared that operation");
                 // Resend the prepareOK message
-                PrepareOKMessage reply;
+                UnorderedPrepareOKMessage reply;
                 reply.set_view(msg.view());
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
+                reply.set_batchstart(msg.batchstart());
                 if (!(transport->SendMessageToReplica(
                         this, leaderIdx, MsgType::UNORDERED_PREPARE_OK_TYPE, reply)))
                 {
@@ -1237,32 +1216,32 @@ namespace replication
             }
 
             // Add operations to the unordered bag
-            int i = 0;
+            int i = -1;
             opnum_t op = msg.batchstart() - 1;
             for (const auto &req : msg.request())
             {
                 op++;
+                i++;
                 if (op <= lastUnorderedOp)
                 {
                     continue;
                 }
                 this->lastUnorderedOp++;
                 /* Add the request to the unordered bag */
-                uint64_t shardtag = msg.shardtags(i);
+                uint64_t shardtag = req.shardtag();
+                uint64_t intkey = req.intkey();
+                uint16_t num_predecessors = req.predlist().size();
 
                 /* For now we don't replicate the intkey at replicas
                 Instead, if a new leader takes over, it can get its key from 
                 the string in the Request */
                 uint32_t idx = entryStore.size();
-                entryStore.emplace_back(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, req, shardtag, 0);
+                entryStore.emplace_back(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, std::move(req), shardtag, intkey, num_predecessors);
 
                 IoclEntry &entry = Entry(idx);
-                // Grab the msg.predlist() efficiently and store
-                entry.predList.Swap(msg.mutable_predlists(i));
 
                 ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
                 shardtagToEntryIdx[shardtag] = idx;
-                i++;
             }
 
             /* Build reply and send it to the leader */
@@ -1358,13 +1337,19 @@ namespace replication
         void IOCL_CTReplica::HandleCoordinationFinal(const TransportAddress &remote,
                                                 const proto::PredecessorFinalMessage &msg)
         {
-            Debug("hadnelCoordiantonFINAL from predecessor%lu-->successor %lu",
-                msg.p(), msg.s());
+            Debug("hadnelCoordiantonFINAL from predecessorIDX%u-->successor %lu",
+                msg.predidx(), msg.s());
             auto it = shardtagToEntryIdx.find(msg.s());
             if (it == shardtagToEntryIdx.end()) {
-
-                auto &vec = outstandingCoordinationFinals[msg.s()];
-                vec.emplace_back(std::move(msg));
+                uint64_t curr_finals_mask = outstandingCoordinationFinals[msg.s()];
+                uint64_t bit = 1ULL << msg.predidx();
+                if ((curr_finals_mask & bit) == 0) {
+                    curr_finals_mask |= bit;
+                } else {
+                    Warning("Duplicate final ACK received from predecessor IDX %u for my shardtag %lu",
+                            msg.predidx(), msg.s());
+                }
+                outstandingCoordinationFinals[msg.s()] = curr_finals_mask;
                 return;
             }
             IoclEntry &entry = Entry(it->second);
@@ -1375,17 +1360,18 @@ namespace replication
                have been drained when upon arrival */
             ASSERT(outstandingCoordinationFinals.find(entry.myShardTag) == outstandingCoordinationFinals.end());
             /* Mark that this predecessor has finalized */
-            auto facks_it = entry.finalAcks.find({msg.p(), msg.shardidx()});
-            if (facks_it != entry.finalAcks.end()) {
-                Warning("Duplicate final ACK received from predecessor with shardtag %lu on shard %u for my shardtag %lu",
-                        msg.p(), msg.shardidx(), entry.myShardTag);
+            uint64_t bit = 1ULL << msg.predidx();
+            if ((entry.final_ack_mask & bit) == 0) {
+                entry.final_ack_mask |= bit;
+                entry.final_ack_count++;
+            } else {
+                Warning("Duplicate final ACK received from predecessor IDX %u for my shardtag %lu",
+                        msg.predidx(), entry.myShardTag);
                 return;
             }
-            /* ASSERT THIS IS A LEGAL PREDECESSOR */
-            entry.finalAcks.emplace(msg.p(), msg.shardidx());
             /* Now it is safe to Execute this operation! */
             /* Check if it is waiting to be executed */
-            if ((entry.state == IOCL_STATE_COMMITTED) && (entry.finalAcks.size() == entry.predList.predlist_size())) {
+            if ((entry.state == IOCL_STATE_COMMITTED) && (entry.final_ack_count == entry.num_predecessors)) {
                 ASSERT(perKeySubLogs.find(entry.intkey) != perKeySubLogs.end());
                 // TODO ASSERT WE ARE IN THE LOG
                 Debug("All final ACKs received for entry with shardtag %lu, so now executing +ReadyFinalRoutine!", entry.myShardTag);
@@ -1399,15 +1385,17 @@ namespace replication
                 msg.s(), msg.shardidx(), msg.predidx(), msg.p());
             auto it = shardtagToEntryIdx.find(msg.p());
             if (it == shardtagToEntryIdx.end()) {
-                auto &vec = outstandingCoordinationReqs[msg.p()];
-                vec.emplace_back(std::move(msg));
+                std::vector<outCoordReq> &vec = outstandingCoordinationReqs[msg.p()];
+                outCoordReq ocr{msg.s(), static_cast<uint32_t>(msg.shardidx()), static_cast<uint16_t>(msg.predidx())};
+                vec.emplace_back(ocr);
                 return;
             }
             IoclEntry &entry = Entry(it->second);
             /* If not yet persisted, can't respond yet */
             if (entry.state == IOCL_STATE_ARRIVED) {
-                auto &vec = outstandingCoordinationReqs[msg.p()];
-                vec.emplace_back(std::move(msg));
+                std::vector<outCoordReq> &vec = outstandingCoordinationReqs[msg.p()];
+                outCoordReq ocr{msg.s(), static_cast<uint32_t>(msg.shardidx()), static_cast<uint16_t>(msg.predidx())};
+                vec.emplace_back(ocr);
                 return;
             }
             /* assert that there are no outstanding
@@ -1426,19 +1414,22 @@ namespace replication
             }
             // NOTE the shardidx is int32
             /* Store the successor for the final TS */
-
-            auto succ_it = entry.successors.find({msg.s(), msg.shardidx()});
-            if (succ_it == entry.successors.end()) {
-                entry.successors.emplace(std::make_pair(msg.s(), msg.shardidx()), 0);
-            } else {
+            SuccessorKey succ{msg.s(), static_cast<uint32_t>(msg.shardidx())};
+            auto result = entry.successors.emplace(succ, SuccessorInfo{static_cast<uint16_t>(msg.predidx()), false});
+            auto succ_it = result.first;
+            bool inserted = result.second;
+            if (!inserted) {
                 Warning("Duplicate successor request received for successor %lu on shard %u", msg.s(), msg.shardidx());
+                ASSERT(succ_it->second.predidx == msg.predidx());
             }
             /* Reply to the successor if we've already been added to the ordered log */
-            if (entry.state == IOCL_STATE_READY || entry.state == IOCL_STATE_PREPARED || entry.state == IOCL_STATE_COMMITTED) {
+            if (entry.state == IOCL_STATE_READY ||
+                entry.state == IOCL_STATE_PREPARED ||
+                entry.state == IOCL_STATE_COMMITTED) {
                 /* Send out the Final ACK to all successors */
-                predFinalSend.set_p(entry.myShardTag);
+                predFinalSend.set_predidx(msg.predidx());
                 predFinalSend.set_s(msg.s());
-                entry.successors[{msg.s(), msg.shardidx()}] = 1; // Mark that we've sent final ACK to this successor
+                succ_it->second.final_sent = true; // Mark that we've sent final ACK to this successor
                 if (!(transport->SendMessageToReplica(this, msg.shardidx(), 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                 {
                     RWarning("Failed to send SuccessorRequest message to client");
@@ -1456,8 +1447,9 @@ namespace replication
             // NOTE the shardidx is int32
             auto it = shardtagToEntryIdx.find(msg.s());
             if (it == shardtagToEntryIdx.end()) {
-                auto &vec = outstandingCoordinationResps[msg.s()];
-                vec.emplace_back(std::move(msg));
+                std::vector<outCoordResp> &vec = outstandingCoordinationResps[msg.s()];
+                outCoordResp ocr{msg.arrivalts(), static_cast<uint16_t>(msg.predidx())};
+                vec.emplace_back(ocr);
                 return;
             }
             uint32_t idx = it->second;
@@ -1467,7 +1459,7 @@ namespace replication
                outstandingCoordinationResps -- should
                have been drained when upon arrival */
             ASSERT(outstandingCoordinationResps.find(entry.myShardTag) == outstandingCoordinationResps.end());
-            ASSERT(msg.predidx() < entry.predList.predlist_size());
+            ASSERT(msg.predidx() < entry.num_predecessors);
             // ASSERT(entry.predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
             entry.predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
             entry.ACKs++;
@@ -1476,7 +1468,7 @@ namespace replication
 
             // Replicated < Coordinated
             if (entry.state == IOCL_STATE_PERSISTED &&
-                     entry.ACKs == entry.predList.predlist_size()) {
+                     entry.ACKs == entry.num_predecessors) {
                 /* Now can progress to READY state */
                 Debug("Replicated < Coordinated for %lu", entry.myShardTag);
                 // ASSERT it is in here in the first place

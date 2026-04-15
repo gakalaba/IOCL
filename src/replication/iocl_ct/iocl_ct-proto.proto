@@ -4,10 +4,6 @@ import "request.proto";
 
 package replication.iocl_ct.proto;
 
-message PredListHolder {
-    repeated uint64 predlist = 1;
-}
-
 message ReplyMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
@@ -28,9 +24,8 @@ message PrepareMessage {
     required uint64 view = 1;
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
-    repeated LinearizeableOperation request = 4;
-    repeated uint64 shardTags = 5;
-    repeated PredListHolder timestamp_chains = 6;
+    repeated uint64 shardtags = 4;
+    repeated uint64 timestamp_chains = 5;
 }
 
 message PrepareOKMessage {
@@ -44,8 +39,6 @@ message UnorderedPrepareMessage {
     required uint64 opnum = 2;
     required uint64 batchstart = 3;
     repeated LinearizeableOperation request = 4;
-    repeated uint64 shardTags = 5;
-    repeated PredListHolder predLists = 6;
 }
 
 message UnorderedPrepareOKMessage {
@@ -63,8 +56,7 @@ message PredecessorReplyMessage {
 
 message PredecessorFinalMessage {
     required uint64 s = 1;
-    required uint64 p = 2;
-    required int32 shardIdx = 3;
+    required uint32 predidx = 2;
 }
 
 message CommitMessage {

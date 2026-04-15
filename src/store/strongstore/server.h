@@ -277,7 +277,7 @@ namespace strongstore
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
-        void RespondToClientOperation(const TransportAddress *remote, uint32_t idx, uint64_t clientid, uint64_t client_req_id, int status, string retval);
+        void RespondToClientOperation(const TransportAddress *remote, uint64_t clientid, uint64_t client_req_id, int status, string retval);
 
         void ReplicateCoordinatorCommit(uint64_t client_id,
                 uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,

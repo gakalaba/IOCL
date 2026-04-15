@@ -58,28 +58,58 @@ namespace replication
             IOCL_STATE_COMMITTED
         };
 
-        struct IoclEntry {
-            struct PairHash {
-                std::size_t operator()(const std::pair<uint64_t, int32_t>& p) const noexcept {
-                    uint64_t h1 = std::hash<uint64_t>()(p.first);
-                    uint64_t h2 = std::hash<int32_t>()(p.second);
+        struct SuccessorKey {
+            uint64_t s_shardtag;
+            uint32_t s_shardidx;
 
-                    // Very good hash mixing (from boost::hash_combine)
-                    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
-                }
-            };
+            bool operator==(const SuccessorKey &other) const noexcept {
+                return s_shardtag == other.s_shardtag &&
+                    s_shardidx == other.s_shardidx;
+            }
+        };
+
+        struct SuccessorKeyHash {
+            std::size_t operator()(const SuccessorKey &x) const noexcept {
+                std::size_t h1 = std::hash<uint64_t>{}(x.s_shardtag);
+                std::size_t h2 = std::hash<uint32_t>{}(x.s_shardidx);
+
+                std::size_t h = h1;
+                h ^= h2 + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+                return h;
+            }
+        };
+
+        struct SuccessorInfo {
+            uint16_t predidx;
+            bool final_sent;
+        };
+
+        struct outCoordResp {
+            uint64_t arrivalTs;
+            uint16_t predidx;
+        };
+
+        struct outCoordReq {
+            uint64_t s;
+            uint32_t shardidx;
+            uint16_t predidx;
+        };
+
+        struct IoclEntry {
             viewstamp_t viewstamp;
             IoclEntryState state;
-            const LinearizeableOperation request; // op, key, value, slot_idx, clientid, clientreqid
-            uint64_t myShardTag;
-            proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
+            const LinearizeableOperation request; // op, key, value, slot_idx, clientid, clientreqid, shardtag, predList
+            const uint64_t myShardTag; // redundant but for caching and less request.shardtag access
+            const uint64_t intkey; // redundant but for caching and less request.intkey access
+            const uint16_t num_predecessors;
             uint64_t arrivalTs;
             uint64_t finalTs;
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
-            const uint64_t intkey;
-            std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> finalAcks; // tracking all unique final ACKs from predecessors
-            std::unordered_map<std::pair<uint64_t,int32_t>, int, PairHash> successors; // keep track of all your successors to send the final ACK! (shardtag -> shardidx)
+            uint64_t final_ack_mask = 0; // num_predecessors <= 64, so can fit in a 64-bit int
+            uint8_t final_ack_count = 0;
+            // keep track of all your successors to send the final ACK! (successor shardtag, successor shardidx, predix) -> have we sent the final ACK to this successor already?
+            std::unordered_map<SuccessorKey, SuccessorInfo, SuccessorKeyHash> successors;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
@@ -91,18 +121,23 @@ namespace replication
             uint8_t u_prepare_ok_count = 0;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const LinearizeableOperation &request, uint64_t shardtag, uint64_t intkey)
+                    LinearizeableOperation request, uint64_t shardtag, uint64_t intkey, uint16_t num_predecessors)
                 : viewstamp(viewstamp),
                   state(state),
-                  request(request),
+                  request(std::move(request)),
                   myShardTag(shardtag),
+                  num_predecessors(num_predecessors),
                   ACKs(0),
                   prepare_ok_count(0),
                   prepare_ok_mask(0),
                   u_prepare_ok_count(0),
                   u_prepare_ok_mask(0),
-                  intkey(intkey) {}
-            virtual ~IoclEntry() {}
+                  arrivalTs(0),
+                  finalTs(0),
+                  intkey(intkey) {
+                    successors.reserve(16);
+                    predecessorArrivalTs.reserve(num_predecessors);
+                  }
         };
         // Comparison operator for ordering IoclEntries
         struct EntryReadyCompareIdx {
@@ -117,6 +152,10 @@ namespace replication
 
                 // Then by Tag (unique)
                 return ea.myShardTag < eb.myShardTag;
+                /* EntryReadyCompareIdx using (finalTs, myShardTag)
+                is fine as long as myShardTag is truly unique
+                per entry and finalTs is only changed while the
+                entry is out of the set. */
             }
         };
 
@@ -153,6 +192,7 @@ namespace replication
             opnum_t lastBatchEnd;
             opnum_t lastUnorderedBatchEnd;
             uint8_t Q;
+            // cached message objects for ReceiveMessage()
             proto::UnorderedPrepareMessage unorderedPrepareRecv;
             proto::UnorderedPrepareOKMessage unorderedPrepareOKRecv;
             proto::PrepareMessage prepareRecv;
@@ -160,6 +200,7 @@ namespace replication
             proto::CommitMessage commitRecv;
             proto::PredecessorReplyMessage coordRespRecv;
             proto::PredecessorFinalMessage coordFinalRecv;
+            // cached message objects for transmission
             proto::PredecessorFinalMessage predFinalSend;
             proto::PredecessorReplyMessage preplySend;
 
@@ -186,18 +227,18 @@ namespace replication
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
-            ska::flat_hash_map<uint64_t, std::vector<SuccessorRequestMessage>> outstandingCoordinationReqs;
-            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
-            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorFinalMessage>> outstandingCoordinationFinals;
+            ska::flat_hash_map<uint64_t, std::vector<outCoordReq>> outstandingCoordinationReqs;
+            ska::flat_hash_map<uint64_t, std::vector<outCoordResp>> outstandingCoordinationResps;
+            ska::flat_hash_map<uint64_t, uint64_t> outstandingCoordinationFinals;
             std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
 
-            struct ClientTableEntry
-            {
-                uint64_t lastReqId;
-                bool replied;
-                proto::ReplyMessage reply;
-            };
-            std::map<uint64_t, ClientTableEntry> clientTable;
+            // struct ClientTableEntry
+            // {
+            //     uint64_t lastReqId;
+            //     bool replied;
+            //     proto::ReplyMessage reply;
+            // };
+            // std::map<uint64_t, ClientTableEntry> clientTable;
 
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
             replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;

@@ -364,8 +364,11 @@ namespace strongstore
         uint32_t idx = op_slots_->Alloc();
         PendingOpReplySlot &reply = op_slots_->GetByIdx(idx);
         reply.remote = &remote;
-        msg.mutable_kv()->set_idx(idx);
+        msg.mutable_kv()->set_slot_idx(idx);
 
+        // this->replica_->HandleRequest(msg);
+
+        // better perf
         transport_->TimerMicro(0, [this, m = std::move(msg)]() mutable {
             this->replica_->HandleRequest(m);
         });
@@ -1666,7 +1669,7 @@ namespace strongstore
         }
     }
 
-    void Server::RespondToClientOperation(const TransportAddress *remote, uint32_t idx,
+    void Server::RespondToClientOperation(const TransportAddress *remote,
                         uint64_t clientid, uint64_t client_req_id, int status, string retval)
     {
         Debug("got this status %d and this retval %s for transaction_id = %lu", status, retval.c_str(), client_req_id);
@@ -1677,7 +1680,7 @@ namespace strongstore
         op_reply_.set_status(status);
         op_reply_.set_return_value(retval);
         op_reply_.set_transaction_id(client_req_id); //op_reply_.set_transaction_id(transaction_id); ???
-
+        ASSERT(remote != nullptr);
         transport_->SendMessage(this, *remote, MsgType::LIN_REPLY_TYPE, op_reply_);
     }
 
@@ -1978,7 +1981,7 @@ namespace strongstore
     {
         Debug("inside ReplicaUpcall with req_id = %lu", msg.rid().client_req_id());
         Debug("the operation is %s", msg.kv().op() == replication::KVOpMessage::GET ? "GET" : "PUT");
-        Debug("The shardtag is %lu, the key is %s, the value is %s, the idx is %d", msg.shardtag(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().idx());
+        Debug("The shardtag is %lu, the key is %s, the value is %s, the slot idx is %d", msg.shardtag(), msg.kv().key().c_str(), msg.kv().value().c_str(), msg.kv().slot_idx());
 
         string retval;
         int status = REPLY_OK;
@@ -2003,10 +2006,10 @@ namespace strongstore
         }
         if (replica_idx_ != 0) return;
 
-        uint32_t idx = msg.kv().idx();
+        uint32_t idx = msg.kv().slot_idx();
         PendingOpReplySlot &pending_reply = op_slots_->GetByIdx(idx);
         ASSERT(pending_reply.in_use);
-        RespondToClientOperation(pending_reply.remote, idx, msg.rid().client_id(), msg.rid().client_req_id(), status, retval);
+        RespondToClientOperation(pending_reply.remote, msg.rid().client_id(), msg.rid().client_req_id(), status, retval);
         op_slots_->FreeByIdx(idx);
         pending_reply.remote = nullptr;
     }

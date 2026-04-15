@@ -315,7 +315,7 @@ namespace strongstore
         {
             Panic("Unrecognized operation.");
         }
-        op_.mutable_kv()->set_idx(0); // slot index is decided at the server
+        op_.mutable_kv()->set_slot_idx(0); // slot index is decided at the server
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)
