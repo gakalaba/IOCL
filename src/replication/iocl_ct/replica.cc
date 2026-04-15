@@ -677,6 +677,7 @@ namespace replication
             uint64_t intkey = msg.intkey();
             uint16_t num_predecessors = msg.predlist().size();
             uint32_t idx = entryStore.size();
+            // ASSERT(idx < 300000);
             entryStore.emplace_back(v, IOCL_STATE_ARRIVED, std::move(msg), shardtag, intkey, num_predecessors);
             IoclEntry &entry = Entry(idx);
             ASSERT(entry.viewstamp.opnum - 1 == idx);
@@ -1245,6 +1246,7 @@ namespace replication
                 uint64_t intkey = req.intkey();
                 uint16_t num_predecessors = req.predlist().size();
                 uint32_t idx = entryStore.size();
+                // ASSERT(idx < 300000);
                 entryStore.emplace_back(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, std::move(req), shardtag, intkey, num_predecessors);
                 IoclEntry &entry = Entry(idx);
                 ASSERT(entry.viewstamp.opnum - 1 == idx);
