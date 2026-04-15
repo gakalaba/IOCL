@@ -668,7 +668,6 @@ namespace replication
             entryStore.emplace_back(v, IOCL_STATE_ARRIVED, std::move(msg), shardtag, intkey, num_predecessors);
             IoclEntry &entry = Entry(idx);
             ASSERT(entry.viewstamp.opnum - 1 == idx);
-            entry.predecessorArrivalTs.resize(entry.num_predecessors);
 
             // Add entry to "ordered" unorderedBag (for batching)
             ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
@@ -1227,19 +1226,17 @@ namespace replication
                     continue;
                 }
                 this->lastUnorderedOp++;
+
                 /* Add the request to the unordered bag */
                 uint64_t shardtag = req.shardtag();
                 uint64_t intkey = req.intkey();
                 uint16_t num_predecessors = req.predlist().size();
-
-                /* For now we don't replicate the intkey at replicas
-                Instead, if a new leader takes over, it can get its key from 
-                the string in the Request */
                 uint32_t idx = entryStore.size();
                 entryStore.emplace_back(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, std::move(req), shardtag, intkey, num_predecessors);
-
                 IoclEntry &entry = Entry(idx);
+                ASSERT(entry.viewstamp.opnum - 1 == idx);
 
+                // Add entry to "ordered" unorderedBag (for batching)
                 ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
                 shardtagToEntryIdx[shardtag] = idx;
             }

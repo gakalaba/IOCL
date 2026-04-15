@@ -127,6 +127,7 @@ namespace replication
                   request(std::move(request)),
                   myShardTag(shardtag),
                   num_predecessors(num_predecessors),
+                  predecessorArrivalTs(num_predecessors),
                   ACKs(0),
                   prepare_ok_count(0),
                   prepare_ok_mask(0),
@@ -136,7 +137,6 @@ namespace replication
                   finalTs(0),
                   intkey(intkey) {
                     successors.reserve(16);
-                    predecessorArrivalTs.reserve(num_predecessors);
                   }
         };
         // Comparison operator for ordering IoclEntries
