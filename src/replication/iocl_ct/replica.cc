@@ -98,7 +98,7 @@ namespace replication
                 new Timeout(transport, 300, [this]()
                             { CloseBatch(); });
             this->resendUnorderedPrepareTimeout =
-                new Timeout(transport, 30000, [this]()
+                new Timeout(transport, 500, [this]()
                             { ResendUnorderedPrepare(); });
             this->closeUnorderedBatchTimeout =
                 new Timeout(transport, 300, [this]()
@@ -433,7 +433,19 @@ namespace replication
             {
                 return;
             }
-            RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu", lastUnorderedPrepare.request(0).shardtag(), lastUnorderedPrepare.request(0).rid().client_id());
+            auto it = shardtagToEntryIdx.find(lastUnorderedPrepare.request(0).shardtag());
+            IoclEntry &entry = Entry(it->second);
+            ASSERT(entry.myShardTag == lastUnorderedPrepare.request(0).shardtag());
+            ASSERT(entry.request.rid().client_id() == lastUnorderedPrepare.request(0).rid().client_id());
+            RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu and with quoeums count = %lu",
+                                lastUnorderedPrepare.request(0).shardtag(),
+                                lastUnorderedPrepare.request(0).rid().client_id(),
+                                entry.u_prepare_ok_count);
+            // Notice("Entry info: shardtag = %lu and clientid %lu and num_predecessors = %u and final_ack_count = %u and ACKs = %lu, prepareOkCount = %lu, prepareOKMask = %lu, u_prepareOKCount = %lu, u_preapreOKMask = %lu, finalTs = %lu, arrivalTs = %lu, state = %d, intkey = %lu, and entry.viewstamp.opnum - 1 (%lu)",
+            //             entry.myShardTag, entry.request.rid().client_id(), entry.num_predecessors,
+            //             entry.final_ack_count, entry.ACKs, entry.prepare_ok_count, entry.prepare_ok_mask,
+            //             entry.u_prepare_ok_count, entry.u_prepare_ok_mask, entry.finalTs, entry.arrivalTs,
+            //             entry.state, entry.intkey, entry.viewstamp.opnum-1);
             if (!(transport->SendMessageToAll(this, MsgType::UNORDERED_PREPARE_TYPE, lastUnorderedPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
@@ -885,12 +897,13 @@ namespace replication
 
             IoclEntry &entry = Entry(msg.batchstart()-1);
             uint64_t bit = 1ULL << msg.replicaidx();
-            if ((entry.u_prepare_ok_mask & bit) == 0) {
+            bool new_ok = ((entry.u_prepare_ok_mask & bit) == 0);
+            if (new_ok) {
                 entry.u_prepare_ok_mask |= bit;
                 entry.u_prepare_ok_count++;
             }
 
-            if (entry.u_prepare_ok_count == Q)
+            if (new_ok && entry.u_prepare_ok_count == Q)
             {
                 Debug("Got quorum!");
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
@@ -1292,12 +1305,13 @@ namespace replication
                            msg.opnum());
             }
             uint64_t bit = 1ULL << msg.replicaidx();
-            if ((entry->prepare_ok_mask & bit) == 0) {
+            bool new_ok = ((entry->prepare_ok_mask & bit) == 0);
+            if (new_ok) {
                 entry->prepare_ok_mask |= bit;
                 entry->prepare_ok_count++;
             }
 
-            if (entry->prepare_ok_count == Q)
+            if (new_ok && entry->prepare_ok_count == Q)
             {
                 Debug("Got quorum!");
                 /*
