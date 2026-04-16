@@ -486,15 +486,16 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
         if (ss.responses() == ss.fanout())
         {
             Debug("we're done with this app request! gonna send a new app request soon");
-            auto appreq = ss.apprequest();
-            auto &ttype = appreq->GetTransactionType();
-            auto n_attempts = ss.n_attempts();
+            // auto appreq = ss.apprequest();
+            // auto &ttype = appreq->GetTransactionType();
+            // auto n_attempts = ss.n_attempts();
 
             // Send Next App Request
             if (!cooldownStarted)
             {
                 Debug("next arrival in session %d us", 0);
-                transport_.TimerMicro(0, [this, session_id]() {
+                std::uniform_int_distribution<uint64_t> jitter(0, 1000);
+                transport_.TimerMicro(jitter(rand_), [this, session_id]() {
                     SendNextAppRequestInSession(session_id);
                 });
                 OnReply(session_id, 0, false);
@@ -569,8 +570,8 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
-    auto transaction = ss.transaction();
-    auto &ttype = transaction->GetTransactionType();
+    // auto transaction = ss.transaction();
+    // auto &ttype = transaction->GetTransactionType();
     auto n_attempts = ss.n_attempts();
 
     if (result == COMMITTED || result == ABORTED_USER ||
