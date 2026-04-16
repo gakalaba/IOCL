@@ -1487,9 +1487,18 @@ namespace replication
                have been drained when upon arrival */
             ASSERT(outstandingCoordinationResps.find(entry.myShardTag) == outstandingCoordinationResps.end());
             ASSERT(msg.predidx() < entry.num_predecessors);
-            // ASSERT(entry.predecessorArrivalTs[msg.predidx()] == 0); --> OTHERWISE DEBUG DUPLICATION MESSAGE
+            // Deduplication
+            uint64_t bit = 1ULL << msg.predidx();
+            if (entry.predArrivalTs_reply_mask & bit) {
+                // duplicate → ignore
+                Warning("Duplicate!!! coordination reply for shardtag %lu predidx %u", entry.myShardTag, msg.predidx());
+                return;
+            }
+            // Mark as seen
+            entry.predArrivalTs_reply_mask |= bit;
             entry.predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
             entry.ACKs++;
+            ASSERT(__builtin_popcountll(entry.predArrivalTs_reply_mask) == entry.ACKs);
             // Might remove this for dedup
             ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
 

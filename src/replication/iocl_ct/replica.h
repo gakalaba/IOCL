@@ -119,6 +119,7 @@ namespace replication
             uint8_t prepare_ok_count = 0;
             uint64_t u_prepare_ok_mask = 0;
             uint8_t u_prepare_ok_count = 0;
+            uint64_t predArrivalTs_reply_mask = 0;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
                     LinearizeableOperation request, uint64_t shardtag, uint64_t intkey, uint16_t num_predecessors)
@@ -133,6 +134,7 @@ namespace replication
                   prepare_ok_mask(0),
                   u_prepare_ok_count(0),
                   u_prepare_ok_mask(0),
+                  predArrivalTs_reply_mask(0),
                   arrivalTs(0),
                   finalTs(0),
                   intkey(intkey) {
