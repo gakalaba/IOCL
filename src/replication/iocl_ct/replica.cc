@@ -793,6 +793,7 @@ namespace replication
                     break;
                 }
                 /* Progress to REQUEST ordered */
+                Debug("Head(%lu) is READY and LEAVING queue", head.myShardTag);
                 sq.erase(sq.begin());
                 /* Send out the Final ACK to all successors */
                 for (auto& kv : head.successors) {
@@ -844,6 +845,17 @@ namespace replication
             }
         }
 
+        void IOCL_CTReplica::PrintSubqueue(uint64_t intkey) {
+            auto it = perKeySubqueues.find(intkey);
+            ASSERT(it != perKeySubqueues.end());
+            auto &sq = it->second;
+            Debug("PRINTING The subqueue for intkey %lu is:", intkey);
+            for (uint32_t idx : sq) {
+                IoclEntry &entry = Entry(idx);
+                Debug("entry with shardtag %lu, finalTs %lu, idx %u, num ACKs %d < %lu, and state %d", entry.myShardTag, entry.finalTs, idx, entry.ACKs, entry.num_predecessors, entry.state);
+            }
+        }
+
         void IOCL_CTReplica::InsertInSubqueue(uint64_t intkey, uint32_t idx) {
             Debug("INSERTING into SUBQUEUE.... for idx = %u and intkey %lu and shardtag %lu and finalTs = %lu", idx, intkey, Entry(idx).myShardTag, Entry(idx).finalTs);
             auto it = perKeySubqueues.find(intkey);
@@ -861,8 +873,9 @@ namespace replication
             // N*LogN insertion into the subqueue
             it->second.insert(idx);
             Debug("     The length of this subqueue is now %lu", it->second.size());
-            // entry = entryStore[idx] and
-            // EntryReadyCompareIdx compare by finalTs
+            // PrintSubqueue(intkey);
+            // Each subqueue sorts by EntryReadyCompareIdx which compares
+            // by finalTs. it finds finalTs = entryStore[idx].finalTs
         }
 
         void IOCL_CTReplica::HandleUnorderedPrepareOK(const TransportAddress &remote,
@@ -951,11 +964,18 @@ namespace replication
                     }
 
                     bool readyNow = (entry.ACKs == entry.num_predecessors);
+                    uint64_t candidateFinalTs = readyNow ? std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs)) : 0;
                     Debug("Are we readyNow? ACKs = %d, predList size = %d, so readyNow = %d", entry.ACKs, entry.num_predecessors, readyNow);
+                    if (readyNow) {
+                        /* Assign a final TS */
+                        entry.finalTs = candidateFinalTs;
+                        lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                        /* Assign it ready state */
+                        entry.state = IOCL_STATE_READY;
+                    }
                     auto sq_it = perKeySubqueues.find(entry.intkey);
                     bool no_subqueue = (sq_it == perKeySubqueues.end());
                     bool insertedAtHead = false;
-                    uint64_t candidateFinalTs = readyNow ? std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs)) : 0;
                     if (!no_subqueue && readyNow) {
                         // Make sure we're not in the log already (i-1 is the idx of the entry in the entryStore)
                         ASSERT(std::find(sq_it->second.begin(), sq_it->second.end(), i-1) == sq_it->second.end());
@@ -975,11 +995,6 @@ namespace replication
                     if (readyNow &&
                         (no_subqueue || insertedAtHead)) {
                         Debug("In the fast path!!!");
-                        /* Assign a final TS */
-                        entry.finalTs = candidateFinalTs;
-                        lastReadyTS[entry.intkey] = entry.finalTs + 1;
-                        /* Assign it ready state */
-                        entry.state = IOCL_STATE_READY;
                         /* Send out the Final ACK to all successors */
                         for (auto& kv : entry.successors) {
                             const SuccessorKey &succ = kv.first;
@@ -1490,7 +1505,7 @@ namespace replication
                 ASSERT(it != perKeySubqueues.end());
                 ASSERT(std::find(it->second.begin(), it->second.end(), idx) != it->second.end());
                 ASSERT(it->second.find(idx) != it->second.end());
-                Debug("Found it in the perKeySubqueue!");
+                Debug("Found it in the perKeySubqueue! where it had %lu ACKS and num_predecessors %d", entry.ACKs, entry.num_predecessors);
                 // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
                 it->second.erase(idx);
                 Debug("just erased it!");
@@ -1503,6 +1518,7 @@ namespace replication
                 Debug("REEinserting into SUBQUEUE.... for idx = %u and intkey %lu and shardtag %lu and finalTs = %lu", idx, entry.intkey, entry.myShardTag, entry.finalTs);
                 it->second.insert(idx);
                 Debug("All ACKs received for entry with shardtag %lu, so now ready!", entry.myShardTag);
+                // PrintSubqueue(entry.intkey);
                 ReadyRoutine(entry.intkey);
             }
 

@@ -305,6 +305,7 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
+            void PrintSubqueue(uint64_t intkey);
         };
 
     } // namespace iocl_ct
