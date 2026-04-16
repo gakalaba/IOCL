@@ -127,7 +127,7 @@ namespace replication
                   request(std::move(request)),
                   myShardTag(shardtag),
                   num_predecessors(num_predecessors),
-                  predecessorArrivalTs(num_predecessors),
+                  predecessorArrivalTs(num_predecessors, 0),
                   ACKs(0),
                   prepare_ok_count(0),
                   prepare_ok_mask(0),

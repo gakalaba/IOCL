@@ -1494,28 +1494,33 @@ namespace replication
             ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
 
             // Replicated < Coordinated
-            if (entry.state == IOCL_STATE_PERSISTED &&
-                     entry.ACKs == entry.num_predecessors) {
-                /* Now can progress to READY state */
-                Debug("Replicated < Coordinated for %lu", entry.myShardTag);
+            if (entry.state == IOCL_STATE_PERSISTED) {
                 // ASSERT it is in here in the first place
                 auto it = perKeySubqueues.find(entry.intkey);
                 ASSERT(it != perKeySubqueues.end());
                 ASSERT(std::find(it->second.begin(), it->second.end(), idx) != it->second.end());
                 ASSERT(it->second.find(idx) != it->second.end());
                 Debug("Found it in the perKeySubqueue! where it had %lu ACKS and num_predecessors %d", entry.ACKs, entry.num_predecessors);
+                // PrintSubqueue(entry.intkey);
                 // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
                 it->second.erase(idx);
                 Debug("just erased it!");
                 /* Assign a final TS */
+                uint64_t old_finalTs = entry.finalTs;
                 entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
-                lastReadyTS[entry.intkey] = entry.finalTs + 1;
-                /* Assign it ready state */
-                entry.state = IOCL_STATE_READY;
+                ASSERT(old_finalTs <= entry.finalTs);
+                ASSERT(entry.finalTs >= entry.arrivalTs);
                 // Reinsert
                 Debug("REEinserting into SUBQUEUE.... for idx = %u and intkey %lu and shardtag %lu and finalTs = %lu", idx, entry.intkey, entry.myShardTag, entry.finalTs);
                 it->second.insert(idx);
-                Debug("All ACKs received for entry with shardtag %lu, so now ready!", entry.myShardTag);
+                if (entry.ACKs == entry.num_predecessors) {
+                    Debug("Replicated < Coordinated for %lu", entry.myShardTag);
+                    Debug("All ACKs received for entry with shardtag %lu, so now ready!", entry.myShardTag);
+                    /* Now can progress to READY state */
+                    lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                    /* Assign it ready state */
+                    entry.state = IOCL_STATE_READY;
+                }
                 // PrintSubqueue(entry.intkey);
                 ReadyRoutine(entry.intkey, it->second);
             }
