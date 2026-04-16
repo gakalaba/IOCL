@@ -974,9 +974,9 @@ namespace replication
                         entry.state = IOCL_STATE_READY;
                     }
                     auto sq_it = perKeySubqueues.find(entry.intkey);
-                    bool no_subqueue = (sq_it == perKeySubqueues.end());
-                    bool insertedAtHead = false;
-                    if (!no_subqueue && readyNow) {
+                    bool subqueue_exists = (sq_it != perKeySubqueues.end());
+                    bool wouldBeHead = false;
+                    if (subqueue_exists && readyNow) {
                         // Make sure we're not in the log already (i-1 is the idx of the entry in the entryStore)
                         ASSERT(std::find(sq_it->second.begin(), sq_it->second.end(), i-1) == sq_it->second.end());
                         ASSERT(sq_it->second.find(i-1) == sq_it->second.end());
@@ -984,17 +984,22 @@ namespace replication
                         ASSERT(!sq.empty());
                         uint32_t head_idx = *sq.begin();
                         IoclEntry &head = Entry(head_idx);
-                        insertedAtHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
-                        if (insertedAtHead) {
+                        wouldBeHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
+                        if (wouldBeHead) {
                             ASSERT(head.ACKs < head.num_predecessors);
                             ASSERT(head.state != IOCL_STATE_READY);
                         }
                     }
                     /* FAST PATH: Check if we should never use the subqueue structure anyway */
                     // Coordinated < Replicated
-                    if (readyNow &&
-                        (no_subqueue || insertedAtHead)) {
+                    if (!readyNow || (subqueue_exists && !wouldBeHead)) {
+                        /* Need to wait for more ACKs before we can mark it ready */
+                        /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
+                        Debug("in the slow path -- inserting into subqueue for HOL!");
+                        InsertInSubqueue(entry.intkey, i-1);
+                    } else {
                         Debug("In the fast path!!!");
+                        /* Skip Subqeuue strucutre entirely */
                         /* Send out the Final ACK to all successors */
                         for (auto& kv : entry.successors) {
                             const SuccessorKey &succ = kv.first;
@@ -1037,10 +1042,6 @@ namespace replication
                                 closeBatchTimeout->Start();
                             }
                         }
-                    } else { /* Otherwise, we need to wait for more ACKs before we can mark it ready */
-                        /* Insert into the perKeySubqueue so that Head Of Line Blocking begins! */
-                        Debug("in the slow path -- inserting into subqueue for HOL!");
-                        InsertInSubqueue(entry.intkey, i-1);
                     }
                 }
                 nullCommitTimeout->Reset();
