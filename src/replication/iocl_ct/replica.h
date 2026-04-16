@@ -269,7 +269,7 @@ namespace replication
             void ResendUnorderedPrepare();
             void CloseBatch();
             void CloseUnorderedBatch();
-            void ReadyRoutine(uint64_t intkey);
+            void ReadyRoutine(uint64_t intkey, std::set<uint32_t, EntryReadyCompareIdx> &sq);
             void ReadyFinalRoutine(uint64_t intkey);
             void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);

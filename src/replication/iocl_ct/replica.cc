@@ -772,12 +772,9 @@ namespace replication
             }
         }
 
-        void IOCL_CTReplica::ReadyRoutine(uint64_t intkey)
+        void IOCL_CTReplica::ReadyRoutine(uint64_t intkey, std::set<uint32_t, EntryReadyCompareIdx> &sq)
         {
             Debug("hi");
-            auto it = perKeySubqueues.find(intkey);
-            ASSERT(it != perKeySubqueues.end());
-            auto &sq = it->second;
             Debug("The subqueue length is %lu", sq.size());
 
             while (!sq.empty()) {
@@ -1520,7 +1517,7 @@ namespace replication
                 it->second.insert(idx);
                 Debug("All ACKs received for entry with shardtag %lu, so now ready!", entry.myShardTag);
                 // PrintSubqueue(entry.intkey);
-                ReadyRoutine(entry.intkey);
+                ReadyRoutine(entry.intkey, it->second);
             }
 
             return;
