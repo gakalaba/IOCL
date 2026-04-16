@@ -437,7 +437,7 @@ namespace replication
             IoclEntry &entry = Entry(it->second);
             ASSERT(entry.myShardTag == lastUnorderedPrepare.request(0).shardtag());
             ASSERT(entry.request.rid().client_id() == lastUnorderedPrepare.request(0).rid().client_id());
-            RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu and with quoeums count = %lu",
+            RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu and with quoeums count = %u",
                                 lastUnorderedPrepare.request(0).shardtag(),
                                 lastUnorderedPrepare.request(0).rid().client_id(),
                                 entry.u_prepare_ok_count);
@@ -987,6 +987,7 @@ namespace replication
                             if (!succ_info.final_sent) {
                                 predFinalSend.set_s(succ.s_shardtag);
                                 predFinalSend.set_predidx(succ_info.predidx);
+                                Debug("Sending final ack from predecessor %lu to successor %lu on shardidx %lu", entry.myShardTag, succ.s_shardtag, succ.s_shardidx);
                                 if (!(transport->SendMessageToReplica(this, succ.s_shardidx, 0, MsgType::COORD_FINAL_TYPE, predFinalSend)))
                                 {
                                     RWarning("Failed to send SuccessorRequest message to client");
