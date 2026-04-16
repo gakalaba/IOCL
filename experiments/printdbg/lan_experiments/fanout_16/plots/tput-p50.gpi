@@ -1,0 +1,13 @@
+set datafile separator ','
+set title "10 shards, fanout=16, 5% reads"
+set key top left
+set xlabel 'Throughput (txn/s)'
+set ylabel 'p50 Latency (ms)'
+set terminal pngcairo size 800,600 enhanced dashed font 'DejaVu Sans,12'
+set output '/users/akalaba/IOCL/experiments/printdbg/lan_experiments/fanout_16/plots/tput-p50.png'
+set style line 1 linetype 1 linecolor "red" linewidth 2
+set style line 2 linetype 1 linecolor "green" linewidth 2
+set style line 3 linetype 1 linecolor "blue" linewidth 2
+plot '/users/akalaba/IOCL/experiments/printdbg/lan_experiments/fanout_16/plots/iocl_craq-tput-p50.csv' title 'iocl\_craq' ls 1 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/lan_experiments/fanout_16/plots/vr-tput-p50.csv' title 'vr' ls 2 with linespoint, \
+     '/users/akalaba/IOCL/experiments/printdbg/lan_experiments/fanout_16/plots/craq-tput-p50.csv' title 'craq' ls 3 with linespoint
