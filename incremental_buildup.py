@@ -36,6 +36,11 @@ print("Base client_total =", BASE_CLIENT_TOTAL)
 print("Base client_processes_per_client_node =", BASE_PPN)
 
 
+def make_clients_used_row(value, n):
+    """Create a clients_used row with repeated values to match client_total length."""
+    return [value] * n
+
+
 def update_load(config, fanout):
     """Update load-dependent fields."""
     config["client_issue_concurrent"] = True
@@ -48,15 +53,25 @@ def update_load(config, fanout):
     config["client_total"] = copy.deepcopy(BASE_CLIENT_TOTAL)
     config["client_processes_per_client_node"] = copy.deepcopy(BASE_PPN)
 
+    # Normalize clients_used rows so they match the length of client_total rows
+    for idx in range(len(config["client_total"])):
+        base_used_val = BASE_CLIENTS_USED[idx][0]
+        row_len = len(config["client_total"][idx])
+        config["clients_used"][idx] = make_clients_used_row(base_used_val, row_len)
+
     # Scale only IOCL_CT and Spanner
     for idx in TARGET_IDXS:
-        if idx < len(config["clients_used"]):
-            config["clients_used"][idx][0] = BASE_CLIENTS_USED[idx][0] // fanout
         if idx < len(config["client_total"]):
-            config["client_total"][idx] = [
-                x // fanout for x in BASE_CLIENT_TOTAL[idx]
-            ]
+            scaled_total = [x // fanout for x in BASE_CLIENT_TOTAL[idx]]
+            config["client_total"][idx] = scaled_total
 
+            scaled_used_val = BASE_CLIENTS_USED[idx][0] // fanout
+            config["clients_used"][idx] = make_clients_used_row(
+                scaled_used_val,
+                len(scaled_total)
+            )
+
+    # NEVER change client_processes_per_client_node
     print(f"Setting fanout={fanout}")
     for idx in range(len(protocols)):
         print(
