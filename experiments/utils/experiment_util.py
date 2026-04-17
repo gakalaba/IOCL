@@ -599,24 +599,33 @@ def run_multiple_experiments(config_file, executor):
                 sub_out_dirs.append(sub_out_directories)
 
         retries = 0
-        while len(out_dirs) < len(config[config['experiment_independent_vars_unused'][0][0]]) and retries <= config['max_retries']:
+        target = len(config[config['experiment_independent_vars_unused'][0][0]])
+
+        while len(sub_out_dirs) < target:
             retry_exp_futs = []
+
             for i in range(len(exp_futs)):
                 try:
                     out_dir = exp_futs[i].result()
                     sub_out_dirs.insert(exp_futs_idxs[i], out_dir)
                 except:
                     print('Unexpected error during %s %d: ' %
-                          (config_files[exp_futs_idxs[i]], exp_futs_idxs[i]))
+                        (config_files[exp_futs_idxs[i]], exp_futs_idxs[i]))
                     print(traceback.format_exc())
                     retry_exp_futs.append(exp_futs_idxs[i])
-            if len(out_dirs) == len(config[config['experiment_independent_vars_unused'][0][0]]):
+
+            if len(sub_out_dirs) == target:
                 break
+
+            if retries >= config['max_retries']:
+                break
+
             exp_futs = []
             exp_futs_idxs = []
             for j in retry_exp_futs:
                 exp_futs.append(run_experiment(config_files[j], j, executor))
                 exp_futs_idxs.append(j)
+
             retries += 1
 
         print("%s took %f seconds!" % (config_name, time.time() - start))
