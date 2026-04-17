@@ -72,7 +72,8 @@ def kill_servers(config, executor, kill_args=' -9'):
 
 def kill_clients_no_config(config, executor):
     futures = []
-    for client in config["clients"]:
+    full_client_list = config["clients"][:config["clients_used"]]
+    for client in full_client_list:
         client_host = get_client_host(config, client)
         if is_exp_remote(config):
             futures.append(executor.submit(kill_remote_process_by_name,
@@ -131,11 +132,14 @@ def wait_for_clients_to_terminate(config, client_ssh_threads):
 
 
 def start_clients(config, local_exp_directory, remote_exp_directory, run):
-    assert(config["client_total"] == (len(config["clients"])
+    if ("clients_used" not in config) or (config["clients_used"] == 0):
+            raise Exception("Config must specify clients_used > 0")
+    full_client_list = config["clients"][:config["clients_used"]]
+    assert(config["client_total"] == (len(full_client_list)
                                       * config["client_processes_per_client_node"]))
     client_processes = []
-    for i in range(len(config["clients"])):
-        client = config["clients"][i]
+    for i in range(len(full_client_list)):
+        client = full_client_list[i]
         if is_exp_local(config):
             os.makedirs(os.path.join(local_exp_directory,
                                      config["out_directory_name"], client))
@@ -486,7 +490,7 @@ def run_experiment(config_file, client_config_idx, executor):
                     config, local_exp_directory, remote_exp_directory, i)
                 all_alive = True
                 for st in range(len(server_threads)):
-                    if server_threads[i].poll() != None:
+                    if server_threads[st].poll() != None:
                         print("Server thread %d not alive." % st)
                         all_alive = False
                         break
