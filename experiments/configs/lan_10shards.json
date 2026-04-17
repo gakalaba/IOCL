@@ -5,18 +5,24 @@
       "replication_protocol",
       "client_protocol_mode",
       "client_total",
-      "client_processes_per_client_node"
+      "client_processes_per_client_node",
+      "clients_used"
     ],
     [
       "client_total",
-      "client_processes_per_client_node"
+      "client_processes_per_client_node",
+      "clients_used"
     ]
   ],
   "replication_protocol": [
-    "vr"
+    "vr",
+    "iocl_ct",
+    "strong"
   ],
   "client_protocol_mode": [
-    "vr"
+    "vr",
+    "iocl_ct",
+    "span-lock"
   ],
   "server_names": [
     "us-east-1-0",
@@ -31,7 +37,9 @@
     "mex-cent-1-0"
   ],
   "consistency": [
-    "lin"
+    "lin",
+    "lin",
+    "ss"
   ],
   "num_instances": 1,
   "shard_config": "shard.config",
@@ -53,16 +61,20 @@
     ["eu-west-1-2", "us-east-1-1", "us-west-1-0", "us-west-1-2", "eu-west-1-0"],
     ["mex-cent-1-0", "us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-1"]
   ],
-  "clients_used": 17,
+  "clients_used": [
+    [16],
+    [16],
+    [16]
+  ],
   "client_total": [
-    [
-      17, 68, 136, 272, 544, 1088, 1700
-    ]
+    [16, 64, 128, 256, 512, 1024, 1600],
+    [16, 64, 128, 256, 512, 1024, 1600],
+    [16, 64, 128, 256, 512, 1024, 1600]
   ],
   "client_processes_per_client_node": [
-    [
-      1, 4, 8, 16, 32, 64, 100
-    ]
+    [1, 4, 8, 16, 32, 64, 100],
+    [1, 4, 8, 16, 32, 64, 100],
+    [1, 4, 8, 16, 32, 64, 100]
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -193,8 +205,8 @@
   "server_debug_stats": false,
   "client_experiment_length": 80,
   "client_rand_sleep": 0,
-  "client_ramp_down": 12,
-  "client_ramp_up": 12,
+  "client_ramp_down": 15,
+  "client_ramp_up": 15,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
@@ -245,8 +257,8 @@
       "width": 800,
       "series_indep_vars_idx": 0,
       "series_titles": [
-        "IOCL_CT",
         "View-Stamped Replication",
+        "IOCL_CT",
         "Spanner"
       ],
       "x_var_is_config": false,
