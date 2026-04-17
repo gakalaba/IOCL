@@ -324,6 +324,7 @@ namespace strongstore
             seqno++;
             op_.set_shardtag(myshardtag);
             op_.set_intkey(std::stoull(key)); // for iocl optimization
+            Debug("     --->The shard tag is %lu", myshardtag);
 
             // Construct predecessor list and Issue coordination requests
             replication::SuccessorRequestMessage coordReqMsg;
