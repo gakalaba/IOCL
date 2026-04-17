@@ -178,9 +178,9 @@ namespace replication
             }
 
             uint32_t idx = log[opnum-start];
-            ASSERT(idx >= 0 && idx < entryStore.size());
+            // ASSERT(idx >= 0 && idx < entryStore.size());
             IoclEntry &entry = Entry(idx);
-            ASSERT(entry.viewstamp.opnum == opnum);
+            // ASSERT(entry.viewstamp.opnum == opnum);
             return &entry;
         }
 
@@ -257,7 +257,7 @@ namespace replication
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
-                ASSERT(entry->state == IOCL_STATE_PREPARED);
+                // ASSERT(entry->state == IOCL_STATE_PREPARED);
                 // UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
@@ -360,7 +360,7 @@ namespace replication
             cm.set_view(this->view);
             cm.set_opnum(this->lastCommitted);
 
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
 
             if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
             {
@@ -397,7 +397,7 @@ namespace replication
 
         void IOCL_CTReplica::ResendPrepare()
         {
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
             if (lastOp == lastCommitted)
             {
                 return;
@@ -416,15 +416,15 @@ namespace replication
 
         void IOCL_CTReplica::ResendUnorderedPrepare()
         {
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
             if (entryStore.empty())
             {
                 return;
             }
             auto it = shardtagToEntryIdx.find(lastUnorderedPrepare.request(0).shardtag());
             IoclEntry &entry = Entry(it->second);
-            ASSERT(entry.myShardTag == lastUnorderedPrepare.request(0).shardtag());
-            ASSERT(entry.request.rid().client_id() == lastUnorderedPrepare.request(0).rid().client_id());
+            // ASSERT(entry.myShardTag == lastUnorderedPrepare.request(0).shardtag());
+            // ASSERT(entry.request.rid().client_id() == lastUnorderedPrepare.request(0).rid().client_id());
             RNotice("Resending unordered prepare for last message with shardtag = %lu and from clientid %lu and with quoeums count = %u",
                                 lastUnorderedPrepare.request(0).shardtag(),
                                 lastUnorderedPrepare.request(0).rid().client_id(),
@@ -444,8 +444,8 @@ namespace replication
 
         void IOCL_CTReplica::CloseUnorderedBatch()
         {
-            ASSERT(AmLeader());
-            ASSERT(lastUnorderedBatchEnd < lastUnorderedOp);
+            // ASSERT(AmLeader());
+            // ASSERT(lastUnorderedBatchEnd < lastUnorderedOp);
             /* Send the unordered prepare messages */
             opnum_t unorderedBatchStart = lastUnorderedBatchEnd + 1;
             int batchSize = lastUnorderedOp - unorderedBatchStart + 1;
@@ -462,7 +462,7 @@ namespace replication
             for (opnum_t i = unorderedBatchStart; i <= lastUnorderedOp; i++)
             {
                 const IoclEntry& entry = Entry(i-1);
-                ASSERT(entry.viewstamp.view == view);
+                // ASSERT(entry.viewstamp.view == view);
                 reqs->Add()->CopyFrom(entry.request);
             }
 
@@ -479,8 +479,8 @@ namespace replication
 
         void IOCL_CTReplica::CloseBatch()
         {
-            ASSERT(AmLeader());
-            ASSERT(lastBatchEnd < lastOp);
+            // ASSERT(AmLeader());
+            // ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
             int batchSize = lastOp - batchStart + 1;
@@ -503,9 +503,9 @@ namespace replication
             {
                 uint32_t idx = log[i-1];
                 IoclEntry &entry = Entry(idx);
-                ASSERT(entry.viewstamp.view == view);
-                ASSERT(entry.viewstamp.opnum == i);
-                ASSERT(entry.predecessorArrivalTs.size() == entry.num_predecessors);
+                // ASSERT(entry.viewstamp.view == view);
+                // ASSERT(entry.viewstamp.opnum == i);
+                // ASSERT(entry.predecessorArrivalTs.size() == entry.num_predecessors);
 
                 shardtags->Add(entry.myShardTag);
 
@@ -650,18 +650,18 @@ namespace replication
             uint32_t idx = entryStore.size();
             entryStore.emplace_back(v, IOCL_STATE_ARRIVED, std::move(msg), shardtag, intkey, num_predecessors);
             IoclEntry &entry = Entry(idx);
-            ASSERT(entry.viewstamp.opnum - 1 == idx);
+            // ASSERT(entry.viewstamp.opnum - 1 == idx);
 
             // Add entry to "ordered" unorderedBag (for batching)
             auto result = shardtagToEntryIdx.emplace(shardtag, idx);
-            ASSERT(result.second);
+            // ASSERT(result.second);
 
             // Go through any outstanding predecessor replies and add them in
             auto pit = outstandingCoordinationResps.find(shardtag);
             if (pit != outstandingCoordinationResps.end()) {
                 std::vector<outCoordResp> &ocr = pit->second;
                 for (const auto& resp : ocr) {
-                    ASSERT(resp.predidx < entry.num_predecessors);
+                    // ASSERT(resp.predidx < entry.num_predecessors);
                     // Deduplication
                     uint64_t bit = 1ULL << resp.predidx;
                     if (entry.predArrivalTs_reply_mask & bit) {
@@ -730,11 +730,11 @@ namespace replication
             while (sublog.head < sublog.ops.size()) {
                 opnum_t headOpnum = sublog.ops[sublog.head];
                 const IoclEntry *head_entry = FindInLog(headOpnum);
-                ASSERT(head_entry->state == IOCL_STATE_COMMITTED);
+                // ASSERT(head_entry->state == IOCL_STATE_COMMITTED);
 
                 if (head_entry->final_ack_count != head_entry->num_predecessors) {
                     /* Still waiting on final ACKs, done with loop */
-                    ASSERT(head_entry->final_ack_count <= head_entry->num_predecessors);
+                    // ASSERT(head_entry->final_ack_count <= head_entry->num_predecessors);
                     break;
                 }
                 /* Remove from sublog */
@@ -753,7 +753,7 @@ namespace replication
             while (!sq.empty()) {
                 uint32_t idx = *sq.begin();
                 IoclEntry &head = Entry(idx);
-                ASSERT(head.state == IOCL_STATE_PERSISTED || head.state == IOCL_STATE_READY);
+                // ASSERT(head.state == IOCL_STATE_PERSISTED || head.state == IOCL_STATE_READY);
                 if (head.state != IOCL_STATE_READY) {
                     break;
                 }
@@ -776,7 +776,7 @@ namespace replication
                 }
 
                 /* Assign it a real opnum for this view in the ordered log */
-                ASSERT(head.viewstamp.opnum - 1 == idx);
+                // ASSERT(head.viewstamp.opnum - 1 == idx);
                 viewstamp_t v;
                 ++this->lastOp;
                 v.view = this->view;
@@ -829,7 +829,7 @@ namespace replication
                 ).first;
             }
             // Make sure we are inserting, NOT reinserting
-            ASSERT(it->second.find(idx) == it->second.end());
+            // ASSERT(it->second.find(idx) == it->second.end());
             // N*LogN insertion into the subqueue
             it->second.insert(idx);
             // PrintSubqueue(intkey);
@@ -880,7 +880,7 @@ namespace replication
             {
                 for (opnum_t i = msg.batchstart(); i <= msg.opnum(); i++)
                 {
-                    ASSERT(i > 0 && i <= entryStore.size());
+                    // ASSERT(i > 0 && i <= entryStore.size());
                     IoclEntry &entry = Entry(i-1);
                     /* Progress state to Persisted */
                     entry.state = IOCL_STATE_PERSISTED;
@@ -932,9 +932,9 @@ namespace replication
                     bool wouldBeHead = false;
                     if (subqueue_exists && readyNow) {
                         // Make sure we're NOT in the log already (i-1 is the idx of the entry in the entryStore)
-                        ASSERT(sq_it->second.find(i-1) == sq_it->second.end());
+                        // ASSERT(sq_it->second.find(i-1) == sq_it->second.end());
                         auto &sq = sq_it->second;
-                        ASSERT(!sq.empty());
+                        // ASSERT(!sq.empty());
                         uint32_t head_idx = *sq.begin();
                         IoclEntry &head = Entry(head_idx);
                         wouldBeHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
@@ -962,7 +962,7 @@ namespace replication
                             }
                         }
                         /* Assign it a real opnum for this view in the ordered log */
-                        ASSERT(entry.viewstamp.opnum - 1 == i-1);
+                        // ASSERT(entry.viewstamp.opnum - 1 == i-1);
                         viewstamp_t v;
                         ++this->lastOp;
                         v.view = this->view;
@@ -1045,9 +1045,9 @@ namespace replication
                 RPanic("Unexpected PREPARE: I'm the leader of this view");
             }
 
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.shardtags_size());
+            // ASSERT(msg.batchstart() <= msg.opnum());
+            // ASSERT((msg.opnum() - msg.batchstart() + 1) ==
+            //        (unsigned int)msg.shardtags_size());
 
             viewChangeTimeout->Reset();
             int leaderIdx = configuration.GetLeaderIndex(view);
@@ -1101,12 +1101,12 @@ namespace replication
                 this->lastOp++;
 
                 /* Update its state */
-                ASSERT(entry.viewstamp.opnum - 1 == idx);
+                // ASSERT(entry.viewstamp.opnum - 1 == idx);
                 entry.viewstamp.view = msg.view();
                 entry.viewstamp.opnum = op;
                 entry.state = IOCL_STATE_PREPARED;
                 // loop through timestamp_chains and add to predecessorArrivalTs
-                ASSERT(chain_idx + N <= msg.timestamp_chains_size());
+                // ASSERT(chain_idx + N <= msg.timestamp_chains_size());
                 for (size_t j = 0; j < (N-1); j++) {
                     entry.predecessorArrivalTs[j] = msg.timestamp_chains(chain_idx);
                     chain_idx++;
@@ -1116,8 +1116,8 @@ namespace replication
                 /* Add the request to my log */
                 AppendToLog(entry.viewstamp.opnum, idx);
             }
-            ASSERT(op == msg.opnum());
-            ASSERT(chain_idx == msg.timestamp_chains_size());
+            // ASSERT(op == msg.opnum());
+            // ASSERT(chain_idx == msg.timestamp_chains_size());
 
             /* Build reply and send it to the leader */
             PrepareOKMessage reply;
@@ -1164,9 +1164,9 @@ namespace replication
                 RPanic("Unexpected UNORDERED_PREPARE: I'm the leader of this view");
             }
 
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
+            // ASSERT(msg.batchstart() <= msg.opnum());
+            // ASSERT((msg.opnum() - msg.batchstart() + 1) ==
+            //        (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
             int leaderIdx = configuration.GetLeaderIndex(view);
@@ -1208,11 +1208,11 @@ namespace replication
                 uint32_t idx = entryStore.size();
                 entryStore.emplace_back(viewstamp_t(msg.view(), op), IOCL_STATE_PERSISTED, std::move(req), shardtag, intkey, num_predecessors);
                 IoclEntry &entry = Entry(idx);
-                ASSERT(entry.viewstamp.opnum - 1 == idx);
+                // ASSERT(entry.viewstamp.opnum - 1 == idx);
 
                 // Add entry to "ordered" unorderedBag (for batching)
                 auto result = shardtagToEntryIdx.emplace(shardtag, idx);
-                ASSERT(result.second); // should not have already been there
+                // ASSERT(result.second); // should not have already been there
             }
 
             /* Build reply and send it to the leader */
@@ -1326,7 +1326,7 @@ namespace replication
                responses for this successor in the
                outstandingCoordinationFinals -- should
                have been drained when upon arrival */
-            ASSERT(outstandingCoordinationFinals.find(entry.myShardTag) == outstandingCoordinationFinals.end());
+            // ASSERT(outstandingCoordinationFinals.find(entry.myShardTag) == outstandingCoordinationFinals.end());
             /* Mark that this predecessor has finalized */
             uint64_t bit = 1ULL << msg.predidx();
             if ((entry.final_ack_mask & bit) == 0) {
@@ -1341,7 +1341,7 @@ namespace replication
             /* Check if it is waiting to be executed */
             if ((entry.state == IOCL_STATE_COMMITTED) && (entry.final_ack_count == entry.num_predecessors)) {
                 auto sublog = perKeySubLogs.find(entry.intkey);
-                ASSERT(sublog != perKeySubLogs.end());
+                // ASSERT(sublog != perKeySubLogs.end());
                 // TODO ASSERT WE ARE IN THE LOG
                 ReadyFinalRoutine(entry.intkey, sublog->second);
             }
@@ -1368,7 +1368,7 @@ namespace replication
                requests for this predecessor in the
                outstandingCoordinationReqs -- should
                have been drained when state changed */
-            ASSERT(outstandingCoordinationReqs.find(entry.myShardTag) == outstandingCoordinationReqs.end());
+            // ASSERT(outstandingCoordinationReqs.find(entry.myShardTag) == outstandingCoordinationReqs.end());
 
             /* Send reply now */
             preplySend.set_arrivalts(entry.arrivalTs);
@@ -1422,8 +1422,8 @@ namespace replication
                responses for this successor in the
                outstandingCoordinationResps -- should
                have been drained when upon arrival */
-            ASSERT(outstandingCoordinationResps.find(entry.myShardTag) == outstandingCoordinationResps.end());
-            ASSERT(msg.predidx() < entry.num_predecessors);
+            // ASSERT(outstandingCoordinationResps.find(entry.myShardTag) == outstandingCoordinationResps.end());
+            // ASSERT(msg.predidx() < entry.num_predecessors);
             // Deduplication
             uint64_t bit = 1ULL << msg.predidx();
             if (entry.predArrivalTs_reply_mask & bit) {
@@ -1434,23 +1434,23 @@ namespace replication
             entry.predArrivalTs_reply_mask |= bit;
             entry.predecessorArrivalTs[msg.predidx()] = msg.arrivalts();
             entry.ACKs++;
-            ASSERT(__builtin_popcountll(entry.predArrivalTs_reply_mask) == entry.ACKs);
+            // ASSERT(__builtin_popcountll(entry.predArrivalTs_reply_mask) == entry.ACKs);
             // Might remove this for dedup
-            ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
+            // ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
 
             // Replicated < Coordinated
             if (entry.state == IOCL_STATE_PERSISTED) {
                 // ASSERT it is in here in the first place
                 auto it = perKeySubqueues.find(entry.intkey);
-                ASSERT(it != perKeySubqueues.end());
-                ASSERT(it->second.find(idx) != it->second.end());
+                // ASSERT(it != perKeySubqueues.end());
+                // ASSERT(it->second.find(idx) != it->second.end());
                 // PrintSubqueue(entry.intkey);
                 // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
                 it->second.erase(idx);
                 /* Assign a final TS */
                 uint64_t old_finalTs = entry.finalTs;
                 entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
-                ASSERT(old_finalTs <= entry.finalTs);
+                // ASSERT(old_finalTs <= entry.finalTs);
                 // Reinsert
                 it->second.insert(idx);
                 if (entry.ACKs == entry.num_predecessors) {

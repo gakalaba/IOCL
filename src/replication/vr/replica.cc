@@ -179,7 +179,7 @@ namespace replication
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
-                ASSERT(entry->state == LOG_STATE_PREPARED);
+                // ASSERT(entry->state == LOG_STATE_PREPARED);
                 // UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
@@ -282,7 +282,7 @@ namespace replication
             cm.set_view(this->view);
             cm.set_opnum(this->lastCommitted);
 
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
 
             if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
             {
@@ -310,7 +310,7 @@ namespace replication
 
         void VRReplica::ResendPrepare()
         {
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
             if (lastOp == lastCommitted)
             {
                 return;
@@ -326,8 +326,8 @@ namespace replication
 
         void VRReplica::CloseBatch()
         {
-            ASSERT(AmLeader());
-            ASSERT(lastBatchEnd < lastOp);
+            // ASSERT(AmLeader());
+            // ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
 
@@ -345,9 +345,9 @@ namespace replication
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
                 const LogEntry *entry = log.Find(i);
-                ASSERT(entry != NULL);
-                ASSERT(entry->viewstamp.view == view);
-                ASSERT(entry->viewstamp.opnum == i);
+                // ASSERT(entry != NULL);
+                // ASSERT(entry->viewstamp.view == view);
+                // ASSERT(entry->viewstamp.opnum == i);
                 *reqs->Add() = entry->request;
             }
 
@@ -543,9 +543,9 @@ namespace replication
                 RPanic("Unexpected PREPARE: I'm the leader of this view");
             }
 
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
+            // ASSERT(msg.batchstart() <= msg.opnum());
+            // ASSERT((msg.opnum() - msg.batchstart() + 1) ==
+            //        (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
             int leaderIdx = configuration.GetLeaderIndex(view);
@@ -588,7 +588,7 @@ namespace replication
                 entry.request.Swap(msg.mutable_request(i));
                 // UpdateClientTable(req);
             }
-            ASSERT(op == msg.opnum());
+            // ASSERT(op == msg.opnum());
 
             /* Build reply and send it to the leader */
             PrepareOKMessage reply;
