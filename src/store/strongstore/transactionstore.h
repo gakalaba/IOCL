@@ -133,6 +133,7 @@ namespace strongstore
 
         TransactionFinishResult Commit(uint64_t transaction_id);
         TransactionFinishResult Abort(uint64_t transaction_id);
+        void AbortTombstone(uint64_t transaction_id);
 
         Stats &GetStats() { return stats_; };
 
