@@ -1938,7 +1938,7 @@ namespace strongstore
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
                 // Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                 // transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
-                if (commit_wait_us > 0) {
+                if (replica_idx_ == 0 && commit_wait_us > 0) {
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
                 } else {
@@ -1959,9 +1959,17 @@ namespace strongstore
         else if (request.op() == strongstore::proto::Request::ABORT)
         {
             // Debug("[%lu] Received ABORT", transaction_id);
+            TransactionState s = transactions_.GetRWTransactionState(transaction_id);
 
-            if (transactions_.GetRWTransactionState(transaction_id) != ABORTED)
+            if (s != ABORTED)
             { // replica abort
+                ASSERT(replica_idx_ != 0);
+                if (s == NOT_FOUND) {
+                    transactions_.AbortTombstone(transaction_id);
+                    Warning("[%lu] Replica received ABORT for unknown txn on shard %d replica %d",
+                        transaction_id, shard_idx_, replica_idx_);
+                    return;
+                }
                 const Transaction &transaction = transactions_.GetTransaction(transaction_id);
 
                 LockReleaseResult rr = locks_.ReleaseLocks(transaction_id, transaction);

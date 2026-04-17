@@ -125,6 +125,11 @@ namespace strongstore
         state_ = PREPARED;
     }
 
+    void TransactionStore::AbortTombstone(uint64_t transaction_id)
+    {
+        aborted_.insert(transaction_id);
+    }
+
     void TransactionStore::PendingRWTransaction::ReceivePrepareOK(int coordinator, int participant,
                                                                   const Timestamp &prepare_ts,
                                                                   const Timestamp &nonblock_ts)
