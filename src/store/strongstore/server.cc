@@ -778,6 +778,7 @@ namespace strongstore
         abort_op.set_transaction_id(transaction_id);
         abort_op.mutable_rid()->set_client_id(client_id);
         abort_op.mutable_rid()->set_client_req_id(client_req_id);
+        // this->replica_->HandleRequest(abort_op);
 
         transport_->TimerMicro(0, [this, m = std::move(abort_op)]() mutable {
             this->replica_->HandleRequest(m);
@@ -794,6 +795,8 @@ namespace strongstore
         commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
         commit_op.mutable_rid()->set_client_id(client_id);
         commit_op.mutable_rid()->set_client_req_id(client_req_id);
+
+        // this->replica_->HandleRequest(commit_op);
 
         transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
             this->replica_->HandleRequest(m);
@@ -825,6 +828,7 @@ namespace strongstore
         }
 
         commit_ts.serialize(commit_op.mutable_commit()->mutable_commit_timestamp());
+        // this->replica_->HandleRequest(commit_op);
 
         transport_->TimerMicro(0, [this, m = std::move(commit_op)]() mutable {
             this->replica_->HandleRequest(m);
@@ -848,6 +852,7 @@ namespace strongstore
         prepare_ts.serialize(prepare->mutable_timestamp());
         prepare->set_coordinator(shard_idx_);
         nonblock_ts.serialize(prepare->mutable_nonblock_ts());
+        // this->replica_->HandleRequest(prepare_op);
 
         transport_->TimerMicro(0, [this, m = std::move(prepare_op)]() mutable {
             this->replica_->HandleRequest(m);
@@ -1925,7 +1930,11 @@ namespace strongstore
                 }
 
                 uint64_t commit_wait_us = tt_.TimeToWaitUntilMicros(commit_ts.getTimestamp());
-                if (commit_wait_us > 0) {
+                if (replica_idx_ == 0 && commit_wait_us > 0) {
+                    // Due to local time skews, it's definitely possible a replica could delay the commit even
+                    // if the leader or other replicas did not.
+                    // For now, because we ASSERT locks are always acquired on replica side, i'm making sure
+                    // replicas don't delay the commit (and thus release of locks) so we don't trip the ASSERT
                     Debug("[%lu] delaying commit by %lu us", transaction_id, commit_wait_us);
                     transport_->TimerMicro(commit_wait_us, std::bind(&Server::CoordinatorCommitTransaction, this, transaction_id, commit_ts));
                 } else {
