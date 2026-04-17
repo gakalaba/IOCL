@@ -15,12 +15,10 @@
     ]
   ],
   "replication_protocol": [
-    "vr",
     "iocl_ct",
     "strong"
   ],
   "client_protocol_mode": [
-    "vr",
     "iocl_ct",
     "span-lock"
   ],
@@ -38,7 +36,6 @@
   ],
   "consistency": [
     "lin",
-    "lin",
     "ss"
   ],
   "num_instances": 1,
@@ -50,31 +47,148 @@
   "fault_tolerance": 2,
   "num_shards": 10,
   "shards": [
-    ["us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-0", "eu-west-1-2"],
-    ["us-east-1-1", "us-west-1-0", "us-west-1-2", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-east-1-2", "us-east-1-0", "us-west-1-1", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-west-1-0", "us-east-1-1", "us-west-1-2", "eu-west-1-0", "eu-west-1-2"],
-    ["us-west-1-1", "us-east-1-0", "us-west-1-0", "eu-west-1-1", "mex-cent-1-0"],
-    ["us-west-1-2", "us-east-1-1", "us-east-1-2", "eu-west-1-0", "eu-west-1-2"],
-    ["eu-west-1-0", "us-west-1-0", "us-west-1-2", "eu-west-1-1", "mex-cent-1-0"],
-    ["eu-west-1-1", "us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-2"],
-    ["eu-west-1-2", "us-east-1-1", "us-west-1-0", "us-west-1-2", "eu-west-1-0"],
-    ["mex-cent-1-0", "us-east-1-0", "us-east-1-2", "us-west-1-1", "eu-west-1-1"]
+    [
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-east-1-2",
+      "us-east-1-0",
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-2",
+      "us-east-1-1",
+      "us-east-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-2",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-1"
+    ]
   ],
   "clients_used": [
-    [16],
-    [16],
-    [16]
+    [
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17
+    ],
+    [
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17,
+      17
+    ]
   ],
   "client_total": [
-    [16, 64, 128, 256, 512, 1024, 1600],
-    [16, 64, 128, 256, 512, 1024, 1600],
-    [16, 64, 128, 256, 512, 1024, 1600]
+    [
+      17,
+      34,
+      68,
+      136,
+      272,
+      544,
+      816,
+      1088,
+      1700
+    ],
+    [
+      17,
+      34,
+      68,
+      136,
+      272,
+      544,
+      816,
+      1088,
+      1700
+    ]
   ],
   "client_processes_per_client_node": [
-    [1, 4, 8, 16, 32, 64, 100],
-    [1, 4, 8, 16, 32, 64, 100],
-    [1, 4, 8, 16, 32, 64, 100]
+    [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      48,
+      64,
+      100
+    ],
+    [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      48,
+      64,
+      100
+    ]
   ],
   "client_threads_per_process": 1,
   "clients": [
@@ -141,7 +255,7 @@
   "benchmark_name": "micro",
   "bench_mode": "closed",
   "mpl": 1,
-  "client_key_selector": "uniform",
+  "client_key_selector": "zipf",
   "client_wo_replacement": true,
   "client_fanout": 1,
   "client_issue_concurrent": true,
@@ -203,10 +317,10 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 80,
+  "client_experiment_length": 40,
   "client_rand_sleep": 0,
-  "client_ramp_down": 15,
-  "client_ramp_up": 15,
+  "client_ramp_down": 10,
+  "client_ramp_up": 10,
   "default_remote_shell": "bash",
   "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
