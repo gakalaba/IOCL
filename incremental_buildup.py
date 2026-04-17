@@ -17,61 +17,28 @@ CONFIG_PATH = Path(sys.argv[1])
 with open(CONFIG_PATH) as f:
     base_config = json.load(f)
 
-# === Determine which protocol slots to scale ===
 protocols = base_config.get("replication_protocol", [])
-TARGET_IDXS = [
-    i for i, p in enumerate(protocols)
-    if p in ("iocl_ct", "strong")
-]
 
-print("Scaling indices:", TARGET_IDXS)
-
-# === Save original load values ===
-BASE_CLIENTS_USED = copy.deepcopy(base_config["clients_used"])
-BASE_CLIENT_TOTAL = copy.deepcopy(base_config["client_total"])
-BASE_PPN = copy.deepcopy(base_config["client_processes_per_client_node"])
-
-print("Base clients_used =", BASE_CLIENTS_USED)
-print("Base client_total =", BASE_CLIENT_TOTAL)
-print("Base client_processes_per_client_node =", BASE_PPN)
-
-
-def make_clients_used_row(value, n):
-    """Create a clients_used row with repeated values to match client_total length."""
-    return [value] * n
+print("Protocols:", protocols)
+print("Base clients_used =", base_config["clients_used"])
+print("Base client_total =", base_config["client_total"])
+print("Base client_processes_per_client_node =", base_config["client_processes_per_client_node"])
 
 
 def update_load(config, fanout):
-    """Update load-dependent fields."""
+    """Update only fanout/debug-related fields. Never scale load arrays."""
     config["client_issue_concurrent"] = True
     config["client_debug_output"] = False
     config["server_debug_output"] = False
     config["client_fanout"] = fanout
 
-    # Reset to original values first
-    config["clients_used"] = copy.deepcopy(BASE_CLIENTS_USED)
-    config["client_total"] = copy.deepcopy(BASE_CLIENT_TOTAL)
-    config["client_processes_per_client_node"] = copy.deepcopy(BASE_PPN)
+    # Explicitly preserve original load-related fields exactly as given
+    config["clients_used"] = copy.deepcopy(base_config["clients_used"])
+    config["client_total"] = copy.deepcopy(base_config["client_total"])
+    config["client_processes_per_client_node"] = copy.deepcopy(
+        base_config["client_processes_per_client_node"]
+    )
 
-    # Normalize clients_used rows so they match the length of client_total rows
-    for idx in range(len(config["client_total"])):
-        base_used_val = BASE_CLIENTS_USED[idx][0]
-        row_len = len(config["client_total"][idx])
-        config["clients_used"][idx] = make_clients_used_row(base_used_val, row_len)
-
-    # Scale only IOCL_CT and Spanner
-    for idx in TARGET_IDXS:
-        if idx < len(config["client_total"]):
-            scaled_total = [x // fanout for x in BASE_CLIENT_TOTAL[idx]]
-            config["client_total"][idx] = scaled_total
-
-            scaled_used_val = BASE_CLIENTS_USED[idx][0] // fanout
-            config["clients_used"][idx] = make_clients_used_row(
-                scaled_used_val,
-                len(scaled_total)
-            )
-
-    # NEVER change client_processes_per_client_node
     print(f"Setting fanout={fanout}")
     for idx in range(len(protocols)):
         print(
@@ -94,11 +61,11 @@ def save_config(cfg):
 SKEWS = [
     {"type": "zipf", "zipf": 0.8},
     {"type": "zipf", "zipf": 0.9},
-    {"type": "zipf", "zipf": 0.99},
-    {"type": "uniform"}           # uniform mode — no partitioner, uniform keys
+    {"type": "zipf", "zipf": 0.99}
+    # {"type": "uniform"}
 ]
 
-FANOUT_VALUES = [1, 4, 16]
+FANOUT_VALUES = [4, 16, 1]
 
 
 for skew in SKEWS:
