@@ -272,7 +272,7 @@ namespace replication
             void CloseBatch();
             void CloseUnorderedBatch();
             void ReadyRoutine(uint64_t intkey, std::set<uint32_t, EntryReadyCompareIdx> &sq);
-            void ReadyFinalRoutine(uint64_t intkey);
+            void ReadyFinalRoutine(uint64_t intkey, PerKeySubLog &sublog);
             void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
@@ -307,7 +307,7 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
-            void PrintSubqueue(uint64_t intkey);
+            // void PrintSubqueue(uint64_t intkey);
         };
 
     } // namespace iocl_ct

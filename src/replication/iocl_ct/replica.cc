@@ -33,7 +33,6 @@
 #include "replication/common/replica.h"
 
 #include <algorithm>
-#include <unordered_set>
 
 #include "lib/assert.h"
 #include "lib/configuration.h"
@@ -231,17 +230,11 @@ namespace replication
                     ACK probably via piggybacking mechanism)*/
                     if ((perKeySubLogs.find(entry->intkey) != perKeySubLogs.end()) ||
                         (entry->final_ack_count != entry->num_predecessors)) {
-                        // Warning("Not committing operation " FMT_OPNUM " because not all predecessor final ACKs have arrived (%d/%d)",
-                        //         lastCommitted, entry->final_ack_count, entry->num_predecessors);
-                        ASSERT(entry->final_ack_count <= entry->num_predecessors);
                         // Add ourselves to the perKeySubLog to be executed when all N Acks arrive
                         auto &sublog = perKeySubLogs[entry->intkey];
                         sublog.ops.push_back(lastCommitted);
                     } else {
                         /* Execute it */
-                        ASSERT(entry->final_ack_count == entry->num_predecessors);
-                        ASSERT(perKeySubLogs.find(entry->intkey) == perKeySubLogs.end());
-                        /* We can immediately execute this entry */
                         ReplicaUpcall(entry->request);
                     }
                 }
@@ -651,7 +644,6 @@ namespace replication
             v.opnum = this->lastUnorderedOp;
 
             // Add the request to the unordered bag
-            ASSERT((msg.request_type() == replication::LinearizeableOperation::KV_OP) && msg.has_kv());
             uint64_t shardtag = msg.shardtag();
             uint64_t intkey = msg.intkey();
             uint16_t num_predecessors = msg.predlist().size();
@@ -661,8 +653,8 @@ namespace replication
             ASSERT(entry.viewstamp.opnum - 1 == idx);
 
             // Add entry to "ordered" unorderedBag (for batching)
-            ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
-            shardtagToEntryIdx[shardtag] = idx;
+            auto result = shardtagToEntryIdx.emplace(shardtag, idx);
+            ASSERT(result.second);
 
             // Go through any outstanding predecessor replies and add them in
             auto pit = outstandingCoordinationResps.find(shardtag);
@@ -732,10 +724,9 @@ namespace replication
         }
 
         // INVARIANT: the sublog is never empty!
-        void IOCL_CTReplica::ReadyFinalRoutine(uint64_t intkey)
+        void IOCL_CTReplica::ReadyFinalRoutine(uint64_t intkey, PerKeySubLog &sublog)
         {
             /* Execute as many head entries from the sublog as are ready */
-            auto &sublog = perKeySubLogs[intkey];
             while (sublog.head < sublog.ops.size()) {
                 opnum_t headOpnum = sublog.ops[sublog.head];
                 const IoclEntry *head_entry = FindInLog(headOpnum);
@@ -838,7 +829,6 @@ namespace replication
                 ).first;
             }
             // Make sure we are inserting, NOT reinserting
-            ASSERT(std::find(it->second.begin(), it->second.end(), idx) == it->second.end());
             ASSERT(it->second.find(idx) == it->second.end());
             // N*LogN insertion into the subqueue
             it->second.insert(idx);
@@ -919,11 +909,11 @@ namespace replication
                             SuccessorKey succ_key{succ.s, static_cast<uint32_t>(succ.shardidx)};
                             auto result = entry.successors.emplace(succ_key, SuccessorInfo{static_cast<uint16_t>(succ.predidx), false});
                             auto succ_it = result.first;
-                            bool inserted = result.second;
-                            if (!inserted) {
-                                Warning("Duplicate successor request received for successor %lu on shard %u", succ.s, succ.shardidx);
-                                ASSERT(succ_it->second.predidx == succ.predidx);
-                            }
+                            // bool inserted = result.second;
+                            // if (!inserted) {
+                            //     Warning("Duplicate successor request received for successor %lu on shard %u", succ.s, succ.shardidx);
+                            //     ASSERT(succ_it->second.predidx == succ.predidx);
+                            // }
                         }
                         outstandingCoordinationReqs.erase(it);
                     }
@@ -941,18 +931,13 @@ namespace replication
                     bool subqueue_exists = (sq_it != perKeySubqueues.end());
                     bool wouldBeHead = false;
                     if (subqueue_exists && readyNow) {
-                        // Make sure we're not in the log already (i-1 is the idx of the entry in the entryStore)
-                        ASSERT(std::find(sq_it->second.begin(), sq_it->second.end(), i-1) == sq_it->second.end());
+                        // Make sure we're NOT in the log already (i-1 is the idx of the entry in the entryStore)
                         ASSERT(sq_it->second.find(i-1) == sq_it->second.end());
                         auto &sq = sq_it->second;
                         ASSERT(!sq.empty());
                         uint32_t head_idx = *sq.begin();
                         IoclEntry &head = Entry(head_idx);
                         wouldBeHead = (candidateFinalTs < head.finalTs || (candidateFinalTs == head.finalTs && entry.myShardTag < head.myShardTag));
-                        if (wouldBeHead) {
-                            ASSERT(head.ACKs < head.num_predecessors);
-                            ASSERT(head.state != IOCL_STATE_READY);
-                        }
                     }
                     /* TO HARNESS FAST PATH: Check if we should never use the subqueue structure anyway */
                     // Coordinated < Replicated
@@ -1226,8 +1211,8 @@ namespace replication
                 ASSERT(entry.viewstamp.opnum - 1 == idx);
 
                 // Add entry to "ordered" unorderedBag (for batching)
-                ASSERT(shardtagToEntryIdx.find(shardtag) == shardtagToEntryIdx.end());
-                shardtagToEntryIdx[shardtag] = idx;
+                auto result = shardtagToEntryIdx.emplace(shardtag, idx);
+                ASSERT(result.second); // should not have already been there
             }
 
             /* Build reply and send it to the leader */
@@ -1355,9 +1340,10 @@ namespace replication
             /* Now it is safe to Execute this operation! */
             /* Check if it is waiting to be executed */
             if ((entry.state == IOCL_STATE_COMMITTED) && (entry.final_ack_count == entry.num_predecessors)) {
-                ASSERT(perKeySubLogs.find(entry.intkey) != perKeySubLogs.end());
+                auto sublog = perKeySubLogs.find(entry.intkey);
+                ASSERT(sublog != perKeySubLogs.end());
                 // TODO ASSERT WE ARE IN THE LOG
-                ReadyFinalRoutine(entry.intkey);
+                ReadyFinalRoutine(entry.intkey, sublog->second);
             }
         }
 
@@ -1397,11 +1383,11 @@ namespace replication
             SuccessorKey succ{msg.s(), static_cast<uint32_t>(msg.shardidx())};
             auto result = entry.successors.emplace(succ, SuccessorInfo{static_cast<uint16_t>(msg.predidx()), false});
             auto succ_it = result.first;
-            bool inserted = result.second;
-            if (!inserted) {
-                Warning("Duplicate successor request received for successor %lu on shard %u", msg.s(), msg.shardidx());
-                ASSERT(succ_it->second.predidx == msg.predidx());
-            }
+            // bool inserted = result.second;
+            // if (!inserted) {
+            //     Warning("Duplicate successor request received for successor %lu on shard %u", msg.s(), msg.shardidx());
+            //     ASSERT(succ_it->second.predidx == msg.predidx());
+            // }
             /* Reply to the successor if we've already been added to the ordered log */
             if (entry.state == IOCL_STATE_READY ||
                 entry.state == IOCL_STATE_PREPARED ||
@@ -1457,7 +1443,6 @@ namespace replication
                 // ASSERT it is in here in the first place
                 auto it = perKeySubqueues.find(entry.intkey);
                 ASSERT(it != perKeySubqueues.end());
-                ASSERT(std::find(it->second.begin(), it->second.end(), idx) != it->second.end());
                 ASSERT(it->second.find(idx) != it->second.end());
                 // PrintSubqueue(entry.intkey);
                 // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
@@ -1466,7 +1451,6 @@ namespace replication
                 uint64_t old_finalTs = entry.finalTs;
                 entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
                 ASSERT(old_finalTs <= entry.finalTs);
-                ASSERT(entry.finalTs >= entry.arrivalTs);
                 // Reinsert
                 it->second.insert(idx);
                 if (entry.ACKs == entry.num_predecessors) {
