@@ -4,12 +4,23 @@ import concurrent.futures
 import os
 import sys
 import threading
+import traceback
 
 from utils.remote_util import *
 from utils.git_util import *
 from utils.eval_util import *
 from lib.experiment_codebase import *
 
+def filter_config_to_indices(config, indices):
+    config_new = config.copy()
+
+    if 'experiment_independent_vars_unused' in config and len(config['experiment_independent_vars_unused']) > 0:
+        current_group = config['experiment_independent_vars_unused'][0]
+        for var in current_group:
+            if var in config_new and isinstance(config_new[var], list):
+                config_new[var] = [config_new[var][i] for i in indices]
+
+    return config_new
 
 def is_using_master(config):
     return not 'use_master' in config or config['use_master']
@@ -486,7 +497,7 @@ def run_experiment(config_file, client_config_idx, executor):
                     config, local_exp_directory, remote_exp_directory, i)
                 all_alive = True
                 for st in range(len(server_threads)):
-                    if server_threads[i].poll() != None:
+                    if server_threads[st].poll() != None:
                         print("Server thread %d not alive." % st)
                         all_alive = False
                         break
@@ -534,8 +545,10 @@ def run_multiple_experiments(config_file, executor):
             sys.stderr.write(
                 'Need at least 1 independent variable to run multiple experiments.\n')
             sys.exit(1)
+
         if not 'experiment_independent_vars_unused' in config:
             config['experiment_independent_vars_unused'] = config['experiment_independent_vars']
+
         for i in range(len(config['experiment_independent_vars_unused'])):
             for j in range(len(config['experiment_independent_vars_unused'][i])):
                 for k in range(j):
@@ -550,7 +563,6 @@ def run_multiple_experiments(config_file, executor):
         exp_futs = []
         exp_futs_idxs = []
         config_files = []
-        indep_vars_list = []
 
         exp_dir = get_timestamped_exp_dir(config)
         os.makedirs(exp_dir, exist_ok=True)
@@ -594,36 +606,45 @@ def run_multiple_experiments(config_file, executor):
                 out_dirs.append(out_directory)
                 sub_out_dirs.append(sub_out_directories)
 
-        retries = 0
-        while len(out_dirs) < len(config[config['experiment_independent_vars_unused'][0][0]]) and retries <= config['max_retries']:
-            retry_exp_futs = []
-            for i in range(len(exp_futs)):
-                try:
-                    out_dir = exp_futs[i].result()
-                    sub_out_dirs.insert(exp_futs_idxs[i], out_dir)
-                except:
-                    print('Unexpected error during %s %d: ' %
-                          (config_files[exp_futs_idxs[i]], exp_futs_idxs[i]))
-                    print(traceback.format_exc())
-                    retry_exp_futs.append(exp_futs_idxs[i])
-            if len(out_dirs) == len(config[config['experiment_independent_vars_unused'][0][0]]):
-                break
-            exp_futs = []
-            exp_futs_idxs = []
-            for j in retry_exp_futs:
-                exp_futs.append(run_experiment(config_files[j], j, executor))
-                exp_futs_idxs.append(j)
-            retries += 1
+        successful_leaf_dirs = {}
+        for i in range(len(exp_futs)):
+            idx = exp_futs_idxs[i]
+            try:
+                out_dir = exp_futs[i].result()
+                successful_leaf_dirs[idx] = out_dir
+            except:
+                print('Skipping failed experiment %s %d: ' %
+                      (config_files[idx], idx))
+                print(traceback.format_exc())
+
+        # Append successful leaf results in index order, but do not destroy
+        # any recursive results already in sub_out_dirs.
+        successful_idxs = sorted(successful_leaf_dirs.keys())
+        for idx in successful_idxs:
+            sub_out_dirs.append(successful_leaf_dirs[idx])
 
         print("%s took %f seconds!" % (config_name, time.time() - start))
-
         print(exp_dir)
+
         out = [sub_out_dirs, out_dirs]
-        generate_plots(config, exp_dir, out)
+
+        filtered_config = config
+        if len(exp_futs) > 0:
+            if len(successful_idxs) > 0:
+                filtered_config = filter_config_to_indices(config, successful_idxs)
+            else:
+                print("All directly launched experiments failed for %s; skipping filtering at this level." % config_name)
+
+        if len(sub_out_dirs) > 0 or len(out_dirs) > 0:
+            generate_plots(filtered_config, exp_dir, out)
+        else:
+            print("No successful experiment points for %s; skipping plot generation." % config_name)
+
     return exp_dir, out
 
 
 def run_varying_clients_experiment(config_file, executor):
+    assert(False)
     start = time.time()
     exp_dir = None
     out_dirs = None
@@ -683,7 +704,6 @@ def run_varying_clients_experiment(config_file, executor):
         generate_tput_lat_plots(config, exp_dir, out_dirs)
         print("%s took %f seconds!" % (config_name, time.time() - start))
     return exp_dir, out_dirs
-
 
 def run_multiple_protocols_experiment(config_file, executor=None):
     start = time.time()
