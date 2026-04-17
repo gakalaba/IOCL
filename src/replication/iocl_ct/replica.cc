@@ -692,7 +692,14 @@ namespace replication
                 std::vector<outCoordResp> &ocr = pit->second;
                 for (const auto& resp : ocr) {
                     ASSERT(resp.predidx < entry.num_predecessors);
-                    // ASSERT(entryPtr->predecessorArrivalTs[resp.predidx()] == 0);
+                    // Deduplication
+                    uint64_t bit = 1ULL << resp.predidx;
+                    if (entry.predArrivalTs_reply_mask & bit) {
+                        Warning("Duplicate!!! coordination reply for shardtag %lu predidx %u", entry.myShardTag, resp.predidx);
+                        continue;
+                    }
+                    // Mark as seen
+                    entry.predArrivalTs_reply_mask |= bit;
                     entry.predecessorArrivalTs[resp.predidx] = resp.arrivalTs;
                     entry.ACKs++;
                 }
@@ -1490,7 +1497,6 @@ namespace replication
             // Deduplication
             uint64_t bit = 1ULL << msg.predidx();
             if (entry.predArrivalTs_reply_mask & bit) {
-                // duplicate → ignore
                 Warning("Duplicate!!! coordination reply for shardtag %lu predidx %u", entry.myShardTag, msg.predidx());
                 return;
             }
