@@ -59,19 +59,20 @@ void Replica::LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
     Debug("Upcall result: %s %s", replicate ? "yes" : "no", res.c_str());
 }
 
-void Replica::ReplicaUpcall(opnum_t opnum, const string &op, string &res) {
+void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k,
+                                   const string &v, string &retval) {
     Debug("Making upcall for opnum %lu operation %s", opnum, op.c_str());
-    app->ReplicaUpcall(opnum, op, res);
+    app->ReplicaUpcall(opnum, op, k, v, retval);
 
-    Debug("Upcall result: %s", res.c_str());
+    Debug("Upcall returned");
 }
 
-void Replica::ReplicaUpcall(opnum_t opnum, const string &op, const string &k, const string &v, string &res)
+void Replica::ReplicaUpcall(const LinearizeableOperation &msg)
     {
-        Debug("Making executable upcall for opnum %lu operation %s and key %s and value %s", opnum, op.c_str(), k.c_str(), v.c_str());
-        app->ReplicaUpcall(opnum, op, k, v, res);
+        // Debug("Making executable upcall for opnum %lu operation %s and key %s and value %s", opnum, op.c_str(), k.c_str(), v.c_str());
+        app->ReplicaUpcall(msg);
 
-        Debug("Upcall result: %s", res.c_str());
+        // Debug("Upcall result: %s", res.c_str());
     }
 
 void Replica::UnloggedUpcall(const string &op, string &res) {

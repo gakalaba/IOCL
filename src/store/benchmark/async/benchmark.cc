@@ -47,7 +47,6 @@
 #include "store/benchmark/async/retwis/retwis_client.h"
 #include "store/benchmark/async/micro/micro_client.h"
 #include "store/common/partitioner.h"
-#include "store/common/stats.h"
 #include "store/common/truetime.h"
 #include "store/strongstore/client.h"
 #include "store/strongstore/networkconfig.h"
@@ -379,7 +378,7 @@ DEFINE_string(customer_name_file_path, "smallbank_names",
 
 DEFINE_LATENCY(op);
 
-std::vector<Client *> clients;
+Client *the_client;
 std::vector<BenchmarkClient *> benchClients;
 std::vector<std::thread *> threads;
 Transport *tport;
@@ -722,40 +721,44 @@ int main(int argc, char **argv)
     // }
 
     const std::size_t n_instances = replica_configs.size();
-    for (std::size_t i = 0; i < n_instances; ++i)
-    {
-        Client *client = nullptr;
-        switch (mode)
-        {
-        case strongstore::LinearizableProtocol::PROTO_VR:
-        case strongstore::LinearizableProtocol::PROTO_IOCL_CT:
-        case strongstore::LinearizableProtocol::PROTO_STRONG:
-        {
-            auto &shard_config = replica_configs[i];
-            auto &net_config = net_configs[i];
-            auto &client_region = client_regions[i];
-
-            client = new strongstore::Client(
-                consistency, mode, net_config, client_region, shard_config,
-                FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
-                tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha, FLAGS_ping_replicas);
-            break;
-        }
-        default:
-            NOT_REACHABLE();
-        }
-
-        ASSERT(client != nullptr);
-        clients.push_back(client);
-    }
-
-    // switch (benchMode)
+    // For now, we know this is just 1 client
+    ASSERT(n_instances == 1);
+    // for (std::size_t i = 0; i < n_instances; ++i)
     // {
-    // case BENCH_RETWIS:
-    //     break;
-    // default:
-    //     NOT_REACHABLE();
+    //     Client *client = nullptr;
+    //     switch (mode)
+    //     {
+    //     case strongstore::LinearizableProtocol::PROTO_VR:
+    //     case strongstore::LinearizableProtocol::PROTO_IOCL_CT:
+    //     case strongstore::LinearizableProtocol::PROTO_STRONG:
+    //     {
+    //         auto &shard_config = replica_configs[i];
+    //         auto &net_config = net_configs[i];
+    //         auto &client_region = client_regions[i];
+
+    //         client = new strongstore::Client(
+    //             consistency, mode, net_config, client_region, shard_config,
+    //             FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
+    //             tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha, FLAGS_client_fanout, FLAGS_ping_replicas);
+    //         break;
+    //     }
+    //     default:
+    //         NOT_REACHABLE();
+    //     }
+
+    //     ASSERT(client != nullptr);
+    //     clients.push_back(client);
     // }
+    auto &shard_config = replica_configs[0];
+    auto &net_config = net_configs[0];
+    auto &client_region = client_regions[0];
+
+    the_client = new strongstore::Client(
+        consistency, mode, net_config, client_region, shard_config,
+        FLAGS_client_id, FLAGS_num_shards, FLAGS_closest_replica,
+        tport, part, tt, FLAGS_debug_stats, FLAGS_nb_time_alpha, FLAGS_client_fanout, FLAGS_ping_replicas);
+    ASSERT(the_client != nullptr);
+
     FLAGS_client_read_percentage = ((100 * FLAGS_client_read_percentage) / 1000);
 
     uint32_t seed = FLAGS_client_id << 4;
@@ -777,7 +780,7 @@ int main(int argc, char **argv)
     case BENCH_RETWIS:
         Debug("we'res tarting the retwis??");
         bench = new retwis::RetwisClient(
-            keySelector, clients, FLAGS_message_timeout, *tport, seed,
+            keySelector, the_client, FLAGS_message_timeout, *tport, seed,
             bench_mode,
             FLAGS_client_switch_probability,
             FLAGS_client_arrival_rate, FLAGS_client_think_time, FLAGS_client_stay_probability,
@@ -791,7 +794,7 @@ int main(int argc, char **argv)
     case BENCH_MICRO:
         Debug("we're starting the microooooo, issue_concurrent=%d", to_issue_concurrent);
         bench = new micro::MicroClient(
-            keySelector, clients, FLAGS_message_timeout, *tport, seed,
+            keySelector, the_client, FLAGS_message_timeout, *tport, seed,
             bench_mode,
             FLAGS_client_switch_probability,
             FLAGS_client_arrival_rate, FLAGS_client_think_time, FLAGS_client_stay_probability,
@@ -856,10 +859,11 @@ int main(int argc, char **argv)
         i->join();
         delete i;
     }
-    for (auto i : clients)
-    {
-        delete i;
-    }
+    // for (auto i : clients)
+    // {
+    //     delete i;
+    // }
+    delete the_client;
     for (auto i : benchClients)
     {
         delete i;
@@ -885,20 +889,22 @@ void Cleanup()
 
 void FlushStats()
 {
-    if (FLAGS_stats_file.size() > 0)
-    {
-        Notice("Flushing stats to %s.", FLAGS_stats_file.c_str());
-        Stats total;
-        for (unsigned int i = 0; i < benchClients.size(); i++)
-        {
-            total.Merge(benchClients[i]->GetStats());
-        }
-        for (unsigned int i = 0; i < clients.size(); i++)
-        {
-            total.Merge(clients[i]->GetStats());
-        }
+    Notice("Disabled FlushStats for now!");
+    // if (FLAGS_stats_file.size() > 0)
+    // {
+    //     Notice("Flushing stats to %s.", FLAGS_stats_file.c_str());
+    //     Stats total;
+    //     for (unsigned int i = 0; i < benchClients.size(); i++)
+    //     {
+    //         total.Merge(benchClients[i]->GetStats());
+    //     }
+    //     total.Merge(the_client->GetStats());
+        // for (unsigned int i = 0; i < clients.size(); i++)
+        // {
+        //     total.Merge(clients[i]->GetStats());
+        // }
 
-        total.ExportJSON(FLAGS_stats_file);
-        Notice("All done!");
-    }
+        // total.ExportJSON(FLAGS_stats_file);
+        // Notice("All done!");
+    // }
 }

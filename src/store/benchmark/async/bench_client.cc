@@ -42,7 +42,7 @@
 
 DEFINE_LATENCY(op);
 
-BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
+BenchmarkClient::BenchmarkClient(Client *client, uint32_t timeout,
                                  Transport &transport, uint64_t id,
                                  BenchmarkClientMode mode,
                                  double switch_probability,
@@ -55,7 +55,7 @@ BenchmarkClient::BenchmarkClient(const std::vector<Client *> &clients, uint32_t 
                                  const std::string &latencyFilename)
     : transport_(transport),
       session_states_{},
-      clients_{clients},
+      client_{client},
       client_id_{id},
       timeout_{timeout},
       next_arrival_dist_{arrival_rate * 1e-6},
@@ -99,106 +99,68 @@ void BenchmarkClient::Start(bench_done_callback bdcb)
     n_sessions_started_ = 0;
     n = 0;
     curr_bdcb_ = bdcb;
-    transport_.Timer(warmupSec * 1000, std::bind(&BenchmarkClient::WarmupDone, this));
+    transport_.Timer(warmupSec * 1000, [this]() {
+        WarmupDone();
+    });
     gettimeofday(&startTime, NULL);
 
     if (IsLinearizeable()) {
-        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextAppRequest, this));
+        transport_.TimerMicro(0, [this]() {
+            SendNextAppRequest();
+        });
     } else {
-        transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNext, this));
+        transport_.TimerMicro(0, [this]() {
+            SendNext();
+        });
     }
 }
 
 void BenchmarkClient::SendNext()
 {
-    n_sessions_started_++;
-    Debug("[%d] SendNext", n_sessions_started_);
-
-    std::size_t client_index = n_sessions_started_ % clients_.size();
-    auto &client = *clients_[client_index];
-
-    auto &session = client.BeginSession();
+    auto &session = client_->BeginSession();
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
 
-    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    auto ecb = [this, sid](auto &&arg) {
+        ExecuteCallback(sid, std::forward<decltype(arg)>(arg));
+    };
     auto transaction = GetNextTransaction();
-    stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
-    session_states_.emplace(sid, SessionState{session, transaction, ecb, client_index});
+    auto res = session_states_.emplace(
+        sid, SessionState{session, transaction, ecb});
 
-    auto &ss = session_states_.find(sid)->second;
+    auto &ss = res.first->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, sid);
-    auto btcb = []() {};
+    client_->Begin(session);
+    ExecuteNextOperation(sid);
 
-    Operation op = transaction->GetNextOperation(0);
-    switch (op.type)
-    {
-    case BEGIN_RO:
-    case BEGIN_RW:
-        client.Begin(session, bcb, btcb, timeout_);
-        break;
-
-    default:
-        NOT_REACHABLE();
-    }
-
-    if (!cooldownStarted)
-    {
-        bool send_next = false;
-        uint64_t next_arrival_us = 0;
-        switch (mode_)
-        {
-        case BenchmarkClientMode::OPEN:
-            send_next = true;
-            next_arrival_us = static_cast<uint64_t>(next_arrival_dist_(rand_));
-            break;
-
-        case BenchmarkClientMode::CLOSED:
-            send_next = (n_sessions_started_ < mpl_);
-            next_arrival_us = 0;
-            break;
-        default:
-            Panic("Unexpected client mode!");
-        }
-
-        if (send_next)
-        {
-            Debug("next arrival in %lu us", next_arrival_us);
-            transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNext, this));
-        }
-    }
+    // If we were running Open loop clients, could issue next transaction here
 }
 
 void BenchmarkClient::SendNextAppRequest()
 {
-    n_sessions_started_++;
-    Debug("[%d] SendNextAppRequest", n_sessions_started_);
-
-    std::size_t client_index = n_sessions_started_ % clients_.size();
-    auto &client = *clients_[client_index];
-
-    auto &session = client.BeginSession();
+    auto &session = client_->BeginSession();
     auto sid = session.id();
 
     Debug("session id: %lu", sid);
 
-    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, sid, std::placeholders::_1);
+    auto ecb = [this, sid](auto &&arg) {
+        ExecuteCallback(sid, std::forward<decltype(arg)>(arg));
+    };
     auto appreq = GetNextAppRequest();
-    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
-    session_states_.emplace(sid, SessionState{session, appreq, ecb, client_index, GetFanout()});
+    auto res = session_states_.emplace(
+        sid, SessionState{session, appreq, ecb, GetFanout()});
 
-    auto &ss = session_states_.find(sid)->second;
+    auto &ss = res.first->second;
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextAppRequestOperation, this, sid);
-    auto btcb = []() {};
+    client_->BeginAppRequest(session);
+    ExecuteNextAppRequestOperation(sid);
 
-    client.BeginAppRequest(session, bcb, btcb, timeout_);
+     // If we were running Open loop clients, could issue next transaction here
 }
 
 void BenchmarkClient::SendNextInSession(const uint64_t session_id)
@@ -209,49 +171,34 @@ void BenchmarkClient::SendNextInSession(const uint64_t session_id)
     ASSERT(search != session_states_.end());
     auto &ss = search->second;
 
-    auto ecb = std::bind(&BenchmarkClient::ExecuteCallback, this, session_id, std::placeholders::_1);
+    auto ecb = [this, session_id](auto &&arg) {
+        ExecuteCallback(session_id, std::forward<decltype(arg)>(arg));
+    };
     auto transaction = GetNextTransaction();
-    stats.Increment(transaction->GetTransactionType() + "_attempts", 1);
 
     if (switch_dist_(rand_))
     {
-        auto cur_client_index = ss.current_client_index();
-        std::size_t next_client_index = (cur_client_index + 1) % clients_.size();
+        Panic("do we ever call this");
+        rss::Session rss_session = client_->EndSession(ss.session());
 
-        auto &cur_client = *clients_[cur_client_index];
-        rss::Session rss_session = cur_client.EndSession(ss.session());
+        // auto &next_client = *clients_[next_client_index];
 
-        auto &next_client = *clients_[next_client_index];
-
-        auto &session = next_client.ContinueSession(rss_session);
+        // auto &session = next_client.ContinueSession(rss_session);
+        auto &session = client_->ContinueSession(rss_session);
         ASSERT(session_id == session.id());
 
-        ss.start_transaction(session, transaction, ecb, next_client_index);
+        ss.start_transaction(session, transaction, ecb);
     }
     else
     {
-        ss.start_transaction(ss.session(), transaction, ecb, ss.current_client_index());
+        ss.start_transaction(ss.session(), transaction, ecb);
     }
 
     auto &session = ss.session();
-    auto &client = *clients_[ss.current_client_index()];
 
     _Latency_StartRec(ss.lat());
-
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
-    auto btcb = []() {};
-
-    Operation op = transaction->GetNextOperation(0);
-    switch (op.type)
-    {
-    case BEGIN_RW:
-    case BEGIN_RO:
-        client.Begin(session, bcb, btcb, timeout_);
-        break;
-
-    default:
-        NOT_REACHABLE();
-    }
+    client_->Begin(session);
+    ExecuteNextOperation(session_id);
 }
 
 void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
@@ -261,22 +208,18 @@ void BenchmarkClient::SendNextAppRequestInSession(const uint64_t session_id)
     auto &ss = search->second;
 
     auto appreq = GetNextAppRequest();
-    stats.Increment(appreq->GetTransactionType() + "_attempts", 1);
 
     // reset op_index!
-    ss.start_apprequest(ss.session(), appreq, ss.current_client_index());
+    ss.start_apprequest(ss.session(), appreq);
 
     auto &session = ss.session();
     auto sid = session.id();
     Debug("session id: %lu", sid);
 
-    auto &client = *clients_[ss.current_client_index()];
     _Latency_StartRec(ss.lat());
 
-    auto bcb = std::bind(&BenchmarkClient::ExecuteNextAppRequestOperation, this, sid);
-    auto btcb = []() {};
-
-    client.BeginAppRequest(session, bcb, btcb, timeout_);
+    client_->BeginAppRequest(session);
+    ExecuteNextAppRequestOperation(sid);
 }
 
 void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
@@ -292,47 +235,58 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
 
     Operation op = transaction->GetNextOperation(op_index);
     ss.incr_op_index();
-    Debug("Peeking next op");
     Operation peek_next_op = transaction->GetNextOperation(ss.op_index());
     bool nextOpCommit = (peek_next_op.type == COMMIT) || (peek_next_op.type == ROCOMMIT);
-    Debug("nextOpCommit = %d", nextOpCommit);
 
-    auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
-    auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto pcb = std::bind(&BenchmarkClient::PutCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    auto ptcb = std::bind(&BenchmarkClient::PutTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    auto ccb = std::bind(&BenchmarkClient::CommitCallback, this, session_id, std::placeholders::_1);
-    auto ctcb = std::bind(&BenchmarkClient::CommitTimeout, this);
-    auto acb = std::bind(&BenchmarkClient::AbortCallback, this, session_id, ABORTED_USER);
-    auto atcb = std::bind(&BenchmarkClient::AbortTimeout, this);
-
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
+    auto gcb = [this, session_id](int status, const std::string &key, const std::string &val, Timestamp ts) {
+        GetCallback(session_id, status, key, val, ts);
+    };
+    auto gtcb = [this, session_id](int status, const std::string &key) {
+        GetTimeout(session_id, status, key);
+    };
+    auto pcb = [this, session_id](int status, const std::string &key, const std::string &val) {
+        PutCallback(session_id, status, key, val);
+    };
+    auto ptcb = [this, session_id](int status, const std::string &key, const std::string &val) {
+        PutTimeout(session_id, status, key, val);
+    };
+    auto ccb = [this, session_id](transaction_status_t status) {
+        CommitCallback(session_id, status);
+    };
+    auto ctcb = [this]() {
+        CommitTimeout();
+    };
+    auto acb = [this, session_id]() {
+        AbortCallback(session_id, ABORTED_USER);
+    };
+    auto atcb = [this]() {
+        AbortTimeout();
+    };
 
     switch (op.type)
     {
     case GET:
-        client.Get(session, op.key, gcb, gtcb, timeout_);
+        client_->Get(session, op.key, gcb, gtcb, timeout_);
         break;
 
     case GET_FOR_UPDATE:
-        client.GetForUpdate(session, op.key, gcb, gtcb, timeout_);
+        client_->GetForUpdate(session, op.key, gcb, gtcb, timeout_);
         break;
 
     case PUT:
-        client.Put(session, op.key, op.value, pcb, ptcb, timeout_);
+        client_->Put(session, op.key, op.value, pcb, ptcb, timeout_);
         break;
 
     case COMMIT:
-        client.Commit(session, ccb, ctcb, timeout_);
+        client_->Commit(session, ccb, ctcb, timeout_);
         break;
 
     case ABORT:
-        client.Abort(session, acb, atcb, timeout_);
+        client_->Abort(session, acb, atcb, timeout_);
         break;
 
     case ROCOMMIT:
-        client.ROCommit(session, op.keys, ccb, ctcb, timeout_);
+        client_->ROCommit(session, op.keys, ccb, ctcb, timeout_);
         break;
 
     case WAIT:
@@ -353,7 +307,6 @@ void BenchmarkClient::ExecuteNextOperation(const uint64_t session_id)
     {
         Debug("Not issueing next op from this fn");
     }
-
 }
 
 void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
@@ -367,14 +320,15 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    // Generic Operation Callback
-    auto ocb = std::bind(&BenchmarkClient::ReceiveOperationResponse, this, session_id, std::placeholders::_1, std::placeholders::_2);
-    auto otcb = std::bind(&BenchmarkClient::SendOperationTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
+    // // Generic Operation Callback
+    auto ocb = [this, session_id](int status, const std::string &retval, auto &&pred_list) {
+        ReceiveOperationResponse(session_id, status, retval);
+    };
+    auto otcb = [this, session_id](int status, const std::string &retval, auto &&pred_list) {
+        SendOperationTimeout(session_id, status, retval);
+    };
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
-
-    Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
+    // Debug("opindex == %lu and ss.fanout() == %lu", op_index, ss.fanout());
     if (op_index == ss.fanout())
     {
         Debug("we've sent fanout number of requests, no longer sending more");
@@ -398,7 +352,7 @@ void BenchmarkClient::ExecuteNextAppRequestOperation(const uint64_t session_id)
     default:
         Panic("unsupported opeartion type %d", op.type);
     }
-    client.SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
+    client_->SendOperation(session, op_str, op.key, op.value, ocb, otcb, timeout_);
 
     if (issueConcurrent)
     {
@@ -421,13 +375,14 @@ void BenchmarkClient::ExecuteAbort(const uint64_t session_id, transaction_status
     auto op_index = ss.op_index();
     auto &session = ss.session();
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
+    auto acb = [this, session_id, status]() {
+        AbortCallback(session_id, status);
+    };
+    auto atcb = [this]() {
+        AbortTimeout();
+    };
 
-    auto acb = std::bind(&BenchmarkClient::AbortCallback, this, session_id, status);
-    auto atcb = std::bind(&BenchmarkClient::AbortTimeout, this);
-
-    client.Abort(session, acb, atcb, timeout_);
+    client_->Abort(session, acb, atcb, timeout_);
 }
 
 void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
@@ -447,7 +402,6 @@ void BenchmarkClient::GetCallback(const uint64_t session_id, int status,
         {
             ExecuteNextOperation(session_id);
         }
-        // ExecuteNextOperation(session_id);
     }
     else if (status == REPLY_FAIL)
     {
@@ -469,13 +423,14 @@ void BenchmarkClient::GetTimeout(const uint64_t session_id,
     auto &ss = search->second;
     auto &session = ss.session();
 
-    auto client_index = ss.current_client_index();
-    auto &client = *clients_[client_index];
+    auto gcb = [this, session_id](int status, const std::string &key, const std::string &val, Timestamp ts) {
+        GetCallback(session_id, status, key, val, ts);
+    };
+    auto gtcb = [this, session_id](int status, const std::string &key) {
+        GetTimeout(session_id, status, key);
+    };
 
-    auto gcb = std::bind(&BenchmarkClient::GetCallback, this, session_id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
-    auto gtcb = std::bind(&BenchmarkClient::GetTimeout, this, session_id, std::placeholders::_1, std::placeholders::_2);
-
-    client.Get(session, key, gcb, gtcb, timeout_);
+    client_->Get(session, key, gcb, gtcb, timeout_);
 }
 
 void BenchmarkClient::PutCallback(const uint64_t session_id, int status,
@@ -531,17 +486,18 @@ void BenchmarkClient::ReceiveOperationResponse(const uint64_t session_id,
         if (ss.responses() == ss.fanout())
         {
             Debug("we're done with this app request! gonna send a new app request soon");
-            auto appreq = ss.apprequest();
-            auto &ttype = appreq->GetTransactionType();
-            auto n_attempts = ss.n_attempts();
-
-            stats.Increment(ttype + "_completed", 1);
+            // auto appreq = ss.apprequest();
+            // auto &ttype = appreq->GetTransactionType();
+            // auto n_attempts = ss.n_attempts();
 
             // Send Next App Request
             if (!cooldownStarted)
             {
                 Debug("next arrival in session %d us", 0);
-                transport_.TimerMicro(0, std::bind(&BenchmarkClient::SendNextAppRequestInSession, this, session_id));
+                std::uniform_int_distribution<uint64_t> jitter(0, 1000);
+                transport_.TimerMicro(jitter(rand_), [this, session_id]() {
+                    SendNextAppRequestInSession(session_id);
+                });
                 OnReply(session_id, 0, false);
             }
             else
@@ -591,7 +547,7 @@ void BenchmarkClient::CommitTimeout()
 
 void BenchmarkClient::AbortCallback(const uint64_t session_id, transaction_status_t status)
 {
-    Debug("[%lu] Abort callback. with status %lu", session_id, status);
+    Debug("[%lu] Abort callback. with status %d", session_id, status);
     auto search = session_states_.find(session_id);
     ASSERT(search != session_states_.end());
 
@@ -614,8 +570,8 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
     ASSERT(search != session_states_.end());
 
     auto &ss = search->second;
-    auto transaction = ss.transaction();
-    auto &ttype = transaction->GetTransactionType();
+    // auto transaction = ss.transaction();
+    // auto &ttype = transaction->GetTransactionType();
     auto n_attempts = ss.n_attempts();
 
     if (result == COMMITTED || result == ABORTED_USER ||
@@ -625,8 +581,6 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
         bool erase_session = true;
         if (result == COMMITTED)
         {
-            stats.Increment(ttype + "_committed", 1);
-
             if (!cooldownStarted)
             {
                 bool send_next_in_session = false;
@@ -651,7 +605,9 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                     erase_session = false;
                     Debug("next arrival in session %lu us", next_arrival_us);
 
-                    transport_.TimerMicro(next_arrival_us, std::bind(&BenchmarkClient::SendNextInSession, this, session_id));
+                    transport_.TimerMicro(next_arrival_us, [this, session_id]() {
+                        SendNextInSession(session_id);
+                    });
                 }
             }
             else
@@ -660,16 +616,10 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
             }
         }
 
-        if (retryAborted)
-        {
-            stats.Add(ttype + "_attempts_list", n_attempts);
-        }
-
         OnReply(session_id, result, erase_session);
     }
     else
     {
-        stats.Increment(ttype + "_" + std::to_string(result), 1);
         BenchmarkClient::BenchState state = GetBenchState();
         Debug("Current bench state: %d.", state);
         if (state == DONE)
@@ -690,7 +640,6 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                 // Debug("Upper is %lu (min of %lu and %lu.", upper, (1UL << exp) * abortBackoff,
                 //       maxBackoff);
                 // backoff = std::uniform_int_distribution<uint64_t>(0UL, upper)(GetRand());
-                // stats.Increment(ttype + "_backoff", backoff);
                 Debug("Backing off for %lu us: %lu", backoff, n_attempts);
             }
 
@@ -702,13 +651,8 @@ void BenchmarkClient::ExecuteCallback(uint64_t session_id,
                 auto &ss = search->second;
                 ss.retry_transaction();
 
-                stats.Increment(ss.transaction()->GetTransactionType() + "_attempts", 1);
-
-                auto bcb = std::bind(&BenchmarkClient::ExecuteNextOperation, this, session_id);
-                auto btcb = []() {};
-
-                auto &client = *clients_[ss.current_client_index()];
-                client.Retry(ss.session(), bcb, btcb, timeout_); });
+                client_->Retry(ss.session());
+                ExecuteNextOperation(session_id);});
         }
     }
 }
@@ -727,7 +671,9 @@ void BenchmarkClient::CleanupContinue()
 
     if (n > 0)
     {
-        transport_.TimerMicro(1e6, std::bind(&BenchmarkClient::CleanupContinue, this));
+        transport_.TimerMicro(1e6, [this]() {
+            CleanupContinue();
+        });
     }
     else
     {
@@ -749,13 +695,12 @@ void BenchmarkClient::Cleanup()
 
             auto op_index = ss.op_index();
 
-            auto client_index = ss.current_client_index();
-            auto &client = *clients_[client_index];
-
-            client.ForceAbort(transaction_id);
+            client_->ForceAbort(transaction_id);
         }
 
-        transport_.TimerMicro(1e6, std::bind(&BenchmarkClient::CleanupContinue, this));
+        transport_.TimerMicro(1e6, [this]() {
+            CleanupContinue();
+        });
     }
     else
     {
@@ -863,8 +808,7 @@ void BenchmarkClient::OnReply(uint64_t transaction_id, int result, bool erase_se
 
     if (erase_session)
     {
-        auto &client = *clients_[ss.current_client_index()];
-        client.EndSession(ss.session());
+        client_->EndSession(ss.session());
         session_states_.erase(search);
     }
 
@@ -921,5 +865,7 @@ void BenchmarkClient::Finish()
     cooldownStarted = true;
 
     uint64_t cooldown_us = cooldownSec * 1e6;
-    transport_.TimerMicro(cooldown_us, std::bind(&BenchmarkClient::Cleanup, this));
+    transport_.TimerMicro(cooldown_us, [this]() {
+            Cleanup();
+    });
 }

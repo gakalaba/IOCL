@@ -320,6 +320,20 @@ bool ReplTransport::SendMessageInternal(TransportReceiver *src,
     return true;
 }
 
+bool ReplTransport::SendMessageInternal(TransportReceiver *src,
+                                        const ReplTransportAddress &dst,
+                                        MsgType type,
+                                        const Message &m)
+{
+    (void)type;
+    const ReplTransportAddress *repl_addr =
+        dynamic_cast<const ReplTransportAddress *>(src->GetAddress());
+    std::unique_ptr<Message> msg(m.New());
+    msg->CheckTypeAndMergeFrom(m);
+    receivers_[dst].msgs.push_back(QueuedMessage(repl_addr, std::move(msg)));
+    return true;
+}
+
 ReplTransportAddress ReplTransport::LookupAddress(
     const transport::Configuration &cfg, int groupIdx, int replicaIdx)
 {

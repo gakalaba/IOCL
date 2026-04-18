@@ -51,11 +51,7 @@ namespace replication
             IOCL_CTClient(const transport::Configuration &config, Transport *transport,
                      int group, uint64_t clientid);
             virtual ~IOCL_CTClient();
-            virtual void Invoke(const string &request, continuation_t continuation,
-                                error_continuation_t error_continuation = nullptr);
-            virtual void InvokeIOCL(LinearizeableOperation &msg,
-                                    continuation_t continuation,
-                                    error_continuation_t error_continuation = nullptr);
+            virtual void Invoke(LinearizeableOperation &msg);
             virtual void InvokeUnlogged(
                 int replicaIdx, const string &request, continuation_t continuation,
                 error_continuation_t error_continuation = nullptr,
@@ -67,6 +63,9 @@ namespace replication
 
             virtual void ReceiveMessage(const TransportAddress &remote,
                                         const string &type, const string &data,
+                                        void *meta_data);
+            virtual void ReceiveMessage(const TransportAddress &remote,
+                                        MsgType type, const string &data,
                                         void *meta_data);
         protected:
             int view;
@@ -100,15 +99,15 @@ namespace replication
                       error_continuation(error_continuation){};
             };
 
-            std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
+            // std::unordered_map<uint64_t, PendingRequest *> pendingReqs;
 
             void SendRequest(const PendingRequest *req);
-            void ResendRequest(const uint64_t reqId);
+            // void ResendRequest(const uint64_t reqId);
             void HandleReply(const TransportAddress &remote,
                              const proto::ReplyMessage &msg);
             void HandleUnloggedReply(const TransportAddress &remote,
                                      const proto::UnloggedReplyMessage &msg);
-            void UnloggedRequestTimeoutCallback(const uint64_t reqId);
+            // void UnloggedRequestTimeoutCallback(const uint64_t reqId);
         };
 
     } // namespace iocl_ct

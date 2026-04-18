@@ -86,6 +86,21 @@ namespace strongstore
         return r;
     }
 
+    std::vector<uint64_t> LockTable::WhoHolds(const Transaction &transaction) {
+        std::vector<uint64_t> holders;
+        for (auto &read : transaction.getReadSet())
+        {
+            auto r_holders = locks_.WhoHolds(read.first);
+            holders.insert(holders.end(), r_holders.begin(), r_holders.end());
+        }
+        for (auto &write : transaction.getWriteSet())
+        {
+            auto w_holders = locks_.WhoHolds(write.first);
+            holders.insert(holders.end(), w_holders.begin(), w_holders.end());
+        }
+        return holders;
+    }
+
     LockAcquireResult LockTable::AcquireLocks(uint64_t transaction_id,
                                               const Transaction &transaction)
     {

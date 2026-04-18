@@ -40,7 +40,6 @@
 #include "store/common/frontend/async_transaction.h"
 #include "store/common/frontend/async_apprequest.h"
 #include "store/common/frontend/client.h"
-#include "store/common/stats.h"
 #include "store/common/transaction.h"
 
 typedef std::function<void(transaction_status_t)> execute_callback;
@@ -57,7 +56,7 @@ enum BenchmarkClientMode
 class BenchmarkClient
 {
 public:
-    BenchmarkClient(const std::vector<Client *> &clients, uint32_t timeout,
+    BenchmarkClient(Client *client, uint32_t timeout,
                     Transport &transport, uint64_t id,
                     BenchmarkClientMode mode,
                     double switch_probability,
@@ -82,8 +81,6 @@ public:
     struct Latency_t latency;
     std::vector<uint64_t> latencies;
 
-    inline const Stats &GetStats() const { return stats; }
-
     inline uint64_t GetFanout() { return fanout; };
 
 protected:
@@ -101,19 +98,17 @@ protected:
     };
     BenchState GetBenchState(struct timeval &diff) const;
     BenchState GetBenchState() const;
-
-    Stats stats;
     Transport &transport_;
 
 private:
     class SessionState
     {
     public:
-        SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
-            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+        SessionState(Session &session, AsyncTransaction *transaction, execute_callback ecb)
+            : lat_{}, session_{session}, transaction_{transaction}, appreq_{0}, fanout_{0}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{1}, current_client_txn_count_{0} {}
 
-        SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, std::size_t client_index, uint64_t fanout)
-            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_index_{client_index}, current_client_txn_count_{0} {}
+        SessionState(Session &session, AsyncAppRequest *appreq, execute_callback ecb, uint64_t fanout)
+            : lat_{}, session_{session}, transaction_{0}, appreq_{appreq}, fanout_{fanout}, responses_{0}, ecb_{ecb}, n_attempts_{1}, op_index_{0}, current_client_txn_count_{0} {}
 
         Session &session() { return session_; }
         AsyncTransaction *transaction() const { return transaction_; }
@@ -131,14 +126,11 @@ private:
         uint64_t op_index() const { return op_index_; }
         void incr_op_index() { op_index_++; }
 
-        std::size_t current_client_index() const { return current_client_index_; }
-
-        void start_transaction(Session &session, AsyncTransaction *transaction, execute_callback ecb, std::size_t client_index)
+        void start_transaction(Session &session, AsyncTransaction *transaction, execute_callback ecb)
         {
             session_ = session;
             transaction_ = transaction;
             ecb_ = ecb;
-            current_client_index_ = client_index;
             n_attempts_ = 1;
             op_index_ = 1;
             responses_ = 0;
@@ -151,11 +143,10 @@ private:
             responses_ = 0;
         }
 
-        void start_apprequest(Session &session, AsyncAppRequest *apprequest, std::size_t client_index)
+        void start_apprequest(Session &session, AsyncAppRequest *apprequest)
         {
             session_ = session;
             appreq_ = apprequest;
-            current_client_index_ = client_index;
             n_attempts_ = 1;
             op_index_ = 0;
             responses_ = 0;
@@ -171,7 +162,6 @@ private:
         execute_callback ecb_;
         uint64_t n_attempts_;
         std::size_t op_index_;
-        std::size_t current_client_index_;
         std::size_t current_client_txn_count_;
     };
 
@@ -203,7 +193,7 @@ private:
     void AbortCallback(const uint64_t session_id, transaction_status_t status);
     void AbortTimeout();
 
-    inline bool IsLinearizeable() {return clients_[0]->IsLinearizeable(); };
+    inline bool IsLinearizeable() {return client_->IsLinearizeable(); };
 
     void Finish();
     void WarmupDone();
@@ -213,7 +203,7 @@ private:
 
     std::unordered_map<uint64_t, SessionState> session_states_;
 
-    const std::vector<Client *> &clients_;
+    Client *client_;
 
     const uint64_t client_id_;
     uint32_t timeout_;

@@ -22,7 +22,6 @@
 #include "lib/latency.h"
 #include "lib/message.h"
 #include "store/common/partitioner.h"
-#include "store/common/stats.h"
 #include "store/common/timestamp.h"
 
 enum transaction_status_t {
@@ -68,12 +67,11 @@ class Client {
     virtual Session &ContinueSession(rss::Session &session) = 0;
     virtual rss::Session EndSession(Session &session) = 0;
 
-    virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) = 0;
-    virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout){};
+    virtual void Begin(Session &session) = 0;
+    virtual void BeginAppRequest(Session &session){};
 
 
-    virtual void Retry(Session &session, begin_callback bcb,
-                       begin_timeout_callback btcb, uint32_t timeout) = 0;
+    virtual void Retry(Session &session) = 0;
 
     // Get the value corresponding to key.
     virtual void Get(Session &session, const std::string &key, get_callback gcb,
@@ -110,12 +108,9 @@ class Client {
     virtual bool IsLinearizeable() = 0;
     virtual bool IsIOCL() = 0;
 
-    inline Stats &GetStats() { return stats; }
-
    protected:
     void StartRecLatency();
     void EndRecLatency(const std::string &str);
-    Stats stats;
 
    private:
     Latency_t clientLat;

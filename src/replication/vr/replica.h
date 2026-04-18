@@ -59,6 +59,10 @@ namespace replication
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            void ReceiveMessage(const TransportAddress &remote, MsgType type,
+                                const string &data, void *meta_data);
+            virtual void HandleRequest(LinearizeableOperation &msg);
+            virtual void HandleCoordination(const SuccessorRequestMessage &msg);
 
         private:
             view_t view;
@@ -71,20 +75,23 @@ namespace replication
             proto::PrepareMessage lastPrepare;
             unsigned int batchSize;
             opnum_t lastBatchEnd;
+            uint8_t Q;
+            proto::PrepareMessage prepareRecv;
+            proto::PrepareOKMessage prepareOKRecv;
+            proto::CommitMessage commitRecv;
 
             Log log;
-            std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
-            struct ClientTableEntry
-            {
-                uint64_t lastReqId;
-                bool replied;
-                proto::ReplyMessage reply;
-            };
-            std::map<uint64_t, ClientTableEntry> clientTable;
+            // std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
+            // struct ClientTableEntry
+            // {
+            //     uint64_t lastReqId;
+            //     bool replied;
+            //     proto::ReplyMessage reply;
+            // };
+            // std::map<uint64_t, ClientTableEntry> clientTable;
 
-            QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-            QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-            QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;
 
             Timeout *viewChangeTimeout;
             Timeout *nullCommitTimeout;
@@ -105,17 +112,15 @@ namespace replication
             void EnterView(view_t newview);
             void StartViewChange(view_t newview);
             void SendNullCommit();
-            void UpdateClientTable(const Request &req);
+            // void UpdateClientTable(const Request &req);
             void ResendPrepare();
             void CloseBatch();
 
-            void HandleRequest(const TransportAddress &remote,
-                               const proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 
             void HandlePrepare(const TransportAddress &remote,
-                               const proto::PrepareMessage &msg);
+                               proto::PrepareMessage &msg);
             void HandlePrepareOK(const TransportAddress &remote,
                                  const proto::PrepareOKMessage &msg);
             void HandleCommit(const TransportAddress &remote,
@@ -124,7 +129,7 @@ namespace replication
                 const TransportAddress &remote,
                 const proto::RequestStateTransferMessage &msg);
             void HandleStateTransfer(const TransportAddress &remote,
-                                     const proto::StateTransferMessage &msg);
+                                     proto::StateTransferMessage &msg);
             void HandleStartViewChange(const TransportAddress &remote,
                                        const proto::StartViewChangeMessage &msg);
             void HandleDoViewChange(const TransportAddress &remote,

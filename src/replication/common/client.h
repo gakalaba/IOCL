@@ -69,11 +69,7 @@ class Client : public TransportReceiver {
            int group, uint64_t clientid = 0);
     virtual ~Client();
 
-    virtual void Invoke(const string &request, continuation_t continuation,
-                        error_continuation_t error_continuation = nullptr) = 0;
-    virtual void InvokeIOCL(LinearizeableOperation &msg,
-                                    continuation_t continuation,
-                                    error_continuation_t error_continuation = nullptr);
+    virtual void Invoke(LinearizeableOperation &msg) = 0;
     virtual void InvokeUnlogged(
         int replicaIdx, const string &request, continuation_t continuation,
         error_continuation_t error_continuation = nullptr,

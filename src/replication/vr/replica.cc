@@ -59,9 +59,8 @@ namespace replication
             : Replica(config, groupIdx, myIdx, transport, app),
               batchSize(batchSize),
               log(false),
-              prepareOKQuorum(config.QuorumSize() - 1),
-              startViewChangeQuorum(config.QuorumSize() - 1),
-              doViewChangeQuorum(config.QuorumSize() - 1),
+              startViewChangeQuorum(config.QuorumSize() - 1, config.n),
+              doViewChangeQuorum(config.QuorumSize() - 1, config.n),
               debug_stats_{debug_stats}
         {
             this->status = STATUS_NORMAL;
@@ -71,6 +70,7 @@ namespace replication
             this->lastRequestStateTransferView = 0;
             this->lastRequestStateTransferOpnum = 0;
             lastBatchEnd = 0;
+            Q = config.QuorumSize() - 1;
 
             if (batchSize > 1)
             {
@@ -152,42 +152,14 @@ namespace replication
                            lastCommitted);
                 }
 
-                const Request request = entry->request;
+                const LinearizeableOperation &request = entry->request;
 
                 /* Execute it */
                 RDebug("Executing request " FMT_OPNUM, lastCommitted);
-                ReplyMessage reply;
-                Execute(lastCommitted, entry->request, reply);
-
-                reply.set_view(entry->viewstamp.view);
-                reply.set_opnum(entry->viewstamp.opnum);
-                reply.set_clientreqid(entry->request.clientreqid());
+                ReplicaUpcall(request);
 
                 /* Mark it as committed */
                 log.SetStatus(lastCommitted, LOG_STATE_COMMITTED);
-
-                // Store reply in the client table
-                ClientTableEntry &cte = clientTable[entry->request.clientid()];
-                if (cte.lastReqId <= entry->request.clientreqid())
-                {
-                    cte.lastReqId = entry->request.clientreqid();
-                    cte.replied = true;
-                    cte.reply = reply;
-                }
-                else
-                {
-                    // We've subsequently prepared another operation from the
-                    // same client. So this request must have been completed
-                    // at the client, and there's no need to record the
-                    // result.
-                }
-
-                /* Send reply */
-                auto iter = clientAddresses.find(entry->request.clientid());
-                if (iter != clientAddresses.end())
-                {
-                    transport->SendMessage(this, *iter->second, reply);
-                }
             }
         }
 
@@ -207,8 +179,8 @@ namespace replication
                 {
                     RPanic("Did not find operation " FMT_OPNUM " in log", i);
                 }
-                ASSERT(entry->state == LOG_STATE_PREPARED);
-                UpdateClientTable(entry->request);
+                // ASSERT(entry->state == LOG_STATE_PREPARED);
+                // UpdateClientTable(entry->request);
 
                 PrepareOKMessage reply;
                 reply.set_view(view);
@@ -275,13 +247,13 @@ namespace replication
                 closeBatchTimeout->Stop();
             }
 
-            prepareOKQuorum.Clear();
             startViewChangeQuorum.Clear();
             doViewChangeQuorum.Clear();
         }
 
         void VRReplica::StartViewChange(view_t newview)
         {
+            Panic("We did call StartViewChange :/");
             RNotice("Starting view change for view " FMT_VIEW, newview);
 
             view = newview;
@@ -310,9 +282,9 @@ namespace replication
             cm.set_view(this->view);
             cm.set_opnum(this->lastCommitted);
 
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
 
-            if (!(transport->SendMessageToAll(this, cm)))
+            if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
             {
                 RWarning("Failed to send null COMMIT message to all replicas");
             }
@@ -320,31 +292,31 @@ namespace replication
             nullCommitTimeout->Reset();
         }
 
-        void VRReplica::UpdateClientTable(const Request &req)
-        {
-            ClientTableEntry &entry = clientTable[req.clientid()];
+        // void VRReplica::UpdateClientTable(const Request &req)
+        // {
+        //     ClientTableEntry &entry = clientTable[req.clientid()];
 
-            ASSERT(entry.lastReqId <= req.clientreqid());
+        //     ASSERT(entry.lastReqId <= req.clientreqid());
 
-            if (entry.lastReqId == req.clientreqid())
-            {
-                return;
-            }
+        //     if (entry.lastReqId == req.clientreqid())
+        //     {
+        //         return;
+        //     }
 
-            entry.lastReqId = req.clientreqid();
-            entry.replied = false;
-            entry.reply.Clear();
-        }
+        //     entry.lastReqId = req.clientreqid();
+        //     entry.replied = false;
+        //     entry.reply.Clear();
+        // }
 
         void VRReplica::ResendPrepare()
         {
-            ASSERT(AmLeader());
+            // ASSERT(AmLeader());
             if (lastOp == lastCommitted)
             {
                 return;
             }
             RNotice("Resending prepare");
-            if (!(transport->SendMessageToAll(this, lastPrepare)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, lastPrepare)))
             {
                 RWarning("Failed to ressend prepare message to all replicas");
             }
@@ -354,31 +326,32 @@ namespace replication
 
         void VRReplica::CloseBatch()
         {
-            ASSERT(AmLeader());
-            ASSERT(lastBatchEnd < lastOp);
+            // ASSERT(AmLeader());
+            // ASSERT(lastBatchEnd < lastOp);
 
             opnum_t batchStart = lastBatchEnd + 1;
 
             RDebug("Sending batched prepare from " FMT_OPNUM " to " FMT_OPNUM,
                    batchStart, lastOp);
             /* Send prepare messages */
-            PrepareMessage p;
+            PrepareMessage &p = lastPrepare;
+            p.Clear();
             p.set_view(view);
             p.set_opnum(lastOp);
             p.set_batchstart(batchStart);
+            auto *reqs = p.mutable_request();
+            reqs->Reserve(lastOp - batchStart + 1);
 
             for (opnum_t i = batchStart; i <= lastOp; i++)
             {
-                Request *r = p.add_request();
                 const LogEntry *entry = log.Find(i);
-                ASSERT(entry != NULL);
-                ASSERT(entry->viewstamp.view == view);
-                ASSERT(entry->viewstamp.opnum == i);
-                *r = entry->request;
+                // ASSERT(entry != NULL);
+                // ASSERT(entry->viewstamp.view == view);
+                // ASSERT(entry->viewstamp.opnum == i);
+                *reqs->Add() = entry->request;
             }
-            lastPrepare = p;
 
-            if (!(transport->SendMessageToAll(this, p)))
+            if (!(transport->SendMessageToAll(this, MsgType::PREPARE_TYPE, p)))
             {
                 RWarning("Failed to send prepare message to all replicas");
             }
@@ -392,42 +365,34 @@ namespace replication
                                        const string &type, const string &data,
                                        void *meta_data)
         {
-            RequestMessage request;
-            UnloggedRequestMessage unloggedRequest;
-            PrepareMessage prepare;
-            PrepareOKMessage prepareOK;
-            CommitMessage commit;
-            RequestStateTransferMessage requestStateTransfer;
-            StateTransferMessage stateTransfer;
-            StartViewChangeMessage startViewChange;
-            DoViewChangeMessage doViewChange;
-            StartViewMessage startView;
+            Panic("don't call this version of ReceiveMessage");
+        }
 
-            if (type == request.GetTypeName())
+        void VRReplica::ReceiveMessage(const TransportAddress &remote,
+                                       MsgType type, const string &data,
+                                       void *meta_data)
+        {
+            switch (type) {
+            case MsgType::PREPARE_TYPE:
             {
-                request.ParseFromString(data);
-                HandleRequest(remote, request);
+                prepareRecv.Clear();
+                prepareRecv.ParseFromString(data);
+                HandlePrepare(remote, prepareRecv);
+                break;
             }
-            else if (type == unloggedRequest.GetTypeName())
+            case MsgType::PREPARE_OK_TYPE:
             {
-                unloggedRequest.ParseFromString(data);
-                HandleUnloggedRequest(remote, unloggedRequest);
+                prepareOKRecv.Clear();
+                prepareOKRecv.ParseFromString(data);
+                HandlePrepareOK(remote, prepareOKRecv);
+                break;
             }
-            else if (type == prepare.GetTypeName())
-            {
-                prepare.ParseFromString(data);
-                HandlePrepare(remote, prepare);
-            }
-            else if (type == prepareOK.GetTypeName())
-            {
-                prepareOK.ParseFromString(data);
-                HandlePrepareOK(remote, prepareOK);
-            }
-            else if (type == commit.GetTypeName())
-            {
-                commit.ParseFromString(data);
-                HandleCommit(remote, commit);
-            }
+            case MsgType::COMMIT_TYPE: {
+                commitRecv.Clear();
+                commitRecv.ParseFromString(data);
+                HandleCommit(remote, commitRecv);
+                break;
+            }/*
             else if (type == requestStateTransfer.GetTypeName())
             {
                 requestStateTransfer.ParseFromString(data);
@@ -452,16 +417,19 @@ namespace replication
             {
                 startView.ParseFromString(data);
                 HandleStartView(remote, startView);
-            }
-            else
-            {
-                RPanic("Received unexpected message type in VR proto: %s",
-                       type.c_str());
+            }*/
+            default:
+                RPanic("Received unexpected message type in VR proto: %u",
+                       (uint32_t)type);
             }
         }
 
-        void VRReplica::HandleRequest(const TransportAddress &remote,
-                                      const RequestMessage &msg)
+        void VRReplica::HandleCoordination(const SuccessorRequestMessage &msg)
+        {
+            Panic("shouldn't be calling this from VR");
+        }
+
+        void VRReplica::HandleRequest(LinearizeableOperation &msg)
         {
             // Latency_Start(&rec_to_upcall_lat_);
             viewstamp_t v;
@@ -478,102 +446,49 @@ namespace replication
                 return;
             }
 
-            // Save the client's address
-            clientAddresses.erase(msg.req().clientid());
-            clientAddresses.insert(
-                std::pair<uint64_t, std::unique_ptr<TransportAddress>>(
-                    msg.req().clientid(),
-                    std::unique_ptr<TransportAddress>(remote.clone())));
-
-            // Check the client table to see if this is a duplicate request
-            auto kv = clientTable.find(msg.req().clientid());
-            if (kv != clientTable.end())
-            {
-                const ClientTableEntry &entry = kv->second;
-                if (msg.req().clientreqid() < entry.lastReqId)
-                {
-                    RNotice("Ignoring stale request");
-                    return;
-                }
-                if (msg.req().clientreqid() == entry.lastReqId)
-                {
-                    // This is a duplicate request. Resend the reply if we
-                    // have one. We might not have a reply to resend if we're
-                    // waiting for the other replicas; in that case, just
-                    // discard the request.
-                    if (entry.replied)
-                    {
-                        RNotice("Received duplicate request; resending reply");
-                        if (!(transport->SendMessage(this, remote, entry.reply)))
-                        {
-                            RWarning("Failed to resend reply to client");
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        RNotice(
-                            "Received duplicate request but no reply available; "
-                            "ignoring");
-                        return;
-                    }
-                }
-            }
-
-            // Update the client table
-            UpdateClientTable(msg.req());
-
-            // Leader Upcall
-            bool replicate = false;
-            string res;
-            LeaderUpcall(lastCommitted, msg.req().op(), replicate, res);
-            ClientTableEntry &cte = clientTable[msg.req().clientid()];
-
             // Check whether this request should be committed to replicas
-            if (!replicate)
+            // if (!replicate)
+            // {
+            //     RDebug("Not replicating to replicas");
+            //     ReplyMessage reply;
+            //     reply.set_reply(res);
+            //     reply.set_view(0);
+            //     reply.set_opnum(0);
+            //     reply.set_clientreqid(msg.req().clientreqid());
+            //     cte.replied = true;
+            //     cte.reply = reply;
+            //     transport->SendMessage(this, remote, reply);
+            // }
+            // else
+            // {
+
+            // Assign it an opnum
+            ++this->lastOp;
+            v.view = this->view;
+            v.opnum = this->lastOp;
+
+            RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
+
+            // Add the request to my log
+            LogEntry &entry = log.Append(v, LOG_STATE_PREPARED);
+            entry.request.Swap(&msg);
+
+            if (lastOp - lastBatchEnd + 1 > batchSize)
             {
-                RDebug("Not replicating to replicas");
-                ReplyMessage reply;
-                reply.set_reply(res);
-                reply.set_view(0);
-                reply.set_opnum(0);
-                reply.set_clientreqid(msg.req().clientreqid());
-                cte.replied = true;
-                cte.reply = reply;
-                transport->SendMessage(this, remote, reply);
+                CloseBatch();
             }
             else
             {
-                Request request;
-                request.set_op(res);
-                request.set_clientid(msg.req().clientid());
-                request.set_clientreqid(msg.req().clientreqid());
-
-                /* Assign it an opnum */
-                ++this->lastOp;
-                v.view = this->view;
-                v.opnum = this->lastOp;
-
-                RDebug("Received REQUEST, assigning " FMT_VIEWSTAMP, VA_VIEWSTAMP(v));
-
-                /* Add the request to my log */
-                log.Append(v, request, LOG_STATE_PREPARED);
-
-                if (lastOp - lastBatchEnd + 1 > batchSize)
+                RDebug("Keeping in batch");
+                if (!closeBatchTimeout->Active())
                 {
-                    CloseBatch();
+                    closeBatchTimeout->Start();
                 }
-                else
-                {
-                    RDebug("Keeping in batch");
-                    if (!closeBatchTimeout->Active())
-                    {
-                        closeBatchTimeout->Start();
-                    }
-                }
-
-                nullCommitTimeout->Reset();
             }
+
+            nullCommitTimeout->Reset();
+            // }
+
         }
 
         void VRReplica::HandleUnloggedRequest(const TransportAddress &remote,
@@ -598,8 +513,7 @@ namespace replication
                 Warning("Failed to send reply message");
         }
 
-        void VRReplica::HandlePrepare(const TransportAddress &remote,
-                                      const PrepareMessage &msg)
+        void VRReplica::HandlePrepare(const TransportAddress &remote, PrepareMessage &msg)
         {
             RDebug("Received PREPARE <" FMT_VIEW "," FMT_OPNUM "-" FMT_OPNUM ">",
                    msg.view(), msg.batchstart(), msg.opnum());
@@ -629,11 +543,12 @@ namespace replication
                 RPanic("Unexpected PREPARE: I'm the leader of this view");
             }
 
-            ASSERT(msg.batchstart() <= msg.opnum());
-            ASSERT((msg.opnum() - msg.batchstart() + 1) ==
-                   (unsigned int)msg.request_size());
+            // ASSERT(msg.batchstart() <= msg.opnum());
+            // ASSERT((msg.opnum() - msg.batchstart() + 1) ==
+            //        (unsigned int)msg.request_size());
 
             viewChangeTimeout->Reset();
+            int leaderIdx = configuration.GetLeaderIndex(view);
 
             if (msg.opnum() <= this->lastOp)
             {
@@ -644,7 +559,7 @@ namespace replication
                 reply.set_opnum(msg.opnum());
                 reply.set_replicaidx(myIdx);
                 if (!(transport->SendMessageToReplica(
-                        this, configuration.GetLeaderIndex(view), reply)))
+                        this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
                 {
                     RWarning("Failed to send PrepareOK message to leader");
                 }
@@ -661,7 +576,7 @@ namespace replication
 
             /* Add operations to the log */
             opnum_t op = msg.batchstart() - 1;
-            for (auto &req : msg.request())
+            for (int i = 0; i < msg.request_size(); i++)
             {
                 op++;
                 if (op <= lastOp)
@@ -669,10 +584,11 @@ namespace replication
                     continue;
                 }
                 this->lastOp++;
-                log.Append(viewstamp_t(msg.view(), op), req, LOG_STATE_PREPARED);
-                UpdateClientTable(req);
+                LogEntry &entry = log.Append(viewstamp_t(msg.view(), op), LOG_STATE_PREPARED);
+                entry.request.Swap(msg.mutable_request(i));
+                // UpdateClientTable(req);
             }
-            ASSERT(op == msg.opnum());
+            // ASSERT(op == msg.opnum());
 
             /* Build reply and send it to the leader */
             PrepareOKMessage reply;
@@ -681,7 +597,7 @@ namespace replication
             reply.set_replicaidx(myIdx);
 
             if (!(transport->SendMessageToReplica(
-                    this, configuration.GetLeaderIndex(view), reply)))
+                    this, leaderIdx, MsgType::PREPARE_OK_TYPE, reply)))
             {
                 RWarning("Failed to send PrepareOK message to leader");
             }
@@ -717,9 +633,19 @@ namespace replication
                 return;
             }
 
-            viewstamp_t vs = {msg.view(), msg.opnum()};
-            if (auto msgs =
-                    (prepareOKQuorum.AddAndCheckForQuorum(vs, msg.replicaidx(), msg)))
+            LogEntry *entry = log.Find(msg.opnum());
+            if (entry == nullptr)
+            {
+                RPanic("Did not find operation " FMT_OPNUM " in log",
+                           msg.opnum());
+            }
+            uint64_t bit = 1ULL << msg.replicaidx();
+            if ((entry->prepare_ok_mask & bit) == 0) {
+                entry->prepare_ok_mask |= bit;
+                entry->prepare_ok_count++;
+            }
+
+            if (entry->prepare_ok_count == Q)
             {
                 /*
                  * We have a quorum of PrepareOK messages for this
@@ -732,11 +658,6 @@ namespace replication
                  */
                 CommitUpTo(msg.opnum());
 
-                if (msgs->size() >= (unsigned int)configuration.QuorumSize())
-                {
-                    return;
-                }
-
                 /*
                  * Send COMMIT message to the other replicas.
                  *
@@ -747,7 +668,7 @@ namespace replication
                 cm.set_view(this->view);
                 cm.set_opnum(this->lastCommitted);
 
-                if (!(transport->SendMessageToAll(this, cm)))
+                if (!(transport->SendMessageToAll(this, MsgType::COMMIT_TYPE, cm)))
                 {
                     RWarning("Failed to send COMMIT message to all replicas");
                 }
@@ -832,7 +753,7 @@ namespace replication
         }
 
         void VRReplica::HandleStateTransfer(const TransportAddress &remote,
-                                            const StateTransferMessage &msg)
+                                            StateTransferMessage &msg)
         {
             RDebug("Received STATETRANSFER " FMT_VIEWSTAMP, msg.view(), msg.opnum());
 
@@ -884,7 +805,9 @@ namespace replication
                         oldLastOp = lastOp;
 
                         viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                        log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                        LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
+                        // created_entry.request.Swap(&newEntry.request());
+                        // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
                     }
                 }
                 else
@@ -894,7 +817,9 @@ namespace replication
 
                     lastOp++;
                     viewstamp_t vs = {newEntry.view(), newEntry.opnum()};
-                    log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    // log.Append(vs, newEntry.request(), LOG_STATE_PREPARED);
+                    LogEntry &created_entry = log.Append(vs, LOG_STATE_PREPARED);
+                    // created_entry.request.Swap(&newEntry.request());
                 }
             }
 
@@ -945,8 +870,9 @@ namespace replication
 
             ASSERT(msg.view() == view);
 
-            if (auto msgs = startViewChangeQuorum.AddAndCheckForQuorum(
-                    msg.view(), msg.replicaidx(), msg))
+            viewstamp_t vs = {msg.view(), 0};
+            if (startViewChangeQuorum.AddAndCheckForQuorum(
+                    vs, msg.replicaidx()))
             {
                 int leader = configuration.GetLeaderIndex(view);
                 // Don't try to send a DoViewChange message to ourselves
@@ -960,18 +886,18 @@ namespace replication
                     dvc.set_replicaidx(myIdx);
 
                     // Figure out how much of the log to include
-                    opnum_t minCommitted =
-                        std::min_element(
-                            msgs->begin(), msgs->end(),
-                            [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                            {
-                                return a.second.lastcommitted() <
-                                       b.second.lastcommitted();
-                            })
-                            ->second.lastcommitted();
-                    minCommitted = std::min(minCommitted, lastCommitted);
+                    // opnum_t minCommitted =
+                    //     std::min_element(
+                    //         msgs->begin(), msgs->end(),
+                    //         [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
+                    //         {
+                    //             return a.second.lastcommitted() <
+                    //                    b.second.lastcommitted();
+                    //         })
+                    //         ->second.lastcommitted();
+                    // minCommitted = std::min(minCommitted, lastCommitted);
 
-                    log.Dump(minCommitted, dvc.mutable_entries());
+                    // log.Dump(minCommitted, dvc.mutable_entries());
 
                     if (!(transport->SendMessageToReplica(this, leader, dvc)))
                     {
@@ -1013,9 +939,10 @@ namespace replication
 
             ASSERT(configuration.GetLeaderIndex(msg.view()) == myIdx);
 
-            auto msgs = doViewChangeQuorum.AddAndCheckForQuorum(msg.view(),
-                                                                msg.replicaidx(), msg);
-            if (msgs != NULL)
+            viewstamp_t vs = {msg.view(), 0};
+            auto quorum_reached = doViewChangeQuorum.AddAndCheckForQuorum(vs,
+                                                                msg.replicaidx());
+            if (quorum_reached)
             {
                 // Find the response with the most up to date log, i.e. the
                 // one with the latest viewstamp
@@ -1023,18 +950,18 @@ namespace replication
                 opnum_t latestOp = log.LastViewstamp().opnum;
                 DoViewChangeMessage *latestMsg = NULL;
 
-                for (auto kv : *msgs)
-                {
-                    DoViewChangeMessage &x = kv.second;
-                    if ((x.lastnormalview() > latestView) ||
-                        (((x.lastnormalview() == latestView) &&
-                          (x.lastop() > latestOp))))
-                    {
-                        latestView = x.lastnormalview();
-                        latestOp = x.lastop();
-                        latestMsg = &x;
-                    }
-                }
+                // for (auto kv : *msgs)
+                // {
+                //     DoViewChangeMessage &x = kv.second;
+                //     if ((x.lastnormalview() > latestView) ||
+                //         (((x.lastnormalview() == latestView) &&
+                //           (x.lastop() > latestOp))))
+                //     {
+                //         latestView = x.lastnormalview();
+                //         latestOp = x.lastop();
+                //         latestMsg = &x;
+                //     }
+                // }
 
                 // Install the new log. We might not need to do this, if our
                 // log was the most current one.
@@ -1079,25 +1006,25 @@ namespace replication
                 //
                 // We need to compute this before we enter the new view
                 // because the saved messages will go away.
-                auto svcs = startViewChangeQuorum.GetMessages(view);
-                opnum_t minCommittedSVC =
-                    std::min_element(
-                        svcs.begin(), svcs.end(),
-                        [](decltype(*svcs.begin()) a, decltype(*svcs.begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommittedDVC =
-                    std::min_element(
-                        msgs->begin(), msgs->end(),
-                        [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
-                        {
-                            return a.second.lastcommitted() < b.second.lastcommitted();
-                        })
-                        ->second.lastcommitted();
-                opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
-                minCommitted = std::min(minCommitted, lastCommitted);
+                // auto svcs = startViewChangeQuorum.GetMessages(view);
+                // opnum_t minCommittedSVC =
+                //     std::min_element(
+                //         svcs.begin(), svcs.end(),
+                //         [](decltype(*svcs.begin()) a, decltype(*svcs.begin()) b)
+                //         {
+                //             return a.second.lastcommitted() < b.second.lastcommitted();
+                //         })
+                //         ->second.lastcommitted();
+                // opnum_t minCommittedDVC =
+                //     std::min_element(
+                //         msgs->begin(), msgs->end(),
+                //         [](decltype(*msgs->begin()) a, decltype(*msgs->begin()) b)
+                //         {
+                //             return a.second.lastcommitted() < b.second.lastcommitted();
+                //         })
+                //         ->second.lastcommitted();
+                // opnum_t minCommitted = std::min(minCommittedSVC, minCommittedDVC);
+                // minCommitted = std::min(minCommitted, lastCommitted);
 
                 EnterView(msg.view());
 
@@ -1115,7 +1042,7 @@ namespace replication
                 sv.set_lastop(lastOp);
                 sv.set_lastcommitted(lastCommitted);
 
-                log.Dump(minCommitted, sv.mutable_entries());
+                // log.Dump(minCommitted, sv.mutable_entries());
 
                 if (!(transport->SendMessageToAll(this, sv)))
                 {

@@ -27,8 +27,6 @@
  **********************************************************************/
 #include "store/strongstore/client.h"
 
-#include <rss/lib.h>
-
 #include <cmath>
 #include <cstdlib>
 #include <functional>
@@ -49,6 +47,7 @@ namespace strongstore
                    int nShards, int closestReplica, Transport *transport,
                    Partitioner *part, TrueTime &tt, bool debug_stats,
                    double nb_time_alpha,
+                   uint64_t fanout,
                    bool emulate_wan)
         : coord_choices_{},
           min_lats_{},
@@ -69,6 +68,7 @@ namespace strongstore
           replication_proto_{replication_proto},
           nb_time_alpha_{nb_time_alpha},
           debug_stats_{debug_stats},
+          fanout_{fanout},
           emulate_wan_{emulate_wan},
           last_req_id_{0}
     {
@@ -79,7 +79,7 @@ namespace strongstore
         /* Start a client for each shard. */
         for (uint64_t i = 0; i < nshards_; i++)
         {
-            ShardClient *shardclient = new ShardClient(config_, transport_, client_id_, i, wcb);
+            ShardClient *shardclient = new ShardClient(config_, transport_, client_id_, i, fanout_, wcb);
             sclients_.push_back(shardclient);
         }
 
@@ -94,15 +94,22 @@ namespace strongstore
         if (consistency != LIN) {
             CalculateCoordinatorChoices();
 
-            rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
+            // rss::RegisterRSSService(service_name_, std::bind(&Client::RealTimeBarrier, this, std::placeholders::_1, std::placeholders::_2));
+        }
+
+        outstanding_.reserve(fanout_*2);
+        ASSERT(consistency != Consistency::RSS);
+        if (debug_stats_)
+        {
+            Panic("Debug stats disabled!");
         }
     }
 
     Client::~Client()
     {
-        if (consistency_ != LIN) {
-            rss::UnregisterRSSService(service_name_);
-        }
+        // if (consistency_ != LIN) {
+            // rss::UnregisterRSSService(service_name_);
+        // }
 
         if (debug_stats_)
         {
@@ -399,13 +406,14 @@ namespace strongstore
         StrongSession session{};
         auto sid = session.id();
 
-        sessions_.emplace(sid, std::move(session));
+        auto res = sessions_.emplace(sid, std::move(session));
 
-        return sessions_.find(sid)->second;
+        return res.first->second;
     }
 
     Session &Client::ContinueSession(rss::Session &rss_session)
     {
+        Panic("Why are we calling this??");
         auto sid = rss_session.id();
 
         sessions_.emplace(sid, StrongSession{std::move(rss_session)});
@@ -433,12 +441,7 @@ namespace strongstore
     /* Begins a transaction. All subsequent operations before a commit() or
      * abort() are part of this transaction.
      */
-    void Client::Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
-    {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueBegin, this, std::ref(session), bcb));
-    }
-
-    void Client::ContinueBegin(Session &s, begin_callback bcb)
+    void Client::Begin(Session &s)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -460,11 +463,9 @@ namespace strongstore
         {
             sclients_[i]->Begin(tid, start_ts);
         }
-
-        bcb();
     }
 
-    void Client::BeginAppRequest(Session &s, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    void Client::BeginAppRequest(Session &s)
     {
         auto &session = static_cast<StrongSession &>(s);
 
@@ -477,28 +478,15 @@ namespace strongstore
 
         Debug("[%lu] BeginAppRequest", arid);
 
-        // Timestamp start_ts{tt_.Now().latest(), client_id_};
-
         session.start_apprequest(arid);
         sessions_by_apprequest_id_.emplace(arid, session);
-
-        // for (uint64_t i = 0; i < nshards_; i++)
-        // {
-        //     sclients_[i]->Begin(tid, start_ts);
-        // }
-
-        bcb();
     }
 
     /* Begins a transaction, retrying the transaction indicated by session.
      */
-    void Client::Retry(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout)
+    void Client::Retry(Session &s)
     {
-        rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueRetry, this, std::ref(session), bcb));
-    }
-
-    void Client::ContinueRetry(Session &s, begin_callback bcb)
-    {
+        // rss::StartTransaction(service_name_, session, std::bind(&Client::ContinueRetry, this, std::ref(session), bcb));
         auto &session = static_cast<StrongSession &>(s);
 
         if (session.transaction_id() != static_cast<uint64_t>(-1))
@@ -516,8 +504,6 @@ namespace strongstore
         {
             sclients_[i]->Begin(tid, start_ts);
         }
-
-        bcb();
     }
 
     /* Returns the value corresponding to the supplied key. */
@@ -553,7 +539,6 @@ namespace strongstore
         auto gcb1 = [gcb, session = std::ref(session)](int s, const std::string &k, const std::string &v, Timestamp ts)
         {
             // check how many outstanding gets!
-            // session.get().set_executing();
             session.get().remove_parallel_get(k);
             if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
                 session.get().set_executing();
@@ -567,7 +552,6 @@ namespace strongstore
         auto gtcb1 = [gtcb, session = std::ref(session)](int s, const std::string &k)
         {
             // check how many outstanding gets!
-            // session.get().set_executing();
             session.get().remove_parallel_get(k);
             if (session.get().num_parallel_gets() == 0 && session.get().state() == StrongSession::GETTING) {
                 session.get().set_executing();
@@ -708,45 +692,27 @@ namespace strongstore
                           isIOCL,
                           session = std::ref(session)](int s, const std::string &v, const std::vector<std::pair<uint64_t, uint32_t>> &p)
         {
-            Debug("returning from SendOperation back to client");
             session.get().set_executing();
             if (isIOCL) {
-                auto it1 = p.begin();
-                auto it2 = this->outstandingOperationRefCount_.begin();
-                auto it3 = this->outstandingOperationList_.begin();
-                // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
-                // will never loop if VR, since pred_list is empty
-                while (it1 != p.end()) {
-                    (*it2)--;
-                    if ((*it2) <= 0) {
-                        // remove from both lists
-                        Debug("Refcount fell below 0 --> Removing predecessor entry with (tag %lu at shard %u)", it1->first, it1->second);
-                        it2 = this->outstandingOperationRefCount_.erase(it2);
-                        it3 = this->outstandingOperationList_.erase(it3);
-                    } else {
-                        ++it2;
-                        ++it3;
+                size_t prefix = p.size();
+                ASSERT(prefix < this->outstanding_.size());
+
+                size_t j = 0;
+                for (size_t i = 0; i < this->outstanding_.size(); ++i) {
+                    auto &entry = this->outstanding_[i];
+                    if (i <= prefix) {
+                        ASSERT(entry.refcount > 0);
+                        entry.refcount--;
                     }
-                    ++it1;
+
+                    if (entry.refcount > 0) {
+                        if (j != i) {
+                            this->outstanding_[j] = entry;
+                        }
+                        ++j;
+                    }
                 }
-                // afterwards, it2 and it3 should be 
-                // pointing to the entry itself, remove it
-                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
-                ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
-                (*it2)--;
-                if ((*it2) <= 0) {
-                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
-                    it2 = this->outstandingOperationRefCount_.erase(it2);
-                    it3 = this->outstandingOperationList_.erase(it3);
-                }
-                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount
-                auto itl = this->outstandingOperationList_.begin();
-                auto itr = this->outstandingOperationRefCount_.begin();
-                for (;
-                    itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
-                    ++itl, ++itr) {
-                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
-                }
+                this->outstanding_.resize(j);
             }
             ocb(s, v, p);
         };
@@ -757,47 +723,30 @@ namespace strongstore
         {
             session.get().set_executing();
             if (isIOCL) {
-                auto it1 = p.begin();
-                auto it2 = this->outstandingOperationRefCount_.begin();
-                auto it3 = this->outstandingOperationList_.begin();
-                // oustandingList and outstandingRefCount are the same length, and p is guaranteed to be a prefix of l
-                // will never loop if VR, since pred_list is empty
-                while (it1 != p.end()) {
-                    (*it2)--;
-                    if ((*it2) <= 0) {
-                        // remove from both lists
-                        Debug("Refcount fell below 0 --> Removing predecessor entry with (tag %lu at shard %u)", it1->first, it1->second);
-                        it2 = this->outstandingOperationRefCount_.erase(it2);
-                        it3 = this->outstandingOperationList_.erase(it3);
-                    } else {
-                        ++it2;
-                        ++it3;
+                size_t prefix = p.size();
+                ASSERT(prefix < this->outstanding_.size());
+
+                size_t j = 0;
+                for (size_t i = 0; i < this->outstanding_.size(); ++i) {
+                    auto &entry = this->outstanding_[i];
+                    if (i <= prefix) {
+                        ASSERT(entry.refcount > 0);
+                        entry.refcount--;
                     }
-                    ++it1;
+
+                    if (entry.refcount > 0) {
+                        if (j != i) {
+                            this->outstanding_[j] = entry;
+                        }
+                        ++j;
+                    }
                 }
-                // afterwards, it2 and it3 should be 
-                // pointing to the entry itself, remove it
-                Debug("Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
-                ASSERT(it2 != this->outstandingOperationRefCount_.end() && it3 != this->outstandingOperationList_.end());
-                (*it2)--;
-                if ((*it2) <= 0) {
-                    Debug("Refcount fell below 0 --> Removing own entry with tag %lu at shard %u", (*(it3)).first, (*(it3)).second);
-                    it2 = this->outstandingOperationRefCount_.erase(it2);
-                    it3 = this->outstandingOperationList_.erase(it3);
-                }
-                // Print the outstnadingOperationsList and the outstnaidngOperationRefCount
-                auto itl = this->outstandingOperationList_.begin();
-                auto itr = this->outstandingOperationRefCount_.begin();
-                for (;
-                    itl != this->outstandingOperationList_.end() && itr != this->outstandingOperationRefCount_.end();
-                    ++itl, ++itr) {
-                    Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
-                }
+                this->outstanding_.resize(j);
             }
             otcb(s, v, p);
         };
 
-        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstandingOperationList_, outstandingOperationRefCount_, IsIOCL());
+        sclients_[i]->SendOperation(arid, op, key, value, ocb1, otcb1, timeout, outstanding_, isIOCL);
     }
 
     /* Attempts to commit the ongoing transaction. */
@@ -823,37 +772,27 @@ namespace strongstore
         Debug("[%lu] min_read_ts: %lu.%lu", tid, min_read_ts.getTimestamp(), min_read_ts.getID());
 
         uint64_t req_id = last_req_id_++;
-        PendingRequest *req = new PendingRequest(req_id);
-        pending_reqs_[req_id] = req;
-        req->ccb = ccb;
-        req->ctcb = ctcb;
+        Debug("my client_id is %lu, my req_id is %lu", client_id_, req_id);
+
+        ASSERT(!pending_commit_slot_.in_use);
+        pending_commit_slot_.ccb = ccb;
+        pending_commit_slot_.in_use = true;
+        pending_commit_slot_.outstandingPrepares = 0;
 
         auto &participants = session.participants();
-
-        stats.IncrementList("txn_groups", participants.size());
 
         Debug("[%lu] PREPARE", tid);
         ASSERT(participants.size() > 0);
 
-        req->outstandingPrepares = 0;
-
         int coordinator_shard = ChooseCoordinator(session);
 
         Timestamp nonblock_timestamp = Timestamp();
-        if (consistency_ == Consistency::RSS)
-        {
-            nonblock_timestamp = ChooseNonBlockTimestamp(session);
-        }
 
-        auto cccb = std::bind(&Client::CommitCallback, this, std::ref(session), req->id,
-                              std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-        auto cctcb = [](int) {};
-
-        auto pccb = [transaction_id = tid](int status)
+        auto cccb = [this, session = std::ref(session), req_id](int status)
         {
-            Debug("[%lu] PREPARE callback status %d", transaction_id, status);
+             this->CommitCallback(session, req_id, status);
         };
-        auto pctcb = [](int) {};
+        auto cctcb = [](int) {};
 
         for (auto p : participants)
         {
@@ -863,23 +802,18 @@ namespace strongstore
             }
             else
             {
-                sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp, pccb, pctcb, timeout);
+                sclients_[p]->RWCommitParticipant(tid, coordinator_shard, nonblock_timestamp);
             }
         }
     }
 
-    void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts)
+    void Client::CommitCallback(StrongSession &session, uint64_t req_id, int status)
     {
         auto tid = session.transaction_id();
         Debug("[%lu] COMMIT callback status %d", tid, status);
+        Debug("Searching in pending_reqs_ with req_id %lu", req_id);
 
-        auto search = pending_reqs_.find(req_id);
-        if (search == pending_reqs_.end())
-        {
-            Debug("[%lu] Transaction already finished", tid);
-            return;
-        }
-        PendingRequest *req = search->second;
+        ASSERT(pending_commit_slot_.in_use); // should be true, right? where could it have finihsed earlier?
 
         transaction_status_t tstatus;
         switch (status)
@@ -895,23 +829,12 @@ namespace strongstore
             break;
         }
 
-        commit_callback ccb = req->ccb;
-        pending_reqs_.erase(req_id);
-        delete req;
+        commit_callback &ccb = pending_commit_slot_.ccb;
+        pending_commit_slot_.in_use = false;
 
-        uint64_t ms = 0;
-        if (tstatus == COMMITTED && consistency_ == Consistency::RSS)
-        {
-            ms = tt_.TimeToWaitUntilMS(nonblock_ts.getTimestamp());
-            Debug("Waiting for nonblock time: %lu ms", ms);
-            session.advance_min_read_ts(commit_ts);
-            auto &min_read_ts = session.min_read_ts();
-            Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
-        }
+        // rss::EndTransaction(service_name_, session);
 
-        rss::EndTransaction(service_name_, session);
-
-        transport_->Timer(ms, std::bind(ccb, tstatus));
+        ccb(tstatus);
     }
 
     void Client::Abort(Session &s, abort_callback acb, abort_timeout_callback atcb, uint32_t timeout)
@@ -933,13 +856,19 @@ namespace strongstore
         auto &participants = session.participants();
 
         uint64_t req_id = last_req_id_++;
-        PendingRequest *req = new PendingRequest(req_id);
-        pending_reqs_[req_id] = req;
-        req->acb = acb;
-        req->atcb = atcb;
-        req->outstandingPrepares = participants.size();
+        if (pending_commit_slot_.in_use) {
+            Notice("I expect the outstanding_prepares to be 0 = %u", pending_commit_slot_.outstandingPrepares);
+            Panic("Ok that means it can abort after we issue commit");
+        }
+        ASSERT(!pending_commit_slot_.in_use);
+        pending_commit_slot_.acb = acb;
+        pending_commit_slot_.in_use = true;
+        pending_commit_slot_.outstandingPrepares = participants.size();
 
-        auto cb = std::bind(&Client::AbortCallback, this, std::ref(session), req->id);
+        auto cb = [this, session = std::ref(session), req_id]()
+        {
+            this->AbortCallback(session, req_id);
+        };
         auto tcb = []() {};
 
         for (int p : participants)
@@ -953,22 +882,15 @@ namespace strongstore
         auto tid = session.transaction_id();
         Debug("[%lu] Abort callback, with req_id = %lu", tid, req_id);
 
-        auto search = pending_reqs_.find(req_id);
-        if (search == pending_reqs_.end())
-        {
-            Debug("[%lu] Transaction already finished", tid);
-            return;
-        }
+        ASSERT(pending_commit_slot_.in_use); // should be true, right? where could it have finihsed earlier?
 
-        PendingRequest *req = search->second;
-        --req->outstandingPrepares;
-        if (req->outstandingPrepares == 0)
+        --pending_commit_slot_.outstandingPrepares;
+        if (pending_commit_slot_.outstandingPrepares == 0)
         {
-            abort_callback acb = req->acb;
-            pending_reqs_.erase(req_id);
-            delete req;
+            abort_callback &acb = pending_commit_slot_.acb;
+            pending_commit_slot_.in_use = false;
 
-            rss::EndTransaction(service_name_, session);
+            // rss::EndTransaction(service_name_, session);
 
             Debug("[%lu] Abort finished", tid);
             acb();
@@ -1003,13 +925,10 @@ namespace strongstore
         }
 
         uint64_t req_id = last_req_id_++;
-        PendingRequest *req = new PendingRequest(req_id);
-        pending_reqs_[req_id] = req;
-        req->ccb = ccb;
-        req->ctcb = ctcb;
-        req->outstandingPrepares = sharded_keys.size();
-
-        stats.IncrementList("txn_groups", sharded_keys.size());
+        ASSERT(!pending_commit_slot_.in_use);
+        pending_commit_slot_.ccb = ccb;
+        pending_commit_slot_.in_use = true;
+        pending_commit_slot_.outstandingPrepares = sharded_keys.size();
 
         ASSERT(sharded_keys.size() > 0);
 
@@ -1026,10 +945,10 @@ namespace strongstore
         Debug("[%lu] commit_ts: %lu.%lu", tid, commit_ts.getTimestamp(), commit_ts.getID());
         Debug("[%lu] min_ts: %lu.%lu", tid, min_ts.getTimestamp(), min_ts.getID());
 
-        auto roccb = std::bind(&Client::ROCommitCallback, this, std::ref(session), req->id,
+        auto roccb = std::bind(&Client::ROCommitCallback, this, std::ref(session), req_id,
                                std::placeholders::_1, std::placeholders::_2,
                                std::placeholders::_3);
-        auto rocscb = std::bind(&Client::ROCommitSlowCallback, this, std::ref(session), req->id,
+        auto rocscb = std::bind(&Client::ROCommitSlowCallback, this, std::ref(session), req_id,
                                 std::placeholders::_1, std::placeholders::_2,
                                 std::placeholders::_3, std::placeholders::_4);
         auto roctcb = []() {}; // TODO: Handle timeout
@@ -1048,28 +967,20 @@ namespace strongstore
 
         Debug("[%lu] ROCommit callback", tid);
 
-        auto search = pending_reqs_.find(req_id);
-        if (search == pending_reqs_.end())
-        {
-            Debug("[%lu] ROCommitCallback for terminated request id %lu", tid, req_id);
-            return;
-        }
+        ASSERT(pending_commit_slot_.in_use); // should be true, right? where could it have finihsed earlier?
 
         SnapshotResult r = ReceiveFastPath(session, tid, shard_idx, values, prepares);
         if (r.state == COMMIT)
         {
-            PendingRequest *req = search->second;
-
-            commit_callback ccb = req->ccb;
-            pending_reqs_.erase(search);
-            delete req;
+            commit_callback &ccb = pending_commit_slot_.ccb;
+            pending_commit_slot_.in_use = false;
 
             session.advance_min_read_ts(r.max_read_ts);
 
             auto &min_read_ts = session.min_read_ts();
             Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
 
-            rss::EndTransaction(service_name_, session);
+            // rss::EndTransaction(service_name_, session);
 
             Debug("[%lu] COMMIT OK", tid);
             ccb(COMMITTED);
@@ -1083,13 +994,7 @@ namespace strongstore
     void Client::ROCommitSlowCallback(StrongSession &session, uint64_t req_id, int shard_idx,
                                       uint64_t rw_transaction_id, const Timestamp &commit_ts, bool is_commit)
     {
-        auto search = pending_reqs_.find(req_id);
-        if (search == pending_reqs_.end())
-        {
-            Debug("ROCommitSlowCallback for terminated request id %lu", req_id);
-            return;
-        }
-
+        ASSERT(pending_commit_slot_.in_use); // should be true, right? where could it have finihsed earlier?
         auto tid = session.transaction_id();
 
         Debug("[%lu] ROCommitSlow callback", tid);
@@ -1097,18 +1002,15 @@ namespace strongstore
         SnapshotResult r = ReceiveSlowPath(session, tid, rw_transaction_id, is_commit, commit_ts);
         if (r.state == COMMIT)
         {
-            PendingRequest *req = search->second;
-
-            commit_callback ccb = req->ccb;
-            pending_reqs_.erase(search);
-            delete req;
+            commit_callback &ccb = pending_commit_slot_.ccb;
+            pending_commit_slot_.in_use = false;
 
             session.advance_min_read_ts(r.max_read_ts);
 
             auto &min_read_ts = session.min_read_ts();
             Debug("min_read_timestamp_: %lu.%lu", min_read_ts.getTimestamp(), min_read_ts.getID());
 
-            rss::EndTransaction(service_name_, session);
+            // rss::EndTransaction(service_name_, session);
 
             Debug("[%lu] COMMIT OK", tid);
             ccb(COMMITTED);

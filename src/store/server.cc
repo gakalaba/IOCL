@@ -498,6 +498,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_VR:
@@ -507,6 +508,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::vr::VRReplica *>(replica));
         break;
     }
     case PROTO_IOCL_CT:
@@ -516,6 +518,7 @@ int main(int argc, char **argv)
             replica_config, FLAGS_group_idx, FLAGS_replica_idx, tport, 1,
             dynamic_cast<replication::AppReplica *>(server),
             FLAGS_debug_stats);
+        server->SetReplica(dynamic_cast<replication::iocl_ct::IOCL_CTReplica *>(replica));
         break;
     }
     default:
@@ -536,8 +539,9 @@ int main(int argc, char **argv)
 
     if (FLAGS_stats_file.size() > 0)
     {
-        Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
-        server->GetStats().ExportJSON(FLAGS_stats_file);
+        Notice("Disabled debug stats for now, not exporting to %s.", FLAGS_stats_file.c_str());
+        // Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
+        // server->GetStats().ExportJSON(FLAGS_stats_file);
     }
 
     return 0;
@@ -549,9 +553,11 @@ void Cleanup(int signal)
     tport->Stop();
     if (FLAGS_stats_file.size() > 0)
     {
-        Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
-        server->GetStats().ExportJSON(FLAGS_stats_file);
+        Notice("Disabled debug stats for now, not exporting to %s.", FLAGS_stats_file.c_str());
+        // Notice("Exporting stats to %s.", FLAGS_stats_file.c_str());
+        // server->GetStats().ExportJSON(FLAGS_stats_file);
     }
+    server->PrintAFewThings(); // DELETE ME
     replica->Close();
     delete replica;
     delete server;

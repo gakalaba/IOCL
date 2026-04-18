@@ -56,105 +56,20 @@ namespace replication
 
         IOCL_CTClient::~IOCL_CTClient()
         {
-            for (auto kv : pendingReqs)
-            {
-                delete kv.second;
-            }
         }
 
-        void IOCL_CTClient::Invoke(const string &request, continuation_t continuation,
-                              error_continuation_t error_continuation)
-        {
-            Panic("Should never call this");
-        }
-
-        void IOCL_CTClient::InvokeIOCL(LinearizeableOperation &msg,
-                                continuation_t continuation,
-                                error_continuation_t error_continuation)
+        void IOCL_CTClient::Invoke(LinearizeableOperation &msg)
         {
             // TODO: Currently, invocations never timeout and error_continuation is
             // never called. It may make sense to set a timeout on the invocation.
-            (void)error_continuation;
-
-            Debug("Inside InvokeIOCL: shardtag is %lu and predlist size is %d",
-                  msg.shardtag(), msg.predlist().size());
-            Debug("size of the message before: %lu", msg.ByteSizeLong());
-            string request_str;
-            proto::RequestMessage reqMsg;
-            // We only want to stringify the operation, not the IOCL metadata
-            reqMsg.mutable_predlist()->Swap(msg.mutable_predlist());
-            uint64_t theshardtag = msg.shardtag();
-            uint64_t theintkey = msg.intkey();
-            reqMsg.set_shardtag(msg.shardtag());
-            reqMsg.set_intkey(msg.intkey());
-            msg.clear_shardtag();
-            msg.clear_predlist();
-            msg.clear_intkey();
-            // Issue coordination requests
-            proto::SuccessorRequestMessage coordReqMsg;
-            coordReqMsg.set_s(reqMsg.shardtag()); // my shard tag
-            coordReqMsg.set_shardidx(group); // who pred should return to??
-            for (uint32_t i = 0; i < reqMsg.predlist().size(); i++)
-            {
-                uint64_t sendTo = msg.shardlist(i);
-                // if (sendTo == group)
-                // {
-                //     Debug("Skipping sending COORD REQUEST to self for predecessor_tag %u",
-                //           reqMsg.predlist(i));
-                //     // Append this index to the same_shards field
-                //     reqMsg.add_same_shards(i);
-                //     continue;
-                // }
-                uint64_t predShardTag = reqMsg.predlist(i);
-                coordReqMsg.set_p(predShardTag);
-                coordReqMsg.set_predidx(i);
-                Debug("SENDING %dth COORD REQUEST for predecessor_tag %lu to shard %lu",
-                      i, predShardTag, sendTo);
-                // XXX Try sending only to (what we think is) the leader first
-                if (!transport->SendMessageToReplica(this, sendTo, 0, coordReqMsg))
-                {
-                    Warning("Could not send request to replicas.");
-                }
-            }
-            msg.clear_shardlist();
-            Debug("size of the message after (right before stringify): %lu", msg.ByteSizeLong());
-
-            msg.SerializeToString(&request_str);
-
-            // uint64_t reqId = (reqMsg.shardtag() & 0xFFFFFFFF);
-            uint64_t reqId = ++lastReqId;
-            // Timeout *timer =
-            //     new Timeout(transport, 15000, [this, reqId]()
-            //                 { ResendRequest(reqId); });
-            PendingRequest *req =
-                new PendingRequest(request_str, reqId, theshardtag, theintkey, continuation);
-
-            pendingReqs[reqId] = req;
 
             /*------------------ Send Request ------------------*/
-            // req->request is the string type of LinearizeableOperation without IOCL metadata
-            reqMsg.mutable_req()->set_op(request_str);
-            // uint64_t pid = (reqMsg.shardtag() >> 32) & 0xFFFFFFFF;
-            // reqMsg.mutable_req()->set_clientid(pid);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
+            if (!(transport->SendMessageToReplica(this, group, 0, msg)))
+            {
+                Panic("Could not send request to replicas.");
+            }
 
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
-            {
-                // req->timer->Reset();
-            }
-            else
-            {
-                Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
-            }
         }
-
-
 
         void IOCL_CTClient::InvokeUnlogged(int replicaIdx, const string &request,
                                       continuation_t continuation,
@@ -167,18 +82,9 @@ namespace replication
             reqMsg.mutable_req()->set_clientid(clientid);
             reqMsg.mutable_req()->set_clientreqid(reqId);
 
-            if (transport->SendMessageToReplica(this, group, replicaIdx, reqMsg))
+            if (!(transport->SendMessageToReplica(this, group, replicaIdx, reqMsg)))
             {
-                // Timeout *timer = new Timeout(transport, timeout, [this, reqId]()
-                //                              { UnloggedRequestTimeoutCallback(reqId); });
-                PendingUnloggedRequest *req = new PendingUnloggedRequest(
-                    request, reqId, continuation, error_continuation);
-                pendingReqs[reqId] = req;
-                // req->timer->Start();
-            }
-            else
-            {
-                Warning("Could not send unlogged request to replica %u.", replicaIdx);
+                Panic("Could not send unlogged request to replica %u.", replicaIdx);
             }
         }
 
@@ -193,123 +99,91 @@ namespace replication
 
         void IOCL_CTClient::SendRequest(const PendingRequest *req)
         {
-            proto::RequestMessage reqMsg;
+            LinearizeableOperation reqMsg;
             // req->request is the string type of LinearizeableOperation
-            reqMsg.mutable_req()->set_op(req->request);
-            reqMsg.mutable_req()->set_clientid(clientid);
-            reqMsg.mutable_req()->set_clientreqid(req->clientReqId);
-            reqMsg.set_shardtag(req->shardtag);
-            reqMsg.set_intkey(req->intkey);
+            // reqMsg.set_op(req->request);
+            reqMsg.mutable_rid()->set_client_id(clientid);
+            reqMsg.mutable_rid()->set_client_req_id(req->clientReqId);
+            // reqMsg.set_shardtag(req->shardtag);
+            // reqMsg.set_intkey(req->intkey);
 
-            // Debug("SENDING REQUEST: %lu %lu", clientid, pendingRequest->clientReqId);
-            // XXX Try sending only to (what we think is) the leader first
-            if (transport->SendMessageToReplica(this, group, 0, reqMsg))
-            // if (transport->SendMessageToGroup(this, group, reqMsg))
+            if (!(transport->SendMessageToReplica(this, group, 0, reqMsg)))
             {
-                // req->timer->Reset();
-            }
-            else
-            {
-                Warning("Could not send request to replicas.");
-                pendingReqs.erase(req->clientReqId);
-                delete req;
+                Panic("Could not send request to replicas.");
             }
         }
 
-        void IOCL_CTClient::ResendRequest(const uint64_t reqId)
+        void IOCL_CTClient::ReceiveMessage(const TransportAddress &remote,
+                                      MsgType type, const string &data,
+                                      void *meta_data)
         {
-            Panic("Shouldn't be resending");
-            if (pendingReqs.find(reqId) == pendingReqs.end())
-            {
-                Debug("Received resend request when no request was pending");
-                return;
-            }
-
-            Warning("Client timeout; resending request: %lu", reqId);
-            SendRequest(pendingReqs[reqId]);
+            Panic("Unimplemented");
         }
 
         void IOCL_CTClient::ReceiveMessage(const TransportAddress &remote,
                                       const string &type, const string &data,
                                       void *meta_data)
         {
-            proto::ReplyMessage reply;
-            proto::UnloggedReplyMessage unloggedReply;
+            Panic("shoud have no responses from replicas, all traffic should go through upcall mechanism");
+            // proto::ReplyMessage reply;
+            // proto::UnloggedReplyMessage unloggedReply;
 
-            if (type == reply.GetTypeName())
-            {
-                reply.ParseFromString(data);
-                HandleReply(remote, reply);
-            }
-            else if (type == unloggedReply.GetTypeName())
-            {
-                unloggedReply.ParseFromString(data);
-                HandleUnloggedReply(remote, unloggedReply);
-            }
-            else
-            {
-                Client::ReceiveMessage(remote, type, data, meta_data);
-            }
+            // if (type == reply.GetTypeName())
+            // {
+            //     reply.ParseFromString(data);
+            //     HandleReply(remote, reply);
+            // }
+            // else if (type == unloggedReply.GetTypeName())
+            // {
+            //     unloggedReply.ParseFromString(data);
+            //     HandleUnloggedReply(remote, unloggedReply);
+            // }
+            // else
+            // {
+            //     Client::ReceiveMessage(remote, type, data, meta_data);
+            // }
         }
 
         void IOCL_CTClient::HandleReply(const TransportAddress &remote,
                                    const proto::ReplyMessage &msg)
         {
-            uint64_t reqId = msg.clientreqid();
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
+            Panic("Shouldn't be getting reply");
+            // uint64_t reqId = msg.clientreqid();
+            // auto it = pendingReqs.find(reqId);
+            // if (it == pendingReqs.end())
+            // {
+            //     Debug("Received reply when no request was pending");
+            //     return;
+            // }
 
-            PendingRequest *req = it->second;
-            Debug("Client received reply: %lu", reqId);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            req->continuation(req->request, msg.reply());
-            delete req;
+            // PendingRequest *req = it->second;
+            // Debug("Client received reply: %lu", reqId);
+            // // req->timer->Stop();
+            // pendingReqs.erase(it);
+            // req->continuation(req->request, msg.reply());
+            // delete req;
         }
 
         void IOCL_CTClient::HandleUnloggedReply(const TransportAddress &remote,
                                            const proto::UnloggedReplyMessage &msg)
         {
-            uint64_t reqId = msg.clientreqid();
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
+            Panic("Shouldn't be getting unlogged reply");
+            // uint64_t reqId = msg.clientreqid();
+            // auto it = pendingReqs.find(reqId);
+            // if (it == pendingReqs.end())
+            // {
+            //     Debug("Received reply when no request was pending");
+            //     return;
+            // }
 
-            PendingUnloggedRequest *req =
-                static_cast<PendingUnloggedRequest *>(it->second);
+            // PendingUnloggedRequest *req =
+            //     static_cast<PendingUnloggedRequest *>(it->second);
 
-            Debug("Client received unloggedReply %lu", reqId);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            req->continuation(req->request, msg.reply());
-            delete req;
-        }
-
-        void IOCL_CTClient::UnloggedRequestTimeoutCallback(const uint64_t reqId)
-        {
-            auto it = pendingReqs.find(reqId);
-            if (it == pendingReqs.end())
-            {
-                Debug("Received reply when no request was pending");
-                return;
-            }
-            Warning("Unlogged request timed out");
-            PendingUnloggedRequest *req =
-                static_cast<PendingUnloggedRequest *>(it->second);
-            // req->timer->Stop();
-            pendingReqs.erase(it);
-            if (req->error_continuation)
-            {
-                req->error_continuation(req->request, ErrorCode::TIMEOUT);
-            }
-            delete req;
+            // Debug("Client received unloggedReply %lu", reqId);
+            // // req->timer->Stop();
+            // pendingReqs.erase(it);
+            // req->continuation(req->request, msg.reply());
+            // delete req;
         }
 
     } // namespace iocl_ct

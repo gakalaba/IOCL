@@ -28,8 +28,8 @@
 #ifndef STORE_SERVER_H
 #define STORE_SERVER_H
 
-#include "store/common/stats.h"
 #include "store/common/timestamp.h"
+#include "replication/common/replica.h"
 
 #include <string>
 
@@ -41,8 +41,9 @@ public:
   virtual void Load(const std::string &key, const std::string &value,
                     const Timestamp timestamp) = 0;
 
-  virtual Stats &GetStats() = 0;
   virtual void SeeAllTxns() = 0;
+  virtual void SetReplica(class replication::Replica *replica) = 0;
+  virtual void PrintAFewThings() = 0;
 };
 
 #endif /* STORE_SERVER_H */

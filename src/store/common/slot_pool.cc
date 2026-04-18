@@ -1,10 +1,11 @@
 // -*- mode: c++; c-file-style: "k&r"; c-basic-offset: 4 -*-
 /***********************************************************************
  *
- * replica-inl.h:
- *   inline/template functions for common replica interface
+ * store/common/backend/versionstore.cc:
+ *   Timestamped version store
  *
- * Copyright 2013 Dan R. K. Ports  <drkp@cs.washington.edu>
+ * Copyright 2022 Jeffrey Helt, Matthew Burke, Amit Levy, Wyatt Lloyd
+ * Copyright 2015 Irene Zhang <iyzhang@cs.washington.edu>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -28,23 +29,6 @@
  *
  **********************************************************************/
 
-#ifndef _COMMON_REPLICA_INL_H_
-#define _COMMON_REPLICA_INL_H_
+#include "store/common/slot_pool.h"
 
-template <class MSG>
-void Replica::Execute(opnum_t opnum, const LinearizeableOperation &msg, MSG &reply) {
-    Panic("Don't use this");
-    ReplicaUpcall(msg);
-
-    // reply.set_reply(res);
-}
-
-template <class MSG>
-void Replica::ExecuteUnlogged(const UnloggedRequest &msg, MSG &reply) {
-    string res;
-    UnloggedUpcall(msg.op(), res);
-
-    reply.set_reply(res);
-}
-
-#endif  // _COMMON_REPLICA_INL_H_
+using namespace std;

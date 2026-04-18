@@ -33,7 +33,7 @@
 #include <random>
 
 #include "lib/transport.h"
-#include "store/common/common-proto.pb.h"
+#include "replication/common/common-proto.pb.h"
 
 class PingTransport
 {

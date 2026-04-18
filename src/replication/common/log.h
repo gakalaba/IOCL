@@ -53,11 +53,15 @@ enum LogEntryState {
 struct LogEntry {
     viewstamp_t viewstamp;
     LogEntryState state;
-    Request request;
+    LinearizeableOperation request;
     string hash;
     // Speculative client table stuff
     opnum_t prevClientReqOpnum;
     ::google::protobuf::Message *replyMessage;
+
+    // Quorum tracking stuff
+    uint64_t prepare_ok_mask = 0;
+    uint8_t prepare_ok_count = 0;
 
     LogEntry() { replyMessage = NULL; }
     LogEntry(const LogEntry &x)
@@ -70,7 +74,7 @@ struct LogEntry {
         }
     }
     LogEntry(viewstamp_t viewstamp, LogEntryState state,
-             const Request &request, const string &hash)
+             const LinearizeableOperation &request, const string &hash)
         : viewstamp(viewstamp), state(state), request(request), hash(hash), replyMessage(NULL) {}
     virtual ~LogEntry() {
         if (replyMessage) {
@@ -82,10 +86,10 @@ struct LogEntry {
 class Log {
    public:
     Log(bool useHash, opnum_t start = 1, string initialHash = EMPTY_HASH);
-    LogEntry &Append(viewstamp_t vs, const Request &req, LogEntryState state);
+    LogEntry &Append(viewstamp_t vs, LogEntryState state);
     LogEntry *Find(opnum_t opnum);
     bool SetStatus(opnum_t opnum, LogEntryState state);
-    bool SetRequest(opnum_t op, const Request &req);
+    // bool SetRequest(opnum_t op, const LinearizeableOperation&req);
     void RemoveAfter(opnum_t opnum);
     LogEntry *Last();
     viewstamp_t LastViewstamp() const;  // deprecated

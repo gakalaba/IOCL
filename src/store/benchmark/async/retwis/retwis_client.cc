@@ -38,7 +38,7 @@
 namespace retwis
 {
 
-    RetwisClient::RetwisClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
+    RetwisClient::RetwisClient(KeySelector *keySelector, Client *client, uint32_t timeout,
                                Transport &transport, uint64_t id,
                                BenchmarkClientMode mode,
                                double switch_probability,
@@ -46,7 +46,7 @@ namespace retwis
                                int mpl,
                                int expDuration, int warmupSec, int cooldownSec, int tputInterval, uint32_t abortBackoff,
                                bool retryAborted, uint32_t maxBackoff, uint32_t maxAttempts, bool issueConcurrent, const std::string &latencyFilename)
-        : BenchmarkClient(clients, timeout, transport, id,
+        : BenchmarkClient(client, timeout, transport, id,
                           mode,
                           switch_probability,
                           arrival_rate, think_time, stay_probability,

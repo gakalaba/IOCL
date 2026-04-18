@@ -41,16 +41,12 @@ public:
                                 const std::string &type, const std::string &data,
                                 void *meta_data) override;
 
-    virtual inline Stats &GetStats() override { return stats; };
-
 protected:
     typedef void (MessageServer::*MessageHandler)(const TransportAddress &,
                                                   google::protobuf::Message *);
 
     void RegisterHandler(google::protobuf::Message *message,
                          MessageServer::MessageHandler handler);
-
-    Stats stats;
 
 private:
     std::unordered_map<std::string, std::pair<google::protobuf::Message *,

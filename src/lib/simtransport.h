@@ -105,6 +105,10 @@ protected:
     bool SendMessageInternal(TransportReceiver *src,
                              const SimulatedTransportAddress &dstAddr,
                              const Message &m) override;
+    bool SendMessageInternal(TransportReceiver *src,
+                             const SimulatedTransportAddress &dstAddr,
+                                MsgType type,
+                             const Message &m) override;
 
 private:
     struct QueuedMessage

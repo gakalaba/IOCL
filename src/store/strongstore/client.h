@@ -70,7 +70,7 @@ namespace strongstore
         const Timestamp &min_read_ts() const { return min_read_ts_; }
         void advance_min_read_ts(const Timestamp &ts) { min_read_ts_ = std::max(min_read_ts_, ts); }
 
-        const std::set<int> &participants() const { return participants_; }
+        const std::unordered_set<int> &participants() const { return participants_; }
         const std::unordered_set<int> &parallel_gets_participants() const { return parallel_gets_participants_; }
         const std::unordered_map<uint64_t, PreparedTransaction> prepares() const { return prepares_; }
 
@@ -158,7 +158,7 @@ namespace strongstore
         void set_needs_abort() { state_ = NEEDS_ABORT; }
         void set_aborting() { state_ = ABORTING; }
 
-        std::set<int> &mutable_participants() { return participants_; }
+        std::unordered_set<int> &mutable_participants() { return participants_; }
         void add_participant(int p) { participants_.insert(p); }
         void add_get_participant(int p) { parallel_gets_participants_.insert(p); }
         void clear_participants() { participants_.clear(); parallel_gets_participants_.clear(); }
@@ -173,14 +173,17 @@ namespace strongstore
         uint64_t apprequest_id_;
         Timestamp start_ts_;
         Timestamp min_read_ts_;
-        std::set<int> participants_;
+        std::unordered_set<int> participants_;
         std::unordered_set<int> parallel_gets_participants_;
         std::unordered_map<uint64_t, PreparedTransaction> prepares_;
         std::unordered_map<std::string, std::list<Value>> values_;
         Timestamp snapshot_ts_;
         int current_participant_;
         State state_;
-        std::unordered_set<std::string> parallel_gets;
+        // NOTE: For now it is safe for gets to be
+        // identified by unique key, since we know
+        // transactions never repeat their keys
+        std::unordered_set<std::string> parallel_gets; // (key -> get)
     };
 
     class CommittedTransaction
@@ -212,6 +215,7 @@ namespace strongstore
                uint64_t id, int nshards, int closestReplic, Transport *transport,
                Partitioner *part, TrueTime &tt, bool debug_stats,
                double nb_time_alpha,
+               uint64_t fanout,
                bool emulate_wan = false);
         virtual ~Client();
 
@@ -221,15 +225,14 @@ namespace strongstore
 
         // Overriding functions from ::Client
         // Begin a transaction
-        virtual void Begin(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void Begin(Session &session) override;
 
         // Begin an application-level request
-        virtual void BeginAppRequest(Session &session, begin_callback bcb, begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void BeginAppRequest(Session &session) override;
 
 
         // Begin a retried transaction.
-        virtual void Retry(Session &session, begin_callback bcb,
-                           begin_timeout_callback btcb, uint32_t timeout) override;
+        virtual void Retry(Session &session) override;
 
         // Get the value corresponding to key.
         virtual void Get(Session &session, const std::string &key,
@@ -274,26 +277,10 @@ namespace strongstore
     private:
         const static std::size_t MAX_SHARDS = 16;
 
-        struct PendingRequest
-        {
-            PendingRequest(uint64_t id)
-                : id(id), outstandingPrepares(0) {}
-
-            ~PendingRequest() {}
-
-            commit_callback ccb;
-            commit_timeout_callback ctcb;
-            abort_callback acb;
-            abort_timeout_callback atcb;
-            uint64_t id;
-            int outstandingPrepares;
-        };
-
-        void ContinueBegin(Session &session, begin_callback bcb);
         void ContinueRetry(Session &session, begin_callback bcb);
 
         // local Prepare function
-        void CommitCallback(StrongSession &session, uint64_t req_id, int status, Timestamp commit_ts, Timestamp nonblock_ts);
+        void CommitCallback(StrongSession &session, uint64_t req_id, int status);
 
         void AbortCallback(StrongSession &session, uint64_t req_id);
 
@@ -369,8 +356,6 @@ namespace strongstore
         uint64_t next_apprequest_id_;
 
         uint64_t last_req_id_;
-        std::unordered_map<uint64_t, PendingRequest *> pending_reqs_;
-
         Latency_t op_lat_;
         Latency_t commit_lat_;
 
@@ -384,10 +369,19 @@ namespace strongstore
 
         bool emulate_wan_;
 
+        uint64_t fanout_;
+
         // IOCL specific state
         // (shardtag, shardid) -> refcount
-        std::list<std::pair<uint64_t, uint32_t>> outstandingOperationList_;
-        std::list<uint16_t> outstandingOperationRefCount_;
+        std::vector<OutstandingPred> outstanding_;
+
+        struct PendingCommitSlot {
+            bool in_use = false;
+            uint16_t outstandingPrepares;
+            commit_callback ccb;
+            abort_callback acb;
+        };
+        PendingCommitSlot pending_commit_slot_;
     };
 
 } // namespace strongstore

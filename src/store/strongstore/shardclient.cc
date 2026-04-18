@@ -37,23 +37,44 @@ namespace strongstore
     using namespace proto;
 
     ShardClient::ShardClient(const transport::Configuration &config,
-                             Transport *transport, uint64_t client_id, int shard,
-                             wound_callback wcb)
+                             Transport *transport, uint64_t client_id, int shard, uint64_t fanout,
+                             wound_callback wcb, prepare_ok_callback pokcb)
         : last_req_id_{0},
           config_{config},
           transport_{transport},
           client_id_{client_id},
           shard_idx_{shard},
-          wcb_{wcb}
+          wcb_{wcb},
+          pokcb_{pokcb},
+          fanout_{fanout}
     {
         transport_->Register(this, config_, -1, -1);
 
         // TODO: Remove hardcoding
         replica_ = 0;
         seqno = 0;
+        slots_.resize(fanout);
+        // set all the objects in slots pred_list to size fanout
+        for (auto &slot : slots_) {
+            slot.pred_list.reserve(fanout);
+        }
+        if (fanout == 0) {
+            server_shard_client_ = true;
+            pending_prepare_ok_slot_ = new SlotPool<PendingPrepareOKSlot>(30000);
+        } else {
+            server_shard_client_ = false;
+            get_slots_ = new SlotPool<PendingGetSlot>(fanout);
+            pending_rw_coord_commit_slot_ = new SlotPool<PendingRWCoordCommitSlot>(1);
+        }
+        pending_abort_slot_ = new SlotPool<PendingAbortSlot>(30000);
     }
 
-    ShardClient::~ShardClient() {}
+    ShardClient::~ShardClient() {
+        delete get_slots_;
+        delete pending_rw_coord_commit_slot_;
+        delete pending_abort_slot_;
+        delete pending_prepare_ok_slot_;
+    }
     void ShardClient::Close()
     {
     }
@@ -62,32 +83,50 @@ namespace strongstore
                                      const std::string &type,
                                      const std::string &data, void *meta_data)
     {
-        Debug("Got message wahoo");
-        if (type == get_reply_.GetTypeName())
-        {
+        Panic("Shouldn't be calling this ReceiveMessage");
+    }
+    void ShardClient::ReceiveMessage(const TransportAddress &remote,
+                                     MsgType type,
+                                     const std::string &data, void *meta_data)
+    {
+        Debug("Got message wahoo of type %u", (uint32_t)type);
+        switch (type) {
+        case MsgType::GET_REPLY_TYPE: {
             get_reply_.ParseFromString(data);
             HandleGetReply(get_reply_);
+            break;
         }
-        else if (type == op_reply_.GetTypeName())
-        {
+        case MsgType::LIN_REPLY_TYPE: {
             op_reply_.ParseFromString(data);
             HandleSendOperationReply(op_reply_);
+            break;
         }
-        else if (type == rw_commit_c_reply_.GetTypeName())
-        {
+        case MsgType::TXN_COMMIT_REPLY_TYPE: {
             rw_commit_c_reply_.ParseFromString(data);
             HandleRWCommitCoordinatorReply(rw_commit_c_reply_);
+            break;
         }
-        else if (type == rw_commit_p_reply_.GetTypeName())
-        {
-            rw_commit_p_reply_.ParseFromString(data);
-            HandleRWCommitParticipantReply(rw_commit_p_reply_);
-        }
-        else if (type == prepare_ok_reply_.GetTypeName())
-        {
+        // case MsgType::TXN_COMMIT_PART_REPLY_TYPE: {
+        //     rw_commit_p_reply_.ParseFromString(data);
+        //     HandleRWCommitParticipantReply(rw_commit_p_reply_);
+        //     break;
+        // }
+        case MsgType::TXN_PREPARE_OK_REPLY_TYPE: {
             prepare_ok_reply_.ParseFromString(data);
             HandlePrepareOKReply(prepare_ok_reply_);
+            break;
         }
+        case MsgType::TXN_ABORT_REPLY_TYPE: {
+            abort_reply_.ParseFromString(data);
+            HandleAbortReply(abort_reply_);
+            break;
+        }
+        case MsgType::TXN_WOUND_TYPE: {
+            wound_.ParseFromString(data);
+            HandleWound(wound_);
+            break;
+        }
+        /*
         else if (type == prepare_abort_reply_.GetTypeName())
         {
             prepare_abort_reply_.ParseFromString(data);
@@ -103,19 +142,9 @@ namespace strongstore
             ro_commit_slow_reply_.ParseFromString(data);
             HandleROCommitSlowReply(ro_commit_slow_reply_);
         }
-        else if (type == abort_reply_.GetTypeName())
-        {
-            abort_reply_.ParseFromString(data);
-            HandleAbortReply(abort_reply_);
-        }
-        else if (type == wound_.GetTypeName())
-        {
-            wound_.ParseFromString(data);
-            HandleWound(wound_);
-        }
-        else
-        {
-            Panic("Received unexpected message type: %s", type.c_str());
+        */
+        default:
+            Panic("Received unexpected message type: %u", (uint32_t)type);
         }
     }
 
@@ -129,45 +158,35 @@ namespace strongstore
     /* Sends BEGIN to a single shard indexed by i. */
     void ShardClient::Begin(uint64_t transaction_id, const Timestamp &start_time)
     {
-        Debug("[%lu] [shard %i] BEGIN", transaction_id, shard_idx_);
-
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search == transactions_.end());
-
-        auto &t = transactions_[transaction_id];
-
-        t.set_start_time(start_time);
+        ASSERT((transaction_id != the_transaction_.transaction_id()) || transaction_id == 0);
+        the_transaction_.set_start_time(start_time);
+        the_transaction_.set_transaction_id(transaction_id);
     }
 
     bool ShardClient::CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb)
     {
-        auto search = transactions_.find(transaction_id);
-        if (search == transactions_.end())
+        if (transaction_id != the_transaction_.transaction_id())
         {
             return false;
         }
 
-        auto &txn = search->second;
-
         // Read your own writes, check the write set first.
-        auto wsearch = txn.getWriteSet().find(key);
-        if (wsearch != txn.getWriteSet().end())
+        // auto wsearch = the_transaction_.getWriteSet().find(key);
+        // if (wsearch != the_transaction_.getWriteSet().end())
+        for (auto &write : the_transaction_.getWriteSet())
         {
-            gcb(REPLY_OK, key, wsearch->second, Timestamp());
-            return true;
+            if (write.first == key) {
+                gcb(REPLY_OK, key, write.second, Timestamp());
+                return true;
+            }
         }
 
         // Consistent reads, check the read set.
-        auto rssearch = read_sets_.find(transaction_id);
-        if (rssearch != read_sets_.end())
+        auto rsearch = the_read_set_.find(key);
+        if (rsearch != the_read_set_.end())
         {
-            auto &read_set = rssearch->second;
-            auto rsearch = read_set.find(key);
-            if (rsearch != read_set.end())
-            {
-                gcb(REPLY_OK, key, rsearch->second, Timestamp());
-                return true;
-            }
+            gcb(REPLY_OK, key, rsearch->second, Timestamp());
+            return true;
         }
 
         return false;
@@ -195,16 +214,14 @@ namespace strongstore
         Debug("[shard %i] Sending GET [%s]", shard_idx_, key.c_str());
 
         uint64_t req_id = last_req_id_++;
-        PendingGet *pendingGet = new PendingGet(transaction_id, req_id);
-        pendingGets[req_id] = pendingGet;
-        pendingGet->key = key;
-        pendingGet->gcb = gcb;
-        pendingGet->gtcb = gtcb;
+        PendingGetSlot &pendingGet = get_slots_->Alloc(req_id);
+        pendingGet.gcb = gcb;
+        pendingGet.key = key;
+        pendingGet.transaction_id = transaction_id;
+        pendingGet.req_id = req_id;
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-        auto &t = search->second;
-        auto &start_ts = t.start_time();
+        ASSERT(transaction_id == the_transaction_.transaction_id());
+        auto &start_ts = the_transaction_.start_time();
 
         // TODO: Setup timeout
         get_.Clear();
@@ -215,7 +232,7 @@ namespace strongstore
         get_.set_key(key);
         get_.set_for_update(for_update);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, get_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::GET_TYPE, get_);
     }
 
     void ShardClient::HandleGetReply(const proto::GetReply &reply)
@@ -223,35 +240,30 @@ namespace strongstore
         uint64_t req_id = reply.rid().client_req_id();
         int status = reply.status();
 
-        auto itr = pendingGets.find(req_id);
-        if (itr == pendingGets.end())
-        {
+        PendingGetSlot *pendingGet = get_slots_->GetByKeyIfPresent(req_id);
+        if (pendingGet == nullptr) {
             Debug("[%d][%lu] GetReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
-
-        PendingGet *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        get_callback gcb = req->gcb;
-        std::string key = req->key;
-        pendingGets.erase(itr);
-        delete req;
+        get_callback gcb = std::move(pendingGet->gcb);
+        std::string key = std::move(pendingGet->key);
+        uint64_t transaction_id = pendingGet->transaction_id;
 
         Debug("[%lu] [shard %i] Received GET reply: %s %d",
               transaction_id, shard_idx_, key.c_str(), status);
 
-        std::string val;
+        const std::string &val = reply.val();
         Timestamp ts;
         if (status == REPLY_OK)
         {
-            val = reply.val();
             ts = Timestamp(reply.timestamp());
         }
 
         Debug("[%lu] Added %lu.%lu to read set.", transaction_id, ts.getTimestamp(), ts.getID());
-        transactions_[transaction_id].addReadSet(key, ts);
-        read_sets_[transaction_id][key] = val;
+        ASSERT(the_transaction_.transaction_id() == transaction_id);
+        the_transaction_.addReadSet(key, ts);
 
+        get_slots_->FreeByKey(req_id);
         gcb(status, key, val, ts);
     }
 
@@ -259,11 +271,9 @@ namespace strongstore
                           put_callback pcb, put_timeout_callback ptcb,
                           uint32_t timeout)
     {
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
-        auto &t = search->second;
-        t.addWriteSet(key, value);
+        the_transaction_.addWriteSet(key, value);
 
         pcb(REPLY_OK, key, value);
     }
@@ -273,109 +283,92 @@ namespace strongstore
                                   const std::string &key, const std::string &value,
                                   op_callback ocb, op_timeout_callback otcb,
                                   uint32_t timeout,
-                                  std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
-                                  std::list<uint16_t> &outstandingOperationRefCount,
+                                  std::vector<OutstandingPred> &outstandingOperationVec,
                                   bool isIOCL)
     {
         // Send the operation to appropriate shard.
         Debug("[shard %i] AppReqiest Sending Operation %s(%s, %s)", shard_idx_, op.c_str(), key.c_str(), value.c_str());
 
         uint64_t req_id = last_req_id_++;
-        Debug("Storing the request in pendingReqs with app_request_id = %lu and its reqid = %lu", app_request_id, req_id);
-        PendingOperation *pendingOp = new PendingOperation(app_request_id, req_id);
-        pendingOps[req_id] = pendingOp;
-        pendingOp->op = op;
-        pendingOp->key = key;
-        pendingOp->val = value;
-        pendingOp->ocb = ocb;
-        pendingOp->otcb = otcb;
+        uint32_t idx = req_id % fanout_;
+        auto &pendingOp = slots_[idx];
+        ASSERT((!pendingOp.in_use) && pendingOp.pred_list.empty());
+        pendingOp.in_use = true;
+        pendingOp.ocb = ocb;
 
-        // TODO: Setup timeout
         op_.Clear();
+        op_.set_request_type(replication::LinearizeableOperation::KV_OP);
         op_.mutable_rid()->set_client_id(client_id_);
         op_.mutable_rid()->set_client_req_id(req_id);
         op_.set_transaction_id(app_request_id);
-        op_.set_key(key);
-        op_.set_value(value);
-        op_.set_op(op);
+        op_.mutable_kv()->set_key(key);
+        op_.mutable_kv()->set_value(value);
+        if (op == "get")
+        {
+            op_.mutable_kv()->set_op(replication::KVOpMessage::GET);
+        }
+        else if (op == "put")
+        {
+            op_.mutable_kv()->set_op(replication::KVOpMessage::PUT);
+        }
+        else
+        {
+            Panic("Unrecognized operation.");
+        }
+        op_.mutable_kv()->set_slot_idx(0); // slot index is decided at the server
 
         // Set the optional fields (myshardtag and pred_list) if IOCL
         if (isIOCL)
         {
-            Debug("IT IS IOCL!!! Setting myshardtag and pred_list");
             uint64_t myshardtag = CreateTag(client_id_, seqno);
-            Debug("this client_id_ = %lu, this seqno at this shard is %lu, and myshardtag = %lu", client_id_, seqno, myshardtag);
             seqno++;
             op_.set_shardtag(myshardtag);
             op_.set_intkey(std::stoull(key)); // for iocl optimization
+            Debug("     --->The shard tag is %lu", myshardtag);
 
-            // Construct predecessor list
-            auto it1 = outstandingOperationList.begin();
-            auto it2 = outstandingOperationRefCount.begin();
-            pendingOp->pred_list.reserve(outstandingOperationList.size());
-            while (it1 != outstandingOperationList.end() && it2 != outstandingOperationRefCount.end()) {
+            // Construct predecessor list and Issue coordination requests
+            replication::SuccessorRequestMessage coordReqMsg;
+            coordReqMsg.set_s(myshardtag); // my shard tag
+            coordReqMsg.set_shardidx(shard_idx_); // who pred should return to??
+            uint32_t i = 0;
+            for (auto &entry : outstandingOperationVec) {
                 // increment refcount entry
-                (*it2)++;
+                entry.refcount++;
                 // Add this entry to predecessor list and the RPC message
-                op_.add_predlist((*it1).first);
-                op_.add_shardlist((*it1).second);
-                pendingOp->pred_list.push_back(*it1);
-                Debug("Added predecessor tag = %lu with shard idx %u", (*it1).first, (*it1).second);
-                ++it1;
-                ++it2;
+                op_.add_predlist(entry.tag);
+                pendingOp.pred_list.push_back(std::make_pair(entry.tag, entry.shardid));
+                // Send coordination message to predecessor shard
+                coordReqMsg.set_p(entry.tag);
+                coordReqMsg.set_predidx(i);
+                if (!transport_->SendMessageToReplica(this, entry.shardid, 0, MsgType::CLIENT_COORD_TYPE, coordReqMsg))
+                {
+                    Warning("Could not send request to replicas.");
+                }
+                i++;
             }
             // Add self to outstanding operations and refcount lists
-            outstandingOperationList.push_back(std::make_pair(myshardtag, shard_idx_));
-            outstandingOperationRefCount.push_back(1);
-            // Print the outstnadingOperationsList and the outstnaidngOperationRefCount in a single loop
-            auto itl = outstandingOperationList.begin();
-            auto itr = outstandingOperationRefCount.begin();
-            for (;
-                 itl != outstandingOperationList.end() && itr != outstandingOperationRefCount.end();
-                 ++itl, ++itr) {
-                Debug("(tag %lu at shard %u) has refcount %u", itl->first, itl->second, *itr);
-            }
-            Debug("the size of the op is %lu", op_.ByteSizeLong());
-        } else {
-            Debug("Not IOCL, so not setting myshardtag and pred_list");
-            Debug("the size of the op is %lu", op_.ByteSizeLong());
+            outstandingOperationVec.push_back(OutstandingPred{myshardtag, (uint32_t)shard_idx_, 1});
         }
 
-        Debug("The shard client is sending the message to replica where shard_idx = %d and replica_ = %d", shard_idx_, replica_);
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, op_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::LIN_OP_TYPE, op_);
     }
 
     // IOCL receive the response
     void ShardClient::HandleSendOperationReply(const proto::LinearizeableReply &reply)
     {
-        Debug("shard client got LinearizeableReply!");
         uint64_t req_id = reply.rid().client_req_id();
-        Debug("the app_request_id = %lu", req_id);
         int status = reply.status();
         string retval = reply.return_value();
 
-        auto itr = pendingOps.find(req_id);
-        if (itr == pendingOps.end())
-        {
-            Debug("[%d][%lu] SendOperationREply for opeartion not stored in PendingOps.", shard_idx_, req_id);
-            Panic("huhuhuhuhuh");
-            return; // stale request
-        }
+        uint32_t idx = req_id % fanout_;
+        auto &pendingOp = slots_[idx];
+        ASSERT(pendingOp.in_use);
 
-        PendingOperation *op = itr->second;
-        uint64_t app_request_id = op->transaction_id;
-        op_callback ocb = std::move(op->ocb); // wrapped in move to make efficient
-        std::vector<std::pair<uint64_t, uint32_t>> pred_list = std::move(op->pred_list);
-        Debug("moving the pred_list of size %lu", pred_list.size());
-        pendingOps.erase(itr);
-        delete op;
+        op_callback ocb = std::move(pendingOp.ocb); // wrapped in move to make efficient
 
-        Debug("[shard %i] Received SendOperation (part of app request %lu) reply with status %d and return value %s",
-              shard_idx_, app_request_id, status, retval.c_str());
-
-        // maybe we could compare the vals from reply.val and req.val to make sure it's all marshalled right?
-
-        ocb(status, retval, pred_list);
+        ocb(status, retval, pendingOp.pred_list);
+        pendingOp.in_use = false;
+        pendingOp.pred_list.clear();
     }
 
     void ShardClient::ROCommit(uint64_t transaction_id,
@@ -485,28 +478,24 @@ namespace strongstore
 
     void ShardClient::RWCommitCoordinator(
         uint64_t transaction_id,
-        const std::set<int> participants, Timestamp &nonblock_timestamp,
+        const std::unordered_set<int> participants, Timestamp &nonblock_timestamp,
         rw_coord_commit_callback ccb, rw_coord_commit_timeout_callback ctcb, uint32_t timeout)
     {
         Debug("[%lu] [shard %i] Sending RWCommitCoordinator", transaction_id, shard_idx_);
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-
-        const auto &t = search->second;
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        PendingRWCoordCommit *pendingCommit = new PendingRWCoordCommit(transaction_id, req_id);
-        pendingRWCoordCommits[req_id] = pendingCommit;
-        pendingCommit->ccb = ccb;
-        pendingCommit->ctcb = ctcb;
+        PendingRWCoordCommitSlot &pendingRWCommitC = pending_rw_coord_commit_slot_->Alloc(req_id);
+        pendingRWCommitC.ccb = ccb;
+        pendingRWCommitC.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_c_.Clear();
         rw_commit_c_.mutable_rid()->set_client_id(client_id_);
         rw_commit_c_.mutable_rid()->set_client_req_id(req_id);
         rw_commit_c_.set_transaction_id(transaction_id);
-        t.serialize(rw_commit_c_.mutable_transaction());
+        the_transaction_.serialize(rw_commit_c_.mutable_transaction());
         nonblock_timestamp.serialize((rw_commit_c_.mutable_nonblock_timestamp()));
 
         for (int p : participants)
@@ -514,100 +503,83 @@ namespace strongstore
             rw_commit_c_.add_participants(p);
         }
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_c_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_TYPE, rw_commit_c_);
     }
 
     void ShardClient::HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply)
     {
         uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingRWCoordCommits.find(req_id);
-        if (itr == pendingRWCoordCommits.end())
-        {
-            Debug("[%d][%lu] RWCommitCoordinatorReply for stale request.", shard_idx_, req_id);
+        PendingRWCoordCommitSlot *pendingRWCommitC = pending_rw_coord_commit_slot_->GetByKeyIfPresent(req_id);
+        if (pendingRWCommitC == nullptr) {
+            Debug("[%d][%lu] RWCommitCoordinatorReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
+        rw_coord_commit_callback ccb = std::move(pendingRWCommitC->ccb);
+        uint64_t transaction_id = pendingRWCommitC->transaction_id;
 
-        PendingRWCoordCommit *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        rw_coord_commit_callback ccb = req->ccb;
-        pendingRWCoordCommits.erase(itr);
-        delete req;
+        ASSERT(transaction_id == the_transaction_.transaction_id());
+        the_transaction_.clear();
 
-        transactions_.erase(transaction_id);
-        read_sets_.erase(transaction_id);
-
-        Debug("[shard %i] COMMIT timestamp %lu.%lu", shard_idx_,
-              reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        ccb(reply.status(), Timestamp(reply.commit_timestamp()), Timestamp(reply.nonblock_timestamp()));
+        pending_rw_coord_commit_slot_->FreeByKey(req_id);
+        ccb(reply.status());
     }
 
     void ShardClient::RWCommitParticipant(uint64_t transaction_id,
-                                          int coordinator_shard, Timestamp &nonblock_timestamp,
-                                          rw_part_commit_callback ccb, rw_part_commit_timeout_callback ctcb,
-                                          uint32_t timeout)
+                                          int coordinator_shard, Timestamp &nonblock_timestamp)
     {
         Debug("[%lu] [shard %i] Sending RWCommitParticipant", transaction_id, shard_idx_);
 
-        auto search = transactions_.find(transaction_id);
-        ASSERT(search != transactions_.end());
-
-        const auto &t = search->second;
+        ASSERT(transaction_id == the_transaction_.transaction_id());
 
         uint64_t req_id = last_req_id_++;
-        PendingRWParticipantCommit *pendingCommit = new PendingRWParticipantCommit(transaction_id, req_id);
-        pendingRWParticipantCommits[req_id] = pendingCommit;
-        pendingCommit->ccb = ccb;
-        pendingCommit->ctcb = ctcb;
+        // ASSERT(!pending_rw_part_commit_slot_.in_use);
+        // pending_rw_part_commit_slot_.ccb = ccb;
+        // pending_rw_part_commit_slot_.in_use = true;
+        // pending_rw_part_commit_slot_.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         rw_commit_p_.Clear();
         rw_commit_p_.mutable_rid()->set_client_id(client_id_);
         rw_commit_p_.mutable_rid()->set_client_req_id(req_id);
         rw_commit_p_.set_transaction_id(transaction_id);
-        t.serialize(rw_commit_p_.mutable_transaction());
+        the_transaction_.serialize(rw_commit_p_.mutable_transaction());
         rw_commit_p_.set_coordinator_shard(coordinator_shard);
         nonblock_timestamp.serialize((rw_commit_p_.mutable_nonblock_timestamp()));
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, rw_commit_p_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_COMMIT_PART_TYPE, rw_commit_p_);
+        the_transaction_.clear();
     }
 
-    void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
-    {
-        Debug("[shard %i] Received RWCommitParticipant", shard_idx_);
-        uint64_t req_id = reply.rid().client_req_id();
+    // void ShardClient::HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply)
+    // {
+    //     Debug("[shard %i] Received RWCommitParticipant", shard_idx_);
+    //     uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingRWParticipantCommits.find(req_id);
-        if (itr == pendingRWParticipantCommits.end())
-        {
-            Debug("[%d][%lu] RWCommitParticipantReply for stale request.", shard_idx_, req_id);
-            return; // stale request
-        }
+    //     ASSERT(pending_rw_part_commit_slot_.in_use); // hoping this isn't too conservative when we start having aborts?
+    //     rw_part_commit_callback ccb = pending_rw_part_commit_slot_.ccb;
+    //     uint64_t transaction_id = pending_rw_part_commit_slot_.transaction_id;
+    //     pending_rw_part_commit_slot_.in_use = false;
 
-        PendingRWParticipantCommit *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        rw_part_commit_callback ccb = req->ccb;
-        pendingRWParticipantCommits.erase(itr);
-        delete req;
+    //     Debug("Got response fro mPARTICIPANT for TID %lu --> CLEARNIG IT", transaction_id);
+    //     ASSERT(transaction_id == the_transaction_.transaction_id());
+    //     the_transaction_.clear();
 
-        transactions_.erase(transaction_id);
-        read_sets_.erase(transaction_id);
+    //     ccb(reply.status());
+    // }
 
-        ccb(reply.status());
-    }
-
+    // Participant Leader wants to send out PrepareOK to Coordinator Leader
     void ShardClient::PrepareOK(uint64_t transaction_id, int participant_shard,
-                                const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts,
-                                prepare_callback pcb,
-                                prepare_timeout_callback ptcb, uint32_t timeout)
+                                const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts)
     {
         Debug("[shard %i] Sending PrepareOK [%lu]", shard_idx_, transaction_id);
 
         uint64_t req_id = last_req_id_++;
-        PendingPrepareOK *pendingPrepareOK = new PendingPrepareOK(transaction_id, req_id);
-        pendingPrepareOKs[req_id] = pendingPrepareOK;
-        pendingPrepareOK->pcb = pcb;
-        pendingPrepareOK->ptcb = ptcb;
+        if (pending_prepare_ok_slot_->ContainsKey(transaction_id)) {
+            Panic("i was hoping tid was uniqe enough!");
+            return; // already have pending prepare ok for this transaction, just ignore
+        }
+        pending_prepare_ok_slot_->Alloc(transaction_id); // just used for dedup of prepareOkCallback
 
         // TODO: Setup timeout
         prepare_ok_.mutable_rid()->set_client_id(client_id_);
@@ -617,30 +589,22 @@ namespace strongstore
         prepare_timestamp.serialize(prepare_ok_.mutable_prepare_timestamp());
         nonblock_ts.serialize(prepare_ok_.mutable_nonblock_timestamp());
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, prepare_ok_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_PREPARE_OK_TYPE, prepare_ok_);
     }
 
     void ShardClient::HandlePrepareOKReply(const proto::PrepareOKReply &reply)
     {
-        Debug("[shard %i] Received PrepareOKReply", shard_idx_);
+        Debug("[shard %i] Received PrepareOKReply for TID %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
-
-        auto itr = pendingPrepareOKs.find(req_id);
-        if (itr == pendingPrepareOKs.end())
-        {
-            Debug("[%d][%lu] PrepareOKReply for stale request.", shard_idx_,
-                  req_id);
-            return; // stale request
+        if (!pending_prepare_ok_slot_->ContainsKey(req_id)) {
+            Debug("[%d][%lu] Stale PrepareOKReply for req_id %lu.", shard_idx_, req_id, req_id);
+            return; // stale reply, just ignore
         }
-
-        PendingPrepareOK *req = itr->second;
-        prepare_callback pcb = req->pcb;
-        pendingPrepareOKs.erase(itr);
-        delete req;
 
         Debug("[shard %i] COMMIT timestamp [%lu.%lu]", shard_idx_,
               reply.commit_timestamp().timestamp(), reply.commit_timestamp().id());
-        pcb(reply.status(), Timestamp(reply.commit_timestamp()));
+        pending_prepare_ok_slot_->FreeByKey(req_id);
+        pokcb_(reply.rid().client_req_id(), reply.status(), Timestamp(reply.commit_timestamp()));
     }
 
     void ShardClient::PrepareAbort(uint64_t transaction_id, int participant_shard,
@@ -691,13 +655,12 @@ namespace strongstore
     void ShardClient::Abort(uint64_t transaction_id, abort_callback acb,
                             abort_timeout_callback atcb, uint32_t timeout)
     {
-        Debug("[%lu] [shard %i] Sending Abort", transaction_id, shard_idx_);
-
         uint64_t req_id = last_req_id_++;
-        PendingAbort *pendingAbort = new PendingAbort(transaction_id, req_id);
-        pendingAborts[req_id] = pendingAbort;
-        pendingAbort->acb = acb;
-        pendingAbort->atcb = atcb;
+        Debug("[%lu] [shard %i] Sending Abort with req_id %lu", transaction_id, shard_idx_, req_id);
+
+        PendingAbortSlot &pendingAbort = pending_abort_slot_->Alloc(req_id);
+        pendingAbort.acb = acb;
+        pendingAbort.transaction_id = transaction_id;
 
         // TODO: Setup timeout
         abort_.Clear();
@@ -705,7 +668,7 @@ namespace strongstore
         abort_.mutable_rid()->set_client_req_id(req_id);
         abort_.set_transaction_id(transaction_id);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, abort_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_ABORT_TYPE, abort_);
     }
 
     void ShardClient::Wound(uint64_t transaction_id)
@@ -714,28 +677,26 @@ namespace strongstore
 
         wound_.set_transaction_id(transaction_id);
 
-        transport_->SendMessageToReplica(this, shard_idx_, replica_, wound_);
+        transport_->SendMessageToReplica(this, shard_idx_, replica_, MsgType::TXN_WOUND_TYPE, wound_);
     }
 
     void ShardClient::AbortGet(uint64_t transaction_id)
     {
         Debug("[%lu] [shard %i] Aborting GET", transaction_id, shard_idx_);
 
-        for (auto it = pendingGets.begin(); it != pendingGets.end(); )
+        // Loop through pending get slots
+        for (uint32_t idx = 0; idx < fanout_; idx++)
         {
-            if (it->second->transaction_id == transaction_id)
-            {
-                PendingGet *req = it->second;
-                uint64_t transaction_id = req->transaction_id;
-                get_callback gcb = req->gcb;
-                std::string key = req->key;
+            if (get_slots_->ContainsIdx(idx)) {
+                auto &pendingGet = get_slots_->GetByIdx(idx);
+                if (pendingGet.transaction_id == transaction_id)
+                {
+                    get_callback gcb = std::move(pendingGet.gcb);
+                    std::string key = std::move(pendingGet.key);
 
-                it = pendingGets.erase(it);
-                delete req;
-
-                gcb(REPLY_FAIL, key, "", {});
-            } else {
-                ++it;
+                    get_slots_->FreeByKey(pendingGet.req_id);
+                    gcb(REPLY_FAIL, key, "", {});
+                }
             }
         }
     }
@@ -752,26 +713,26 @@ namespace strongstore
         Debug("[shard %i] Received HandleAbortReply for req_id %lu", shard_idx_, reply.rid().client_req_id());
         uint64_t req_id = reply.rid().client_req_id();
 
-        auto itr = pendingAborts.find(req_id);
-        if (itr == pendingAborts.end())
-        {
-            Debug("[%d][%lu] HandleAbortReply for stale request.", shard_idx_,
-                  req_id);
+        PendingAbortSlot *pendingAbort = pending_abort_slot_->GetByKeyIfPresent(req_id);
+        if (pendingAbort == nullptr) {
+            Debug("[%d][%lu] HandleAbortReply for stale request for req_id %lu.", shard_idx_, req_id, req_id);
             return; // stale request
         }
-
-        PendingAbort *req = itr->second;
-        uint64_t transaction_id = req->transaction_id;
-        abort_callback acb = req->acb;
-        pendingAborts.erase(itr);
-        delete req;
+        uint64_t transaction_id = pendingAbort->transaction_id;
+        abort_callback acb = std::move(pendingAbort->acb);
 
         if (reply.status() == REPLY_OK)
         {
-            transactions_.erase(transaction_id);
-            read_sets_.erase(transaction_id);
+            if (transaction_id != the_transaction_.transaction_id())
+            {
+                ASSERT(server_shard_client_);
+            } else {
+                ASSERT(!server_shard_client_);
+                the_transaction_.clear();
+            }
         }
 
+        pending_abort_slot_->FreeByKey(req_id);
         acb();
     }
 

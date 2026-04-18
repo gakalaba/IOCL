@@ -58,52 +58,106 @@ namespace replication
             IOCL_STATE_COMMITTED
         };
 
-        struct IoclEntry {
-            struct PairHash {
-                std::size_t operator()(const std::pair<uint64_t, int32_t>& p) const noexcept {
-                    uint64_t h1 = std::hash<uint64_t>()(p.first);
-                    uint64_t h2 = std::hash<int32_t>()(p.second);
+        struct SuccessorKey {
+            uint64_t s_shardtag;
+            uint32_t s_shardidx;
 
-                    // Very good hash mixing (from boost::hash_combine)
-                    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
-                }
-            };
+            bool operator==(const SuccessorKey &other) const noexcept {
+                return s_shardtag == other.s_shardtag &&
+                    s_shardidx == other.s_shardidx;
+            }
+        };
+
+        struct SuccessorKeyHash {
+            std::size_t operator()(const SuccessorKey &x) const noexcept {
+                std::size_t h1 = std::hash<uint64_t>{}(x.s_shardtag);
+                std::size_t h2 = std::hash<uint32_t>{}(x.s_shardidx);
+
+                std::size_t h = h1;
+                h ^= h2 + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+                return h;
+            }
+        };
+
+        struct SuccessorInfo {
+            uint16_t predidx;
+            bool final_sent;
+        };
+
+        struct outCoordResp {
+            uint64_t arrivalTs;
+            uint16_t predidx;
+        };
+
+        struct outCoordReq {
+            uint64_t s;
+            uint32_t shardidx;
+            uint16_t predidx;
+        };
+
+        struct IoclEntry {
             viewstamp_t viewstamp;
             IoclEntryState state;
-            Request request;
-            uint64_t myShardTag;
-            proto::PredListHolder predList; // we copied the predlist out of the RPC message via Swap()
+            const LinearizeableOperation request; // op, key, value, slot_idx, clientid, clientreqid, shardtag, predList
+            const uint64_t myShardTag; // redundant but for caching and less request.shardtag access
+            const uint64_t intkey; // redundant but for caching and less request.intkey access
+            const uint16_t num_predecessors;
             uint64_t arrivalTs;
             uint64_t finalTs;
             std::vector<uint64_t> predecessorArrivalTs;
             int ACKs;
-            const uint64_t intkey;
-            std::unordered_set<std::pair<uint64_t,int32_t>, PairHash> finalAcks; // tracking all unique final ACKs from predecessors
-            std::unordered_map<std::pair<uint64_t,int32_t>, int, PairHash> successors; // keep track of all your successors to send the final ACK! (shardtag -> shardidx)
+            uint64_t final_ack_mask = 0; // num_predecessors <= 64, so can fit in a 64-bit int
+            uint8_t final_ack_count = 0;
+            // keep track of all your successors to send the final ACK! (successor shardtag, successor shardidx, predix) -> have we sent the final ACK to this successor already?
+            std::unordered_map<SuccessorKey, SuccessorInfo, SuccessorKeyHash> successors;
             // string hash;
             // // Speculative client table stuff
             // opnum_t prevClientReqOpnum;
             // ::google::protobuf::Message *replyMessage;
+            // Quorum tracking stuff
+            uint64_t prepare_ok_mask = 0;
+            uint8_t prepare_ok_count = 0;
+            uint64_t u_prepare_ok_mask = 0;
+            uint8_t u_prepare_ok_count = 0;
+            uint64_t predArrivalTs_reply_mask = 0;
 
             IoclEntry(viewstamp_t viewstamp, IoclEntryState state,
-                    const Request &request, uint64_t shardtag, uint64_t intkey)
+                    LinearizeableOperation request, uint64_t shardtag, uint64_t intkey, uint16_t num_predecessors)
                 : viewstamp(viewstamp),
                   state(state),
-                  request(request),
+                  request(std::move(request)),
                   myShardTag(shardtag),
+                  num_predecessors(num_predecessors),
+                  predecessorArrivalTs(num_predecessors, 0),
                   ACKs(0),
-                  intkey(intkey) {}
-            virtual ~IoclEntry() {}
+                  prepare_ok_count(0),
+                  prepare_ok_mask(0),
+                  u_prepare_ok_count(0),
+                  u_prepare_ok_mask(0),
+                  predArrivalTs_reply_mask(0),
+                  arrivalTs(0),
+                  finalTs(0),
+                  intkey(intkey) {
+                    successors.reserve(16);
+                  }
         };
         // Comparison operator for ordering IoclEntries
-        struct EntryReadyCompare {
-            bool operator()(const IoclEntry* a, const IoclEntry* b) const {
+        struct EntryReadyCompareIdx {
+            const std::vector<IoclEntry> *store;
+            bool operator()(uint32_t a, uint32_t b) const {
+                const IoclEntry &ea = (*store)[a];
+                const IoclEntry &eb = (*store)[b];
+
                 // First by final timestamp
-                if (a->finalTs < b->finalTs) return true;
-                if (a->finalTs > b->finalTs) return false;
+                if (ea.finalTs < eb.finalTs) return true;
+                if (ea.finalTs > eb.finalTs) return false;
 
                 // Then by Tag (unique)
-                return a->myShardTag < b->myShardTag;
+                return ea.myShardTag < eb.myShardTag;
+                /* EntryReadyCompareIdx using (finalTs, myShardTag)
+                is fine as long as myShardTag is truly unique
+                per entry and finalTs is only changed while the
+                entry is out of the set. */
             }
         };
 
@@ -118,6 +172,12 @@ namespace replication
 
             void ReceiveMessage(const TransportAddress &remote, const string &type,
                                 const string &data, void *meta_data);
+            void ReceiveMessage(const TransportAddress &remote, MsgType type,
+                                const string &data, void *meta_data);
+            virtual void HandleRequest(LinearizeableOperation &msg);
+            virtual void HandleCoordination(const SuccessorRequestMessage &msg);
+            inline IoclEntry &Entry(uint32_t idx) { return entryStore[idx]; }
+            inline const IoclEntry &Entry(uint32_t idx) const { return entryStore[idx]; }
 
         private:
             view_t view;
@@ -133,36 +193,57 @@ namespace replication
             unsigned int batchSize;
             opnum_t lastBatchEnd;
             opnum_t lastUnorderedBatchEnd;
+            uint8_t Q;
+            // cached message objects for ReceiveMessage()
+            proto::UnorderedPrepareMessage unorderedPrepareRecv;
+            proto::UnorderedPrepareOKMessage unorderedPrepareOKRecv;
+            proto::PrepareMessage prepareRecv;
+            proto::PrepareOKMessage prepareOKRecv;
+            proto::CommitMessage commitRecv;
+            proto::PredecessorReplyMessage coordRespRecv;
+            proto::PredecessorFinalMessage coordFinalRecv;
+            // cached message objects for transmission
+            proto::PredecessorFinalMessage predFinalSend;
+            proto::PredecessorReplyMessage preplySend;
 
-            std::vector<IoclEntry *> log;
-            ska::flat_hash_map<uint64_t, std::vector<opnum_t>> perKeySubLogs;
+            struct PerKeySubLog {
+                std::vector<opnum_t> ops;
+                size_t head = 0;
+            };
+            ska::flat_hash_map<uint64_t, PerKeySubLog> perKeySubLogs;
 
             /*******************************/
             /* IOCL_CT specific structures */
             /*******************************/
-            ska::flat_hash_map<uint64_t, std::unique_ptr<IoclEntry>> unorderedBag;
-            std::unordered_map<opnum_t, IoclEntry *> unorderedBagByOpnum; // For Batching
-            ska::flat_hash_map<uint64_t, std::set<IoclEntry*, EntryReadyCompare>> perKeySubqueues;
+            std::vector<IoclEntry> entryStore;
+            ska::flat_hash_map<uint64_t, uint32_t> shardtagToEntryIdx;
+            std::vector<uint32_t> log;                           // ordered opnum offset -> entry index
+            /* Getting rid of unorderedBagByOpnum because 
+               all of the following will always hold true:
+               1. every unordered request gets exactly one IoclEntry
+               2. entries are appended to entryStore in the same order unordered opnums are assigned
+               3. nothing else gets inserted into entryStore anywhere other than at HandleRequest
+               4. you never remove/recycle entries in a way that changes indices 
+            */
+            ska::flat_hash_map<uint64_t, std::set<uint32_t, EntryReadyCompareIdx>> perKeySubqueues;
             std::map<uint64_t, std::unique_ptr<TransportAddress>> clientAddresses;
             uint64_t shardTS;
             std::unordered_map<uint64_t, uint64_t> lastReadyTS; // last ready TS per Key
-            ska::flat_hash_map<uint64_t, std::vector<proto::SuccessorRequestMessage>> outstandingCoordinationReqs;
-            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorReplyMessage>> outstandingCoordinationResps;
-            ska::flat_hash_map<uint64_t, std::vector<proto::PredecessorFinalMessage>> outstandingCoordinationFinals;
+            ska::flat_hash_map<uint64_t, std::vector<outCoordReq>> outstandingCoordinationReqs;
+            ska::flat_hash_map<uint64_t, std::vector<outCoordResp>> outstandingCoordinationResps;
+            ska::flat_hash_map<uint64_t, uint64_t> outstandingCoordinationFinals;
             std::unordered_map<uint64_t, std::vector<size_t>> perKeyQueueLengths;
 
-            struct ClientTableEntry
-            {
-                uint64_t lastReqId;
-                bool replied;
-                proto::ReplyMessage reply;
-            };
-            std::map<uint64_t, ClientTableEntry> clientTable;
+            // struct ClientTableEntry
+            // {
+            //     uint64_t lastReqId;
+            //     bool replied;
+            //     proto::ReplyMessage reply;
+            // };
+            // std::map<uint64_t, ClientTableEntry> clientTable;
 
-            QuorumSet<viewstamp_t, proto::UnorderedPrepareOKMessage> unorderedPrepareOKQuorum;
-            QuorumSet<viewstamp_t, proto::PrepareOKMessage> prepareOKQuorum;
-            QuorumSet<view_t, proto::StartViewChangeMessage> startViewChangeQuorum;
-            QuorumSet<view_t, proto::DoViewChangeMessage> doViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> startViewChangeQuorum;
+            replication::QuorumSet<viewstamp_t, replication::ViewstampHash, replication::ViewstampEq> doViewChangeQuorum;
 
             Timeout *viewChangeTimeout;
             Timeout *nullCommitTimeout;
@@ -185,20 +266,19 @@ namespace replication
             void EnterView(view_t newview);
             void StartViewChange(view_t newview);
             void SendNullCommit();
-            void UpdateClientTable(const Request &req);
+            // void UpdateClientTable(const Request &req);
             void ResendPrepare();
             void ResendUnorderedPrepare();
             void CloseBatch();
             void CloseUnorderedBatch();
-            void ReadyRoutine(IoclEntry *entry);
-            void ReadyFinalRoutine(IoclEntry *entry);
-            void AppendToLog(IoclEntry *entry);
+            void ReadyRoutine(uint64_t intkey, std::set<uint32_t, EntryReadyCompareIdx> &sq);
+            void ReadyFinalRoutine(uint64_t intkey, PerKeySubLog &sublog);
+            void AppendToLog(opnum_t new_entry_opnum, uint32_t idx);
             IoclEntry *FindInLog(opnum_t opnum);
             viewstamp_t LastViewstampOfLog() const;
-            uint64_t FoldL(const proto::PredListHolder &pl);
+            uint64_t FoldL(const std::vector<uint64_t> &pl);
+            void InsertInSubqueue(uint64_t intkey, uint32_t idx);
 
-            void HandleRequest(const TransportAddress &remote,
-                               proto::RequestMessage &msg);
             void HandleUnloggedRequest(const TransportAddress &remote,
                                        const proto::UnloggedRequestMessage &msg);
 
@@ -210,8 +290,6 @@ namespace replication
                                proto::UnorderedPrepareMessage &msg);
             void HandleUnorderedPrepareOK(const TransportAddress &remote,
                                  const proto::UnorderedPrepareOKMessage &msg);
-            void HandleCoordination(const TransportAddress &remote,
-                                 const proto::SuccessorRequestMessage &msg);
             void HandleCoordinationReply(const TransportAddress &remote,
                                 const proto::PredecessorReplyMessage &msg);
             void HandleCoordinationFinal(const TransportAddress &remote,
@@ -229,6 +307,7 @@ namespace replication
                                     const proto::DoViewChangeMessage &msg);
             void HandleStartView(const TransportAddress &remote,
                                  const proto::StartViewMessage &msg);
+            // void PrintSubqueue(uint64_t intkey);
         };
 
     } // namespace iocl_ct

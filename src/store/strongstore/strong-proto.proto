@@ -24,9 +24,8 @@ message GetReply {
     // -2 = retry
     // -3 = abstain/no reply
     required int32 status = 2;
-    required string key = 3;
-    optional string val = 4;
-    optional TimestampMessage timestamp = 5;
+    optional string val = 3;
+    optional TimestampMessage timestamp = 4;
 }
 
 message RWCommitCoordinator {
@@ -40,8 +39,6 @@ message RWCommitCoordinator {
 message RWCommitCoordinatorReply {
     required RequestIDMessage rid = 1;
     required int32 status = 2;
-    optional TimestampMessage commit_timestamp = 3;
-    optional TimestampMessage nonblock_timestamp = 4;
 }
 
 message RWCommitParticipant {
@@ -130,30 +127,6 @@ message ROCommitSlowReply {
 
 message Wound {
     required uint64 transaction_id = 1;
-}
-
-message PrepareMessage {
-    required TransactionMessage txn = 1;
-    required TimestampMessage timestamp = 2;
-    required int32 coordinator = 3;
-    required TimestampMessage nonblock_ts = 5;
-    repeated int32 participants = 4;
-}
-
-message CommitMessage {
-    required TimestampMessage commit_timestamp = 1;
-}
-
-message Request {
-     enum Operation {
-          PREPARE = 1;
-          COMMIT = 2;
-          ABORT = 3;
-     }	
-     required Operation op = 1;
-     required uint64 txnid = 2;
-     optional PrepareMessage prepare = 3;
-     optional CommitMessage commit = 4;
 }
 
 message Reply {

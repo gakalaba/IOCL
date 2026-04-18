@@ -45,7 +45,7 @@
 #define OPERATION_TIMEOUT 1000
 #define OPERATION_RETRIES 5
 
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include "lib/assert.h"
@@ -58,6 +58,7 @@
 #include "store/strongstore/preparedtransaction.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "replication/common/request.pb.h"
+#include "store/common/slot_pool.h"
 
 namespace strongstore
 {
@@ -70,6 +71,11 @@ namespace strongstore
         MODE_SPAN_OCC,
         MODE_SPAN_LOCK,
         MODE_MVTSO
+    };
+    struct OutstandingPred {
+        uint64_t tag;
+        uint32_t shardid;
+        uint16_t refcount;
     };
 
     typedef std::function<void(int, const std::string &, const std::string &, Timestamp)> get_callback;
@@ -84,7 +90,9 @@ namespace strongstore
     typedef std::function<void(int, Timestamp)> prepare_callback;
     typedef std::function<void(int, Timestamp)> prepare_timeout_callback;
 
-    typedef std::function<void(int, Timestamp, Timestamp)> rw_coord_commit_callback;
+    typedef std::function<void(uint64_t, int, Timestamp)> prepare_ok_callback;
+
+    typedef std::function<void(int)> rw_coord_commit_callback;
     typedef std::function<void(int)> rw_coord_commit_timeout_callback;
 
     typedef std::function<void(int)> rw_part_commit_callback;
@@ -105,12 +113,16 @@ namespace strongstore
         /* Constructor needs path to shard config. */
         ShardClient(
             const transport::Configuration &config, Transport *transport, uint64_t client_id,
-            int shard, wound_callback wcb = [](uint64_t transaction_id) {});
+            int shard, uint64_t fanout, wound_callback wcb = [](uint64_t transaction_id) {}, prepare_ok_callback pokcb = [](uint64_t transaction_id, int participant_shard, Timestamp prepare_timestamp) {});
 
         ~ShardClient();
 
         void ReceiveMessage(const TransportAddress &remote,
                             const std::string &type,
+                            const std::string &data,
+                            void *meta_data);
+        void ReceiveMessage(const TransportAddress &remote,
+                            MsgType type,
                             const std::string &data,
                             void *meta_data);
         void Close();
@@ -131,8 +143,7 @@ namespace strongstore
                          const std::string &key, const std::string &value,
                          op_callback ocb, op_timeout_callback otcb,
                          uint32_t timeout,
-                         std::list<std::pair<uint64_t, uint32_t>> &outstandingOperationList,
-                         std::list<uint16_t> &outstandingOperationRefCount,
+                         std::vector<OutstandingPred> &outstandingOperationVec,
                          bool isIOCL);
 
         void ROCommit(uint64_t transaction_id, const std::vector<std::string> &keys,
@@ -142,20 +153,16 @@ namespace strongstore
                       ro_commit_timeout_callback ctcb, uint32_t timeout);
 
         void RWCommitCoordinator(uint64_t transaction_id,
-                                 const std::set<int> participants,
+                                 const std::unordered_set<int> participants,
                                  Timestamp &nonblock_timestamp,
                                  rw_coord_commit_callback ccb,
                                  rw_coord_commit_timeout_callback ctcb, uint32_t timeout);
         void RWCommitParticipant(uint64_t transaction_id,
                                  int coordinator_shard,
-                                 Timestamp &nonblock_timestamp,
-                                 rw_part_commit_callback ccb,
-                                 rw_part_commit_timeout_callback ctcb, uint32_t timeout);
+                                 Timestamp &nonblock_timestamp);
 
         void PrepareOK(uint64_t transaction_id, int participant_shard,
-                       const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts,
-                       prepare_callback pcb,
-                       prepare_timeout_callback ptcb, uint32_t timeout);
+                       const Timestamp &prepare_timestamp, const Timestamp &nonblock_ts);
 
         void PrepareAbort(uint64_t transaction_id, int participant_shard,
                           prepare_callback pcb, prepare_timeout_callback ptcb,
@@ -175,37 +182,6 @@ namespace strongstore
             uint64_t transaction_id;
             uint64_t req_id;
         };
-        struct PendingGet : public PendingRequest
-        {
-            PendingGet(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            std::string key;
-            get_callback gcb;
-            get_timeout_callback gtcb;
-        };
-        struct PendingRWCoordCommit : public PendingRequest
-        {
-            PendingRWCoordCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            rw_coord_commit_callback ccb;
-            rw_coord_commit_timeout_callback ctcb;
-        };
-        struct PendingRWParticipantCommit : public PendingRequest
-        {
-            PendingRWParticipantCommit(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            rw_part_commit_callback ccb;
-            rw_part_commit_timeout_callback ctcb;
-        };
-        struct PendingAbort : public PendingRequest
-        {
-            PendingAbort(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            abort_callback acb;
-            abort_timeout_callback atcb;
-        };
-        struct PendingPrepareOK : public PendingRequest
-        {
-            PendingPrepareOK(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            prepare_callback pcb;
-            prepare_timeout_callback ptcb;
-        };
         struct PendingPrepareAbort : public PendingRequest
         {
             PendingPrepareAbort(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
@@ -220,16 +196,6 @@ namespace strongstore
             ro_commit_timeout_callback ctcb;
             uint64_t n_slow_replies;
         };
-        struct PendingOperation : public PendingRequest
-        {
-            PendingOperation(uint64_t transaction_id, uint64_t req_id) : PendingRequest(transaction_id, req_id) {}
-            std::string op;
-            std::string key;
-            std::string val;
-            op_callback ocb;
-            op_timeout_callback otcb;
-            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
-        };
 
         bool CheckPriorReadsAndWrites(uint64_t transaction_id, const std::string &key, get_callback gcb);
 
@@ -240,7 +206,7 @@ namespace strongstore
         void HandleGetReply(const proto::GetReply &reply);
         void HandleSendOperationReply(const proto::LinearizeableReply &reply);
         void HandleRWCommitCoordinatorReply(const proto::RWCommitCoordinatorReply &reply);
-        void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
+        // void HandleRWCommitParticipantReply(const proto::RWCommitParticipantReply &reply);
         void HandlePrepareOKReply(const proto::PrepareOKReply &reply);
         void HandlePrepareAbortReply(const proto::PrepareAbortReply &reply);
         void HandleROCommitReply(const proto::ROCommitReply &reply);
@@ -248,16 +214,11 @@ namespace strongstore
         void HandleAbortReply(const proto::AbortReply &reply);
         void HandleWound(const proto::Wound &wound);
 
-        std::unordered_map<uint64_t, Transaction> transactions_;
-        std::unordered_map<uint64_t, std::unordered_map<std::string, std::string>> read_sets_;
+        Transaction the_transaction_;
+        bool server_shard_client_;
+        std::unordered_map<std::string, std::string> the_read_set_;
 
-        std::unordered_map<uint64_t, PendingGet *> pendingGets;
-        std::unordered_map<uint64_t, PendingOperation *> pendingOps;
-        std::unordered_map<uint64_t, PendingRWCoordCommit *> pendingRWCoordCommits;
-        std::unordered_map<uint64_t, PendingRWParticipantCommit *> pendingRWParticipantCommits;
-        std::unordered_map<uint64_t, PendingPrepareOK *> pendingPrepareOKs;
         std::unordered_map<uint64_t, PendingPrepareAbort *> pendingPrepareAborts;
-        std::unordered_map<uint64_t, PendingAbort *> pendingAborts;
         std::unordered_map<uint64_t, PendingROCommit *> pendingROCommits;
 
         proto::Get get_;
@@ -288,9 +249,46 @@ namespace strongstore
         int shard_idx_;        // which shard this client accesses
         int replica_;          // which replica to use for reads
         wound_callback wcb_;
+        prepare_ok_callback pokcb_;
+        uint64_t fanout_;
 
         // IOCL Operation Metadata
         uint64_t seqno;
+
+        struct PendingReplySlot {
+            bool in_use = false;
+            op_callback ocb;
+            std::vector<std::pair<uint64_t, uint32_t>> pred_list;
+        };
+        std::vector<PendingReplySlot> slots_;
+
+        struct PendingGetSlot {
+            bool in_use = false;
+            uint64_t transaction_id;
+            get_callback gcb;
+            std::string key;
+            uint64_t req_id;
+        };
+        SlotPool<PendingGetSlot> *get_slots_ = nullptr;
+
+        struct PendingRWCoordCommitSlot {
+            bool in_use = false;
+            rw_coord_commit_callback ccb;
+            uint64_t transaction_id;
+        };
+        SlotPool<PendingRWCoordCommitSlot> *pending_rw_coord_commit_slot_ = nullptr;
+
+        struct PendingPrepareOKSlot {
+            bool in_use = false;
+        };
+        SlotPool<PendingPrepareOKSlot> *pending_prepare_ok_slot_ = nullptr;
+
+        struct PendingAbortSlot {
+            bool in_use = false;
+            abort_callback acb;
+            uint64_t transaction_id;
+        };
+        SlotPool<PendingAbortSlot> *pending_abort_slot_ = nullptr;
     };
 
 } // namespace strongstore

@@ -75,6 +75,7 @@ namespace strongstore
                                        const Transaction &transaction);
         LockReleaseResult ReleaseLocks(uint64_t transaction_id,
                                        const Transaction &transaction);
+        std::vector<uint64_t> WhoHolds(const Transaction &transaction);
 
     private:
         WoundWait locks_;

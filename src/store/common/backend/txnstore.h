@@ -37,7 +37,6 @@
 
 #include "lib/assert.h"
 #include "lib/message.h"
-#include "store/common/stats.h"
 #include "store/common/timestamp.h"
 #include "store/common/transaction.h"
 
@@ -83,11 +82,6 @@ public:
     // load keys
     virtual void Load(const std::string &key, const std::string &value,
                       const Timestamp &timestamp);
-
-    inline Stats &GetStats() { return stats; }
-
-protected:
-    Stats stats;
 };
 
 #endif /* _TXN_STORE_H_ */

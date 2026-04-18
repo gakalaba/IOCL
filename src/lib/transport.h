@@ -46,6 +46,32 @@ public:
     virtual TransportAddress *clone() const = 0;
 };
 
+enum class MsgType : uint8_t {
+    // Messages between clients and server
+    LIN_OP_TYPE,
+    LIN_REPLY_TYPE,
+    CLIENT_COORD_TYPE,
+    GET_TYPE,
+    GET_REPLY_TYPE,
+    TXN_COMMIT_TYPE,
+    TXN_COMMIT_REPLY_TYPE,
+    TXN_COMMIT_PART_TYPE,
+    TXN_COMMIT_PART_REPLY_TYPE,
+    TXN_PREPARE_OK_TYPE,
+    TXN_PREPARE_OK_REPLY_TYPE,
+    TXN_ABORT_TYPE,
+    TXN_ABORT_REPLY_TYPE,
+    TXN_WOUND_TYPE,
+    // Messages between servers
+    PREPARE_TYPE,
+    PREPARE_OK_TYPE,
+    UNORDERED_PREPARE_TYPE,
+    UNORDERED_PREPARE_OK_TYPE,
+    COMMIT_TYPE,
+    COORD_RESP_TYPE,
+    COORD_FINAL_TYPE,
+};
+
 class TransportReceiver
 {
 protected:
@@ -61,6 +87,10 @@ public:
                                 const string &type,
                                 const string &data,
                                 void *meta_data) = 0;
+    virtual void ReceiveMessage(const TransportAddress &remote,
+                            MsgType type,
+                            const std::string &data,
+                            void *meta_data) = 0;
     virtual void Close() = 0;
 
 protected:
@@ -84,17 +114,33 @@ public:
     virtual bool SendMessage(TransportReceiver *src,
                              const TransportAddress &dst,
                              const Message &m) = 0;
+    virtual bool SendMessage(TransportReceiver *src,
+                             const TransportAddress &dst,
+                             MsgType type,
+                             const Message &m) = 0;
     /* Send message to a replica in the local/default(0) group */
     virtual bool SendMessageToReplica(TransportReceiver *src,
                                       int replicaIdx,
+                                      const Message &m) = 0;
+    virtual bool SendMessageToReplica(TransportReceiver *src,
+                                      int replicaIdx,
+                                        MsgType type,
                                       const Message &m) = 0;
     /* Send message to a replica in a specific group */
     virtual bool SendMessageToReplica(TransportReceiver *src,
                                       int groupIdx,
                                       int replicaIdx,
                                       const Message &m) = 0;
+    virtual bool SendMessageToReplica(TransportReceiver *src,
+                                      int groupIdx,
+                                      int replicaIdx,
+                                      MsgType type,
+                                      const Message &m) = 0;
     /* Send message to all replicas in the local/default(0) group */
     virtual bool SendMessageToAll(TransportReceiver *src,
+                                  const Message &m) = 0;
+    virtual bool SendMessageToAll(TransportReceiver *src,
+                                    MsgType type,
                                   const Message &m) = 0;
     /* Send message to all replicas in all groups in the configuration */
     virtual bool SendMessageToAllGroups(TransportReceiver *src,
@@ -103,9 +149,17 @@ public:
     virtual bool SendMessageToGroups(TransportReceiver *src,
                                      const std::vector<int> &groups,
                                      const Message &m) = 0;
+    virtual bool SendMessageToGroups(TransportReceiver *src,
+                                     const std::vector<int> &groups,
+                                        MsgType type,
+                                     const Message &m) = 0;
     /* Send message to all replicas in a single group */
     virtual bool SendMessageToGroup(TransportReceiver *src,
                                     int groupIdx,
+                                    const Message &m) = 0;
+    virtual bool SendMessageToGroup(TransportReceiver *src,
+                                    int groupIdx,
+                                    MsgType type,
                                     const Message &m) = 0;
     /* Send message to failure coordinator
      */

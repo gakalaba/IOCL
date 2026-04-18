@@ -51,11 +51,11 @@
 #include "store/strongstore/common.h"
 #include "store/strongstore/locktable.h"
 #include "store/strongstore/occstore.h"
-#include "store/strongstore/replicaclient.h"
 #include "store/strongstore/shardclient.h"
 #include "store/strongstore/strong-proto.pb.h"
 #include "store/strongstore/transactionstore.h"
 #include "store/common/backend/timingdebug.h"
+#include "store/common/slot_pool.h"
 
 namespace strongstore
 {
@@ -64,18 +64,21 @@ namespace strongstore
     {
     public:
         RequestID(uint64_t client_id, uint64_t client_req_id,
-                  TransportAddress *addr)
+                  const TransportAddress *addr)
             : client_id_{client_id}, client_req_id_{client_req_id}, addr_{addr} {}
         ~RequestID() {}
 
         const uint64_t client_id() const { return client_id_; }
         const uint64_t client_req_id() const { return client_req_id_; }
         const TransportAddress *addr() const { return addr_; }
+        void set_addr(TransportAddress *addr) { addr_ = addr; }
+        void set_client_id(uint64_t client_id) { client_id_ = client_id; }
+        void set_client_req_id(uint64_t client_req_id) { client_req_id_ = client_req_id; }
 
     private:
         uint64_t client_id_;
         uint64_t client_req_id_;
-        TransportAddress *addr_;
+        const TransportAddress *addr_;
     };
 
     inline bool operator==(const strongstore::RequestID &lhs,
@@ -124,13 +127,15 @@ namespace strongstore
         // Override TransportReceiver
         void ReceiveMessage(const TransportAddress &remote, const std::string &type,
                             const std::string &data, void *meta_data) override;
+        void ReceiveMessage(const TransportAddress &remote, MsgType type,
+                            const std::string &data, void *meta_data) override;
         void Close() override;
+        void SetReplica(replication::Replica *replica) override;
 
         // Override AppReplica
         void LeaderUpcall(opnum_t opnum, const string &op, bool &replicate,
                           string &response) override;
-        void ReplicaUpcall(opnum_t opnum, const string &op,
-                           string &response) override;
+        void ReplicaUpcall(const replication::LinearizeableOperation &msg) override;
 
         void UnloggedUpcall(const string &op, string &response) override;
 
@@ -138,36 +143,10 @@ namespace strongstore
         void Load(const string &key, const string &value,
                   const Timestamp timestamp) override;
 
-        Stats &GetStats() override;
         void SeeAllTxns() override;
+        void PrintAFewThings() override;
 
     private:
-        class PendingRWCommitCoordinatorReply
-        {
-        public:
-            PendingRWCommitCoordinatorReply(uint64_t client_id,
-                                            uint64_t client_req_id,
-                                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
-        };
-        class PendingRWCommitParticipantReply
-        {
-        public:
-            PendingRWCommitParticipantReply(uint64_t client_id,
-                                            uint64_t client_req_id,
-                                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
-        };
-        class PendingPrepareOKReply
-        {
-        public:
-            PendingPrepareOKReply(uint64_t client_id, uint64_t client_req_id,
-                                  TransportAddress *remote)
-                : rids{{client_id, client_req_id, remote}} {}
-            std::unordered_set<RequestID> rids;
-        };
         class PendingROCommitReply
         {
         public:
@@ -178,24 +157,39 @@ namespace strongstore
             uint64_t n_slow_path_replies;
             Latency_Frame_t wait_lat;
         };
-        class PendingGetReply
-        {
-        public:
-            PendingGetReply(uint64_t client_id, uint64_t client_req_id,
-                            TransportAddress *remote)
-                : rid{client_id, client_req_id, remote} {}
-            RequestID rid;
+        struct PendingGetReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+            uint64_t client_id;
+            uint64_t client_req_id;
+            size_t get_idx;
             std::string key;
         };
-        class PendingOperationReply
-        {
-        public:
-            PendingOperationReply(uint64_t client_id, uint64_t client_op_id,
-                                TransportAddress *remote)
-                : rid{client_id, client_op_id, remote} {}
-            RequestID rid;
-            std::string key;
-            std::string value;
+        struct PendingOpReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+        };
+        struct PendingRWCommitCoordinatorReplySlot {
+            bool in_use = false;
+            const TransportAddress *remote = nullptr;
+            uint64_t client_id;
+            uint64_t client_req_id;
+        };
+        struct PendingRWCommitParticipantReplySlot {
+            bool in_use = false;
+            uint64_t client_id;
+            uint64_t client_req_id;
+        };
+        struct PendingPrepareOKReplySlot {
+            bool in_use = false;
+
+            // Nested key type for set semantics
+            struct Rid {
+                const TransportAddress *remote = nullptr;
+                uint64_t client_id;
+                uint64_t client_req_id;
+            };
+            std::vector<Rid> participant_rids;
         };
 
         struct TimestampID
@@ -220,8 +214,9 @@ namespace strongstore
 
         void HandleSendOperation(const TransportAddress &remote, replication::LinearizeableOperation &msg);
 
+        void HandleClientCoordination(replication::SuccessorRequestMessage &msg);
 
-        void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
+        // void HandleROCommit(const TransportAddress &remote, proto::ROCommit &msg);
 
         void HandleRWCommitCoordinator(const TransportAddress &remote,
                                        proto::RWCommitCoordinator &msg);
@@ -236,12 +231,12 @@ namespace strongstore
         void SendRWCommmitParticipantReplyOK(uint64_t transaction_id);
         void SendRWCommmitParticipantReplyFail(uint64_t transaction_id);
 
-        void SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
-                                               uint64_t client_id,
-                                               uint64_t client_req_id);
+        // void SendRWCommmitParticipantReplyFail(const TransportAddress &remote,
+        //                                        uint64_t client_id,
+        //                                        uint64_t client_req_id);
 
         void SendPrepareOKRepliesOK(uint64_t transaction_id, const Timestamp &commit_ts);
-        void SendPrepareOKRepliesFail(PendingPrepareOKReply *reply);
+        void SendPrepareOKRepliesFail(uint64_t transaction_id, PendingPrepareOKReplySlot &reply);
 
         void HandleRWCommitParticipant(const TransportAddress &remote,
                                        proto::RWCommitParticipant &msg);
@@ -250,46 +245,48 @@ namespace strongstore
         void HandleWound(const TransportAddress &remote, proto::Wound &msg);
 
         void SendAbortParticipants(uint64_t transaction_id,
-                                   const std::unordered_set<int> &participants);
+                                   const std::vector<int> &participants);
 
         void HandlePrepareOK(const TransportAddress &remote, proto::PrepareOK &msg);
         void HandlePrepareAbort(const TransportAddress &remote,
                                 proto::PrepareAbort &msg);
 
-        void PrepareCallback(uint64_t transaction_id, int status,
-                             Timestamp timestamp);
-        void SendOperationCallback(uint64_t transaction_id, int status);
         void PrepareOKCallback(uint64_t transaction_id, int status,
                                Timestamp timestamp);
         void PrepareAbortCallback(uint64_t transaction_id, int status,
                                   Timestamp timestamp);
 
-        void CommitCoordinatorCallback(uint64_t transaction_id, transaction_status_t status);
-        void CommitParticipantCallback(uint64_t transaction_id, transaction_status_t status);
-        void AbortParticipantCallback(uint64_t transaction_id);
-
         void WoundPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
 
-        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
+        void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
         void NotifyPendingRWs(uint64_t transaction_id, const std::unordered_set<uint64_t> &rws);
-        void ContinueGet(uint64_t transaction_id, const std::unordered_map<std::__cxx11::string, std::__cxx11::string>& holderWriteSet);
+        void ContinueGet(uint64_t transaction_id, const std::vector<std::pair<std::string, std::string>> & holderWriteSet);
         void ContinueGetAbort(uint64_t transaction_id);
         void ContinueCoordinatorPrepare(uint64_t transaction_id);
         void ContinueParticipantPrepare(uint64_t transaction_id);
 
-        void NotifyPendingROs(const std::unordered_set<uint64_t> &ros);
-        void ContinueROCommit(uint64_t transaction_id);
+        // void NotifyPendingROs(const std::unordered_set<uint64_t> &ros);
+        // void ContinueROCommit(uint64_t transaction_id);
 
-        void NotifySlowPathROs(const std::unordered_set<uint64_t> &ros, uint64_t rw_transaction_id,
-                               bool is_commit, const Timestamp &commit_ts = Timestamp());
-        void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
-                            bool is_commit, const Timestamp &commit_ts);
-        void ReplicaUpcallAppRequest(opnum_t opnum, replication::LinearizeableOperation &op, string &response);
+        // void NotifySlowPathROs(const std::unordered_set<uint64_t> &ros, uint64_t rw_transaction_id,
+        //                        bool is_commit, const Timestamp &commit_ts = Timestamp());
+        // void SendROSlowPath(uint64_t transaction_id, uint64_t rw_transaction_id,
+        //                     bool is_commit, const Timestamp &commit_ts);
+        void ReplicaUpcallAppRequest(const replication::LinearizeableOperation &msg);
 
         const Timestamp GetPrepareTimestamp(uint64_t client_id);
         void CoordinatorCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
         void ParticipantCommitTransaction(uint64_t transaction_id, const Timestamp commit_ts);
-        void RespondToClientOperation(PendingOperationReply *reply, uint64_t transaction_id, int status, string retval);
+        void RespondToClientOperation(const TransportAddress *remote, uint64_t clientid, uint64_t client_req_id, int status, string retval);
+
+        void ReplicateCoordinatorCommit(uint64_t client_id,
+                uint64_t client_req_id, uint64_t transaction_id, const Transaction &transaction,
+                const Timestamp &start_ts, const Timestamp &nonblock_ts, const Timestamp &commit_ts,
+                const std::vector<int> &participant);
+        void ReplicateCommit(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id, const Timestamp &commit_ts);
+        void ReplicateAbort(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id);
+        void ReplicatePrepare(uint64_t client_id, uint64_t client_req_id, uint64_t transaction_id,
+                const Transaction &transaction, const Timestamp &prepare_ts, const Timestamp &nonblock_ts);
 
         const TrueTime &tt_;
         TransactionStore transactions_;
@@ -301,19 +298,14 @@ namespace strongstore
         const transport::Configuration &replica_config_;
 
         std::vector<ShardClient *> shard_clients_;
-        ReplicaClient *replica_client_;
+        // ReplicaClient *replica_client_;
 
         Transport *transport_;
+        replication::Replica *replica_;
 
         uint64_t server_id_;
 
-        std::unordered_map<uint64_t, PendingRWCommitCoordinatorReply *> pending_rw_commit_c_replies_;
-        std::unordered_map<uint64_t, PendingRWCommitParticipantReply *> pending_rw_commit_p_replies_;
-        std::unordered_map<uint64_t, PendingPrepareOKReply *> pending_prepare_ok_replies_;
         std::unordered_map<uint64_t, PendingROCommitReply *> pending_ro_commit_replies_;
-        // pending_get_replies maps to a vector of PendingGetReply*
-        std::unordered_map<uint64_t, std::vector<PendingGetReply *>> pending_get_replies_;
-        std::unordered_map<uint64_t, PendingOperationReply *> pending_operation_replies_;
 
         proto::Get get_;
         replication::LinearizeableOperation op_;
@@ -336,8 +328,6 @@ namespace strongstore
         PingMessage ping_;
         proto::Wound wound_;
 
-        Stats stats_;
-
         Latency_t ro_wait_lat_;
 
         Timestamp min_prepare_timestamp_;
@@ -347,6 +337,16 @@ namespace strongstore
         bool debug_stats_;
 
         uint64_t expected_fire_us;
+
+        SlotPool<PendingOpReplySlot> *op_slots_ = nullptr;
+        SlotPool<PendingRWCommitCoordinatorReplySlot> *rw_commit_c_slots_ = nullptr;
+        SlotPool<PendingRWCommitParticipantReplySlot> *rw_commit_p_slots_ = nullptr;
+        SlotPool<PendingPrepareOKReplySlot> *prepare_ok_slots_ = nullptr;
+        // Gets will use opened slot pool structure - so we can store vector of GetReplySlots
+        std::vector<PendingGetReplySlot> get_slots_;
+        std::vector<uint32_t> free_get_slots_;
+        std::unordered_map<uint64_t, std::vector<uint32_t>> transaction_id_to_get_slots_;
+
     };
 
 } // namespace strongstore

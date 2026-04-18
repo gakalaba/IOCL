@@ -36,27 +36,53 @@
 
 namespace replication {
 
-template <class IDTYPE, class MSGTYPE>
+// Hash for viewstamp_t
+struct ViewstampHash
+{
+    std::size_t operator()(const viewstamp_t &vs) const noexcept
+    {
+        // Simple 64-bit mix of view and opnum.
+        // Good enough for this use.
+        uint64_t x = static_cast<uint64_t>(vs.view);
+        uint64_t y = static_cast<uint64_t>(vs.opnum);
+
+        uint64_t h = x;
+        h ^= y + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        return static_cast<std::size_t>(h);
+    }
+};
+
+struct ViewstampEq
+{
+    bool operator()(const viewstamp_t &a, const viewstamp_t &b) const noexcept
+    {
+        return a.view == b.view && a.opnum == b.opnum;
+    }
+};
+
+template <class IDTYPE, class HASH = std::hash<IDTYPE>, class EQ = std::equal_to<IDTYPE>>
 class QuorumSet
 {
 public:
-    QuorumSet(int numRequired)
-        : numRequired(numRequired)
+    QuorumSet(int numRequired, int numReplicas)
+        : numRequired(numRequired),
+          numReplicas(numReplicas)
     {
-
+        ASSERT(numReplicas > 0);
+        ASSERT(numRequired > 0);
+        ASSERT(numReplicas <= 64);
     }
 
     void
     Clear()
     {
-        messages.clear();
+        states.clear();
     }
 
     void
-    Clear(IDTYPE vs)
+    Clear(const IDTYPE &id)
     {
-        std::map<int, MSGTYPE> &vsmessages = messages[vs];
-        vsmessages.clear();
+       states.erase(id);
     }
 
     int
@@ -65,66 +91,57 @@ public:
         return numRequired;
     }
 
-    const std::map<int, MSGTYPE> &
-    GetMessages(IDTYPE vs)
+    bool
+    CheckForQuorum(const IDTYPE &id) const
     {
-        return messages[vs];
+        auto it = states.find(id);
+        if (it == states.end()) {
+            return false;
+        }
+        return it->second.count >= numRequired;
     }
 
-    const std::map<int, MSGTYPE> *
-    CheckForQuorum(IDTYPE vs)
+    bool
+    AddAndCheckForQuorum(IDTYPE id, int replicaIdx)
     {
-        std::map<int, MSGTYPE> &vsmessages = messages[vs];
-        int count = vsmessages.size();
-        if (count >= numRequired) {
-            return &vsmessages;
-        } else {
-            return NULL;
-        }
-    }
+        ASSERT(replicaIdx >= 0);
+        ASSERT(replicaIdx < numReplicas);
 
-    const std::map<int, MSGTYPE> *
-    CheckForQuorum()
-    {
-        for (const auto &p : messages) {
-            const IDTYPE &vs = p.first;
-            const std::map<int, MSGTYPE> *quorum = CheckForQuorum(vs);
-            if (quorum != nullptr) {
-                return quorum;
-            }
-        }
-        return nullptr;
-    }
+        State &s = states[id];
+        const uint64_t bit = 1ULL << replicaIdx;
 
-    const std::map<int, MSGTYPE> *
-    AddAndCheckForQuorum(IDTYPE vs, int replicaIdx, const MSGTYPE &msg)
-    {
-        std::map<int, MSGTYPE> &vsmessages = messages[vs];
-        if (vsmessages.find(replicaIdx) != vsmessages.end()) {
-            // This is a duplicate message
-
-            // But we'll ignore that, replace the old message from
-            // this replica, and proceed.
-            //
-            // XXX Is this the right thing to do? It is for
-            // speculative replies in SpecPaxos...
+        if ((s.seen_mask & bit) == 0) {
+            s.seen_mask |= bit;
+            s.count++;
         }
 
-        vsmessages[replicaIdx] = msg;
-
-        return CheckForQuorum(vs);
+        return s.count >= numRequired;
     }
 
     void
-    Add(IDTYPE vs, int replicaIdx, const MSGTYPE &msg)
+    Add(const IDTYPE &id, int replicaIdx)
     {
-        AddAndCheckForQuorum(vs, replicaIdx, msg);
+        (void)AddAndCheckForQuorum(id, replicaIdx);
+    }
+
+    int Count(const IDTYPE &id) const
+    {
+        auto it = states.find(id);
+        if (it == states.end()) {
+            return 0;
+        }
+        return it->second.count;
     }
 
 public:
     int numRequired;
 private:
-    std::map<IDTYPE, std::map<int, MSGTYPE> > messages;
+    struct State {
+        uint8_t count = 0;
+        uint64_t seen_mask = 0;
+    };
+    int numReplicas;
+    std::unordered_map<IDTYPE, State, HASH, EQ> states;
 };
 
 }      // namespace replication

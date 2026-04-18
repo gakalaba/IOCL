@@ -36,7 +36,7 @@
 namespace micro
 {
 
-    MicroClient::MicroClient(KeySelector *keySelector, const std::vector<Client *> &clients, uint32_t timeout,
+    MicroClient::MicroClient(KeySelector *keySelector, Client *client, uint32_t timeout,
                              Transport &transport, uint64_t id,
                              BenchmarkClientMode mode,
                              double switch_probability,
@@ -47,7 +47,7 @@ namespace micro
                              uint32_t read_percentage,
                              bool wo_replacement,
                              const std::string &latencyFilename)
-        : BenchmarkClient(clients, timeout, transport, id,
+        : BenchmarkClient(client, timeout, transport, id,
                           mode,
                           switch_probability,
                           arrival_rate, think_time, stay_probability,
@@ -59,7 +59,7 @@ namespace micro
           read_percentage_{read_percentage},
           wo_replacement_{wo_replacement},
           txn_idx_{0},
-          max_txns_per_client_{100000}
+          max_txns_per_client_{150000}
     {
         ASSERT(fanout > 0);
         allKeyIdxs.reserve(fanout * max_txns_per_client_);
@@ -102,7 +102,9 @@ namespace micro
     {
         int this_txn_id = txn_idx_;
         if (this_txn_id >= max_txns_per_client_) {
-            Panic("Exceeded max txns per client!");
+            this_txn_id = 0;
+            txn_idx_ = 0;
+            // Panic("Exceeded max txns per client!");
         }
         txn_idx_++;
         return new BasicAppRequest(keySelector, fanout_, read_percentage_, gsl::span<int>(allKeyIdxs).subspan(this_txn_id * fanout_, fanout_));

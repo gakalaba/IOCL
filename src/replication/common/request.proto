@@ -1,17 +1,37 @@
 syntax = "proto2";
 
-package replication;
+import "common-proto.proto";
 
-message Request {
-     required bytes op = 1;
-     required uint64 clientid = 2;
-     required uint64 clientreqid = 3;
-}
+package replication;
 
 message UnloggedRequest {
      required bytes op = 1;
      required uint64 clientid = 2;
      required uint64 clientreqid = 3;
+}
+
+message KVOpMessage {
+    enum Op {
+          GET = 1;
+          PUT = 2;
+    }
+    required Op op = 1;   // GET/PUT/etc, or better an enum
+    required string key = 2;
+    optional string value = 3;
+
+    required uint32 slot_idx = 4;
+}
+
+message PrepareMessage {
+    required TransactionMessage txn = 1;
+    required TimestampMessage timestamp = 2;
+    required int32 coordinator = 3;
+    required TimestampMessage nonblock_ts = 5;
+    repeated int32 participants = 4;
+}
+
+message CommitMessage {
+    required TimestampMessage commit_timestamp = 1;
 }
 
 message RequestIDMessage {
@@ -20,13 +40,27 @@ message RequestIDMessage {
 }
 
 message LinearizeableOperation {
+    enum Operation {
+          KV_OP = 1;
+          PREPARE = 2;
+          COMMIT = 3;
+          ABORT = 4;
+    }
     required RequestIDMessage rid = 1;
     required uint64 transaction_id = 2;
-    required string op = 3;
-    required string key = 4;
-    required string value = 5;
-    optional uint64 shardtag = 6;
-    optional uint64 intkey = 7;
-    repeated uint64 predlist = 8;
-    repeated uint32 shardlist = 9;
+    required Operation request_type = 4;
+    optional KVOpMessage kv = 5;
+    optional PrepareMessage prepare = 6;
+    optional CommitMessage commit = 7;
+
+    optional uint64 shardtag = 8;
+    optional uint64 intkey = 9;
+    repeated uint64 predlist = 10;
+}
+
+message SuccessorRequestMessage {
+    required uint64 p = 1;
+    required uint64 s = 2;
+    required uint32 predIdx = 3;
+    required int32 shardIdx = 4;
 }

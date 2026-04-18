@@ -51,22 +51,22 @@ void BufferClient::Begin(uint64_t tid)
 void BufferClient::Get(const std::string &key, get_callback gcb,
                        get_timeout_callback gtcb, uint32_t timeout)
 {
-    // Read your own writes, check the write set first.
-    if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
-    {
-        gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
-        return;
-    }
+    // // Read your own writes, check the write set first.
+    // if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
+    // {
+    //     gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
+    //     return;
+    // }
 
-    // Consistent reads, check the read set.
-    if (txn.getReadSet().find(key) != txn.getReadSet().end())
-    {
-        auto readSetItr = readSet.find(key);
-        ASSERT(readSetItr != readSet.end());
-        gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
-            std::get<1>(readSetItr->second));
-        return;
-    }
+    // // Consistent reads, check the read set.
+    // if (txn.getReadSet().find(key) != txn.getReadSet().end())
+    // {
+    //     auto readSetItr = readSet.find(key);
+    //     ASSERT(readSetItr != readSet.end());
+    //     gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
+    //         std::get<1>(readSetItr->second));
+    //     return;
+    // }
 
     get_callback bufferCb = [this, gcb](int status, const std::string &key,
                                         const std::string &value,
@@ -89,21 +89,21 @@ void BufferClient::Get(const std::string &key, const Timestamp &ts,
                        uint32_t timeout)
 {
     // Read your own writes, check the write set first.
-    if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
-    {
-        gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
-        return;
-    }
+    // if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
+    // {
+    //     gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
+    //     return;
+    // }
 
-    // Consistent reads, check the read set.
-    if (txn.getReadSet().find(key) != txn.getReadSet().end())
-    {
-        auto readSetItr = readSet.find(key);
-        ASSERT(readSetItr != readSet.end());
-        gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
-            std::get<1>(readSetItr->second));
-        return;
-    }
+    // // Consistent reads, check the read set.
+    // if (txn.getReadSet().find(key) != txn.getReadSet().end())
+    // {
+    //     auto readSetItr = readSet.find(key);
+    //     ASSERT(readSetItr != readSet.end());
+    //     gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
+    //         std::get<1>(readSetItr->second));
+    //     return;
+    // }
 
     get_callback bufferCb = [this, gcb](int status, const std::string &key,
                                         const std::string &value,
@@ -125,22 +125,22 @@ void BufferClient::GetForUpdate(const std::string &key, const Timestamp &ts,
                                 get_callback gcb, get_timeout_callback gtcb,
                                 uint32_t timeout)
 {
-    // Read your own writes, check the write set first.
-    if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
-    {
-        gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
-        return;
-    }
+    // // Read your own writes, check the write set first.
+    // if (txn.getWriteSet().find(key) != txn.getWriteSet().end())
+    // {
+    //     gcb(REPLY_OK, key, (txn.getWriteSet().find(key))->second, Timestamp());
+    //     return;
+    // }
 
-    // Consistent reads, check the read set.
-    if (txn.getReadSet().find(key) != txn.getReadSet().end())
-    {
-        auto readSetItr = readSet.find(key);
-        ASSERT(readSetItr != readSet.end());
-        gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
-            std::get<1>(readSetItr->second));
-        return;
-    }
+    // // Consistent reads, check the read set.
+    // if (txn.getReadSet().find(key) != txn.getReadSet().end())
+    // {
+    //     auto readSetItr = readSet.find(key);
+    //     ASSERT(readSetItr != readSet.end());
+    //     gcb(REPLY_OK, key, std::get<0>(readSetItr->second),
+    //         std::get<1>(readSetItr->second));
+    //     return;
+    // }
 
     get_callback bufferCb = [this, gcb](int status, const std::string &key,
                                         const std::string &value,

@@ -160,6 +160,10 @@ private:
     virtual bool SendMessageInternal(TransportReceiver *src,
                                      const TCPTransportAddress &dst,
                                      const Message &m) override;
+    virtual bool SendMessageInternal(TransportReceiver *src,
+                                     const TCPTransportAddress &dst,
+                                        MsgType type,
+                                     const Message &m) override;
     virtual const TCPTransportAddress *
     LookupMulticastAddress(const transport::Configuration *config) override
     {

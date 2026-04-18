@@ -30,7 +30,7 @@
 
 #include <functional>
 #include <random>
-#include <set>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -51,7 +51,7 @@ public:
     virtual uint64_t operator()(const std::string &key, uint64_t numShards,
                                 int group, const std::vector<int> &txnGroups) = 0;
     uint64_t operator()(const std::string &key, uint64_t numShards,
-                        int group, const std::set<int> &txnGroups);
+                        int group, const std::unordered_set<int> &txnGroups);
 };
 
 class DefaultPartitioner : public Partitioner
