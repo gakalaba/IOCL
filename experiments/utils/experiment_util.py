@@ -83,8 +83,7 @@ def kill_servers(config, executor, kill_args=' -9'):
 
 def kill_clients_no_config(config, executor):
     futures = []
-    full_client_list = config["clients"][:config["clients_used"]]
-    for client in full_client_list:
+    for client in config["clients"]:
         client_host = get_client_host(config, client)
         if is_exp_remote(config):
             futures.append(executor.submit(kill_remote_process_by_name,
@@ -143,14 +142,11 @@ def wait_for_clients_to_terminate(config, client_ssh_threads):
 
 
 def start_clients(config, local_exp_directory, remote_exp_directory, run):
-    if ("clients_used" not in config) or (config["clients_used"] == 0):
-            raise Exception("Config must specify clients_used > 0")
-    full_client_list = config["clients"][:config["clients_used"]]
-    assert(config["client_total"] == (len(full_client_list)
+    assert(config["client_total"] == (len(config["clients"])
                                       * config["client_processes_per_client_node"]))
     client_processes = []
-    for i in range(len(full_client_list)):
-        client = full_client_list[i]
+    for i in range(len(config["clients"])):
+        client = config["clients"][i]
         if is_exp_local(config):
             os.makedirs(os.path.join(local_exp_directory,
                                      config["out_directory_name"], client))
@@ -540,16 +536,17 @@ def run_multiple_experiments(config_file, executor):
     with open(config_file) as f:
         config = json.load(f)
 
-        if 'src_commit_hash' not in config:
+        if not 'src_commit_hash' in config:
             config['src_commit_hash'] = get_current_branch(
                 config['src_directory'])
 
+        # verify that we can run all of the experiments
         if len(config['experiment_independent_vars']) == 0:
             sys.stderr.write(
                 'Need at least 1 independent variable to run multiple experiments.\n')
             sys.exit(1)
 
-        if 'experiment_independent_vars_unused' not in config:
+        if not 'experiment_independent_vars_unused' in config:
             config['experiment_independent_vars_unused'] = config['experiment_independent_vars']
 
         for i in range(len(config['experiment_independent_vars_unused'])):
@@ -566,6 +563,7 @@ def run_multiple_experiments(config_file, executor):
         exp_futs = []
         exp_futs_idxs = []
         config_files = []
+        indep_vars_list = []
 
         exp_dir = get_timestamped_exp_dir(config)
         os.makedirs(exp_dir, exist_ok=True)
@@ -573,16 +571,26 @@ def run_multiple_experiments(config_file, executor):
         out_dirs = []
         sub_out_dirs = []
 
-        target = len(config[config['experiment_independent_vars_unused'][0][0]])
-
-        for i in range(target):
+        # handle looping through fanout lists
+        # if ("client_fanout" in config and type(config["client_fanout"]) == int):
+        #     config["client_fanout"] = [config["client_fanout"]]
+        # fanout = 1
+        # if "client_fanout" in config:
+        #     fanout = len(config["client_fanout"])
+        # print("fanout is ", fanout)
+        for i in range(len(config[config['experiment_independent_vars_unused'][0][0]])):
             config_new = config.copy()
             config_new['base_local_exp_directory'] = exp_dir
             config_new['experiment_independent_vars_unused'] = config['experiment_independent_vars_unused'][1:]
 
+            # for f in range(fanout):
+            #     print("f is ", f)
+            #     if ("client_fanout" in config):
+            #         config_new['client_fanout'] = config['client_fanout'][f]
+            #     print("just set client_fanout in config_new to ", config_new['client_fanout'])
             for j in range(len(config['experiment_independent_vars_unused'][0])):
-                var = config['experiment_independent_vars_unused'][0][j]
-                config_new[var] = config[var][i]
+                config_new[config['experiment_independent_vars_unused'][0][j]
+                           ] = config[config['experiment_independent_vars_unused'][0][j]][i]
 
             config_file_new = os.path.join(
                 exp_dir, '%s-%d.json' % (config_name, i))
@@ -619,9 +627,15 @@ def run_multiple_experiments(config_file, executor):
         print("%s took %f seconds!" % (config_name, time.time() - start))
         print(exp_dir)
 
-        filtered_config = filter_config_to_indices(config, successful_idxs)
-
         out = [sub_out_dirs, out_dirs]
+
+        filtered_config = config
+        if len(exp_futs) > 0:
+            if len(successful_idxs) > 0:
+                filtered_config = filter_config_to_indices(config, successful_idxs)
+            else:
+                print("All directly launched experiments failed for %s; skipping filtering at this level." % config_name)
+
         if len(sub_out_dirs) > 0 or len(out_dirs) > 0:
             generate_plots(filtered_config, exp_dir, out)
         else:
@@ -631,6 +645,7 @@ def run_multiple_experiments(config_file, executor):
 
 
 def run_varying_clients_experiment(config_file, executor):
+    assert(False)
     start = time.time()
     exp_dir = None
     out_dirs = None
@@ -665,41 +680,31 @@ def run_varying_clients_experiment(config_file, executor):
             exp_futs.append(run_experiment(config_file_new, i, executor))
             exp_futs_idxs.append(i)
 
-        successful_out_dirs = {}
-        failed_idxs = set()
+        retries = 0
+        out_dirs = {}
+        while len(out_dirs) < len(config['client_nodes_per_server']) and retries < config['max_retries']:
+            retry_exp_futs = []
+            for i in range(len(exp_futs)):
+                try:
+                    out_dir = exp_futs[i].result()
+                    out_dirs[exp_futs_idxs[i]] = out_dir
+                except:
+                    print('Unexpected error during %s %d: ' %
+                          (config_files[exp_futs_idxs[i]], exp_futs_idxs[i]))
+                    print(traceback.format_exc())
+                    retry_exp_futs.append(exp_futs_idxs[i])
+            if len(out_dirs) == len(config['client_nodes_per_server']):
+                break
+            exp_futs = []
+            exp_futs_idxs = []
+            for j in retry_exp_futs:
+                exp_futs.append(run_experiment(config_files[j], j, executor))
+                exp_futs_idxs.append(j)
+            retries += 1
 
-        for i in range(len(exp_futs)):
-            idx = exp_futs_idxs[i]
-            try:
-                out_dir = exp_futs[i].result()
-                successful_out_dirs[idx] = out_dir
-            except:
-                print('Skipping failed experiment %s %d: ' %
-                      (config_files[idx], idx))
-                print(traceback.format_exc())
-                failed_idxs.add(idx)
-
-        # Rebuild ordered dict-like mapping with compact plotting indices
-        successful_idxs = sorted(successful_out_dirs.keys())
-        out_dirs = {new_i: successful_out_dirs[old_i] for new_i, old_i in enumerate(successful_idxs)}
-
-        filtered_config = config.copy()
-        if 'client_nodes_per_server' in filtered_config:
-            filtered_config['client_nodes_per_server'] = [filtered_config['client_nodes_per_server'][i] for i in successful_idxs]
-        if 'client_processes_per_client_node' in filtered_config:
-            filtered_config['client_processes_per_client_node'] = [filtered_config['client_processes_per_client_node'][i] for i in successful_idxs]
-        if 'client_total' in filtered_config:
-            filtered_config['client_total'] = [filtered_config['client_total'][i] for i in successful_idxs]
-        if 'client_threads_per_process' in filtered_config and isinstance(filtered_config['client_threads_per_process'], list):
-            filtered_config['client_threads_per_process'] = [filtered_config['client_threads_per_process'][i] for i in successful_idxs]
-
-        if len(out_dirs) > 0:
-            generate_tput_lat_plots(filtered_config, exp_dir, out_dirs)
-        else:
-            print("No successful experiment points for %s; skipping tput/lat plot generation." % config_name)
+        generate_tput_lat_plots(config, exp_dir, out_dirs)
         print("%s took %f seconds!" % (config_name, time.time() - start))
     return exp_dir, out_dirs
-
 
 def run_multiple_protocols_experiment(config_file, executor=None):
     start = time.time()
