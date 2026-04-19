@@ -65,8 +65,6 @@ class IOCLCodebase:
 
         client_id = i * config["client_processes_per_client_node"] + k
 
-        bench_mode = config['bench_mode']
-
         truetime_error = config["truetime_error"] if "truetime_error" in config else 0
         client_command = ' '.join([str(x) for x in [
             path_to_client_bin,
@@ -76,7 +74,6 @@ class IOCLCodebase:
             '--net_config_path', network_config_path,
             '--num_shards', config['num_shards'],
             '--benchmark', config['benchmark_name'],
-            '--bench_mode', bench_mode,
             '--exp_duration', config['client_experiment_length'],
             '--warmup_secs', config['client_ramp_up'],
             '--cooldown_secs', config['client_ramp_down'],
@@ -85,12 +82,18 @@ class IOCLCodebase:
             '--clock_error', truetime_error,
             '--strong_consistency', config['consistency']]])
 
+        bench_mode = 'closed'
+        if 'bench_mode' in config:
+            client_command += ' --bench_mode %s' % config['bench_mode']
+            bench_mode = config['bench_mode']
+
         if bench_mode == 'open':
             client_command += ' --client_arrival_rate %f' % config['client_arrival_rate']
             client_command += ' --client_think_time %f' % config['client_think_time']
             client_command += ' --client_stay_probability %f' % config['client_stay_probability']
         elif bench_mode == 'closed':
-            client_command += ' --mpl=%d' % config['mpl']
+            if 'mpl' in config:
+                client_command += ' --mpl=%d' % config['mpl']
 
         if 'client_fanout' in config:
             client_command += ' --client_fanout %d' % config['client_fanout']

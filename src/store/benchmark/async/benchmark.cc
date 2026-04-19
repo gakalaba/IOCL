@@ -294,7 +294,7 @@ static bool ValidateBenchMode(const char *flagname, const std::string &value)
               << std::endl;
     return false;
 }
-DEFINE_string(bench_mode, bench_args[0], "benchmark mode (open or closed)");
+DEFINE_string(bench_mode, bench_args[1], "benchmark mode (open or closed)");
 DEFINE_validator(bench_mode, &ValidateBenchMode);
 
 DEFINE_double(zipf_coefficient, 0.5, "the coefficient of the zipf distribution for key selection.");
@@ -775,6 +775,9 @@ int main(int argc, char **argv)
     if (mode == strongstore::LinearizableProtocol::PROTO_VR) {
         ASSERT(to_issue_concurrent == false);
     }
+
+    Notice("FLAGS_MPL = %d", (int)FLAGS_mpl);
+    Notice("bench_mode %d", (int)bench_mode);
     switch (benchMode)
     {
     case BENCH_RETWIS:
