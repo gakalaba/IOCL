@@ -23,7 +23,14 @@
   "server_names": [
     "us-east-1-0",
     "us-east-1-1",
-    "us-east-1-2"
+    "us-east-1-2",
+    "us-west-1-0",
+    "us-west-1-1",
+    "us-west-1-2",
+    "eu-west-1-0",
+    "eu-west-1-1",
+    "eu-west-1-2",
+    "mex-cent-1-0"
   ],
   "consistency": [
     "lin",
@@ -35,88 +42,179 @@
   "network_config": "network.json",
   "replica_config_format_str": "replica-%d.config",
   "shard_config_format_str": "shard-%d.config",
-  "fault_tolerance": 1,
-  "num_shards": 3,
+  "fault_tolerance": 2,
+  "num_shards": 10,
   "shards": [
     [
       "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
       "us-east-1-1",
-      "us-east-1-2"
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
     ],
     [
       "us-east-1-2",
       "us-east-1-0",
-      "us-east-1-1"
+      "us-west-1-1",
+      "eu-west-1-1",
+      "mex-cent-1-0"
     ],
     [
+      "us-west-1-0",
+      "us-east-1-1",
+      "us-west-1-2",
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "us-west-1-1",
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "us-west-1-2",
       "us-east-1-1",
       "us-east-1-2",
-      "us-east-1-0"
+      "eu-west-1-0",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-0",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-1",
+      "mex-cent-1-0"
+    ],
+    [
+      "eu-west-1-1",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-2"
+    ],
+    [
+      "eu-west-1-2",
+      "us-east-1-1",
+      "us-west-1-0",
+      "us-west-1-2",
+      "eu-west-1-0"
+    ],
+    [
+      "mex-cent-1-0",
+      "us-east-1-0",
+      "us-east-1-2",
+      "us-west-1-1",
+      "eu-west-1-1"
     ]
   ],
   "client_total": [
     [
-      6,
+      4,
+      8,
       12,
-      144,
-      288,
-      432,
-      600
+      16,
+      32,
+      64,
+      96,
+      128,
+      192,
+      256,
+      320,
+      384,
+      448,
+      512
     ],
     [
-      6,
+      4,
+      8,
       12,
-      144,
-      288,
-      432,
-      600
+      16,
+      32,
+      64,
+      96,
+      128,
+      192,
+      256,
+      320,
+      384,
+      448,
+      512
     ]
   ],
   "client_processes_per_client_node": [
     [
       1,
       2,
+      3,
+      4,
+      8,
+      16,
       24,
+      32,
       48,
-      72,
-      100
+      64,
+      80,
+      96,
+      112,
+      128
     ],
     [
       1,
       2,
+      3,
+      4,
+      8,
+      16,
       24,
+      32,
       48,
-      72,
-      100
+      64,
+      80,
+      96,
+      112,
+      128
     ]
   ],
   "client_threads_per_process": 1,
   "clients": [
     "client-0-0",
     "client-0-1",
-    "client-1-0",
-    "client-1-1",
-    "client-2-0",
-    "client-2-1"
+    "client-0-2",
+    "client-0-3"
   ],
   "server_regions": {
     "ca": [
-      "us-east-1-0"
+      "us-east-1-0",
+      "us-west-1-0",
+      "eu-west-1-0"
     ],
     "va": [
-      "us-east-1-2"
+      "us-east-1-2",
+      "us-west-1-2",
+      "eu-west-1-2"
     ],
-    "ir": [],
+    "ir": [
+      "mex-cent-1-0"
+    ],
     "or": [
       "client-0-0",
       "client-0-1",
-      "client-1-0",
-      "client-1-1",
-      "client-2-0",
-      "client-2-1"
+      "client-0-2",
+      "client-0-3"
     ],
     "jp": [
-      "us-east-1-1"
+      "us-east-1-1",
+      "us-west-1-1",
+      "eu-west-1-1"
     ]
   },
   "server_port": 7087,
@@ -145,7 +243,7 @@
     "txn_groups",
     "commit_branch"
   ],
-  "experiment_name": "new",
+  "experiment_name": "iocl",
   "codebase_name": "iocl",
   "pin_client_processes": [
     0,
@@ -187,13 +285,13 @@
   "server_debug_output": false,
   "client_debug_stats": false,
   "server_debug_stats": false,
-  "client_experiment_length": 35,
+  "client_experiment_length": 40,
   "client_rand_sleep": 0,
   "client_ramp_down": 10,
   "client_ramp_up": 10,
   "default_remote_shell": "bash",
-  "server_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
-  "client_host_format_str": "%s.%s.%s.wisc.cloudlab.us",
+  "server_host_format_str": "%s.%s.%s.utah.cloudlab.us",
+  "client_host_format_str": "%s.%s.%s.utah.cloudlab.us",
   "project_name": "praxis-pg0",
   "region_rtt_latencies": {
     "ca": {
@@ -397,8 +495,8 @@
   "make_env": {},
   "server_rdma_port": 9087,
   "rxe_cfg_path": "",
-  "client_read_percentage": 0,
-  "client_write_percentage": 1000,
+  "client_read_percentage": 900,
+  "client_write_percentage": 100,
   "client_conflict_percentage": 2,
   "client_max_processors": 2,
   "client_random_coordinator": false,
@@ -418,5 +516,5 @@
   "client_cpuprofile": false,
   "server_gc_debug_trace": false,
   "partitioner": "load_balanced",
-  "client_zipf_coefficient": 0.8
+  "client_zipf_coefficient": 0.99
 }
