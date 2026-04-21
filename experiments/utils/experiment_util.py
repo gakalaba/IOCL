@@ -530,11 +530,15 @@ def run_experiment(config_file, client_config_idx, executor):
 
 
 def run_multiple_experiments(config_file, executor):
+
     start = time.time()
     exp_dir = None
     out_dirs = None
     with open(config_file) as f:
         config = json.load(f)
+
+        if '__is_top_level' not in config:
+            config['__is_top_level'] = True
 
         if not 'src_commit_hash' in config:
             config['src_commit_hash'] = get_current_branch(
@@ -581,6 +585,7 @@ def run_multiple_experiments(config_file, executor):
             config_new = config.copy()
             config_new['base_local_exp_directory'] = exp_dir
             config_new['experiment_independent_vars_unused'] = config['experiment_independent_vars_unused'][1:]
+            config_new['__is_top_level'] = False
 
             # for f in range(fanout):
             #     print("f is ", f)
@@ -636,7 +641,8 @@ def run_multiple_experiments(config_file, executor):
                 print("All directly launched experiments failed for %s; skipping filtering at this level." % config_name)
 
         if len(sub_out_dirs) > 0 or len(out_dirs) > 0:
-            generate_plots(filtered_config, exp_dir, out)
+            if not config.get('__is_top_level', False):
+                generate_plots(filtered_config, exp_dir, out)
         else:
             print("No successful experiment points for %s; skipping plot generation." % config_name)
 
