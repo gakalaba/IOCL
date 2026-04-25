@@ -1439,7 +1439,8 @@ namespace replication
             // ASSERT(entry.state == IOCL_STATE_ARRIVED || entry.state == IOCL_STATE_PERSISTED);
 
             // Replicated < Coordinated
-            if (entry.state == IOCL_STATE_PERSISTED) {
+            if (entry.state == IOCL_STATE_PERSISTED && entry.ACKs == entry.num_predecessors) {
+                /* Now can progress to READY state */
                 // ASSERT it is in here in the first place
                 auto it = perKeySubqueues.find(entry.intkey);
                 // ASSERT(it != perKeySubqueues.end());
@@ -1448,20 +1449,39 @@ namespace replication
                 // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
                 it->second.erase(idx);
                 /* Assign a final TS */
-                uint64_t old_finalTs = entry.finalTs;
                 entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
+                lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                /* Assign it ready state */
+                entry.state = IOCL_STATE_READY;
                 // ASSERT(old_finalTs <= entry.finalTs);
                 // Reinsert
                 it->second.insert(idx);
-                if (entry.ACKs == entry.num_predecessors) {
-                    /* Now can progress to READY state */
-                    lastReadyTS[entry.intkey] = entry.finalTs + 1;
-                    /* Assign it ready state */
-                    entry.state = IOCL_STATE_READY;
-                }
                 // PrintSubqueue(entry.intkey);
                 ReadyRoutine(entry.intkey, it->second);
             }
+            // if (entry.state == IOCL_STATE_PERSISTED) {
+            //     // ASSERT it is in here in the first place
+            //     auto it = perKeySubqueues.find(entry.intkey);
+            //     // ASSERT(it != perKeySubqueues.end());
+            //     // ASSERT(it->second.find(idx) != it->second.end());
+            //     // PrintSubqueue(entry.intkey);
+            //     // Remove it and reinsert it to update its position in the subqueue based on the new finalTs that will be assigned
+            //     it->second.erase(idx);
+            //     /* Assign a final TS */
+            //     uint64_t old_finalTs = entry.finalTs;
+            //     entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
+            //     // ASSERT(old_finalTs <= entry.finalTs);
+            //     // Reinsert
+            //     it->second.insert(idx);
+            //     if (entry.ACKs == entry.num_predecessors) {
+            //         /* Now can progress to READY state */
+            //         lastReadyTS[entry.intkey] = entry.finalTs + 1;
+            //         /* Assign it ready state */
+            //         entry.state = IOCL_STATE_READY;
+            //     }
+            //     // PrintSubqueue(entry.intkey);
+            //     ReadyRoutine(entry.intkey, it->second);
+            // }
 
             return;
         }
