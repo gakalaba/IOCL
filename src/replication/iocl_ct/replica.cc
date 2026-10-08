@@ -707,7 +707,7 @@ namespace replication
             {
                 return 0;
             }
-            auto v = pl[0];
+            auto v = pl[0]+1;
             for (size_t i = 1; i < pl.size(); ++i)
             {
                 uint64_t e = pl[i];
