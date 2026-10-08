@@ -923,7 +923,7 @@ namespace replication
                     if (readyNow) {
                         /* Assign a final TS */
                         entry.finalTs = candidateFinalTs;
-                        lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                        lastReadyTS[entry.intkey] = std::max(lastReadyTs[entry.intkey], entry.finalTs + 1);
                         /* Assign it ready state */
                         entry.state = IOCL_STATE_READY;
                     }
@@ -1450,7 +1450,7 @@ namespace replication
                 it->second.erase(idx);
                 /* Assign a final TS */
                 entry.finalTs = std::max(entry.arrivalTs, FoldL(entry.predecessorArrivalTs));
-                lastReadyTS[entry.intkey] = entry.finalTs + 1;
+                lastReadyTS[entry.intkey] = std::max(lastReadyTS[entry.intkey], entry.finalTs + 1);
                 /* Assign it ready state */
                 entry.state = IOCL_STATE_READY;
                 // ASSERT(old_finalTs <= entry.finalTs);
@@ -1475,7 +1475,7 @@ namespace replication
             //     it->second.insert(idx);
             //     if (entry.ACKs == entry.num_predecessors) {
             //         /* Now can progress to READY state */
-            //         lastReadyTS[entry.intkey] = entry.finalTs + 1;
+            //         lastReadyTS[entry.intkey] = std::max(lastReadyTS[entry.intkey], entry.finalTs + 1);
             //         /* Assign it ready state */
             //         entry.state = IOCL_STATE_READY;
             //     }
